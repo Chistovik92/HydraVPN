@@ -1,0 +1,18 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Не коммитим тяжёлые нативные ядра — собираются отдельно (см. docs/BUILD.md)
+/app/libs/*.aar
+
+# Ключи подписи
+*.jks
+*.keystore
+keystore.properties

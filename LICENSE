@@ -1,0 +1,25 @@
+ShadowLink — мультипротокольный VPN-клиент для Android
+Copyright (C) 2026  ShadowLink contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+--------------------------------------------------------------------------
+Полный текст лицензии GPL-3.0 добавьте в этот файл при публикации:
+  https://www.gnu.org/licenses/gpl-3.0.txt
+(например, через GitHub → «Add file» → выбор шаблона лицензии GPL-3.0).
+
+Встраиваемые компоненты:
+  - sing-box (github.com/SagerNet/sing-box) — GPL-3.0
+  - Xray-core / libXray (github.com/XTLS)   — MPL-2.0
+Их лицензии и уведомления об авторских правах сохраняются.
