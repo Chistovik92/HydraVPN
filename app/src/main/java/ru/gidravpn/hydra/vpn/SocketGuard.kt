@@ -26,4 +26,8 @@ object SocketGuard {
     /** Вынести UDP-сокет из-под VPN-маршрутизации. */
     fun protect(socket: DatagramSocket): Boolean =
         service?.protect(socket) ?: false
+
+    /** Вынести сокет по файловому дескриптору (native-ядра: sing-box PlatformInterface). */
+    fun protect(fd: Int): Boolean =
+        service?.protect(fd) ?: false
 }

@@ -4,6 +4,8 @@ import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import android.os.HandlerThread
 import android.os.ParcelFileDescriptor
 import io.nekohasekai.libbox.BoxService
 import io.nekohasekai.libbox.InterfaceUpdateListener
@@ -74,17 +76,24 @@ class HydraPlatformInterface(
 
     private val appContext get() = ru.gidravpn.hydra.AppCtx.appContext
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var monitorThread: HandlerThread? = null
 
     /** libbox запрашивает tun через openTun — отдаём дескриптор нашего VpnService. */
     override fun openTun(options: TunOptions): Int = existingTun.detachFd()
 
     override fun useProcFS(): Boolean = false
 
-    /** autoDetectInterfaceControl не нужен: наше приложение исключено из VPN. */
-    override fun usePlatformAutoDetectInterfaceControl(): Boolean = false
+    /**
+     * VpnService.protect(fd) на исходящие сокеты, если libbox сам его запросит.
+     * На практике для VLESS/gRPC этот колбэк не вызывается ни разу (реальная
+     * причина "no available network interface" была в getInterfaces() —
+     * см. флаги ниже), но это официальный Android-механизм именно под эту
+     * задачу, и он ничего не стоит держать реализованным на будущее/другие ядра.
+     */
+    override fun usePlatformAutoDetectInterfaceControl(): Boolean = true
 
     override fun autoDetectInterfaceControl(fd: Int) {
-        // no-op (используется только при usePlatformAutoDetectInterfaceControl = true)
+        ru.gidravpn.hydra.vpn.SocketGuard.protect(fd)
     }
 
     override fun writeLog(message: String) {
@@ -129,19 +138,46 @@ class HydraPlatformInterface(
         }.getOrDefault(-1)
     }
 
-    /** Монитор дефолтного интерфейса через системный NetworkCallback. */
+    /**
+     * Монитор дефолтного интерфейса через системный NetworkCallback.
+     *
+     * Колбэк регистрируется с явным Handler'ом на выделенном HandlerThread,
+     * а не на внутреннем потоке ConnectivityManager по умолчанию: вызов
+     * listener.updateDefaultInterface() внутри колбэка — это JNI-вызов в Go,
+     * и на «чужом», не контролируемом нами потоке он воспроизводимо валил
+     * процесс нативным SIGABRT (тумбстоун, поток ConnectivityThread) —
+     * такой краш не перехватывается никаким try/catch/runCatching на
+     * стороне Kotlin, так как это не JVM-исключение.
+     */
     override fun startDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
-        val ctx = appContext ?: return
+        val ctx = appContext ?: run {
+            onLogLine("sing-box: monitor интерфейса: нет AppCtx.appContext"); return
+        }
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.N) return
-        val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: return
+        val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: run {
+            onLogLine("sing-box: monitor интерфейса: нет ConnectivityManager"); return
+        }
+        val thread = HandlerThread("Hydra-NetMonitor").apply { start() }
+        monitorThread = thread
+        val handler = android.os.Handler(thread.looper)
         val cb = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) = notify(network, listener)
             override fun onLinkPropertiesChanged(network: Network, lp: LinkProperties) =
                 notify(network, listener)
         }
         networkCallback = cb
-        runCatching { cm.registerDefaultNetworkCallback(cb) }
-            .onFailure { onLogLine("sing-box: monitor интерфейса: ${it.message}") }
+        // registerDefaultNetworkCallback() у владельца VPN воспроизводимо репортит
+        // собственный tun как "дефолтную сеть" (onAvailable сразу отдаёт LinkProperties
+        // с interfaceName=tun0) — sing-box получает команду биндить исходящий сокет на
+        // собственный туннель и падает с "no available network interface" на 100%
+        // соединений. NET_CAPABILITY_NOT_VPN в запросе делает такое совпадение
+        // структурно невозможным: подходит только реальная подложенная сеть (Wi-Fi/мобильная).
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            .build()
+        runCatching { cm.registerNetworkCallback(request, cb, handler) }
+            .onFailure { onLogLine("sing-box: monitor интерфейса: ошибка регистрации: ${it.message}") }
     }
 
     override fun closeDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
@@ -152,19 +188,24 @@ class HydraPlatformInterface(
             }
             networkCallback = null
         }
+        monitorThread?.quitSafely()
+        monitorThread = null
     }
 
     private fun notify(network: Network, listener: InterfaceUpdateListener) {
         runCatching {
-            val ctx = appContext ?: return
-            val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: return
-            val lp = cm.getLinkProperties(network) ?: return
+            val ctx = appContext ?: run { onLogLine("sing-box: notify: нет appContext"); return }
+            val cm = ctx.getSystemService(ConnectivityManager::class.java)
+                ?: run { onLogLine("sing-box: notify: нет ConnectivityManager"); return }
+            val lp = cm.getLinkProperties(network)
+                ?: run { onLogLine("sing-box: notify: нет LinkProperties для $network"); return }
             val caps = cm.getNetworkCapabilities(network)
-            val name = lp.interfaceName ?: return
+            val name = lp.interfaceName
+                ?: run { onLogLine("sing-box: notify: нет interfaceName в $lp"); return }
             val index = java.net.NetworkInterface.getByName(name)?.index ?: 0
             val isMetered = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) == false
             listener.updateDefaultInterface(name, index, isMetered, false)
-        }
+        }.onFailure { onLogLine("sing-box: notify: исключение: ${it}") }
     }
 
     /**
@@ -182,9 +223,31 @@ class HydraPlatformInterface(
                     name = ni.name ?: ""
                     index = ni.index
                     mtu = ni.mtu
+                    // Go net.Flags: Up=1, Broadcast=2, Loopback=4, PointToPoint=8,
+                    // Multicast=16, Running=32. Поле не заполнялось вовсе (оставалось 0
+                    // = "интерфейс не поднят") — вероятная причина, по которой sing-box
+                    // отбрасывал абсолютно все интерфейсы как непригодные.
+                    flags = runCatching {
+                        var f = 0
+                        if (ni.isUp) f = f or 1 or 32
+                        if (ni.isLoopback) f = f or 4
+                        if (ni.isPointToPoint) f = f or 8
+                        if (ni.supportsMulticast()) f = f or 16
+                        f
+                    }.getOrDefault(0)
+                    // sing-box парсит каждую строку как netip.ParsePrefix("адрес/длина_маски").
+                    // Go явно отказывается парсить zone-id внутри префикса ("IPv6 zones cannot
+                    // be present in a prefix") — воспроизведено на link-local IPv6 rmnet_data0
+                    // вида "fe80::...%rmnet_data0" (hostAddress для scoped-адресов включает
+                    // "%zone" в Java) — обрезаем zone перед добавлением "/prefix".
                     addresses = StringIteratorImpl(
                         runCatching {
-                            ni.interfaceAddresses.mapNotNull { it.address?.hostAddress }.toList()
+                            ni.interfaceAddresses.mapNotNull { ia ->
+                                val host = ia.address?.hostAddress
+                                    ?.substringBefore('%')
+                                    ?: return@mapNotNull null
+                                "$host/${ia.networkPrefixLength}"
+                            }.toList()
                         }.getOrDefault(emptyList())
                     )
                 }

@@ -28,6 +28,7 @@ object VpnState {
     val logs = _logs.asStateFlow()
 
     fun log(msg: String) {
+        android.util.Log.d("HydraCore", msg)
         _logs.value = (_logs.value + line(msg)).takeLast(500)
     }
 
