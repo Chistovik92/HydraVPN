@@ -25,6 +25,7 @@ gradle wrapper --gradle-version 8.9   # один раз, если нет gradlew
 ```bash
 git clone https://github.com/SagerNet/sing-box
 cd sing-box
+git checkout v1.12.9          # версия, против которой собран/проверен Hydra
 # инструмент gomobile от SagerNet
 go install github.com/sagernet/gomobile/cmd/gomobile@latest
 go install github.com/sagernet/gomobile/cmd/gobind@latest
@@ -32,16 +33,24 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 gomobile init
 
 # набор фич (tun/quic/utls/clash-api и т.д.) задаётся build-тегами
-TAGS="with_gvisor,with_quic,with_utls,with_clash_api,with_wireguard"
-gomobile bind -v -androidapi 26 -javapkg=io.nekohasekai \
-  -tags "$TAGS" -trimpath -ldflags="-s -w" \
+TAGS="with_gvisor,with_quic,with_utls,with_clash_api,with_wireguard,with_conntrack"
+gomobile bind -v -androidapi 21 -javapkg=io.nekohasekai -libname=box \
+  -tags "$TAGS" -trimpath -buildvcs=false \
+  -ldflags="-X github.com/sagernet/sing-box/constant.Version=1.12.9 -s -w -buildid= -checklinkname=0" \
   -o libbox.aar ./experimental/libbox
 
 cp libbox.aar /path/to/Hydra/app/libs/
 ```
 
-Готовые сборки также публикуют сторонние репозитории (например
-`sing-box-for-android`); проверяйте соответствие версии и build-тегов.
+> **Проверено на практике (Windows, NDK r29):**
+> - Go **1.25.x** — версия CI sing-box; на Go 1.24/1.26 линковка падает с
+>   `invalid reference to os.checkPidfdOnce` (workaround sing-box#3233 /
+>   golang/go#70508 в `experimental/libbox/pidfd_android.go`);
+> - `-checklinkname=0` обязателен (см. ldflags выше);
+> - `-libname=box` и `-androidapi 21` — как в официальном `cmd/internal/build_libbox`.
+>
+> Готовые сборки также публикуют сторонние репозитории (например
+> `sing-box-for-android`); проверяйте соответствие версии и build-тегов.
 
 ### 2.2 Xray-core → `libXray.aar`
 
