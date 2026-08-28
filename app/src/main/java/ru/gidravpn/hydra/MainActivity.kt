@@ -1,12 +1,16 @@
 package ru.gidravpn.hydra
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import ru.gidravpn.hydra.ui.MainViewModel
@@ -25,9 +29,15 @@ class MainActivity : ComponentActivity() {
         if (result.resultCode == RESULT_OK) vm.startTunnel()
     }
 
+    // Разрешение на уведомления (Android 13+) — без него не видно статус VPN-соединения
+    private val notificationPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* отказ не критичен: сервис всё равно поднимет туннель */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        requestNotificationPermissionIfNeeded()
 
         // Импорт по deep-link (vless:// и т.п.)
         handleImportIntent(intent)
@@ -54,5 +64,13 @@ class MainActivity : ComponentActivity() {
     private fun requestVpnPermission() {
         val prepare = VpnService.prepare(this)
         if (prepare != null) vpnConsent.launch(prepare) else vm.startTunnel()
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }

@@ -123,7 +123,9 @@ class TunBridge(
         adjustChecksum(p, 10, oldIp, newIp)
         val proto = p[9].toInt() and 0xFF
         when (proto) {
-            6 -> adjustChecksum(p, ihl + 16, oldIp, newIp)   // TCP: offset checksum
+            6 -> if (p.size >= ihl + 18) {                   // TCP: offset checksum
+                adjustChecksum(p, ihl + 16, oldIp, newIp)
+            }
             17 -> if (p.size >= ihl + 8) {                   // UDP: checksum (0 = none)
                 val cs = ((p[ihl + 6].toInt() and 0xFF) shl 8) or (p[ihl + 7].toInt() and 0xFF)
                 if (cs != 0) adjustChecksum(p, ihl + 6, oldIp, newIp)

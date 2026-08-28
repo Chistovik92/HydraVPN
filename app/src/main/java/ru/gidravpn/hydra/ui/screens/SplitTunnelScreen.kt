@@ -21,6 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import ru.gidravpn.hydra.data.model.SplitTunnelMode
 import ru.gidravpn.hydra.ui.MainViewModel
 import ru.gidravpn.hydra.ui.components.Card
@@ -37,7 +39,10 @@ fun SplitTunnelScreen(vm: MainViewModel) {
     var search by remember { mutableStateOf("") }
     var showSystem by remember { mutableStateOf(false) }
 
-    val apps = remember { installedApps(context) }
+    var apps by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        apps = withContext(Dispatchers.Default) { installedApps(context) }
+    }
     val filtered = remember(search, showSystem, apps) {
         apps.filter {
             (showSystem || !it.isSystem) &&
