@@ -1,5 +1,59 @@
 # Changelog
 
+## [0.5.3] — краш на каждом запуске + «подключено, но нет интернета»
+Оба бага найдены и исправлены живой отладкой на реальном устройстве
+(OnePlus 15, Android 16, через adb: logcat, dumpsys dropbox/connectivity,
+live-переустановка) — 0.5.2 не переживал запуск на реальном железе.
+
+### Исправлено
+- **Краш на КАЖДОМ запуске приложения**: `object VpnState` инициализировал
+  поле `_logs` раньше `fmt` (используется внутри `line()`) — на момент
+  вычисления `_logs` поле `fmt` было ещё `null`, `fmt.format(Date())` падал
+  с `NullPointerException` в `<clinit>`. `VpnState` впервые трогается в
+  конструкторе `MainViewModel`, создаваемой в `MainActivity.onCreate()` до
+  отрисовки UI, — падало на каждом запуске, в любом флейворе, независимо от
+  версии Android. Похоже, это и был исходный краш из самой первой жалобы.
+- **Второй JNI-краш**: `startDefaultInterfaceMonitor` регистрировал
+  `ConnectivityManager.NetworkCallback` на внутреннем потоке
+  `ConnectivityManager` — вызов `listener.updateDefaultInterface()` (JNI в
+  Go) с этого «чужого» потока воспроизводимо валил процесс нативным
+  `SIGABRT` (тумбстоун, поток `ConnectivityThread`), что не перехватывается
+  никаким `try/catch`/`runCatching` на стороне Kotlin. Теперь колбэк
+  регистрируется на выделенном `HandlerThread`.
+- **«Подключено», но нет интернета** (0.0 MB, 100% исходящих TCP-соединений
+  sing-box падали с `no available network interface`):
+  - `registerDefaultNetworkCallback()` у **владельца** VPN воспроизводимо
+    репортил **собственный `tun0`** как «дефолтную сеть» вместо реального
+    Wi-Fi/мобильного интерфейса — sing-box пытался биндить исходящий сокет
+    на собственный туннель. Заменено на `registerNetworkCallback()` с явным
+    `NetworkRequest`, требующим `NET_CAPABILITY_NOT_VPN`.
+  - `getInterfaces()` никогда не заполнял поле `flags` (Go `net.Flags`) —
+    все интерфейсы выглядели «не поднятыми» (flags=0), sing-box отбрасывал
+    их все как непригодные.
+  - `getInterfaces()` отдавал голый `hostAddress` без CIDR-маски, а для
+    IPv6 link-local адресов ещё и с zone-id (`fe80::...%rmnet_data0`) —
+    Go-паника `netip.ParsePrefix`.
+  - Добавлен `VpnService.protect(fd)` через `SocketGuard` как официальный
+    резервный механизм (`usePlatformAutoDetectInterfaceControl = true`).
+- Экран «Настройки» показывал захардкоженную версию (`Hydra 0.5.1`,
+  отставшую от реального релиза) — теперь берётся из `BuildConfig.VERSION_NAME`.
+
+### Изменено
+- `VpnState.log()` дублирует сообщения в logcat (тег `HydraCore`) — упрощает
+  диагностику на реальном устройстве без пересборки debug-APK ради
+  временных логов.
+- `buildFeatures.buildConfig = true` — включено для доступа к
+  `BuildConfig.VERSION_NAME` из UI.
+
+### Верификация
+- Подтверждено на реальном устройстве: чистая установка → запуск без
+  краша → подключение → загрузка настоящих страниц в браузере
+  (accessibility-дамп подтвердил результаты поиска с внешним IP через
+  VPN-сервер, отличным от реального IP телефона).
+- `no available network interface` сведено со 100% исходящих TCP-соединений
+  до единичных в первую долю секунды при старте (до первого сетевого
+  колбэка) — не устранено полностью, но не мешает работе.
+
 ## [0.5.2] — критические фиксы краша + верификация native-сборки
 ### Исправлено
 - **Краш при каждом подключении VPN на Android 14+**: `AndroidManifest.xml`
