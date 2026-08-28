@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
 /**
@@ -94,7 +95,7 @@ class HydraVpnService : VpnService() {
         }
     }
 
-    private fun establishTun(profile: ServerProfile): ParcelFileDescriptor {
+    private suspend fun establishTun(profile: ServerProfile): ParcelFileDescriptor {
         // PPP-движки (SSTP/L2TP): MRU 1400, иначе фрагментация на TLS/UDP-транспорте
         val userspace = profile.protocol?.engine == ru.gidravpn.hydra.data.model.Engine.USERSPACE
         val builder = Builder()
@@ -104,8 +105,21 @@ class HydraVpnService : VpnService() {
             .addDnsServer("1.1.1.1")
             .addRoute("0.0.0.0", 0)
             .addRoute("::", 0)
-        // не заворачиваем собственный трафик приложения
-        runCatching { builder.addDisallowedApplication(packageName) }
+
+        // Раздельное туннелирование (DataStore → правила VpnService.Builder)
+        val split = ru.gidravpn.hydra.data.repository.SplitTunnelRepository(applicationContext)
+            .settings.firstOrNull() ?: ru.gidravpn.hydra.data.model.SplitTunnel()
+        when (split.mode) {
+            ru.gidravpn.hydra.data.model.SplitTunnelMode.INCLUDE ->
+                split.packages.forEach { pkg -> runCatching { builder.addAllowedApplication(pkg) } }
+            ru.gidravpn.hydra.data.model.SplitTunnelMode.EXCLUDE -> {
+                split.packages.forEach { pkg -> runCatching { builder.addDisallowedApplication(pkg) } }
+                runCatching { builder.addDisallowedApplication(packageName) } // собственный трафик — мимо VPN
+            }
+            ru.gidravpn.hydra.data.model.SplitTunnelMode.OFF ->
+                runCatching { builder.addDisallowedApplication(packageName) } // не заворачиваем собственный трафик
+        }
+
         return builder.establish() ?: error("Не удалось поднять tun (нет разрешения VPN?)")
     }
 

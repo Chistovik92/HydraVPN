@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0] — раздельное туннелирование
+### Добавлено
+- **SplitTunnel**: модель (`SplitTunnelMode` OFF/INCLUDE/EXCLUDE + список
+  пакетов), хранение в DataStore (`SplitTunnelRepository`, JSON).
+- **Экран SplitTunnel**: выбор режима, список установленных приложений
+  (launcher-intent, пометка системных), поиск, переключатель системных.
+- Применение правил в `HydraVpnService.establishTun`: `addAllowedApplication`/
+  `addDisallowedApplication` по режиму (INCLUDE/EXCLUDE); собственное
+  приложение всегда вне VPN.
+- Вкладка «Split» в навигации.
+- `MainViewModel`: splitTunnel-состояние, setMode/toggleApp.
+
+### Изменено
+- `establishTun` стал suspend (чтение DataStore до establish()).
+
 ## [0.4.1] — Xray streamSettings и sing-box PlatformInterface
 ### Добавлено
 - **XrayConfigBuilder**: полный `streamSettings` — tls (serverName/alpn/uTLS/

@@ -7,8 +7,11 @@ import androidx.lifecycle.viewModelScope
 import ru.gidravpn.hydra.data.model.Engine
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
+import ru.gidravpn.hydra.data.model.SplitTunnel
+import ru.gidravpn.hydra.data.model.SplitTunnelMode
 import ru.gidravpn.hydra.data.model.Subscription
 import ru.gidravpn.hydra.data.repository.ServerRepository
+import ru.gidravpn.hydra.data.repository.SplitTunnelRepository
 import ru.gidravpn.hydra.vpn.HydraVpnService
 import ru.gidravpn.hydra.vpn.VpnState
 import ru.gidravpn.hydra.vpn.core.ConnectionState
@@ -17,11 +20,24 @@ import kotlinx.coroutines.launch
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ServerRepository(app)
+    private val splitRepo = SplitTunnelRepository(app)
 
     val servers: StateFlow<List<ServerProfile>> = repo.allServers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val subscriptions: StateFlow<List<Subscription>> = repo.allSubscriptions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val splitTunnel: StateFlow<SplitTunnel> = splitRepo.settings
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SplitTunnel())
+
+    fun setSplitMode(mode: SplitTunnelMode) = viewModelScope.launch {
+        splitRepo.setMode(mode)
+        VpnState.log("Split tunneling: режим ${mode.name}")
+    }
+
+    fun toggleSplitApp(pkg: String) = viewModelScope.launch {
+        splitRepo.toggleApp(pkg)
+    }
 
     val state = VpnState.state
     val logs = VpnState.logs

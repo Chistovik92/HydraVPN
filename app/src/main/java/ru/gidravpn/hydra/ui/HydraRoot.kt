@@ -18,7 +18,7 @@ import ru.gidravpn.hydra.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-enum class Tab(val label: String) { MAIN("● Главная"), SERVERS("Серверы"), LOGS("Логи"), SETTINGS("⚙️") }
+enum class Tab(val label: String) { MAIN("● Главная"), SERVERS("Серверы"), SPLIT("Split"), LOGS("Логи"), SETTINGS("⚙️") }
 
 @Composable
 fun HydraRoot(vm: MainViewModel) {
@@ -32,6 +32,7 @@ fun HydraRoot(vm: MainViewModel) {
                 when (tab) {
                     Tab.MAIN -> MainScreen(vm, onGoServers = { tab = Tab.SERVERS })
                     Tab.SERVERS -> ServersScreen(vm, onSelected = { tab = Tab.MAIN })
+                    Tab.SPLIT -> SplitTunnelScreen(vm)
                     Tab.LOGS -> LogsScreen(vm)
                     Tab.SETTINGS -> SettingsScreen()
                 }
