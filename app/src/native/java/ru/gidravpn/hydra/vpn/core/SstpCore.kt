@@ -90,7 +90,7 @@ class SstpCore : VpnCore {
         onLog("SSTP: подключение к ${profile.address}:${profile.port}…")
         val raw = Socket()
         SocketGuard.protect(raw) // иначе TLS-трафик уйдёт в собственный tun
-        raw.connect(InetSocketAddress(profile.address, profile.port), CONNECT_TIMEOUT_MS)
+        raw.connect(InetSocketAddress(profile.address, profile.port), CONNECT_TIMEOUT_MS.toInt())
         raw.tcpNoDelay = true
 
         val ssl = createTlsSocket(raw, profile, allowInsecure, extra.optString("sni"))

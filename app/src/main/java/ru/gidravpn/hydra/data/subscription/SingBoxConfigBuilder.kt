@@ -7,8 +7,9 @@ import org.json.JSONObject
 
 /**
  * Преобразует [ServerProfile] в полноценный конфиг sing-box (JSON), который
- * скармливается движку libbox. Собирается tun-inbound + один proxy-outbound +
- * маршрутизация. Формат соответствует schema sing-box 1.11+.
+ * скармливается движку libbox. Собирает tun-inbound + один proxy-outbound +
+ * маршрутизацию. Формат — схема sing-box 1.12 (новый формат DNS-серверов
+ * с полем type; tun без auto_route — маршруты задаёт VpnService.Builder).
  */
 object SingBoxConfigBuilder {
 
@@ -18,24 +19,26 @@ object SingBoxConfigBuilder {
 
         root.put("log", JSONObject().put("level", "info").put("timestamp", true))
 
-        // DNS
+        // DNS (схема 1.12: серверы с явным type)
         root.put("dns", JSONObject().apply {
             put("servers", JSONArray().apply {
-                put(JSONObject().put("tag", "remote").put("address", "https://1.1.1.1/dns-query").put("detour", "proxy"))
-                put(JSONObject().put("tag", "local").put("address", "223.5.5.5").put("detour", "direct"))
+                put(JSONObject().put("type", "https").put("tag", "remote")
+                    .put("server", "1.1.1.1").put("detour", "proxy"))
+                put(JSONObject().put("type", "local").put("tag", "local"))
             })
             put("strategy", "prefer_ipv4")
         })
 
-        // inbound: tun (пакеты берёт наш VpnService через файловый дескриптор)
+        // inbound: tun (пакеты берёт наш VpnService через файловый дескриптор;
+        // auto_route/strict_route выключены — маршрутизацией владеет VpnService.Builder)
         root.put("inbounds", JSONArray().put(JSONObject().apply {
             put("type", "tun")
             put("tag", "tun-in")
             put("interface_name", "hydra-tun")
             put("mtu", 9000)
             put("address", JSONArray().put("172.19.0.1/28"))
-            put("auto_route", true)
-            put("strict_route", true)
+            put("auto_route", false)
+            put("strict_route", false)
             put("stack", "gvisor")
         }))
 

@@ -1,26 +1,34 @@
 package ru.gidravpn.hydra.vpn.core
 
 import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.ParcelFileDescriptor
 import io.nekohasekai.libbox.BoxService
+import io.nekohasekai.libbox.InterfaceUpdateListener
 import io.nekohasekai.libbox.Libbox
+import io.nekohasekai.libbox.NetworkInterface
+import io.nekohasekai.libbox.NetworkInterfaceIterator
+import io.nekohasekai.libbox.Notification
 import io.nekohasekai.libbox.PlatformInterface
+import io.nekohasekai.libbox.StringIterator
 import io.nekohasekai.libbox.TunOptions
+import io.nekohasekai.libbox.WIFIState
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.subscription.SingBoxConfigBuilder
+import java.io.File
 
 /**
  * Интеграция sing-box через libbox.aar (gomobile-биндинг experimental/libbox).
  *
- * ВНИМАНИЕ: сигнатуры методов libbox/PlatformInterface меняются между версиями
- * sing-box. Код ориентирован на sing-box ~1.12. При обновлении .aar
- * компилятор укажет, какие члены PlatformInterface нужно доопределить —
- * это ожидаемо. Сверяйтесь с SagerNet/sing-box-for-android →
- * io.nekohasekai.sfa.bg.PlatformInterfaceWrapper (лучший референс).
+ * Собрано и проверено против **libbox 1.12.9** (сигнатуры PlatformInterface
+ * сверены с фактическим .aar). При обновлении .aar компилятор укажет
+ * расхождения — реф. SagerNet/sing-box-for-android → PlatformInterfaceWrapper.
  */
 class SingBoxCore : VpnCore {
 
-    override val name = "sing-box (${Libbox.version()})"
+    override val name = "sing-box ${Libbox.version()}"
     private var service: BoxService? = null
 
     override fun start(
@@ -35,10 +43,7 @@ class SingBoxCore : VpnCore {
         val config = SingBoxConfigBuilder.build(profile).toString(2)
         onLog("sing-box: конфиг сгенерирован (${config.length} байт)")
 
-        val platform = HydraPlatformInterface(
-            existingTun = tun,
-            onLogLine = onLog,
-        )
+        val platform = HydraPlatformInterface(existingTun = tun, onLogLine = onLog)
         val svc = Libbox.newService(config, platform)
         service = svc
         svc.start()
@@ -56,88 +61,157 @@ class SingBoxCore : VpnCore {
 }
 
 /**
- * Провайдер fd tun'а из VpnService в PlatformInterface libbox + платформенные
- * методы. Версионно-зависимые члены (возвращающие libbox-типы) помечены
- * TODO(libbox-версия) — точные сигнатуры сверяются с собранным .aar.
+ * Реализация PlatformInterface (libbox 1.12.x) поверх VpnService:
+ *  - tun поднят сервисом заранее, openTun отдаёт его fd;
+ *  - монитор дефолтного интерфейса — ConnectivityManager.NetworkCallback;
+ *  - сокеты sing-box не требуют protect: собственное приложение исключено
+ *    из VPN правилами establishTun (addDisallowedApplication).
  */
 class HydraPlatformInterface(
     private val existingTun: ParcelFileDescriptor,
     private val onLogLine: (String) -> Unit,
 ) : PlatformInterface {
 
-    /** Контекст приложения для системных сервисов. */
     private val appContext get() = ru.gidravpn.hydra.AppCtx.appContext
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
-    /**
-     * libbox запрашивает tun через openTun(options). Мы уже подняли интерфейс
-     * в VpnService, поэтому просто отдаём его файловый дескриптор.
-     */
+    /** libbox запрашивает tun через openTun — отдаём дескриптор нашего VpnService. */
     override fun openTun(options: TunOptions): Int = existingTun.detachFd()
 
     override fun useProcFS(): Boolean = false
 
-    override fun writeLog(message: String) { onLogLine(message) }
+    /** autoDetectInterfaceControl не нужен: наше приложение исключено из VPN. */
+    override fun usePlatformAutoDetectInterfaceControl(): Boolean = false
 
-    // ----- методы, доступные без libbox-типов -----
+    override fun autoDetectInterfaceControl(fd: Int) {
+        // no-op (используется только при usePlatformAutoDetectInterfaceControl = true)
+    }
 
-    /** Владелец соединения (uid → package): Android 10+, ConnectionManager. */
+    override fun writeLog(message: String) {
+        onLogLine(message)
+    }
+
+    override fun underNetworkExtension(): Boolean = false
+
+    override fun includeAllNetworks(): Boolean = false
+
+    /** UID владельца соединения (Android 10+); 0 = неизвестно. */
     override fun findConnectionOwner(
         ipProtocol: Int,
         sourceAddress: String,
         sourcePort: Int,
         destinationAddress: String,
         destinationPort: Int,
-    ): String {
-        val ctx = appContext ?: return "unknown"
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) return "unknown"
+    ): Int {
+        val ctx = appContext ?: return 0
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) return 0
         return runCatching {
-            val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: return "unknown"
-            val uid = cm.getConnectionOwnerUid(
+            val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: return 0
+            cm.getConnectionOwnerUid(
                 ipProtocol,
                 java.net.InetSocketAddress(sourceAddress, sourcePort),
                 java.net.InetSocketAddress(destinationAddress, destinationPort),
             )
+        }.getOrDefault(0)
+    }
+
+    override fun packageNameByUid(uid: Int): String {
+        val ctx = appContext ?: return "unknown"
+        return runCatching {
             ctx.packageManager.getNameForUid(uid) ?: "uid:$uid"
         }.getOrDefault("unknown")
     }
 
-    /**
-     * Использовать платформенный монитор интерфейсов по умолчанию
-     * (NetworkCallback) вместо внутреннего netlink-монитора sing-box.
-     */
-    override fun usePlatformDefaultInterfaceMonitor(): Boolean = true
-
-    override fun underNetworkExtension(): Boolean = false
-
-    /** Включать все сети (для системных VPN-профилей); мы — обычный VpnService. */
-    override fun includeAllNetworks(): Boolean = false
-
-    // ----- версионно-зависимые методы (возвращают libbox-типы) -----
-    // Точная сигнатура сверяется с собранным libbox.aar (~1.12):
-    // реф. io.nekohasekai.sfa.bg.PlatformInterfaceWrapper.
-
-    override fun startDefaultInterfaceMonitor(listener: io.nekohasekai.libbox.DefaultInterfaceMonitorListener) {
-        // TODO(libbox-версия): регистрировать ConnectivityManager.NetworkCallback
-        //   и дёргать listener.onUpdate(interfaceName, index, flags)? при изменении
-        //   дефолтной сети (реализация по образцу PlatformInterfaceWrapper.startDefaultInterfaceMonitor).
-        onLogLine("sing-box: platform interface monitor — каркас (см. PlatformInterfaceWrapper)")
+    override fun uidByPackageName(packageName: String): Int {
+        val ctx = appContext ?: return -1
+        return runCatching {
+            ctx.packageManager.getApplicationInfo(packageName, 0).uid
+        }.getOrDefault(-1)
     }
 
-    override fun closeDefaultInterfaceMonitor() {
-        // TODO(libbox-версия): снимать NetworkCallback.
+    /** Монитор дефолтного интерфейса через системный NetworkCallback. */
+    override fun startDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
+        val ctx = appContext ?: return
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.N) return
+        val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: return
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) = notify(network, listener)
+            override fun onLinkPropertiesChanged(network: Network, lp: LinkProperties) =
+                notify(network, listener)
+        }
+        networkCallback = cb
+        runCatching { cm.registerDefaultNetworkCallback(cb) }
+            .onFailure { onLogLine("sing-box: monitor интерфейса: ${it.message}") }
     }
 
-    override fun getInterfaces(): io.nekohasekai.libbox.NetworkInterfaceIterator? {
-        // TODO(libbox-версия): перечислить java.net.NetworkInterface.getNetworkInterfaces()
-        //   в libbox.NetworkInterfaceIterator (реф. PlatformInterfaceWrapper.getInterfaces).
-        return null
+    override fun closeDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
+        val ctx = appContext ?: return
+        networkCallback?.let { cb ->
+            runCatching {
+                ctx.getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(cb)
+            }
+            networkCallback = null
+        }
     }
 
-    override fun readWIFIState(): io.nekohasekai.libbox.WIFIState? = null
-
-    override fun systemCertificates(): io.nekohasekai.libbox.CertificateIterator? {
-        // TODO(libbox-версия): перечислить системное хранилище CA
-        //   (реф. PlatformInterfaceWrapper.systemCertificates).
-        return null
+    private fun notify(network: Network, listener: InterfaceUpdateListener) {
+        runCatching {
+            val ctx = appContext ?: return
+            val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: return
+            val lp = cm.getLinkProperties(network) ?: return
+            val caps = cm.getNetworkCapabilities(network)
+            val name = lp.interfaceName ?: return
+            val index = java.net.NetworkInterface.getByName(name)?.index ?: 0
+            val isMetered = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) == false
+            listener.updateDefaultInterface(name, index, isMetered, false)
+        }
     }
+
+    /** Перечисление системных сетевых интерфейсов для libbox. */
+    override fun getInterfaces(): NetworkInterfaceIterator {
+        val interfaces = java.net.NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
+        return object : NetworkInterfaceIterator {
+            private val items = interfaces.map { ni ->
+                NetworkInterface().apply {
+                    name = ni.name ?: ""
+                    index = ni.index
+                    mtu = ni.mtu
+                    addresses = StringIteratorImpl(
+                        ni.interfaceAddresses.mapNotNull { it.address?.hostAddress }.toList()
+                    )
+                }
+            }
+            private var pos = 0
+            override fun hasNext() = pos < items.size
+            override fun next(): NetworkInterface = items[pos++]
+        }
+    }
+
+    /** Состояние Wi-Fi для маршрутизации policy-based (не используется). */
+    override fun readWIFIState(): WIFIState? = null
+
+    /** Системные CA-сертификаты (/system/etc/security/cacerts, как в SFA). */
+    override fun systemCertificates(): StringIterator {
+        val files = File("/system/etc/security/cacerts").listFiles().orEmpty()
+        return StringIteratorImpl(files.map { it.name }.sorted())
+    }
+
+    /** Локальный DNS-транспорт платформы: null → sing-box использует свои серверы. */
+    override fun localDNSTransport(): io.nekohasekai.libbox.LocalDNSTransport? = null
+
+    /** Уведомления ядра (например, об обновлении geodata) — в лог. */
+    override fun sendNotification(notification: Notification) {
+        onLogLine("sing-box: [${notification.typeName}] ${notification.title}")
+    }
+
+    /** Очистка кэша DNS — системный DNS-резолвер пересоздаётся при следующем запросе. */
+    override fun clearDNSCache() {}
+}
+
+/** java.util.List<String> → libbox StringIterator. */
+internal class StringIteratorImpl(private val items: List<String>) : StringIterator {
+    private var pos = 0
+    override fun hasNext() = pos < items.size
+    override fun next(): String = items[pos++]
+    override fun len(): Int = items.size
 }
