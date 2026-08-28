@@ -4,13 +4,19 @@
 /.idea/
 .DS_Store
 /build
+/app/build
 /captures
 .externalNativeBuild
 .cxx
 local.properties
 
+# Бинарник wrapper'а не коммитим — CI генерирует его сам (см. docs/HANDOFF.md)
+gradle/wrapper/gradle-wrapper.jar
+
 # Не коммитим тяжёлые нативные ядра — собираются отдельно (см. docs/BUILD.md)
 /app/libs/*.aar
+/app/libs/*.so
+/app/src/main/jniLibs/**/*.so
 
 # Ключи подписи
 *.jks

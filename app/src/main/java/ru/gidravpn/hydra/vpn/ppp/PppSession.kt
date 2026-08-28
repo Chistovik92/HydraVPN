@@ -271,7 +271,8 @@ class PppSession(
                 startIpcp()
             }
             3 -> {
-                val msg = String(pkt.data.drop(1), Charsets.US_ASCII)
+                val msg = if (pkt.data.size > 1)
+                    String(pkt.data.copyOfRange(1, pkt.data.size), Charsets.US_ASCII) else ""
                 onLog("PPP PAP: отказ аутентификации: $msg")
                 terminate("PAP failure")
             }

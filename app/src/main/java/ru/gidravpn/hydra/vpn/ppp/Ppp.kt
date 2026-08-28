@@ -6,7 +6,7 @@ import java.io.ByteArrayOutputStream
  * PPP (RFC 1661): константы, кодирование/разбор кадров без HDLC-обрамления.
  *
  * SSTP (MS-SSTP) и L2TP (RFC 2661 §5.3) переносят кадры PPP без флагов,
- * Address/Control и FCS: [Protocol(2 байта)][Info...].
+ * Address/Control и FCS: протокол (2 байта) + информное поле.
  */
 object Ppp {
 
@@ -113,6 +113,17 @@ object Ppp {
         override fun equals(other: Any?) = other is Option &&
                 type == other.type && value.contentEquals(other.value)
         override fun hashCode() = type
+
+        /** Значение как big-endian целое (MRU, magic и т.п.). */
+        fun intValue(): Int {
+            var v = 0
+            for (b in value) v = (v shl 8) or (b.toInt() and 0xFF)
+            return v
+        }
+
+        /** Значение как IPv4-строка. */
+        fun ipValue(): String =
+            value.joinToString(".") { (it.toInt() and 0xFF).toString() }
     }
 
     fun encodeOptions(opts: List<Option>): ByteArray {
@@ -149,15 +160,6 @@ object Ppp {
         val parts = ip.split(".").map { it.toInt() }
         return Option(type, byteArrayOf(parts[0].toByte(), parts[1].toByte(), parts[2].toByte(), parts[3].toByte()))
     }
-
-    fun Option.intValue(): Int {
-        var v = 0
-        for (b in value) v = (v shl 8) or (b.toInt() and 0xFF)
-        return v
-    }
-
-    fun Option.ipValue(): String =
-        value.joinToString(".") { (it.toInt() and 0xFF).toString() }
 
     fun int32(v: Int): ByteArray = byteArrayOf(
         ((v ushr 24) and 0xFF).toByte(), ((v ushr 16) and 0xFF).toByte(),
