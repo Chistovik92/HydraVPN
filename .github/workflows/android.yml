@@ -19,5 +19,10 @@ jobs:
         run: gradle wrapper --gradle-version 8.9
       - name: Assemble stub (no native .aar required)
         run: ./gradlew :app:assembleStubDebug --stacktrace
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hydra-stub-debug
+          path: app/build/outputs/apk/stub/debug/*.apk
       - name: Lint
         run: ./gradlew :app:lintStubDebug || true
