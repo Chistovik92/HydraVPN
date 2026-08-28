@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.5.2] — критические фиксы краша + верификация native-сборки
+### Исправлено
+- **Краш при каждом подключении VPN на Android 14+**: `AndroidManifest.xml`
+  объявлял `HydraVpnService` с `android:foregroundServiceType="systemExempted"`,
+  а разрешение `FOREGROUND_SERVICE_SYSTEM_EXEMPTED` имеет уровень защиты
+  `signature|privileged` и никогда не выдаётся сторонним приложениям —
+  `startForeground()` в `HydraVpnService.onStartCommand` падал с
+  `SecurityException` при каждой попытке подключения. Заменено на
+  `specialUse` + `<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="vpn" />`.
+- **Краш userspace-PPP (SSTP/L2TP) на битых TCP-пакетах**:
+  `TunBridge.fixChecksums` не проверял границы буфера для TCP-ветки (в
+  отличие от UDP-ветки рядом) — фрагментированный/укороченный TCP-пакет от
+  сервера приводил к `ArrayIndexOutOfBoundsException` в фоновом потоке без
+  обработчика и убивал процесс целиком. Добавлена проверка `p.size >= ihl + 18`.
+- **ANR на экране Split Tunneling**: `PackageManager.queryIntentActivities()`
+  вызывался синхронно на главном потоке при первом рендере списка
+  приложений — перенесено на `Dispatchers.Default` через `LaunchedEffect`.
+
+### Добавлено
+- Runtime-запрос `POST_NOTIFICATIONS` (Android 13+) в `MainActivity.onCreate` —
+  разрешение было объявлено в манифесте, но никогда не запрашивалось, из-за
+  чего постоянное уведомление о статусе VPN не показывалось пользователю.
+
+### Изменено (накоплено после 0.5.1, ранее не отражено в Changelog)
+- **native-flavor**: интеграция с реальным `libbox.aar` 1.12.9 (sing-box);
+  проверенная рецептура сборки — `docs/BUILD.md` (Go 1.25, `-checklinkname=0`).
+- Правки компиляции stub-сборки, стандартный `gradle-wrapper`.
+- CI: выгрузка stub-APK как артефакта workflow.
+
+### Известные ограничения
+- SSTP/L2TP по-прежнему не проверялись on-device против реального сервера
+  (SoftEther/Mikrotik) — исправлен только конкретный краш чек-суммы, полное
+  согласование PPP не подтверждено.
+- native-flavor компилируется только при наличии `.aar` — ожидаемо, см.
+  `docs/BUILD.md`.
+
 ## [0.5.1] — выпуск: лицензии, документация, CI
 ### Добавлено
 - `LICENSE` — полный текст GPL-3.0 (канонический, gnu.org).

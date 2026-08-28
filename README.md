@@ -4,7 +4,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.5.1**
+- Статус: **0.5.2**
 
 ---
 
@@ -94,7 +94,7 @@ UI (Compose) → MainViewModel → ServerRepository (Room + подписки)
 - [docs/PANELS.md](docs/PANELS.md) — совместимость с панелями подписок
 - [docs/SECURITY.md](docs/SECURITY.md) — политика безопасности
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — как контрибьютить
-- CHANGELOG.md — детальный лог 0.1.0 → 0.5.1
+- CHANGELOG.md — детальный лог 0.1.0 → 0.5.2
 
 ## Лицензия
 
