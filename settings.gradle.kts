@@ -15,5 +15,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ShadowLink"
+rootProject.name = "Hydra"
 include(":app")

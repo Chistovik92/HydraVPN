@@ -5,7 +5,7 @@
 ```
 ┌───────────────────────────────────────────────────────────┐
 │  UI (Jetpack Compose)                                       │
-│  ShadowLinkRoot → MainScreen / ServersScreen / LogsScreen / │
+│  HydraRoot → MainScreen / ServersScreen / LogsScreen / │
 │                   SettingsScreen                            │
 └───────────────┬───────────────────────────────────────────┘
                 │ StateFlow
@@ -23,7 +23,7 @@
                 │
 ┌───────────────▼───────────────────────────────────────────┐
 │  VPN                                                        │
-│  ShadowLinkVpnService (android.net.VpnService)             │
+│  HydraVpnService (android.net.VpnService)             │
 │    ── устанавливает tun, отдаёт fd в VpnCore                │
 │  VpnCore (interface)                                        │
 │    ├─ SingBoxCore  (flavor native, libbox.aar)             │
@@ -51,13 +51,13 @@
 JSON sing-box (tun-inbound + proxy-outbound + маршрутизация) из `ServerProfile`
 в момент подключения. Аналогично `XrayConfigBuilder` для Xray.
 
-**tun принадлежит VpnService.** Дескриптор поднимается в `ShadowLinkVpnService`
+**tun принадлежит VpnService.** Дескриптор поднимается в `HydraVpnService`
 и передаётся ядру. Для sing-box `PlatformInterface.openTun()` возвращает этот fd.
 Для Xray нужен мост tun2socks (Xray сам tun не обслуживает).
 
 **L2TP → IKEv2.** Проксирование пакетов через наш tun не подходит для IPsec:
 IKEv2 на Android — системный (`VpnManager`/`Ikev2VpnProfile`, API 33+), поэтому
-`Ikev2Connector` — отдельная ветка, не использующая `ShadowLinkVpnService`.
+`Ikev2Connector` — отдельная ветка, не использующая `HydraVpnService`.
 
 ## Потоки данных
 

@@ -10,19 +10,19 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
-        android:name=".ShadowLinkApp"
+        android:name=".HydraApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.ShadowLink"
+        android:theme="@style/Theme.Hydra"
         android:usesCleartextTraffic="false">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden"
-            android:theme="@style/Theme.ShadowLink">
+            android:theme="@style/Theme.Hydra">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -38,13 +38,15 @@
                 <data android:scheme="ss" />
                 <data android:scheme="hysteria2" />
                 <data android:scheme="tuic" />
+                <data android:scheme="wireguard" />
+                <data android:scheme="awg" />
                 <data android:scheme="sing-box" />
             </intent-filter>
         </activity>
 
         <!-- Собственно VPN-туннель (Xray / sing-box) -->
         <service
-            android:name=".vpn.ShadowLinkVpnService"
+            android:name=".vpn.HydraVpnService"
             android:exported="false"
             android:permission="android.permission.BIND_VPN_SERVICE"
             android:foregroundServiceType="systemExempted">

@@ -11,6 +11,6 @@
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.**
 -keepclassmembers class **$$serializer { *; }
--keepclasseswithmembers class com.shadowlink.data.** {
+-keepclasseswithmembers class ru.gidravpn.hydra.data.** {
     kotlinx.serialization.KSerializer serializer(...);
 }

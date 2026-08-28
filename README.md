@@ -1,13 +1,15 @@
-# ShadowLink
+# Hydra
 
 **Мультипротокольный VPN-клиент для Android** на Jetpack Compose.
 Поддерживает proxy-протоколы ядра **Xray** и **sing-box** (VLESS, VMess, Trojan,
-Shadowsocks, Hysteria2, TUIC), а также семейство **IPsec** (см. важное замечание
-по L2TP ниже). Импортирует подписки из панелей **x-ui, 3x-ui, PasarGuard, Remnawave**.
+Shadowsocks, Hysteria2, TUIC, WireGuard), **AmneziaWG** (обфусцированный WireGuard),
+а также семейство **IPsec** (см. важное замечание по L2TP ниже). Импортирует
+подписки из панелей **x-ui, 3x-ui, PasarGuard, Remnawave**.
 
-> ⚠️ **Статус: ранний каркас (0.1.0).** Полностью реализованы UI, слой данных,
-> парсинг ссылок/подписок и генерация конфигов. Реальные туннели требуют
-> сборки нативных ядер (`libbox.aar`, `libXray.aar`) — см. [docs/BUILD.md](docs/BUILD.md).
+> ⚠️ **Статус: 0.2.0.** Полностью реализованы UI, слой данных, парсинг
+> ссылок/подписок (.conf WireGuard/AmneziaWG в т.ч.) и генерация конфигов.
+> Реальные туннели требуют сборки нативных ядер (`libbox.aar`, `libXray.aar`,
+> `amneziawg-go.aar`) — см. [docs/BUILD.md](docs/BUILD.md).
 > Flavor `stub` собирается и запускается без ядер (симуляция соединения).
 
 ---
@@ -16,7 +18,8 @@ Shadowsocks, Hysteria2, TUIC), а также семейство **IPsec** (см.
 
 - 🎛 **Единый клиент** для нескольких семейств протоколов.
 - 📥 **Импорт подписок** (base64 или список ссылок) и одиночных ссылок
-  `vless:// vmess:// trojan:// ss:// hysteria2:// tuic://`, в т.ч. по deep-link.
+  `vless:// vmess:// trojan:// ss:// hysteria2:// tuic:// wireguard:// awg://`
+  (или `.conf` WireGuard/AmneziaWG целиком), в т.ч. по deep-link.
 - 🧩 **Совместимость с панелями** x-ui / 3x-ui / PasarGuard / Remnawave
   (см. [docs/PANELS.md](docs/PANELS.md)).
 - 🌗 Тёмный интерфейс на Compose (дизайн — из макета проекта).
@@ -33,6 +36,8 @@ Shadowsocks, Hysteria2, TUIC), а также семейство **IPsec** (см.
 | Shadowsocks | sing-box | конфиг готов, нужен `.aar` |
 | Hysteria2 | sing-box | конфиг готов, нужен `.aar` |
 | TUIC v5 | sing-box | конфиг готов, нужен `.aar` |
+| WireGuard | sing-box | конфиг готов, нужен `.aar` |
+| AmneziaWG 1.0/1.5/2.0 | amneziawg-go | .conf/uapi готовы, нужен `.aar` |
 | L2TP/IPsec | — | **недоступно на Android 13+** → используется IKEv2 |
 | IKEv2/IPsec | системный (VpnManager) | каркас, API 33+ |
 
@@ -45,8 +50,8 @@ Shadowsocks, Hysteria2, TUIC), а также семейство **IPsec** (см.
 ## Быстрый старт
 
 ```bash
-git clone https://github.com/<you>/ShadowLink.git
-cd ShadowLink
+git clone https://github.com/<you>/Hydra.git
+cd Hydra
 # Открыть в Android Studio (Giraffe+), либо:
 gradle wrapper --gradle-version 8.9
 ./gradlew :app:assembleStubDebug      # сборка без нативных ядер (симуляция)
@@ -66,7 +71,7 @@ gradle wrapper --gradle-version 8.9
 UI (Compose)  →  MainViewModel  →  ServerRepository (Room + подписки)
                        │
                        ▼
-             ShadowLinkVpnService (tun)  →  VpnCore
+             HydraVpnService (tun)  →  VpnCore
                                               ├─ SingBoxCore  (libbox.aar)
                                               ├─ XrayCore     (libXray.aar + tun2socks)
                                               └─ NoopCore     (stub)

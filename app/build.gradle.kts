@@ -6,15 +6,15 @@ plugins {
 }
 
 android {
-    namespace = "com.shadowlink"
+    namespace = "ru.gidravpn.hydra"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.shadowlink"
+        applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14, IKEv2 через VpnManager — с API 33 (проверяется в рантайме)
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
 
         // ABI, под которые собраны нативные ядра (libbox / libXray)
         ndk {

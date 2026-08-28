@@ -37,7 +37,7 @@ gomobile bind -v -androidapi 26 -javapkg=io.nekohasekai \
   -tags "$TAGS" -trimpath -ldflags="-s -w" \
   -o libbox.aar ./experimental/libbox
 
-cp libbox.aar /path/to/ShadowLink/app/libs/
+cp libbox.aar /path/to/Hydra/app/libs/
 ```
 
 Готовые сборки также публикуют сторонние репозитории (например
@@ -55,7 +55,7 @@ gomobile init
 gomobile bind -v -androidapi 26 -target=android \
   -o libXray.aar ./
 
-cp libXray.aar /path/to/ShadowLink/app/libs/
+cp libXray.aar /path/to/Hydra/app/libs/
 ```
 
 > Для Xray дополнительно нужен tun2socks-мост (Xray не обслуживает tun напрямую).
@@ -76,9 +76,9 @@ cp libXray.aar /path/to/ShadowLink/app/libs/
 
 ```properties
 # keystore.properties (в .gitignore)
-storeFile=shadowlink.jks
+storeFile=Hydra.jks
 storePassword=...
-keyAlias=shadowlink
+keyAlias=Hydra
 keyPassword=...
 ```
 
