@@ -1,8 +1,8 @@
 # HANDOFF — состояние проекта Hydra
 
-Документ для продолжения работы (в т.ч. под другим аккаунтом/у другого разработчика).
-Приложите к нему архив `Hydra.zip` — он самодостаточен и содержит весь код, git-историю
-и документацию.
+Документ для продолжения работы (в т.ч. под другим аккаунтом/у другого
+разработчика). Главные источники контекста: `CHANGELOG.md` (детальный лог
+по версиям 0.1.0 → 0.5.1) и `docs/PROTOCOLS.md`.
 
 ## Что это
 
@@ -23,8 +23,8 @@
 # native-сборка — сначала положите .aar/.so (см. docs/BUILD.md), затем:
 ./gradlew :app:assembleNativeRelease
 ```
-`gradle-wrapper.jar` в архив не кладётся (бинарник) — CI генерирует его сам
-(`.github/workflows/android.yml`), локально: `gradle wrapper`.
+`gradle-wrapper.jar` в репозиторий не кладётся (бинарник) — CI генерирует его
+сам (`.github/workflows/android.yml`), локально: `gradle wrapper`.
 
 ## Статус по сервисам (полностью — в `docs/SERVICES.md`)
 
@@ -32,7 +32,7 @@
 |---|---|---|
 | VLESS/VMess/Trojan/SS/Hysteria2/TUIC/WireGuard | sing-box | нужен `libbox.aar`; конфиг под схему 1.12+; `HydraPlatformInterface` расширен |
 | AmneziaWG 1.0/1.5/2.0 | amneziawg-go | нужен `amneziawg-go.aar`; генерация `.conf`/uapi готова |
-| Xray (альт. ядро) | Xray-core | нужен `libXray.aar` + tun2socks (`hev-socks5-tunnel`); `XrayCore` — каркас |
+| Xray (альт. ядро) | Xray-core | нужен `libXray.aar` + tun2socks (`hev-socks5-tunnel`); `XrayCore` — каркас, streamSettings готовы |
 | **SSTP** | userspace PPP/TLS | **готово на Kotlin** (LCP/PAP/MS-CHAPv2/IPCP + crypto-binding); нужен on-device тест |
 | **L2TP** | userspace PPP/UDP | **готово на Kotlin** (без IPsec/ESP); нужен on-device тест |
 | PPTP | — | честно недоступно (данные в GRE → нужен root; стек удалён из Android 12/13) |
@@ -53,8 +53,8 @@
    конкретную версию libbox (возвращающие libbox-типы: `getInterfaces`,
    `startDefaultInterfaceMonitor`, `readWIFIState`, `systemCertificates`).
    Референс: SagerNet/sing-box-for-android → `PlatformInterfaceWrapper`.
-4. **Xray**: мост tun2socks (`hev-socks5-tunnel`) + доводка `streamSettings`
-   (reality/ws/grpc) в `XrayConfigBuilder`.
+4. **Xray**: мост tun2socks (`hev-socks5-tunnel`) + запуск ядра в `XrayCore`
+   (streamSettings уже готовы в `XrayConfigBuilder`).
 5. **olcRTC**: gomobile-биндинг (`cnc` → локальный SOCKS5) + tun2socks в `OlcRtcCore`.
 6. **WDTT**: JNI к `libclient.so` + поток VK-авторизации (WebView) в `WdttCore`;
    проверить лицензию upstream перед включением бинарника.
@@ -67,11 +67,11 @@
 app/src/main/java/ru/gidravpn/hydra/
   data/model/         Protocol.kt (все протоколы + флаг beta), ServerProfile, SplitTunnel
   data/subscription/  LinkParser, WireGuardParser/ConfigBuilder, SingBoxConfigBuilder
-  data/repository/     ServerRepository
+  data/repository/    ServerRepository, SplitTunnelRepository (DataStore)
   vpn/                HydraVpnService, SocketGuard, VpnState
   vpn/ppp/            Md4, MsChapV2, Ppp, PppSession, TunBridge  (общий userspace-PPP)
   vpn/core/           VpnCore (интерфейс)
-  ui/                 экраны (Main/Servers/Settings/SplitTunnel/Logs), components/Common (BetaBadge)
+  ui/                 экраны (Main/Servers/SplitTunnel/Settings/Logs), components/Common (BetaBadge)
 app/src/native/.../vpn/core/   SingBoxCore(+Runtime), XrayCore(+ConfigBuilder),
                                AmneziaWgCore, SstpCore, L2tpCore(+Transport), PptpCore,
                                WdttCore, OlcRtcCore, NativeCoreFactory
@@ -85,6 +85,8 @@ CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.5.1
 - Сборка/тесты в исходной среде не выполнялись (нет сети и Android SDK) — правки
   проверялись статически. Пункты «готово на Kotlin» (SSTP, L2TP, PPP-стек) не требуют
   нативных `.aar`, но нуждаются в проверке на устройстве.
+- Константы MS-CHAPv2/MPPE сверены с RFC 2759/3079 (тест-векторы §9.2/§3.5),
+  L2TP — с RFC 2661; SSTP — по MS-SSTP, требует проверки против реального сервера.
 - Бинарники/код сторонних проектов не распространяются — поддержаны форматы ссылок и
   точки интеграции. Лицензии: см. `THIRD_PARTY_NOTICES.md`.
 - Самый подробный контекст «что и почему» — в `CHANGELOG.md` и `docs/PROTOCOLS.md`.

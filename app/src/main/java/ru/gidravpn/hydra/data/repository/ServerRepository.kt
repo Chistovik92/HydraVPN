@@ -32,7 +32,7 @@ class ServerRepository(context: Context) {
     }
 
     suspend fun refreshSubscription(subId: Long, url: String): Int {
-        val profiles = fetcher.fetch(url, "Hydra/0.2", subId)
+        val profiles = fetcher.fetch(url, "Hydra/0.5", subId)
         servers.deleteBySubscription(subId)
         servers.upsertAll(profiles)
         return profiles.size

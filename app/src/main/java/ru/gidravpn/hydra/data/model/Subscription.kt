@@ -12,7 +12,7 @@ data class Subscription(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val url: String,
-    val userAgent: String = "Hydra/0.2",   // некоторые панели отдают разный формат по UA
+    val userAgent: String = "Hydra/0.5",   // некоторые панели отдают разный формат по UA
     val lastUpdated: Long = 0L,
     val autoUpdateHours: Int = 12
 )

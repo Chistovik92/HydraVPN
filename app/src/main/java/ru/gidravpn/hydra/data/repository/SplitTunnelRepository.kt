@@ -9,7 +9,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
-import org.json.JSONObject
 import ru.gidravpn.hydra.data.model.SplitTunnel
 import ru.gidravpn.hydra.data.model.SplitTunnelMode
 
@@ -55,9 +54,7 @@ class SplitTunnelRepository(private val context: Context) {
                 }
             }.getOrDefault(mutableSetOf())
             if (!current.add(pkg)) current.remove(pkg)
-            prefs[KEY_PACKAGES] = JSONObject().let { _ ->
-                JSONArray().apply { current.forEach { p -> put(p) } }.toString()
-            }
+            prefs[KEY_PACKAGES] = JSONArray().apply { current.forEach { p -> put(p) } }.toString()
         }
     }
 }

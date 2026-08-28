@@ -126,7 +126,7 @@ class SstpCore : VpnCore {
         val cryptoBindingReq = arrayOfNulls<BindingReq>(1)
         val certHash = arrayOfNulls<ByteArray>(1)
 
-        val reader = thread(name = "sstp-reader") {
+        thread(name = "sstp-reader") {
             val buf = ByteArray(65536)
             var buffered = ByteArray(0)
             try {
@@ -137,10 +137,7 @@ class SstpCore : VpnCore {
                     while (true) {
                         val pkt = tryExtractPacket(buffered) ?: break
                         buffered = buffered.copyOfRange(pkt.second, buffered.size)
-                        handlePacket(
-                            pkt.first, output, profile, certHash, cryptoBindingReq,
-                            ackLatch, onLog, username, password, tun, onStats,
-                        )
+                        handlePacket(pkt.first, output, certHash, cryptoBindingReq, ackLatch, onLog)
                     }
                 }
             } catch (t: Throwable) {
@@ -210,15 +207,10 @@ class SstpCore : VpnCore {
     private fun handlePacket(
         pkt: ByteArray,
         output: BufferedOutputStream,
-        profile: ServerProfile,
         certHash: Array<ByteArray?>,
         cryptoBindingReq: Array<BindingReq?>,
         ackLatch: CountDownLatch,
         onLog: (String) -> Unit,
-        username: String,
-        password: String,
-        tun: ParcelFileDescriptor,
-        onStats: (TrafficStats) -> Unit,
     ) {
         // header: 4 байта уже проверены; bytes 4-5 — контроль/протокол
         val marker = ((pkt[4].toInt() and 0xFF) shl 8) or (pkt[5].toInt() and 0xFF)

@@ -116,9 +116,13 @@ object XrayConfigBuilder {
     private fun streamSettings(p: ServerProfile, extra: JSONObject): JSONObject {
         val stream = JSONObject()
         stream.put("network", transportName(p.transport))
-        stream.put("security", if (p.security == "reality") "reality"
-        else if (p.security == "tls" || p.security == "reality") p.security
-        else if (p.protocol == Protocol.TROJAN) "tls" else p.security.ifBlank { "none" })
+        val security = when {
+            p.security == "reality" -> "reality"
+            p.security == "tls" -> "tls"
+            p.security.isBlank() && p.protocol == Protocol.TROJAN -> "tls"  // trojan подразумевает TLS
+            else -> p.security.ifBlank { "none" }
+        }
+        stream.put("security", security)
 
         // --- tls / reality ---
         when (stream.optString("security")) {

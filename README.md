@@ -1,95 +1,106 @@
 # Hydra
 
 **Мультипротокольный VPN-клиент для Android** на Jetpack Compose.
-Поддерживает proxy-протоколы ядра **Xray** и **sing-box** (VLESS, VMess, Trojan,
-Shadowsocks, Hysteria2, TUIC, WireGuard), **AmneziaWG** (обфусцированный WireGuard),
-а также **SSTP** и **L2TP**, реализованные целиком на Kotlin (userspace-PPP).
-Импортирует подписки из панелей **x-ui, 3x-ui, PasarGuard, Remnawave**.
 
-> ⚠️ **Статус: 0.3.0.** Полностью реализованы UI, слой данных, парсинг
-> ссылок/подписок (.conf WireGuard/AmneziaWG в т.ч.), генерация конфигов и
-> userspace-PPP-стек (SSTP/L2TP — без нативных зависимостей).
-> Proxy-туннели требуют сборки нативных ядер (`libbox.aar`, `libXray.aar`,
-> `amneziawg-go.aar`) — см. [docs/BUILD.md](docs/BUILD.md).
-> Flavor `stub` собирается и запускается без ядер (симуляция соединения).
+- Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
+- Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
+- Статус: **0.5.1**
 
 ---
 
 ## Возможности
 
-- 🎛 **Единый клиент** для нескольких семейств протоколов.
-- 📥 **Импорт подписок** (base64 или список ссылок) и одиночных ссылок
-  `vless:// vmess:// trojan:// ss:// hysteria2:// tuic:// wireguard:// awg://`
-  (или `.conf` WireGuard/AmneziaWG целиком), в т.ч. по deep-link.
-- 🧩 **Совместимость с панелями** x-ui / 3x-ui / PasarGuard / Remnawave
-  (см. [docs/PANELS.md](docs/PANELS.md)).
-- 🌗 Тёмный интерфейс на Compose (дизайн — из макета проекта).
-- 🗂 Хранение серверов и подписок в Room; авто-обновление подписок.
-- 📝 Экран логов, статистика трафика, foreground-уведомление.
+- 🎛 **Единый клиент** для нескольких семейств протоколов:
+  - proxy (VLESS/VMess/Trojan/Shadowsocks/Hysteria2/TUIC/WireGuard) — sing-box;
+  - Xray — альтернативное ядро (XTLS Vision, REALITY);
+  - **AmneziaWG 1.0/1.5/2.0** — обфусцированный WireGuard (amneziawg-go);
+  - **SSTP** и **L2TP** — реализованы целиком на Kotlin (userspace-PPP),
+    без нативных зависимостей и root;
+  - WDTT и olcRTC — ознакомительные движки, помечены плашкой **BETA**;
+  - PPTP — честный отказ (GRE требует root, стек удалён из Android 12/13).
+- 📥 **Импорт**: подписки (base64/список) из панелей x-ui / 3x-ui / PasarGuard /
+  Remnawave, одиночные ссылки (`vless:// vmess:// trojan:// ss:// hysteria2://
+  tuic:// wireguard:// awg:// sstp:// l2tp://`), `.conf` WireGuard/AmneziaWG,
+  deep-links.
+- ✂️ **Раздельное туннелирование**: весь трафик / только выбранные приложения /
+  кроме выбранных (DataStore + `addAllowed/addDisallowedApplication`).
+- 🌗 Тёмный интерфейс на Compose; экран логов, статистика трафика,
+  foreground-уведомление.
 
 ## Поддержка протоколов
 
 | Протокол | Движок | Статус |
 |---|---|---|
-| VLESS (+ REALITY/XTLS Vision) | sing-box / Xray | конфиг готов, нужен `.aar` |
-| VMess | sing-box / Xray | конфиг готов, нужен `.aar` |
-| Trojan | sing-box | конфиг готов, нужен `.aar` |
-| Shadowsocks | sing-box | конфиг готов, нужен `.aar` |
-| Hysteria2 | sing-box | конфиг готов, нужен `.aar` |
-| TUIC v5 | sing-box | конфиг готов, нужен `.aar` |
+| VLESS (+REALITY/Vision), VMess, Trojan, Shadowsocks | sing-box / Xray | конфиг готов, нужен `.aar` |
+| Hysteria2, TUIC v5 | sing-box | конфиг готов, нужен `.aar` |
 | WireGuard | sing-box | конфиг готов, нужен `.aar` |
-| AmneziaWG 1.0/1.5/2.0 | amneziawg-go | .conf/uapi готовы, нужен `.aar` |
-| SSTP | userspace (Kotlin) | реализован, нужен тест на устройстве |
-| L2TP (без IPsec) | userspace (Kotlin) | реализован, нужен тест на устройстве |
-| WDTT (BETA) | libclient.so | каркас, нужен `.so` + VK-auth |
-| olcRTC (BETA) | olcrtc.aar + tun2socks | каркас, нужен `.aar` |
-| PPTP | — | **недоступно**: GRE требует root, стек удалён из Android 12/13 |
+| AmneziaWG 1.0/1.5/2.0 | amneziawg-go | `.conf`/uapi готовы, нужен `.aar` |
+| **SSTP** (TLS/PPP, MS-CHAPv2, crypto-binding) | userspace (Kotlin) | **реализован**, нужен on-device тест |
+| **L2TP** (RFC 2661, без IPsec) | userspace (Kotlin) | **реализован**, нужен on-device тест |
+| Xray (альт. ядро) | libXray.aar + tun2socks | каркас, нужен `.aar` |
+| WDTT (WG over TURN ВК) | libclient.so | **BETA**, каркас |
+| olcRTC (TCP over WebRTC) | olcrtc.aar + tun2socks | **BETA**, каркас |
+| PPTP | — | **недоступно**: GRE → root; стек удалён из Android 12/13 |
 
-> **Про L2TP.** Системный стек L2TP удалён из Android (12 — из UI, 13 — целиком,
-> строился на устаревшем IKEv1), а L2TP/IPsec недоступен в userspace (ESP).
-> Поэтому Hydra реализует «чистый» L2TP (RFC 2661) на Kotlin: туннель по UDP,
-> аутентификация и согласование IP — на PPP (MS-CHAPv2/PAP + IPCP).
-> Шифрование канала — только на уровне PPP; если нужен защищённый транспорт,
-> используйте SSTP (TLS) или WireGuard/AmneziaWG. Подробности —
-> [docs/PROTOCOLS.md](docs/PROTOCOLS.md).
+Полное описание протоколов и ограничений — [docs/PROTOCOLS.md](docs/PROTOCOLS.md),
+сервисы — [docs/SERVICES.md](docs/SERVICES.md).
 
 ## Быстрый старт
 
 ```bash
-git clone https://github.com/<you>/Hydra.git
-cd Hydra
-# Открыть в Android Studio (Giraffe+), либо:
+git clone https://github.com/Chistovik92/HydraVPN.git
+cd HydraVPN
+# Открыть в Android Studio, либо:
 gradle wrapper --gradle-version 8.9
-./gradlew :app:assembleStubDebug      # сборка без нативных ядер (симуляция)
+./gradlew :app:assembleStubDebug      # без нативных ядер (симуляция)
 ```
 
-Для реальных туннелей соберите ядра и положите `.aar` в `app/libs/`, затем:
+Для реальных туннелей соберите ядра и положите `.aar`/`.so` в `app/libs/`
+(libbox, libXray, amneziawg-go, olcrtc — инструкции: [docs/BUILD.md](docs/BUILD.md)),
+затем:
 
 ```bash
-./gradlew :app:assembleNativeDebug
+./gradlew :app:assembleNativeRelease
 ```
 
-Полная инструкция по сборке ядер — [docs/BUILD.md](docs/BUILD.md).
+> `gradle-wrapper.jar` в репозиторий не кладётся (бинарник) — CI генерирует
+> его сам, локально: `gradle wrapper`.
 
 ## Архитектура (кратко)
 
 ```
-UI (Compose)  →  MainViewModel  →  ServerRepository (Room + подписки)
-                       │
-                       ▼
-             HydraVpnService (tun)  →  VpnCore
-                                              ├─ SingBoxCore  (libbox.aar)
-                                              ├─ XrayCore     (libXray.aar + tun2socks)
-                                              └─ NoopCore     (stub)
-             Ikev2Connector (VpnManager)  ← ветка L2TP/IPsec
+UI (Compose) → MainViewModel → ServerRepository (Room + подписки)
+                    │                + SplitTunnelRepository (DataStore)
+                    ▼
+        HydraVpnService (tun + SocketGuard.protect) → VpnCore
+              ├─ SingBoxCore   (libbox.aar; HydraPlatformInterface)
+              ├─ XrayCore      (libXray.aar + tun2socks)
+              ├─ AmneziaWgCore (amneziawg-go.aar)
+              ├─ SstpCore / L2tpCore (userspace PPP: vpn/ppp + TunBridge)
+              ├─ PptpCore      (честный отказ GRE)
+              ├─ WdttCore / OlcRtcCore (BETA)
+              └─ NoopCore      (stub-сборка)
 ```
 
 Подробно — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Что осталось сделать — [docs/HANDOFF.md](docs/HANDOFF.md) и CHANGELOG.md.
+
+## Документация
+
+- [docs/PROTOCOLS.md](docs/PROTOCOLS.md) — протоколы, форматы ссылок, ограничения
+- [docs/SERVICES.md](docs/SERVICES.md) — сервисы и интеграции (SoftEther, WDTT, olcRTC)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — архитектура и потоки данных
+- [docs/BUILD.md](docs/BUILD.md) — сборка ядер и приложения
+- [docs/PANELS.md](docs/PANELS.md) — совместимость с панелями подписок
+- [docs/SECURITY.md](docs/SECURITY.md) — политика безопасности
+- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — как контрибьютить
+- CHANGELOG.md — детальный лог 0.1.0 → 0.5.1
 
 ## Лицензия
 
-GPL-3.0. Проект встраивает компоненты sing-box (GPL-3.0) и Xray-core (MPL-2.0);
-их лицензии сохраняются. См. [LICENSE](LICENSE) и [docs/PROTOCOLS.md](docs/PROTOCOLS.md).
+GPL-3.0 — см. [LICENSE](LICENSE) и [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Компоненты: sing-box (GPL-3.0), Xray-core (MPL-2.0), amneziawg-go/wireguard-go (MIT),
+hev-socks5-tunnel (MIT). Бинарники ядер не распространяются в составе репозитория.
 
 ## Дисклеймер
 

@@ -5,7 +5,7 @@
 Клиент строит конфиг из `ServerProfile` и запускает нативное ядро поверх tun.
 
 ### VLESS
-- Транспорт: `tcp` / `ws` / `grpc` / `http`.
+- Транспорт: `tcp` / `ws` / `grpc` / `http` / `httpupgrade`.
 - Безопасность: `tls` / `reality` / `none`.
 - REALITY: `pbk` (public key) и `sid` (short id) хранятся в `extra`.
 - Flow: `xtls-rprx-vision`.
@@ -31,36 +31,78 @@
 
 ### Про движки
 - **sing-box** обслуживает tun сам (через `PlatformInterface.openTun`) и покрывает
-  все шесть протоколов выше — рекомендуемый движок по умолчанию.
+  протоколы выше **и WireGuard** — рекомендуемый движок по умолчанию.
 - **Xray-core** сам tun **не** обслуживает. Схема: `tun → tun2socks → socks-inbound Xray`.
   Xray поднимается с локальным socks5 (напр. `127.0.0.1:10808`), а tun2socks
   (`hev-socks5-tunnel`) перекладывает пакеты из tun-fd в этот socks. Xray оставлен
   как альтернатива для сценариев, где важна именно его реализация XTLS.
 
-## Семейство IPsec
+## WireGuard / AmneziaWG
 
-### L2TP/IPsec — почему его нет
-- **Android 12 (2021)** убрал L2TP из системного VPN-UI.
-- **Android 13 (2022)** удалил legacy-стек L2TP полностью — он строился на
-  устаревшем и небезопасном **IKEv1**.
-- Реализовать L2TP на уровне приложения означало бы тащить userspace-стек
-  PPP + L2TP + IPsec ESP — непрактично и небезопасно.
+### WireGuard (через sing-box)
+- Импорт: `.conf` (секции `[Interface]`/`[Peer]`), ссылки `wireguard://<base64 конфига>`.
+- Ключи в `extra` (`private_key`, `public_key`, `preshared_key`, `allowed_ips`,
+  `local_address`, `mtu`, `dns`); endpoint → `address:port` профиля.
+- sing-box-конфиг собирается в `SingBoxConfigBuilder` (outbound `wireguard`).
 
-Отраслевой тренд тот же: Microsoft объявил PPTP/L2TP устаревшими на стороне
-Windows Server (2024), Apple в macOS 26 / iOS 26 (2025) удалил старые
-криптопримитивы, ломая часть L2TP/IPsec-подключений. Рекомендованная замена
-везде — **IKEv2**.
+### AmneziaWG 1.0 / 1.5 / 2.0 (отдельный движок amneziawg-go)
+- Обфускация: **1.0/1.5** — `Jc, Jmin, Jmax, S1, S2, H1–H4` (мусорные пакеты);
+  **2.0** — `I1–I5` (маркеры заголовков). Версия профиля определяется автоматически
+  при импорте (`extra.awg_version`).
+- `WireGuardParser` разбирает оба варианта и ссылки `awg://<base64>`.
+- `WireGuardConfigBuilder` собирает `.conf` и **uapi** (ключи base64 → hex).
+- Запуск туннеля требует `amneziawg-go.aar` (docs/BUILD.md).
 
-### IKEv2/IPsec — как это делается на Android
-- С Android 12/13 приложение может провижионить IKEv2-профиль через
-  `VpnManager` + `Ikev2VpnProfile` (`Ikev2Connector` в коде, требует API 33+).
-- Это **системный** VPN, отдельный от нашего tun-сервиса. Аутентификация:
-  PSK (`ServerProfile.uuidOrPassword`) или username/password (`extra`).
-- Пункт «L2TP/IPsec (PSK)» в UI сохранён ради соответствия макету, но фактически
-  ведёт в IKEv2. Если нужен именно L2TP — поднимите на сервере IKEv2 (напр.
-  strongSwan) как современную замену.
+## Userspace-PPP: SSTP, L2TP, PPTP
+
+Полный PPP-стек на Kotlin (`vpn/ppp`), без нативных .aar и без root.
+
+### SSTP (MS-SSTP)
+- PPP поверх TLS 1.2/1.3 поверх HTTPS (`SSTP_DUPLEX_POST /sra_{BA195780-…}/`).
+- Аутентификация MS-CHAPv2 (взаимная, RFC 2759), опционально PAP.
+- **Crypto-binding** (CALL_CONNECTED): Compound MAC = HMAC-SHA1/SHA256 от
+  CMK (RFC 3079 GetMasterKey) — связывает PPP-аутентификацию и TLS-сессию.
+- Проверка хэша сертификата сервера из ENC_INFO.
+- Ссылка: `sstp://user:pass@host:port#name` (параметры `sni`, `allow_insecure`).
+
+### L2TP (RFC 2661, без IPsec)
+- Туннель по UDP: SCCRQ→SCCRP→SCCCN, сессия ICRQ→ICRP→ICCN,
+  Ns/Nr + ZLB-подтверждения, опциональный tunnel-auth (MD5).
+- Внутри — тот же PPP-стек; IP/DNS приходят по IPCP.
+- **Без IPsec/ESP**: ESP недоступен в userspace (нужен IKE-демон и CAP_NET_ADMIN).
+  Шифрование — только на уровне PPP; для защищённого канала используйте
+  SSTP/WireGuard.
+- Ссылка: `l2tp://user:pass@host:port#name` (параметр `tunnel_secret`).
+
+### PPTP — честно недоступно
+- Данные PPTP идут в **GRE** (IP-протокол 47) — требует raw-сокетов (root).
+- Системный стек PPTP удалён из Android 12/13.
+- UI сообщает правду вместо молчаливого отказа (`PptpCore`).
+
+### Как PPP вливается в tun
+- Туннель поднимается с адресом-заглушкой `172.19.0.1/28`; реальный IP
+  приходит по IPCP. `TunBridge` делает симметричный NAT
+  (исходящие: src 172.19.0.1 → назначенный IP; входящие: dst → 172.19.0.1)
+  с инкрементальной коррекцией чек-сумм IPv4/TCP/UDP (RFC 1624).
+- Транспортные сокеты выводятся из-под VPN-маршрутизации через
+  `SocketGuard.protect()` — иначе петля маршрутизации.
+
+## Ознакомительные движки (BETA)
+
+### WDTT — WireGuard через TURN-релей ВК
+- Нативный `libclient.so` (JNI) + VK-авторизация (OAuth/WebView) →
+  TURN-credentials. Внешне трафик выглядит как WebRTC/TURN к облаку ВК.
+- До сборки библиотеки ядро честно отказывает (`WdttCore`). См. docs/SERVICES.md.
+
+### olcRTC — TCP поверх WebRTC
+- gomobile `olcrtc.aar`: компонент `cnc` устанавливает WebRTC-сессию и
+  выставляет локальный SOCKS5; tun2socks (hev-socks5-tunnel) заворачивает в
+  него пакеты из tun. См. docs/SERVICES.md.
 
 ## Лицензии встраиваемых компонентов
 - **sing-box** — GPL-3.0.
 - **Xray-core / libXray** — MPL-2.0.
-- Из-за GPL-3.0 у sing-box итоговое приложение распространяется под **GPL-3.0**.
+- **wireguard-go / amneziawg-go** — MIT (форк wireguard-go).
+- **hev-socks5-tunnel** — MIT (проверьте upstream перед дистрибуцией).
+- Из-за GPL-3.0 у sing-box итоговое приложение распространяется под **GPL-3.0**
+  (полный список — `THIRD_PARTY_NOTICES.md`).

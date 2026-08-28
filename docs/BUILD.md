@@ -62,7 +62,45 @@ cp libXray.aar /path/to/Hydra/app/libs/
 > Соберите `hev-socks5-tunnel` под Android или переиспользуйте `libtun2socks`
 > из v2rayNG. См. [PROTOCOLS.md](PROTOCOLS.md), раздел «Xray».
 
-### 2.3 Сборка приложения с ядрами (flavor `native`)
+### 2.3 amneziawg-go → `amneziawg-go.aar`
+
+```bash
+git clone https://github.com/amnezia-extensions/amneziawg-go
+cd amneziawg-go
+go install golang.org/x/mobile/cmd/gomobile@latest
+go install golang.org/x/mobile/cmd/gobind@latest
+export PATH="$PATH:$(go env GOPATH)/bin"
+gomobile init
+gomobile bind -v -androidapi 26 -target=android \
+  -o amneziawg-go.aar ./
+
+cp amneziawg-go.aar /path/to/Hydra/app/libs/
+```
+
+Интеграция: `AmneziaWgCore` уже генерирует `.conf`/uapi (`WireGuardConfigBuilder`);
+после сборки .aar подключите GoBackend/IpcUapi-вызовы в местах с
+`TODO(amneziawg-go.aar)`. Генерация конфигов не зависит от .aar.
+
+### 2.4 WDTT → `libclient.so` (beta)
+
+Нативная библиотека WG-over-TURN (см. docs/SERVICES.md, раздел WDTT).
+Соберите `libclient.so` под ABI из `abiFilters` и положите в
+`app/src/main/jniLibs/<abi>/`. Перед включением бинарника проверьте
+лицензию upstream-проекта. JNI-план — `WdttCore`.
+
+### 2.5 olcRTC → `olcrtc.aar` + tun2socks (beta)
+
+gomobile-биндинг компонента `cnc` (TCP over WebRTC → локальный SOCKS5):
+
+```bash
+git clone <olcrtc-upstream>
+gomobile bind -v -androidapi 26 -target=android -o olcrtc.aar ./
+cp olcrtc.aar /path/to/Hydra/app/libs/
+```
+
+Плюс tun2socks (см. 2.2). Мост описан в `OlcRtcCore`.
+
+### 2.6 Сборка приложения с ядрами (flavor `native`)
 
 ```bash
 ./gradlew :app:assembleNativeDebug

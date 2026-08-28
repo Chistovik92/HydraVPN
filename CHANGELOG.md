@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.5.1] — выпуск: лицензии, документация, CI
+### Добавлено
+- `LICENSE` — полный текст GPL-3.0 (канонический, gnu.org).
+- `THIRD_PARTY_NOTICES.md` — лицензии встраиваемых компонентов
+  (sing-box GPL-3.0, Xray-core MPL-2.0, amneziawg-go/wireguard-go MIT,
+  hev-socks5-tunnel MIT, WDTT/olcRTC — проверить upstream) и библиотек.
+- `docs/SERVICES.md` — сервисы и интеграции: панели, SoftEther/Mikrotik
+  (SSTP/L2TP), WDTT (TURN ВК), olcRTC; таблица честных ограничений для поддержки.
+- `docs/SECURITY.md` — политика безопасности, модель угроз (SSTP-сертификаты,
+  L2TP без IPsec, PAP, beta-движки), процесс disclosure.
+- CI: триггеры на `master` и `main`.
+
+### Изменено
+- `docs/PROTOCOLS.md` — разделы userspace-PPP (SSTP/L2TP/PPTP, TunBridge,
+  SocketGuard), WireGuard/AmneziaWG 1.0/1.5/2.0, BETA-движки; лицензии.
+- `docs/ARCHITECTURE.md` — карта кода 0.5.1 (ppp-стек, split tunneling,
+  SocketGuard, все ядра).
+- `docs/BUILD.md` — сборка amneziawg-go.aar, libclient.so (WDTT),
+  olcrtc.aar + tun2socks.
+- `README.md` — финальная таблица протоколов, флейворы, быстрый старт,
+  ссылка на репозиторий.
+- `docs/HANDOFF.md` — обновлён до состояния 0.5.1 (открытые задачи,
+  карта кода).
+
+### Известные ограничения
+- Собранных `.aar`/`.so` в репозитории нет (лицензионная политика);
+  сборка ядер — docs/BUILD.md. Flavor `stub` собирается в CI без них.
+
 ## [0.5.0] — раздельное туннелирование
 ### Добавлено
 - **SplitTunnel**: модель (`SplitTunnelMode` OFF/INCLUDE/EXCLUDE + список

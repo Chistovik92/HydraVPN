@@ -1,8 +1,8 @@
 name: Android CI
 
 on:
-  push: { branches: [ main ] }
-  pull_request: { branches: [ main ] }
+  push: { branches: [ master, main ] }
+  pull_request: { branches: [ master, main ] }
 
 jobs:
   build-stub:
