@@ -167,20 +167,30 @@ class HydraPlatformInterface(
         }
     }
 
-    /** Перечисление системных сетевых интерфейсов для libbox. */
+    /**
+     * Перечисление системных сетевых интерфейсов для libbox.
+     *
+     * Вызывается синхронно из Go-кода sing-box через JNI-мост gomobile —
+     * необработанное исключение здесь всплывает через границу JNI и валит
+     * весь процесс (а не просто соединение), поэтому вся логика — под
+     * runCatching, как и в остальных методах этого класса.
+     */
     override fun getInterfaces(): NetworkInterfaceIterator {
-        val interfaces = java.net.NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
-        return object : NetworkInterfaceIterator {
-            private val items = interfaces.map { ni ->
+        val items = runCatching {
+            java.net.NetworkInterface.getNetworkInterfaces()?.toList().orEmpty().map { ni ->
                 NetworkInterface().apply {
                     name = ni.name ?: ""
                     index = ni.index
                     mtu = ni.mtu
                     addresses = StringIteratorImpl(
-                        ni.interfaceAddresses.mapNotNull { it.address?.hostAddress }.toList()
+                        runCatching {
+                            ni.interfaceAddresses.mapNotNull { it.address?.hostAddress }.toList()
+                        }.getOrDefault(emptyList())
                     )
                 }
             }
+        }.getOrDefault(emptyList())
+        return object : NetworkInterfaceIterator {
             private var pos = 0
             override fun hasNext() = pos < items.size
             override fun next(): NetworkInterface = items[pos++]
@@ -190,10 +200,17 @@ class HydraPlatformInterface(
     /** Состояние Wi-Fi для маршрутизации policy-based (не используется). */
     override fun readWIFIState(): WIFIState? = null
 
-    /** Системные CA-сертификаты (/system/etc/security/cacerts, как в SFA). */
+    /**
+     * Системные CA-сертификаты (/system/etc/security/cacerts, как в SFA).
+     * `listFiles()` может кинуть SecurityException на прошивках со своей
+     * SELinux-политикой доступа к /system — не должно ронять JNI-вызов.
+     */
     override fun systemCertificates(): StringIterator {
-        val files = File("/system/etc/security/cacerts").listFiles().orEmpty()
-        return StringIteratorImpl(files.map { it.name }.sorted())
+        val names = runCatching {
+            File("/system/etc/security/cacerts").listFiles().orEmpty()
+                .map { it.name }.sorted()
+        }.getOrDefault(emptyList())
+        return StringIteratorImpl(names)
     }
 
     /** Локальный DNS-транспорт платформы: null → sing-box использует свои серверы. */
