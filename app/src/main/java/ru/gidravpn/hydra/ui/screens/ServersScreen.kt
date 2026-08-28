@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.ui.MainViewModel
+import ru.gidravpn.hydra.ui.components.BetaBadge
 import ru.gidravpn.hydra.ui.components.clickableNoRipple
 import ru.gidravpn.hydra.ui.theme.*
 
@@ -73,7 +74,13 @@ private fun ServerCard(s: ServerProfile, selected: Boolean, onClick: () -> Unit,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text("${s.flag} ${s.name}", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${s.flag} ${s.name}", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                if (s.protocol?.beta == true) {
+                    Spacer(Modifier.width(6.dp))
+                    BetaBadge()
+                }
+            }
             Text(s.summary, color = TextMuted, fontSize = 12.sp)
         }
         Box(Modifier.size(12.dp).clip(CircleShape)
@@ -119,10 +126,18 @@ private fun AddServerDialog(onDismiss: () -> Unit, onSave: (String, String, Int,
                 Field("Адрес", addr) { addr = it }
                 Field("Порт", port) { port = it.filter(Char::isDigit) }
                 Box {
-                    OutlinedActionButton("Протокол: ${proto.displayName}", Modifier.fillMaxWidth()) { expanded = true }
+                    OutlinedActionButton("Протокол: ${proto.displayName}${if (proto.beta) " [BETA]" else ""}", Modifier.fillMaxWidth()) { expanded = true }
                     DropdownMenu(expanded, { expanded = false }) {
                         Protocol.entries.forEach { p ->
-                            DropdownMenuItem(text = { Text(p.displayName) },
+                            DropdownMenuItem(text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(p.displayName)
+                                    if (p.beta) {
+                                        Spacer(Modifier.width(6.dp))
+                                        BetaBadge()
+                                    }
+                                }
+                            },
                                 onClick = { proto = p; expanded = false })
                         }
                     }

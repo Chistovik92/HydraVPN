@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.gidravpn.hydra.ui.MainViewModel
+import ru.gidravpn.hydra.ui.components.BetaBadge
 import ru.gidravpn.hydra.ui.components.Card
 import ru.gidravpn.hydra.ui.components.Label
 import ru.gidravpn.hydra.ui.components.clickableNoRipple
@@ -46,12 +47,18 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
         // Выбор протокола (отражает протокол выбранного сервера)
         Card(Modifier.fillMaxWidth()) {
             Label("Протокол")
-            Text(
-                server?.protocol?.displayName ?: "—",
-                color = TextPrimary, fontSize = 14.sp,
-                modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp)).background(InputBg).padding(12.dp)
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    server?.protocol?.displayName ?: "—",
+                    color = TextPrimary, fontSize = 14.sp,
+                    modifier = Modifier.weight(1f)
+                        .clip(RoundedCornerShape(10.dp)).background(InputBg).padding(12.dp)
+                )
+                if (server?.protocol?.beta == true) {
+                    Spacer(Modifier.width(8.dp))
+                    BetaBadge()
+                }
+            }
         }
         Spacer(Modifier.height(32.dp))
 

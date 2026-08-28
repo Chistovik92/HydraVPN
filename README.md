@@ -41,6 +41,8 @@ Shadowsocks, Hysteria2, TUIC, WireGuard), **AmneziaWG** (обфусцирова�
 | AmneziaWG 1.0/1.5/2.0 | amneziawg-go | .conf/uapi готовы, нужен `.aar` |
 | SSTP | userspace (Kotlin) | реализован, нужен тест на устройстве |
 | L2TP (без IPsec) | userspace (Kotlin) | реализован, нужен тест на устройстве |
+| WDTT (BETA) | libclient.so | каркас, нужен `.so` + VK-auth |
+| olcRTC (BETA) | olcrtc.aar + tun2socks | каркас, нужен `.aar` |
 | PPTP | — | **недоступно**: GRE требует root, стек удалён из Android 12/13 |
 
 > **Про L2TP.** Системный стек L2TP удалён из Android (12 — из UI, 13 — целиком,

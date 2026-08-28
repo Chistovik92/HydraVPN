@@ -46,3 +46,17 @@ fun Label(text: String) = Text(
     fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp,
     modifier = Modifier.padding(bottom = 8.dp)
 )
+
+/** Плашка BETA для ознакомительных/экспериментальных протоколов (WDTT, olcRTC). */
+@Composable
+fun BetaBadge() {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(AccentViolet.copy(alpha = 0.15f))
+            .border(1.dp, AccentViolet.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    ) {
+        Text("BETA", color = AccentViolet, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+    }
+}

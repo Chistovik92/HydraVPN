@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0] — WDTT и olcRTC (BETA-доступ)
+### Добавлено
+- **WDTT (beta)**: WireGuard через TURN-релей облака ВК. Движок — нативный
+  `libclient.so` (JNI), поток VK-авторизации (WebView) — каркас `WdttCore`
+  с честным отказом до сборки библиотеки и проверки лицензии upstream.
+- **olcRTC (beta)**: TCP поверх WebRTC DataChannel. Движок — gomobile
+  `olcrtc.aar` (компонент cnc → локальный SOCKS5) + tun2socks
+  (hev-socks5-tunnel) — каркас `OlcRtcCore`.
+- Флаг `Protocol.beta` и компонент `BetaBadge`: ознакомительные протоколы
+  помечены в UI (карточка сервера, главный экран, выбор протокола).
+- `Engine.WDTT`, `Engine.OLCRTC`; маршрутизация в `NativeCoreFactory`.
+
+### Известные ограничения
+- WDTT/olcRTC требуют `libclient.so` / `olcrtc.aar` + hev-socks5-tunnel
+  (docs/BUILD.md); до этого подключение завершается понятным отказом.
+
 ## [0.3.0] — SSTP, L2TP и userspace-PPP-стек
 ### Добавлено
 - **Userspace PPP-стек на Kotlin** (`vpn/ppp`, без нативных .aar):

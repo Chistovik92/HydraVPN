@@ -39,8 +39,12 @@ fun SettingsScreen() {
             Text("Обычный WireGuard — через sing-box (libbox.aar). AmneziaWG 1.0/1.5/2.0 — отдельный движок amneziawg-go.aar: обфускация Jc/Jmin/Jmax/S1/S2/H1–H4 и маркеры I1–I5. Генерация .conf/uapi готова.",
                 color = TextMuted, fontSize = 12.sp)
         }
+        SettingsGroup("WDTT и olcRTC (BETA)", AccentViolet) {
+            Text("Ознакомительные движки. WDTT — WireGuard через TURN-релей облака ВК (libclient.so + VK-авторизация). olcRTC — TCP поверх WebRTC DataChannel (olcrtc.aar + tun2socks). Отмечены плашкой BETA в интерфейсе.",
+                color = TextMuted, fontSize = 12.sp)
+        }
         SettingsGroup("О приложении", TextSecondary) {
-            Text("Hydra 0.3.0 — мультипротокольный VPN-клиент. Лицензия GPL-3.0.",
+            Text("Hydra 0.4.0 — мультипротокольный VPN-клиент. Лицензия GPL-3.0.",
                 color = TextMuted, fontSize = 12.sp)
         }
     }
