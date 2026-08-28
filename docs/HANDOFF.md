@@ -2,7 +2,7 @@
 
 Документ для продолжения работы (в т.ч. под другим аккаунтом/у другого
 разработчика). Главные источники контекста: `CHANGELOG.md` (детальный лог
-по версиям 0.1.0 → 0.5.2) и `docs/PROTOCOLS.md`.
+по версиям 0.1.0 → 0.5.3) и `docs/PROTOCOLS.md`.
 
 ## Что это
 
@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.5.2** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.5.3** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -49,17 +49,24 @@
    `olcrtc.aar` (gomobile), `libclient.so` (WDTT). В оффлайн-среде это не делалось.
 2. **On-device проверка SSTP/L2TP**: согласование PPP, MS-CHAPv2, IPCP, SNAT/чек-суммы
    в `TunBridge`, SSTP crypto-binding против реального SoftEther/Mikrotik.
-3. **sing-box PlatformInterface**: доопределить версионно-зависимые методы под
-   конкретную версию libbox (возвращающие libbox-типы: `getInterfaces`,
-   `startDefaultInterfaceMonitor`, `readWIFIState`, `systemCertificates`).
-   Референс: SagerNet/sing-box-for-android → `PlatformInterfaceWrapper`.
+3. ~~sing-box PlatformInterface: доопределить версионно-зависимые методы~~ —
+   готово в 0.5.3: `getInterfaces`/`startDefaultInterfaceMonitor`/`systemCertificates`
+   проверены живым подключением на реальном устройстве (см. CHANGELOG 0.5.3).
+   `readWIFIState` осознанно `null` (policy-based routing не используется).
 4. **Xray**: мост tun2socks (`hev-socks5-tunnel`) + запуск ядра в `XrayCore`
    (streamSettings уже готовы в `XrayConfigBuilder`).
 5. **olcRTC**: gomobile-биндинг (`cnc` → локальный SOCKS5) + tun2socks в `OlcRtcCore`.
 6. **WDTT**: JNI к `libclient.so` + поток VK-авторизации (WebView) в `WdttCore`;
    проверить лицензию upstream перед включением бинарника.
 7. (Опц.) UI-переключатель движка Xray↔sing-box для vless/vmess.
-8. (Опц.) статистика sing-box через `CommandClient` (`SingBoxRuntime`, сейчас каркас).
+8. (Опц.) статистика sing-box через `CommandClient` (`SingBoxRuntime`, сейчас каркас) —
+   в 0.5.3 подтверждено, что счётчики трафика в UI всегда показывают 0,0 MB
+   именно поэтому (реальный трафик при этом идёт нормально).
+9. Известные open items из 0.5.3 (не блокируют работу, чинить отдельно):
+   `no available network interface` всё ещё проскакивает в первую долю
+   секунды при старте подключения (до первого колбэка монитора интерфейса);
+   ANSI-коды цвета из лога sing-box (`\x1b[36mINFO...`) выводятся в UI как
+   есть, не отфильтрованы.
 
 ## Карта кода
 
@@ -77,20 +84,23 @@ app/src/native/.../vpn/core/   SingBoxCore(+Runtime), XrayCore(+ConfigBuilder),
                                WdttCore, OlcRtcCore, NativeCoreFactory
 app/src/stub/.../vpn/core/     StubCore (NoopCore — симуляция для stub/CI)
 docs/   PROTOCOLS · SECURITY · BUILD · ARCHITECTURE · SERVICES · PANELS · CONTRIBUTING
-CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.5.2 (главный источник контекста)
+CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.5.3 (главный источник контекста)
 ```
 
 ## Честные оговорки
 
+- **0.5.3**: первая версия, реально проверенная живым подключением на
+  физическом устройстве (OnePlus 15, Android 16) — до этого весь native-flavor
+  был проверен только статически/сборкой. Живая проверка сразу же вскрыла
+  два краша (порядок инициализации `VpnState`, JNI-краш монитора интерфейса)
+  и полное отсутствие интернета после подключения (см. CHANGELOG.md), которые
+  не могли быть найдены без реального устройства. Урок: "собирается" и
+  "проходит статический анализ" — не то же самое, что "работает на телефоне".
 - **0.5.2**: исправлен краш при подключении VPN на реальных устройствах
   Android 14+ (`foregroundServiceType="systemExempted"` требовал
   signature|privileged-разрешения, которого у стороннего приложения нет —
   см. CHANGELOG.md) и краш userspace-PPP на битых TCP-пакетах
   (`TunBridge.fixChecksums`, отсутствовала проверка границ буфера).
-  Оба фикса проверены на уровне логики и статической сборки, но
-  regression-теста подключения на физическом устройстве Android 14+ не
-  проводилось (нет доступа к устройству в среде разработки) — рекомендуется
-  проверить перед публикацией в Play Store.
 - **Проверено сборкой:** `:app:assembleStubDebug` — BUILD SUCCESSFUL
   (main sourceSet: PPP-стек, split tunneling, UI, Room/KSP). Native-flavor
   компилируется только при наличии `.aar` — это ожидаемо (см. docs/BUILD.md).

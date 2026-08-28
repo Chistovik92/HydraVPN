@@ -44,7 +44,7 @@ fun SettingsScreen() {
                 color = TextMuted, fontSize = 12.sp)
         }
         SettingsGroup("О приложении", TextSecondary) {
-            Text("Hydra 0.5.1 — мультипротокольный VPN-клиент. Лицензия GPL-3.0.",
+            Text("Hydra ${ru.gidravpn.hydra.BuildConfig.VERSION_NAME} — мультипротокольный VPN-клиент. Лицензия GPL-3.0.",
                 color = TextMuted, fontSize = 12.sp)
         }
     }
