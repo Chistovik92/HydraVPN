@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.4.1] — Xray streamSettings и sing-box PlatformInterface
+### Добавлено
+- **XrayConfigBuilder**: полный `streamSettings` — tls (serverName/alpn/uTLS/
+  allowInsecure), reality (publicKey/shortId/spiderX), транспорт ws/grpc/http/
+  httpupgrade/tcp-header; outbounds под протокол (vmess/trojan/ss/vless),
+  DNS и маршрутизация (geoip:private → direct).
+- **XrayCore**: детальная схема моста «tun → tun2socks (hev-socks5-tunnel) →
+  socks-inbound Xray» с параметрами запуска.
+- **HydraPlatformInterface** расширен (реф. SagerNet/sing-box-for-android →
+  PlatformInterfaceWrapper): `findConnectionOwner` (ConnectivityManager, API 29+),
+  `usePlatformDefaultInterfaceMonitor`, `underNetworkExtension`,
+  `includeAllNetworks`; версионно-зависимые каркасы `startDefaultInterfaceMonitor`,
+  `getInterfaces`, `readWIFIState`, `systemCertificates` (TODO-маркеры под
+  конкретную версию libbox).
+- `AppCtx.appContext` — контекст для платформенных методов libbox.
+
+### Известные ограничения
+- Сигнатуры libbox-типов PlatformInterface сверяются после сборки .aar
+  (компилятор укажет расхождения — это ожидаемо, см. SingBoxCore).
+
 ## [0.4.0] — WDTT и olcRTC (BETA-доступ)
 ### Добавлено
 - **WDTT (beta)**: WireGuard через TURN-релей облака ВК. Движок — нативный

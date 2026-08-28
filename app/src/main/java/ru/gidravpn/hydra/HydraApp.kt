@@ -6,5 +6,6 @@ class HydraApp : Application() {
     override fun onCreate() {
         super.onCreate()
         AppCtx.filesDir = filesDir
+        AppCtx.appContext = this
     }
 }

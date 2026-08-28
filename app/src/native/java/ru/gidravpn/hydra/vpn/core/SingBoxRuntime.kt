@@ -1,12 +1,24 @@
 package ru.gidravpn.hydra.vpn.core
 
+import android.content.Context
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.SetupOptions
 import java.io.File
 import kotlin.concurrent.thread
 
-/** Одноразовая инициализация libbox + опрос статистики. */
+/**
+ * Одноразовая инициализация libbox + опрос статистики.
+ *
+ * Статистика: sing-box отдаёт её через CommandClient (Clash API поверх
+ * box service). Референс — SagerNet/sing-box-for-android: GroupUI /
+ * CommandClient с CommandClientOptions{command = Libbox.COMMAND_STATUS}.
+ * Пока .aar не собран — поток-каркас, чтобы не блокировать разработку UI.
+ */
 object SingBoxRuntime {
+
+    /** Контекст для платформенных методов HydraPlatformInterface. */
+    private val appContext: Context? get() = ru.gidravpn.hydra.AppCtx.appContext
+
     @Volatile private var isSetup = false
     @Volatile private var polling = false
     private val baseDir: File get() = ru.gidravpn.hydra.AppCtx.filesDir
@@ -27,8 +39,17 @@ object SingBoxRuntime {
     fun startStatsPolling(onStats: (TrafficStats) -> Unit) {
         polling = true
         thread(name = "singbox-stats") {
-            // Реальный опрос — через Libbox CommandClient (status/groups).
-            // Здесь оставлен каркас; подключите CommandClient к вашей версии libbox.
+            // TODO(libbox.aar): реальный опрос через CommandClient:
+            //   val client = Libbox.newCommandClient(CommandClientOptions().apply {
+            //       command = Libbox.COMMAND_STATUS
+            //       interval = 1000  // мс между опросами
+            //   })
+            //   client.start(object : io.nekohasekai.libbox.CommandClientHandler {
+            //       override fun onChanged(message: String?) {
+            //           // StatusMessage → TrafficStats(downBytes/upBytes)
+            //       }
+            //   })
+            // Сигнатуры зависят от версии libbox — сверить после сборки .aar.
             while (polling) { Thread.sleep(1000) }
         }
     }

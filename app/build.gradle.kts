@@ -11,12 +11,12 @@ android {
 
     defaultConfig {
         applicationId = "ru.gidravpn.hydra"
-        minSdk = 26            // Android 8.0. VpnService доступен с API 14, IKEv2 через VpnManager — с API 33 (проверяется в рантайме)
+        minSdk = 26            // Android 8.0. VpnService РґРѕСЃС‚СѓРїРµРЅ СЃ API 14, IKEv2 С‡РµСЂРµР· VpnManager вЂ” СЃ API 33 (РїСЂРѕРІРµСЂСЏРµС‚СЃСЏ РІ СЂР°РЅС‚Р°Р№РјРµ)
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.4.1"
 
-        // ABI, под которые собраны нативные ядра (libbox / libXray)
+        // ABI, РїРѕРґ РєРѕС‚РѕСЂС‹Рµ СЃРѕР±СЂР°РЅС‹ РЅР°С‚РёРІРЅС‹Рµ СЏРґСЂР° (libbox / libXray)
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
@@ -40,14 +40,14 @@ android {
 
     flavorDimensions += "engine"
     productFlavors {
-        // Собирается без нативных .aar. Ядра — заглушки (симуляция соединения),
-        // удобно для разработки UI и CI без тяжёлых бинарников.
+        // РЎРѕР±РёСЂР°РµС‚СЃСЏ Р±РµР· РЅР°С‚РёРІРЅС‹С… .aar. РЇРґСЂР° вЂ” Р·Р°РіР»СѓС€РєРё (СЃРёРјСѓР»СЏС†РёСЏ СЃРѕРµРґРёРЅРµРЅРёСЏ),
+        // СѓРґРѕР±РЅРѕ РґР»СЏ СЂР°Р·СЂР°Р±РѕС‚РєРё UI Рё CI Р±РµР· С‚СЏР¶С‘Р»С‹С… Р±РёРЅР°СЂРЅРёРєРѕРІ.
         create("stub") {
             dimension = "engine"
             versionNameSuffix = "-stub"
         }
-        // Реальная интеграция с libbox.aar (sing-box) и libXray.aar (Xray).
-        // Требует положить .aar в app/libs (см. docs/BUILD.md).
+        // Р РµР°Р»СЊРЅР°СЏ РёРЅС‚РµРіСЂР°С†РёСЏ СЃ libbox.aar (sing-box) Рё libXray.aar (Xray).
+        // РўСЂРµР±СѓРµС‚ РїРѕР»РѕР¶РёС‚СЊ .aar РІ app/libs (СЃРј. docs/BUILD.md).
         create("native") {
             dimension = "engine"
         }
@@ -82,21 +82,21 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.8.1")
 
-    // Room (хранение серверов / подписок)
+    // Room (С…СЂР°РЅРµРЅРёРµ СЃРµСЂРІРµСЂРѕРІ / РїРѕРґРїРёСЃРѕРє)
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // DataStore (настройки протоколов)
+    // DataStore (РЅР°СЃС‚СЂРѕР№РєРё РїСЂРѕС‚РѕРєРѕР»РѕРІ)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // Сеть (загрузка подписок)
+    // РЎРµС‚СЊ (Р·Р°РіСЂСѓР·РєР° РїРѕРґРїРёСЃРѕРє)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
-    // === Нативные ядра. Файлы .aar кладутся в app/libs вручную (см. docs/BUILD.md) ===
-    // sing-box: github.com/SagerNet/sing-box (experimental/libbox), собран через gomobile
+    // === РќР°С‚РёРІРЅС‹Рµ СЏРґСЂР°. Р¤Р°Р№Р»С‹ .aar РєР»Р°РґСѓС‚СЃСЏ РІ app/libs РІСЂСѓС‡РЅСѓСЋ (СЃРј. docs/BUILD.md) ===
+    // sing-box: github.com/SagerNet/sing-box (experimental/libbox), СЃРѕР±СЂР°РЅ С‡РµСЂРµР· gomobile
     "nativeImplementation"(":libbox@aar")
-    // Xray-core: github.com/XTLS/libXray, собран через gomobile
+    // Xray-core: github.com/XTLS/libXray, СЃРѕР±СЂР°РЅ С‡РµСЂРµР· gomobile
     "nativeImplementation"(":libXray@aar")
 }
