@@ -19,13 +19,13 @@ object VpnState {
     val stats = MutableStateFlow(TrafficStats())
     val connectedSince = MutableStateFlow(0L)
 
+    private val fmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    private fun line(msg: String) = "[${fmt.format(Date())}] $msg"
+
     private val _logs = MutableStateFlow<List<String>>(
         listOf(line("Приложение запущено"))
     )
     val logs = _logs.asStateFlow()
-
-    private val fmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-    private fun line(msg: String) = "[${fmt.format(Date())}] $msg"
 
     fun log(msg: String) {
         _logs.value = (_logs.value + line(msg)).takeLast(500)
