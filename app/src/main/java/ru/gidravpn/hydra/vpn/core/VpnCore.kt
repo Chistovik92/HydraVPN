@@ -10,14 +10,14 @@ enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED, ERROR }
 data class TrafficStats(val downBytes: Long = 0, val upBytes: Long = 0)
 
 /**
- * Абстракция proxy-ядра, работающего поверх tun-интерфейса.
+ * Абстракция ядра, работающего поверх tun-интерфейса.
  * Реализации (выбираются по flavor):
- *  - SingBoxCore (native, libbox.aar)  — VLESS/VMess/Trojan/SS/Hysteria2/TUIC
+ *  - SingBoxCore (native, libbox.aar)  — VLESS/VMess/Trojan/SS/Hysteria2/TUIC/WireGuard
  *  - XrayCore    (native, libXray.aar) — альтернативный движок Xray
- *  - NoopCore    (stub)                — симуляция для разработки/CI
- *
- * Семейство L2TP/IPsec обрабатывается отдельно ([ru.gidravpn.hydra.vpn.Ikev2Connector]),
- * т.к. IKEv2 на Android — системный (VpnManager), а не поверх нашего tun.
+ *  - AmneziaWgCore (native, amneziawg-go.aar)
+ *  - SstpCore / L2tpCore (native, userspace PPP на Kotlin — без .aar)
+ *  - PptpCore    (native) — честный отказ (GRE → root)
+ *  - NoopCore    (stub)   — симуляция для разработки/CI
  */
 interface VpnCore {
     val name: String

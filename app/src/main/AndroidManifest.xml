@@ -40,6 +40,9 @@
                 <data android:scheme="tuic" />
                 <data android:scheme="wireguard" />
                 <data android:scheme="awg" />
+                <data android:scheme="sstp" />
+                <data android:scheme="l2tp" />
+                <data android:scheme="pptp" />
                 <data android:scheme="sing-box" />
             </intent-filter>
         </activity>

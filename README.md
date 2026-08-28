@@ -3,12 +3,13 @@
 **Мультипротокольный VPN-клиент для Android** на Jetpack Compose.
 Поддерживает proxy-протоколы ядра **Xray** и **sing-box** (VLESS, VMess, Trojan,
 Shadowsocks, Hysteria2, TUIC, WireGuard), **AmneziaWG** (обфусцированный WireGuard),
-а также семейство **IPsec** (см. важное замечание по L2TP ниже). Импортирует
-подписки из панелей **x-ui, 3x-ui, PasarGuard, Remnawave**.
+а также **SSTP** и **L2TP**, реализованные целиком на Kotlin (userspace-PPP).
+Импортирует подписки из панелей **x-ui, 3x-ui, PasarGuard, Remnawave**.
 
-> ⚠️ **Статус: 0.2.0.** Полностью реализованы UI, слой данных, парсинг
-> ссылок/подписок (.conf WireGuard/AmneziaWG в т.ч.) и генерация конфигов.
-> Реальные туннели требуют сборки нативных ядер (`libbox.aar`, `libXray.aar`,
+> ⚠️ **Статус: 0.3.0.** Полностью реализованы UI, слой данных, парсинг
+> ссылок/подписок (.conf WireGuard/AmneziaWG в т.ч.), генерация конфигов и
+> userspace-PPP-стек (SSTP/L2TP — без нативных зависимостей).
+> Proxy-туннели требуют сборки нативных ядер (`libbox.aar`, `libXray.aar`,
 > `amneziawg-go.aar`) — см. [docs/BUILD.md](docs/BUILD.md).
 > Flavor `stub` собирается и запускается без ядер (симуляция соединения).
 
@@ -38,14 +39,17 @@ Shadowsocks, Hysteria2, TUIC, WireGuard), **AmneziaWG** (обфусцирова�
 | TUIC v5 | sing-box | конфиг готов, нужен `.aar` |
 | WireGuard | sing-box | конфиг готов, нужен `.aar` |
 | AmneziaWG 1.0/1.5/2.0 | amneziawg-go | .conf/uapi готовы, нужен `.aar` |
-| L2TP/IPsec | — | **недоступно на Android 13+** → используется IKEv2 |
-| IKEv2/IPsec | системный (VpnManager) | каркас, API 33+ |
+| SSTP | userspace (Kotlin) | реализован, нужен тест на устройстве |
+| L2TP (без IPsec) | userspace (Kotlin) | реализован, нужен тест на устройстве |
+| PPTP | — | **недоступно**: GRE требует root, стек удалён из Android 12/13 |
 
-> **Про L2TP.** Android 12 убрал L2TP из системного UI, Android 13 удалил стек
-> целиком (он строился на устаревшем IKEv1). Реализовать L2TP на уровне
-> приложения нереалистично. Пункт «L2TP/IPsec» в интерфейсе сохранён (как в
-> макете), но фактически маршрутизируется в системный **IKEv2/IPsec**.
-> Подробности — [docs/PROTOCOLS.md](docs/PROTOCOLS.md).
+> **Про L2TP.** Системный стек L2TP удалён из Android (12 — из UI, 13 — целиком,
+> строился на устаревшем IKEv1), а L2TP/IPsec недоступен в userspace (ESP).
+> Поэтому Hydra реализует «чистый» L2TP (RFC 2661) на Kotlin: туннель по UDP,
+> аутентификация и согласование IP — на PPP (MS-CHAPv2/PAP + IPCP).
+> Шифрование канала — только на уровне PPP; если нужен защищённый транспорт,
+> используйте SSTP (TLS) или WireGuard/AmneziaWG. Подробности —
+> [docs/PROTOCOLS.md](docs/PROTOCOLS.md).
 
 ## Быстрый старт
 

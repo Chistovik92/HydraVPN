@@ -22,8 +22,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
- * Основной туннель для proxy-ядер (sing-box / Xray).
- * Поднимает tun-интерфейс и передаёт его дескриптор в выбранное ядро.
+ * Основной туннель для всех движков (sing-box / Xray / amneziawg-go /
+ * userspace-PPP: SSTP, L2TP). Поднимает tun-интерфейс и передаёт его
+ * дескриптор в ядро, выбранное по протоколу профиля.
+ *
+ * Транспортные сокеты userspace-ядер (TLS для SSTP, UDP для L2TP)
+ * выводятся из-под VPN-маршрутизации через [SocketGuard].
  */
 class HydraVpnService : VpnService() {
 
@@ -37,6 +41,11 @@ class HydraVpnService : VpnService() {
         const val EXTRA_SERVER_ID = "server_id"
         private const val CHANNEL_ID = "vpn_status"
         private const val NOTIF_ID = 1
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        SocketGuard.attach(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -86,9 +95,11 @@ class HydraVpnService : VpnService() {
     }
 
     private fun establishTun(profile: ServerProfile): ParcelFileDescriptor {
+        // PPP-движки (SSTP/L2TP): MRU 1400, иначе фрагментация на TLS/UDP-транспорте
+        val userspace = profile.protocol?.engine == ru.gidravpn.hydra.data.model.Engine.USERSPACE
         val builder = Builder()
             .setSession("Hydra")
-            .setMtu(9000)
+            .setMtu(if (userspace) 1400 else 9000)
             .addAddress("172.19.0.1", 28)
             .addDnsServer("1.1.1.1")
             .addRoute("0.0.0.0", 0)
@@ -114,7 +125,7 @@ class HydraVpnService : VpnService() {
     }
 
     override fun onRevoke() { stopTunnel() }
-    override fun onDestroy() { scope.cancel(); super.onDestroy() }
+    override fun onDestroy() { SocketGuard.detach(); scope.cancel(); super.onDestroy() }
 
     // ----- notification -----
     private fun buildNotification(state: ConnectionState, server: String): Notification {

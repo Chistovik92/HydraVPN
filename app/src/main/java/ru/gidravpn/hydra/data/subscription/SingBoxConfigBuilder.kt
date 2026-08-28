@@ -111,7 +111,7 @@ object SingBoxConfigBuilder {
                     .put("congestion_control", extra.optString("congestion_control", "bbr"))
                 o.put("tls", tlsBlock(p, extra))
             }
-            else -> o.put("type", "direct")  // L2TP/IKEv2 обрабатывается отдельным движком, не sing-box
+            else -> o.put("type", "direct")  // SSTP/L2TP/PPTP/AWG обрабатываются отдельными движками, не sing-box
         }
         return o
     }

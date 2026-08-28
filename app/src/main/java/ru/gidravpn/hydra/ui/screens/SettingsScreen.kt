@@ -19,8 +19,12 @@ fun SettingsScreen() {
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Настройки", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
 
-        SettingsGroup("IKEv2/IPsec (замена L2TP)", AccentCyan) {
-            Text("PSK и параметры хранятся в профиле сервера. На Android 13+ нативный L2TP удалён — используется системный IKEv2/IPsec.",
+        SettingsGroup("SSTP / L2TP (userspace PPP)", AccentCyan) {
+            Text("Полностью на Kotlin, без нативных .aar: PPP-стек (LCP, MS-CHAPv2, IPCP), SSTP поверх TLS с crypto-binding, L2TP по UDP (без IPsec/ESP). Нужен тест на устройстве.",
+                color = TextMuted, fontSize = 12.sp)
+        }
+        SettingsGroup("PPTP", Danger) {
+            Text("Недоступно: данные в GRE (IP-протокол 47) требуют raw-сокетов/root, стек удалён из Android 12/13. Альтернативы: SSTP, L2TP, WireGuard.",
                 color = TextMuted, fontSize = 12.sp)
         }
         SettingsGroup("Xray Core", AccentIndigo) {
@@ -36,7 +40,7 @@ fun SettingsScreen() {
                 color = TextMuted, fontSize = 12.sp)
         }
         SettingsGroup("О приложении", TextSecondary) {
-            Text("Hydra 0.2.0 — мультипротокольный VPN-клиент. Лицензия GPL-3.0.",
+            Text("Hydra 0.3.0 — мультипротокольный VPN-клиент. Лицензия GPL-3.0.",
                 color = TextMuted, fontSize = 12.sp)
         }
     }

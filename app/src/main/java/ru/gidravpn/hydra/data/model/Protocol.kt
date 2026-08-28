@@ -3,12 +3,14 @@ package ru.gidravpn.hydra.data.model
 /**
  * Семейства протоколов, поддерживаемые клиентом.
  *
- * Важно: пункт [L2TP_IPSEC] в интерфейсе оставлен ради совместимости с макетом,
- * но фактически обслуживается движком IKEv2/IPsec (VpnManager), т.к. Android 13+
- * полностью удалил нативный стек L2TP (см. docs/PROTOCOLS.md).
+ * SSTP и L2TP — userspace-реализации на Kotlin (PPP-стек vpn/ppp),
+ * не требуют нативных .aar. PPTP честно недоступен (GRE → root;
+ * стек удалён из Android 12/13) — см. docs/PROTOCOLS.md.
  */
 enum class Protocol(val id: String, val displayName: String, val engine: Engine) {
-    L2TP_IPSEC("l2tp",   "L2TP/IPsec (PSK)",         Engine.IKEV2),
+    SSTP      ("sstp",   "SSTP (TLS/PPP)",           Engine.USERSPACE),
+    L2TP      ("l2tp",   "L2TP (PPP/UDP)",           Engine.USERSPACE),
+    PPTP      ("pptp",   "PPTP (недоступно)",        Engine.UNAVAILABLE),
     VLESS     ("vless",  "VLESS (Xray/sing-box)",    Engine.SINGBOX),
     VMESS     ("vmess",  "VMess",                    Engine.SINGBOX),
     TROJAN    ("trojan", "Trojan",                   Engine.SINGBOX),
@@ -21,6 +23,9 @@ enum class Protocol(val id: String, val displayName: String, val engine: Engine)
     companion object {
         fun fromId(id: String): Protocol? = entries.firstOrNull { it.id == id }
         fun fromScheme(scheme: String): Protocol? = when (scheme.lowercase()) {
+            "sstp" -> SSTP
+            "l2tp" -> L2TP
+            "pptp" -> PPTP
             "vless" -> VLESS
             "vmess" -> VMESS
             "trojan" -> TROJAN
@@ -36,6 +41,10 @@ enum class Protocol(val id: String, val displayName: String, val engine: Engine)
 
 /**
  * Нативный движок, который будет обслуживать соединение.
- * [AWG] — amneziawg-go (отдельный .aar), обфусцированный WireGuard.
+ *  - [SINGBOX] — sing-box (libbox.aar): proxy-протоколы + WireGuard;
+ *  - [XRAY] — Xray-core (libXray.aar + tun2socks);
+ *  - [AWG] — amneziawg-go.aar (обфусцированный WireGuard);
+ *  - [USERSPACE] — чистый Kotlin (PPP-стек): SSTP, L2TP;
+ *  - [UNAVAILABLE] — протокол невозможен на Android (PPTP/GRE).
  */
-enum class Engine { SINGBOX, XRAY, IKEV2, AWG }
+enum class Engine { SINGBOX, XRAY, AWG, USERSPACE, UNAVAILABLE }

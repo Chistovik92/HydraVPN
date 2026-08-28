@@ -148,7 +148,7 @@ private fun ImportDialog(onDismiss: () -> Unit, onLink: (String) -> Unit, onSubs
         title = { Text("Импорт", color = TextPrimary) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Вставьте ссылку (vless://, vmess://, trojan://, ss://, hysteria2://, tuic://, wireguard://, awg://), .conf WireGuard/AmneziaWG или URL подписки.",
+                Text("Вставьте ссылку (vless://, vmess://, trojan://, ss://, hysteria2://, tuic://, wireguard://, awg://, sstp://, l2tp://), .conf WireGuard/AmneziaWG или URL подписки.",
                     color = TextMuted, fontSize = 12.sp)
                 Field("Ссылка / URL", value) { value = it }
                 Field("Имя подписки (если URL)", name) { name = it }

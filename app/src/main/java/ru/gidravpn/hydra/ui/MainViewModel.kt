@@ -4,13 +4,11 @@ import android.app.Application
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import android.os.Build
 import ru.gidravpn.hydra.data.model.Engine
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.Subscription
 import ru.gidravpn.hydra.data.repository.ServerRepository
-import ru.gidravpn.hydra.vpn.Ikev2Connector
 import ru.gidravpn.hydra.vpn.HydraVpnService
 import ru.gidravpn.hydra.vpn.VpnState
 import ru.gidravpn.hydra.vpn.core.ConnectionState
@@ -59,13 +57,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         val ctx = getApplication<Application>()
 
-        // Семейство L2TP/IPsec обслуживается системным IKEv2 (VpnManager), а не proxy-туннелем.
-        if (server.protocol?.engine == Engine.IKEV2) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                VpnState.log("IKEv2 требует Android 13+ (API 33)"); return
-            }
-            runCatching { Ikev2Connector(ctx).provisionAndStart(server) }
-                .onFailure { VpnState.log("IKEv2: ${it.message}") }
+        // PPTP честно недоступен: GRE требует root, стек удалён из Android 12/13.
+        if (server.protocol?.engine == Engine.UNAVAILABLE) {
+            VpnState.log("${server.protocol?.displayName}: протокол недоступен на Android — используйте SSTP/L2TP/WireGuard")
             return
         }
 

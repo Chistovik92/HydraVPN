@@ -36,6 +36,9 @@ object LinkParser {
             "tuic"      -> parseTuic(link)
             "wireguard", "wg" -> WireGuardParser.toProfile(link, "WireGuard", isAmnezia = false)
             "awg", "amnezia" -> WireGuardParser.toProfile(link, "AmneziaWG", isAmnezia = true)
+            "sstp"      -> parseUserPass(link, Protocol.SSTP, 443)
+            "l2tp"      -> parseUserPass(link, Protocol.L2TP, 1701)
+            "pptp"      -> parseUserPass(link, Protocol.PPTP, 1723)
             // вставленный целиком .conf (без схемы): AWG-параметры → AmneziaWG, иначе WireGuard
             else -> if ("[Interface]" in link) {
                 val awg = Regex("^(Jc|Jmin|Jmax|S1|S2|H[1-4]|I[1-5])\\s*=", RegexOption.IGNORE_CASE)
@@ -43,6 +46,28 @@ object LinkParser {
                 WireGuardParser.toProfile(link, if (awg) "AmneziaWG" else "WireGuard", isAmnezia = awg)
             } else null
         }
+    }
+
+    // sstp://user:pass@host:port#name | l2tp://… | pptp://… (PPP-семейство, userspace)
+    private fun parseUserPass(link: String, protocol: Protocol, defaultPort: Int): ServerProfile {
+        val uri = Uri.parse(link)
+        val q = uri.queryMap()
+        val userInfo = uri.userInfo.orEmpty()
+        val user = urlDecode(userInfo.substringBefore(":"))
+        val pass = userInfo.substringAfter(":", "")
+        return ServerProfile(
+            name = tag(uri) ?: "${protocol.displayName} ${uri.host}",
+            protocolId = protocol.id,
+            address = uri.host.orEmpty(),
+            port = uri.port.takeIf { it > 0 } ?: defaultPort,
+            uuidOrPassword = pass,
+            sni = q["sni"].orEmpty(),
+            extra = JSONObject().apply {
+                put("username", user)
+                q["allow_insecure"]?.let { put("allow_insecure", it == "1" || it == "true") }
+                q["tunnel_secret"]?.let { put("tunnel_secret", it) }  // L2TP tunnel-auth
+            }.toString(),
+        )
     }
 
     // vless://uuid@host:port?type=ws&security=reality&pbk=...&sid=...&sni=...&flow=...#name
