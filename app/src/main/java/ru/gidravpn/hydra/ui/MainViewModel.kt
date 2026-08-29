@@ -57,7 +57,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _requestPermission = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val requestPermission = _requestPermission.asSharedFlow()
 
-    fun select(id: Long) { _selectedId.value = id }
+    /**
+     * Выбор сервера в списке. Если соединение уже активно (или устанавливается),
+     * сразу переключает туннель на новый сервер — VPN-consent уже выдан, повторный
+     * запрос не нужен, поэтому идём напрямую через startTunnelWith(), минуя toggle().
+     */
+    fun select(id: Long) {
+        _selectedId.value = id
+        if (state.value == ConnectionState.CONNECTED || state.value == ConnectionState.CONNECTING) {
+            servers.value.firstOrNull { it.id == id }?.let { startTunnelWith(it) }
+        }
+    }
 
     fun toggle() = viewModelScope.launch {
         if (state.value == ConnectionState.CONNECTED || state.value == ConnectionState.CONNECTING) {
@@ -71,6 +81,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val server = selectedServer.value ?: run {
             VpnState.log("Ошибка: сервер не выбран"); return
         }
+        startTunnelWith(server)
+    }
+
+    private fun startTunnelWith(server: ServerProfile) {
         val ctx = getApplication<Application>()
 
         // PPTP честно недоступен: GRE требует root, стек удалён из Android 12/13.

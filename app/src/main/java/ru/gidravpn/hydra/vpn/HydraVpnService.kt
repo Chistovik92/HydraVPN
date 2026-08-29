@@ -17,6 +17,7 @@ import ru.gidravpn.hydra.vpn.core.CoreFactoryProvider
 import ru.gidravpn.hydra.vpn.core.VpnCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.firstOrNull
@@ -34,6 +35,7 @@ class HydraVpnService : VpnService() {
 
     private var tun: ParcelFileDescriptor? = null
     private var core: VpnCore? = null
+    private var connectJob: Job? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
@@ -61,7 +63,20 @@ class HydraVpnService : VpnService() {
         return START_STICKY
     }
 
-    private fun connect(serverId: Long) = scope.launch {
+    private fun connect(serverId: Long) {
+        connectJob?.cancel()
+        connectJob = scope.launch { doConnect(serverId) }
+    }
+
+    private suspend fun doConnect(serverId: Long) {
+        // Переключение на другой сервер при уже активном соединении вызывает
+        // connect() повторно — без явного гашения предыдущих core/tun они
+        // просто перезаписываются полями ниже и утекают активными в фоне
+        // (соединение остаётся поднятым, невидимым для UI/disconnect).
+        runCatching { core?.stop() }
+        core = null
+        runCatching { tun?.close() }
+        tun = null
         try {
             VpnState.state.value = ConnectionState.CONNECTING
             val profile = ru.gidravpn.hydra.data.repository.ServerRepository(applicationContext).byId(serverId)
@@ -124,6 +139,8 @@ class HydraVpnService : VpnService() {
     }
 
     private fun stopTunnel() {
+        connectJob?.cancel()
+        connectJob = null
         scope.launch {
             runCatching { core?.stop() }
             core = null

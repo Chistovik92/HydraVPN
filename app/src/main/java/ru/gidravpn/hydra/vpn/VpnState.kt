@@ -22,14 +22,21 @@ object VpnState {
     private val fmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
     private fun line(msg: String) = "[${fmt.format(Date())}] $msg"
 
+    // Ядро sing-box/xray шлёт строки лога с терминальными цветовыми
+    // escape-последовательностями. Compose Text их не интерпретирует и
+    // показывает как мусорные символы, поэтому вырезаем перед сохранением.
+    private val ansiCodes = Regex("""\Q[\E[0-9;]*m""")
+    private fun stripAnsi(msg: String) = ansiCodes.replace(msg, "")
+
     private val _logs = MutableStateFlow<List<String>>(
         listOf(line("Приложение запущено"))
     )
     val logs = _logs.asStateFlow()
 
     fun log(msg: String) {
-        android.util.Log.d("HydraCore", msg)
-        _logs.value = (_logs.value + line(msg)).takeLast(500)
+        val clean = stripAnsi(msg)
+        android.util.Log.d("HydraCore", clean)
+        _logs.value = (_logs.value + line(clean)).takeLast(500)
     }
 
     fun clearLogs() { _logs.value = listOf(line("Логи очищены")) }
