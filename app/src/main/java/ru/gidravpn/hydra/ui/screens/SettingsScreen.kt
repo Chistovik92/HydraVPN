@@ -5,6 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,7 +22,7 @@ import ru.gidravpn.hydra.ui.components.clickableNoRipple
 import ru.gidravpn.hydra.ui.theme.*
 
 /** Подэкраны Настроек — Split и Логи переехали сюда из верхнего уровня навигации. */
-private enum class SettingsSection { HUB, TUNNEL, SPLIT, LOGS, ABOUT }
+private enum class SettingsSection { HUB, TUNNEL, SPLIT, LOGS, THEME, ABOUT }
 
 @Composable
 fun SettingsScreen(vm: MainViewModel) {
@@ -32,6 +33,7 @@ fun SettingsScreen(vm: MainViewModel) {
         SettingsSection.TUNNEL -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { TunnelInfoContent() }
         SettingsSection.SPLIT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { SplitTunnelScreen(vm) }
         SettingsSection.LOGS -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { LogsScreen(vm) }
+        SettingsSection.THEME -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { ThemeContent(vm) }
         SettingsSection.ABOUT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { AboutContent() }
     }
 }
@@ -47,6 +49,7 @@ private fun SettingsHub(onSelect: (SettingsSection) -> Unit) {
         HubRow("🌐", "Туннель", "Протоколы и движки", AccentViolet) { onSelect(SettingsSection.TUNNEL) }
         HubRow("🔀", "Split-туннелинг", "Приложения через VPN / мимо VPN", AccentCyan) { onSelect(SettingsSection.SPLIT) }
         HubRow("📋", "Логи", "Журнал подключения", TextSecondary) { onSelect(SettingsSection.LOGS) }
+        HubRow("🎨", "Тема", "Hydra Emerald / Monochrome Stealth", AccentCyan) { onSelect(SettingsSection.THEME) }
         HubRow("ℹ️", "О приложении", "Версия, лицензия", TextSecondary) { onSelect(SettingsSection.ABOUT) }
     }
 }
@@ -117,6 +120,50 @@ private fun TunnelInfoContent() {
         InfoGroup("WDTT и olcRTC (BETA)", AccentViolet) {
             Text("Ознакомительные движки. WDTT — WireGuard через TURN-релей облака ВК (libclient.so + VK-авторизация). olcRTC — TCP поверх WebRTC DataChannel (olcrtc.aar + tun2socks). Отмечены плашкой BETA в интерфейсе.",
                 color = TextMuted, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun ThemeContent(vm: MainViewModel) {
+    val current by vm.themeMode.collectAsState()
+    Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Тема", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        ru.gidravpn.hydra.ui.theme.ThemeMode.entries.forEach { mode ->
+            ThemeOptionCard(mode, selected = mode == current) { vm.setThemeMode(mode) }
+        }
+    }
+}
+
+@Composable
+private fun ThemeOptionCard(
+    mode: ru.gidravpn.hydra.ui.theme.ThemeMode,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val palette = when (mode) {
+        ru.gidravpn.hydra.ui.theme.ThemeMode.EMERALD -> EmeraldPalette
+        ru.gidravpn.hydra.ui.theme.ThemeMode.STEALTH -> StealthPalette
+    }
+    Card(
+        Modifier.fillMaxWidth().clickableNoRipple(onClick),
+        borderColor = if (selected) AccentCyan else Border
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                listOf(palette.bg, palette.surface, palette.accent).forEach { swatch ->
+                    androidx.compose.foundation.Canvas(Modifier.size(16.dp)) {
+                        drawCircle(swatch)
+                    }
+                    Spacer(Modifier.width(4.dp))
+                }
+                Spacer(Modifier.width(8.dp))
+                Column {
+                    Text(mode.label, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(mode.description, color = TextMuted, fontSize = 11.sp)
+                }
+            }
+            if (selected) Text("✓", color = AccentCyan, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

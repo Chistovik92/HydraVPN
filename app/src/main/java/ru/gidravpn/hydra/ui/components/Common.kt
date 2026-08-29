@@ -1,5 +1,6 @@
 package ru.gidravpn.hydra.ui.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,6 +12,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,5 +63,24 @@ fun BetaBadge() {
             .padding(horizontal = 6.dp, vertical = 2.dp)
     ) {
         Text("BETA", color = AccentViolet, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** Простой линейный график по последним замерам — для экрана Профиля. */
+@Composable
+fun Sparkline(samples: List<Float>, color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        if (samples.size < 2) return@Canvas
+        val max = samples.max().coerceAtLeast(1f)
+        val stepX = size.width / (samples.size - 1)
+        val path = Path().apply {
+            samples.forEachIndexed { i, v ->
+                val x = i * stepX
+                val y = size.height * (1f - v / max)
+                if (i == 0) moveTo(x, y) else lineTo(x, y)
+            }
+        }
+        drawPath(path, color, style = Stroke(width = 3f))
+        drawLine(color.copy(alpha = 0.15f), Offset(0f, size.height), Offset(size.width, size.height))
     }
 }

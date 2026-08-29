@@ -17,7 +17,12 @@ import io.nekohasekai.libbox.PlatformInterface
 import io.nekohasekai.libbox.StringIterator
 import io.nekohasekai.libbox.TunOptions
 import io.nekohasekai.libbox.WIFIState
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.runBlocking
+import ru.gidravpn.hydra.AppCtx
 import ru.gidravpn.hydra.data.model.ServerProfile
+import ru.gidravpn.hydra.data.model.SplitTunnel
+import ru.gidravpn.hydra.data.repository.SplitTunnelRepository
 import ru.gidravpn.hydra.data.subscription.SingBoxConfigBuilder
 import java.io.File
 
@@ -42,7 +47,10 @@ class SingBoxCore : VpnCore {
         // libbox.setup вызывается один раз за процесс (idempotent guard в SingBoxRuntime)
         SingBoxRuntime.ensureSetup()
 
-        val config = SingBoxConfigBuilder.build(profile).toString(2)
+        val split = AppCtx.appContext?.let { ctx ->
+            runBlocking { SplitTunnelRepository(ctx).settings.firstOrNull() }
+        } ?: SplitTunnel()
+        val config = SingBoxConfigBuilder.build(profile, splitTunnel = split).toString(2)
         onLog("sing-box: конфиг сгенерирован (${config.length} байт)")
 
         val platform = HydraPlatformInterface(existingTun = tun, onLogLine = onLog)

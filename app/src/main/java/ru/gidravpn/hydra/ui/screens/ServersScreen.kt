@@ -18,20 +18,37 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
+import ru.gidravpn.hydra.data.model.Subscription
 import ru.gidravpn.hydra.ui.MainViewModel
 import ru.gidravpn.hydra.ui.components.BetaBadge
 import ru.gidravpn.hydra.ui.components.clickableNoRipple
 import ru.gidravpn.hydra.ui.theme.*
+import androidx.compose.ui.graphics.Color
 
 @Composable
 fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
     val servers by vm.servers.collectAsState()
+    val subscriptions by vm.subscriptions.collectAsState()
     val selectedId by vm.selectedId.collectAsState()
+    val measuringIds by vm.measuringIds.collectAsState()
     var showAdd by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
 
+    val grouped = remember(servers, subscriptions) {
+        val bySub = servers.groupBy { it.subscriptionId }
+        val ordered = mutableListOf<Pair<Subscription?, List<ServerProfile>>>()
+        bySub[null]?.let { ordered.add(null to it) }
+        subscriptions.forEach { sub -> bySub[sub.id]?.let { ordered.add(sub to it) } }
+        ordered
+    }
+
     Column(Modifier.fillMaxSize().padding(20.dp)) {
-        Text("Серверы", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically) {
+            Text("Серверы", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+            Text("Обновить пинг", color = AccentCyan, fontSize = 12.sp,
+                modifier = Modifier.clickableNoRipple { vm.measureAllPings() })
+        }
         Spacer(Modifier.height(20.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -41,10 +58,17 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
         Spacer(Modifier.height(16.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(servers, key = { it.id }) { s ->
-                ServerCard(s, selected = (selectedId ?: servers.firstOrNull()?.id) == s.id,
-                    onClick = { vm.select(s.id); onSelected() },
-                    onDelete = { vm.delete(s) })
+            grouped.forEach { (sub, list) ->
+                if (sub != null) {
+                    item(key = "header_${sub.id}") { SubscriptionHeader(sub, list.size) }
+                }
+                items(list, key = { it.id }) { s ->
+                    ServerCard(s, selected = (selectedId ?: servers.firstOrNull()?.id) == s.id,
+                        measuring = s.id in measuringIds,
+                        onClick = { vm.select(s.id); onSelected() },
+                        onDelete = { vm.delete(s) },
+                        onMeasure = { vm.measurePing(s) })
+                }
             }
         }
     }
@@ -61,7 +85,22 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
 }
 
 @Composable
-private fun ServerCard(s: ServerProfile, selected: Boolean, onClick: () -> Unit, onDelete: () -> Unit) {
+private fun SubscriptionHeader(sub: Subscription, count: Int) {
+    Row(
+        Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(sub.name.uppercase(), color = TextMuted, fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp)
+        Text("$count", color = TextMuted, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun ServerCard(
+    s: ServerProfile, selected: Boolean, measuring: Boolean,
+    onClick: () -> Unit, onDelete: () -> Unit, onMeasure: () -> Unit
+) {
     Row(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
@@ -73,18 +112,54 @@ private fun ServerCard(s: ServerProfile, selected: Boolean, onClick: () -> Unit,
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Box(Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(SurfaceDim),
+            contentAlignment = Alignment.Center) {
+            Text(s.flag, fontSize = 16.sp)
+        }
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${s.flag} ${s.name}", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(s.name, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 if (s.protocol?.beta == true) {
                     Spacer(Modifier.width(6.dp))
                     BetaBadge()
                 }
             }
-            Text(s.summary, color = TextMuted, fontSize = 12.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(s.protocol?.displayName ?: s.protocolId.uppercase(), color = TextMuted, fontSize = 12.sp)
+                Text(" • ", color = TextMuted, fontSize = 12.sp)
+                Text(
+                    when {
+                        measuring -> "измерение…"
+                        s.pingMs >= 0 -> "${s.pingMs}мс"
+                        else -> "измерить"
+                    },
+                    color = if (measuring) TextMuted else pingColor(s.pingMs),
+                    fontSize = 12.sp,
+                    modifier = Modifier.clickableNoRipple { if (!measuring) onMeasure() }
+                )
+            }
         }
-        Box(Modifier.size(12.dp).clip(CircleShape)
-            .background(if (selected) Success else TextMuted))
+        Spacer(Modifier.width(8.dp))
+        s.protocol?.let { ProtocolChip(it.shortCode) }
+    }
+}
+
+@Composable
+private fun pingColor(pingMs: Int): Color = when {
+    pingMs in 0..99 -> AccentCyan
+    pingMs in 100..200 -> Warning
+    else -> TextMuted
+}
+
+@Composable
+private fun ProtocolChip(code: String) {
+    Box(
+        Modifier.clip(RoundedCornerShape(6.dp))
+            .background(AccentIndigo.copy(alpha = 0.15f))
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Text(code, color = AccentIndigo, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }
 

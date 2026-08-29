@@ -2,6 +2,8 @@ package ru.gidravpn.hydra.data.subscription
 
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
+import ru.gidravpn.hydra.data.model.SplitTunnel
+import ru.gidravpn.hydra.data.model.SplitTunnelMode
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -13,7 +15,7 @@ import org.json.JSONObject
  */
 object SingBoxConfigBuilder {
 
-    fun build(profile: ServerProfile, socksPort: Int = 0): JSONObject {
+    fun build(profile: ServerProfile, socksPort: Int = 0, splitTunnel: SplitTunnel = SplitTunnel()): JSONObject {
         val outbound = outboundFor(profile)
         val root = JSONObject()
 
@@ -50,13 +52,21 @@ object SingBoxConfigBuilder {
             put(JSONObject().put("type", "block").put("tag", "block"))
         })
 
-        // маршрутизация
+        // маршрутизация (+ пользовательские правила split tunneling по IP/доменам — Фаза 2)
+        val netRules = splitTunnel.netRules.takeIf { splitTunnel.netActive }.orEmpty()
         root.put("route", JSONObject().apply {
             put("rules", JSONArray().apply {
+                if (netRules.isNotEmpty()) {
+                    val ruleOutbound = if (splitTunnel.netMode == SplitTunnelMode.EXCLUDE) "direct" else "proxy"
+                    netRules.groupBy({ it.type }, { it.value }).forEach { (type, values) ->
+                        put(JSONObject().put(type.singBoxKey, JSONArray(values)).put("outbound", ruleOutbound))
+                    }
+                }
                 put(JSONObject().put("protocol", "dns").put("outbound", "dns-out"))
                 put(JSONObject().put("ip_is_private", true).put("outbound", "direct"))
             })
-            put("final", "proxy")
+            // INCLUDE: через прокси идёт только явно перечисленное, всё остальное — мимо VPN.
+            put("final", if (netRules.isNotEmpty() && splitTunnel.netMode == SplitTunnelMode.INCLUDE) "direct" else "proxy")
             put("auto_detect_interface", true)
         })
 
