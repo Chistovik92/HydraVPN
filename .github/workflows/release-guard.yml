@@ -7,6 +7,11 @@ name: Release guard
 on:
   release:
     types: [published, edited]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Тег релиза для проверки (например v0.6.0)"
+        required: true
 
 jobs:
   verify-release-assets:
@@ -15,7 +20,7 @@ jobs:
       - name: Проверить состав ассетов
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -32,7 +37,7 @@ jobs:
       - name: Проверить, что внутри full-APK есть ядро sing-box
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
