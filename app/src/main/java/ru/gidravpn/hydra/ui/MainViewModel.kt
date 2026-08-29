@@ -5,13 +5,17 @@ import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ru.gidravpn.hydra.data.model.Engine
+import ru.gidravpn.hydra.data.model.NetworkRule
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.SplitTunnel
 import ru.gidravpn.hydra.data.model.SplitTunnelMode
+import ru.gidravpn.hydra.data.net.PingMeasurer
 import ru.gidravpn.hydra.data.model.Subscription
 import ru.gidravpn.hydra.data.repository.ServerRepository
 import ru.gidravpn.hydra.data.repository.SplitTunnelRepository
+import ru.gidravpn.hydra.data.repository.ThemeRepository
+import ru.gidravpn.hydra.ui.theme.ThemeMode
 import ru.gidravpn.hydra.vpn.HydraVpnService
 import ru.gidravpn.hydra.vpn.VpnState
 import ru.gidravpn.hydra.vpn.core.ConnectionState
@@ -21,6 +25,12 @@ import kotlinx.coroutines.launch
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ServerRepository(app)
     private val splitRepo = SplitTunnelRepository(app)
+    private val themeRepo = ThemeRepository(app)
+
+    val themeMode: StateFlow<ThemeMode> = themeRepo.mode
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.EMERALD)
+
+    fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { themeRepo.setMode(mode) }
 
     val servers: StateFlow<List<ServerProfile>> = repo.allServers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -38,6 +48,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleSplitApp(pkg: String) = viewModelScope.launch {
         splitRepo.toggleApp(pkg)
     }
+
+    fun setNetMode(mode: SplitTunnelMode) = viewModelScope.launch { splitRepo.setNetMode(mode) }
+    fun addNetRule(rule: NetworkRule) = viewModelScope.launch { splitRepo.addNetRule(rule) }
+    fun removeNetRule(rule: NetworkRule) = viewModelScope.launch { splitRepo.removeNetRule(rule) }
 
     val state = VpnState.state
     val logs = VpnState.logs
@@ -126,4 +140,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun delete(server: ServerProfile) = viewModelScope.launch { repo.delete(server) }
     fun clearLogs() = VpnState.clearLogs()
+
+    private val _measuringIds = MutableStateFlow<Set<Long>>(emptySet())
+    val measuringIds: StateFlow<Set<Long>> = _measuringIds.asStateFlow()
+
+    fun measurePing(server: ServerProfile) = viewModelScope.launch {
+        _measuringIds.update { it + server.id }
+        val ms = PingMeasurer.measure(server.address, server.port)
+        repo.save(server.copy(pingMs = ms))
+        _measuringIds.update { it - server.id }
+    }
+
+    fun measureAllPings() {
+        servers.value.forEach { measurePing(it) }
+    }
 }

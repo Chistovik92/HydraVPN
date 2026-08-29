@@ -53,14 +53,76 @@
   ANSI-мусор в логах, split tunneling верифицирован.
 - ✅ **Фаза 1** (0.5.5): Настройки — хаб с подэкранами (Туннель/Split/Логи/
   О приложении), нижняя навигация свёрнута до 3 вкладок.
-- ⬜ **Фаза 2**: маршрутизация по IP/доменам (второй тип split tunneling,
-  вдобавок к по-приложениям) — `SingBoxConfigBuilder.route.rules` уже готов
-  к расширению этими правилами.
-- ⬜ **Фаза 3**: список серверов — измерение пинга (поле `ServerProfile.pingMs`
-  и отображение уже есть, не хватает только action'а измерения), группировка
-  по подписке (`ServerProfile.subscriptionId` уже есть), значок протокола/движка.
-- ⬜ **Фаза 4**: тест на Xiaomi 12T Pro (Android 15, HyperOS) — Realme X2 Pro
-  (Android 11) уже прошёл несколько раундов живого тестирования, Xiaomi ещё нет.
+- ✅ **Фаза 1.5** (редизайн по артбуку «Hydra VPN Design Artbook», не
+  версионирован отдельно): новая палитра Hydra Emerald (Abyss/Cyber Slate/
+  #00E599) + вторая тема Monochrome Stealth с переключателем в Настройках
+  (`ThemeMode`, `ThemeRepository`, `LocalHydraPalette` в `ui/theme/`);
+  нижняя навигация расширена до 4 вкладок с иконками (добавлена **Профиль**);
+  reactor-кнопка подключения на Canvas (кибер-контур + радар-пульс,
+  явное состояние ERROR); карточки серверов — флаг вынесен в чип, пинг
+  раскрашен по порогам, протокол-чип вместо точки; новый экран Профиля
+  (статистика, sparkline-графики трафика, ссылка на GitHub); упрощённая
+  геометрическая иконка приложения. Артбук — AI-моки, использован как
+  референс стиля, не скопирован пиксель-в-пиксель (карта мира намеренно
+  заменена на стилизованный кибер-радар, не географическую карту).
+- ✅ **Фаза 2**: маршрутизация по IP/доменам — второй, независимый от
+  по-приложениям, режим split tunneling (`SplitTunnel.netMode`/`netRules`,
+  `NetRuleType` — IP/CIDR, домен, поддомены, ключевое слово). UI — вторая
+  вкладка в Split-туннелинге («По IP/доменам», те же режимы Весь трафик/
+  Только выбранные/Кроме выбранных). Реализовано через `route.rules` в
+  `SingBoxConfigBuilder` (правила пользователя приоритетнее служебных
+  dns/private-ip; `INCLUDE` меняет `final` на `direct`). **Честная оговорка**:
+  работает только при подключении через sing-box-протоколы (VLESS/VMess/
+  Trojan/SS/Hysteria2/TUIC/WireGuard) — у `VpnService.Builder` нет доменной
+  маршрутизации, а точечное исключение IP (`excludeRoute`) доступно только
+  с API 33 при minSdk 26 проекта, поэтому для SSTP/L2TP/AmneziaWG правила
+  не действуют (явно показано в UI). `SingBoxCore`/`SingBoxConfigBuilder` —
+  часть native-флейвора, живая компиляция недоступна офлайн (нет
+  `libbox.aar`) — проверено ревью diff + UI протестирован на устройстве
+  (stub-сборка, добавление/удаление/персист правил).
+  **Осознанно не расширено** (изучено, но не реализовано — см. TODO №10):
+  паритет для AmneziaWG через AllowedIPs не сделан, т.к. `AmneziaWgCore.start()`
+  сейчас `throw NotImplementedError` (движок не подключён, ждёт
+  `amneziawg-go.aar` из TODO №1), а `HydraVpnService.establishTun()` уже
+  ставит OS-уровневый `addRoute("0.0.0.0/0")` до старта движка — сужение
+  AllowedIPs дало бы чёрную дыру для несовпадающего трафика вместо bypass;
+  настоящий фикс потребовал бы переписать общий `establishTun()` под
+  awareness о `netRules`, рискованно менять ради нерабочего движка. SOCKS5-мост
+  SSTP/L2TP в sing-box (чтобы и там работали IP/домен-правила) тоже не сделан:
+  `TunBridge`/`PppSession` не имеют понятия о TCP-соединениях (только
+  `sendIpPacket` целыми IP-пакетами) — потребовался бы собственный userspace
+  TCP/IP-стек уровня gVisor netstack, непропорционально дорого ради этой фичи.
+- ✅ **Фаза 3**: измерение пинга — `PingMeasurer` (новый, `data/net/`) меряет
+  время TCP-connect до `address:port` (ICMP недоступен без root), переиспользуя
+  паттерн `Socket()` + `SocketGuard.protect()` уже отработанный в `SstpCore`;
+  корректно работает и при активном VPN, и без него (`protect()` — no-op,
+  если сервис не подключён). Триггеры в UI: клик по значению/тексту «измерить»
+  на карточке сервера (`MainViewModel.measurePing`) и «Обновить пинг» вверху
+  экрана для всего списка сразу (`measureAllPings`); `measuringIds`
+  показывает «измерение…» на карточке пока идёт замер. Группировка по
+  подписке — `ServersScreen` группирует `servers` по `subscriptionId`,
+  показывает заголовок с именем подписки и счётчиком только для реальных
+  групп (серверы без подписки остаются плоским списком, без лишнего UI).
+  Значок протокола был готов ещё в Фазе 1.5 (`ProtocolChip`). Проверено
+  живьём на устройстве: реальные значения пинга, персист через
+  перезапуск приложения (Room), группировка на импортированной подписке.
+- ✅ **Фаза 4**: тест на Xiaomi 12T Pro (модель 22081212UG, Android 15/SDK 35,
+  HyperOS). Стенд: только stub-flavor (`assembleStubDebug`) — нативные ядра
+  недоступны офлайн (см. TODO №1), поэтому проверка симуляции подключения,
+  не реального sing-box/AmneziaWG туннеля. Пройдено живьём: установка
+  (HyperOS требует явного подтверждения «Установка через USB» на
+  устройстве — по умолчанию блокирует `adb install`), запуск, edge-to-edge/
+  отступы под вырез и жестовую навигацию корректны на большом экране
+  (1220×2712), добавление сервера, измерение пинга (реальный TCP-connect,
+  145мс до 1.1.1.1), системный VPN-consent диалог, полный цикл подключения/
+  отключения (`ОТКЛЮЧИТЬ`, статус, трафик-счётчики, elapsed-таймер), Профиль
+  (sparkline-графики), Настройки → Тема (живое переключение Emerald ⇄
+  Stealth), Логи. Крашей не найдено. **Честная оговорка**: `adb shell input`
+  (эмуляция тапов) на HyperOS дополнительно заблокирован отдельным
+  тумблером «USB-отладка (настройки безопасности)» — без него ни один тап
+  не проходит (`SecurityException: INJECT_EVENTS`); включается в
+  Настройках разработчика, применяется не сразу, обычно требует
+  переподключения кабеля или перезагрузки устройства.
 
 Полный план с деталями реализации каждой фазы — в
 `.claude/plans/modular-kindling-stardust.md` (внутри worktree, не в git).
@@ -90,19 +152,33 @@
    секунды при старте подключения (до первого колбэка монитора интерфейса);
    ANSI-коды цвета из лога sing-box (`\x1b[36mINFO...`) выводятся в UI как
    есть, не отфильтрованы.
+10. **AmneziaWG IP/домен split tunneling паритет** (отложено при Фазе 2,
+    см. выше) — делать одним пакетом с TODO №1 (когда появится
+    `amneziawg-go.aar` и `AmneziaWgCore` реально заработает), и только вместе
+    с правкой `HydraVpnService.establishTun()` под awareness о `netRules`
+    (иначе сужение AllowedIPs даёт чёрную дыру, а не bypass). SOCKS5-мост
+    SSTP/L2TP в sing-box для той же цели — отдельная, гораздо более крупная
+    задача (нужен собственный userspace TCP/IP-стек уровня gVisor netstack);
+    заводить как отдельную инициативу, если/когда понадобится.
 
 ## Карта кода
 
 ```
 app/src/main/java/ru/gidravpn/hydra/
-  data/model/         Protocol.kt (все протоколы + флаг beta), ServerProfile, SplitTunnel
+  data/model/         Protocol.kt (все протоколы + флаг beta), ServerProfile,
+                      SplitTunnel (+ NetRuleType/NetworkRule — Фаза 2, IP/домены)
   data/subscription/  LinkParser, WireGuardParser/ConfigBuilder, SingBoxConfigBuilder
-  data/repository/    ServerRepository, SplitTunnelRepository (DataStore)
+  data/net/           PingMeasurer (TCP-connect замер, Фаза 3)
+  data/repository/    ServerRepository, SplitTunnelRepository, ThemeRepository (DataStore)
   vpn/                HydraVpnService, SocketGuard, VpnState
   vpn/ppp/            Md4, MsChapV2, Ppp, PppSession, TunBridge  (общий userspace-PPP)
   vpn/core/           VpnCore (интерфейс)
-  ui/                 экраны (Main/Servers/SplitTunnel/Settings/Logs), components/Common (BetaBadge)
-                      Settings — хаб с подэкранами (см. фазу 1 роадмапа выше),
+  ui/theme/           Color.kt (HydraPalette + LocalHydraPalette + два инстанса
+                      EmeraldPalette/StealthPalette), ThemeMode, Theme.kt, Type.kt
+  ui/                 экраны (Main/Servers/Profile/SplitTunnel/Settings/Logs),
+                      components/Common (BetaBadge, Sparkline)
+                      Settings — хаб с подэкранами (см. фазу 1 роадмапа выше,
+                      включая под-экран «Тема» из Фазы 1.5),
                       Split/Logs теперь рендерятся ВНУТРИ SettingsScreen, а не
                       как отдельные top-level экраны
 app/src/native/.../vpn/core/   SingBoxCore(+Runtime), XrayCore(+ConfigBuilder),

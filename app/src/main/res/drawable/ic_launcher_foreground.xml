@@ -1,6 +1,14 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#38BDF8"
-        android:pathData="M54,28c-8,0 -14,6 -14,14v6h-4v26h36V48h-4v-6C68,34 62,28 54,28zM54,36c4,0 6,3 6,6v6H48v-6C48,39 50,36 54,36z"/>
+    <!-- Упрощённый геометрический герб: три головы, сходящиеся в букву H, с хвостом-стрелой -->
+    <path android:fillColor="#00E599"
+        android:pathData="
+            M32,40 L40,40 L40,78 L32,78 Z
+            M68,40 L76,40 L76,78 L68,78 Z
+            M40,54 L68,54 L68,62 L40,62 Z
+            M50,62 L58,62 L54,86 Z
+            M32,40 L40,40 L27,23 Z
+            M68,40 L76,40 L81,23 Z
+            M46,54 L62,54 L54,16 Z"/>
 </vector>

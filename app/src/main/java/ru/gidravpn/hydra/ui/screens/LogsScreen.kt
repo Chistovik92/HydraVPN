@@ -53,6 +53,7 @@ fun LogsScreen(vm: MainViewModel) {
     }
 }
 
+@Composable
 private fun colorFor(line: String) = when {
     "✓" in line -> Success
     "Ошибка" in line -> Danger
