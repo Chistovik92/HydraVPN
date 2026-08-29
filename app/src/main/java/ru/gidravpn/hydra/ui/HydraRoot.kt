@@ -6,7 +6,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -15,10 +14,10 @@ import androidx.compose.ui.unit.sp
 import ru.gidravpn.hydra.ui.components.clickableNoRipple
 import ru.gidravpn.hydra.ui.screens.*
 import ru.gidravpn.hydra.ui.theme.*
-import java.text.SimpleDateFormat
-import java.util.*
 
-enum class Tab(val label: String) { MAIN("● Главная"), SERVERS("Серверы"), SPLIT("Split"), LOGS("Логи"), SETTINGS("⚙️") }
+// Только 3 вкладки верхнего уровня — Split и Логи переехали внутрь
+// Настроек (см. SettingsScreen), как в референсе INCY.
+enum class Tab(val label: String) { MAIN("● Главная"), SERVERS("Серверы"), SETTINGS("Настройки") }
 
 @Composable
 fun HydraRoot(vm: MainViewModel) {
@@ -26,34 +25,15 @@ fun HydraRoot(vm: MainViewModel) {
 
     Surface(color = Bg, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            StatusBar()
             NavBar(tab) { tab = it }
             Box(Modifier.weight(1f)) {
                 when (tab) {
                     Tab.MAIN -> MainScreen(vm, onGoServers = { tab = Tab.SERVERS })
                     Tab.SERVERS -> ServersScreen(vm, onSelected = { tab = Tab.MAIN })
-                    Tab.SPLIT -> SplitTunnelScreen(vm)
-                    Tab.LOGS -> LogsScreen(vm)
-                    Tab.SETTINGS -> SettingsScreen()
+                    Tab.SETTINGS -> SettingsScreen(vm)
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun StatusBar() {
-    var clock by remember { mutableStateOf(now()) }
-    LaunchedEffect(Unit) {
-        while (true) { clock = now(); kotlinx.coroutines.delay(1000) }
-    }
-    Row(
-        Modifier.fillMaxWidth().background(SurfaceDim).padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(clock, color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        Text("📶  🔋", fontSize = 13.sp)
     }
 }
 
@@ -79,5 +59,3 @@ private fun NavBar(current: Tab, onSelect: (Tab) -> Unit) {
         }
     }
 }
-
-private fun now() = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())

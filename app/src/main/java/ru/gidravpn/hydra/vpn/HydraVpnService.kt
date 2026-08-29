@@ -15,11 +15,14 @@ import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.vpn.core.ConnectionState
 import ru.gidravpn.hydra.vpn.core.CoreFactoryProvider
 import ru.gidravpn.hydra.vpn.core.VpnCore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
@@ -35,6 +38,8 @@ class HydraVpnService : VpnService() {
 
     private var tun: ParcelFileDescriptor? = null
     private var core: VpnCore? = null
+    // Сырой fd tun-интерфейса, снятый ДО detachFd() (см. releaseTun()).
+    private var tunFd: Int = -1
     private var connectJob: Job? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -73,10 +78,18 @@ class HydraVpnService : VpnService() {
         // connect() повторно — без явного гашения предыдущих core/tun они
         // просто перезаписываются полями ниже и утекают активными в фоне
         // (соединение остаётся поднятым, невидимым для UI/disconnect).
-        runCatching { core?.stop() }
-        core = null
-        runCatching { tun?.close() }
-        tun = null
+        releaseTun()
+
+        // fd/ядро держим в локальных переменных, пока попытка не подтверждена
+        // активной, — иначе гонка с параллельным stopTunnel()/новым connect()
+        // (оба просто отдельные scope.launch{} на Dispatchers.IO) может
+        // записать их в поля класса уже ПОСЛЕ того, как отключение решило,
+        // что core/tun пусты, и просто ничего не остановило. cancel() при этом
+        // не прерывает уже идущий синхронный vpnCore.start() — отмена
+        // проверяется явно через ensureActive() сразу после него.
+        var newTun: ParcelFileDescriptor? = null
+        var newTunFd = -1
+        var newCore: VpnCore? = null
         try {
             VpnState.state.value = ConnectionState.CONNECTING
             val profile = ru.gidravpn.hydra.data.repository.ServerRepository(applicationContext).byId(serverId)
@@ -85,28 +98,57 @@ class HydraVpnService : VpnService() {
             VpnState.activeServer.value = profile
             VpnState.log("Подключение к ${profile.address}…")
 
-            val fd = establishTun(profile)
-            tun = fd
-
+            newTun = establishTun(profile)
+            newTunFd = newTun.fd // снимаем ДО openTun()/detachFd() внутри vpnCore.start()
             val vpnCore = CoreFactoryProvider.factory.create(profile)
-            core = vpnCore
+            newCore = vpnCore
             VpnState.log("Ядро: ${vpnCore.name}")
 
             vpnCore.start(
-                tun = fd,
+                tun = newTun,
                 profile = profile,
                 onLog = { VpnState.log(it) },
                 onStats = { VpnState.stats.value = it },
             )
 
+            currentCoroutineContext().ensureActive()
+
+            tun = newTun
+            tunFd = newTunFd
+            core = newCore
             VpnState.connectedSince.value = System.currentTimeMillis()
             VpnState.state.value = ConnectionState.CONNECTED
             VpnState.log("✓ Соединение установлено")
             updateNotification(ConnectionState.CONNECTED, profile.name)
         } catch (t: Throwable) {
+            runCatching { newCore?.stop() }
+            runCatching { newTun?.close() }
+            if (newTunFd >= 0) runCatching { ParcelFileDescriptor.adoptFd(newTunFd).close() }
+            if (t is CancellationException) throw t
             VpnState.log("Ошибка: ${t.message}")
             VpnState.state.value = ConnectionState.ERROR
             stopTunnel()
+        }
+    }
+
+    /**
+     * Гасит текущее ядро/tun. sing-box (openTun -> detachFd()) забирает
+     * реальный fd себе — после этого ParcelFileDescriptor.close() с нашей
+     * стороны становится no-op, а core.stop() у libbox не всегда надёжно/
+     * синхронно закрывает fd на своей стороне: воспроизведено на реальном
+     * устройстве — VPN-сеть системы (dumpsys connectivity) оставалась
+     * CONNECTED ещё десятки секунд после штатного отключения в UI, пока не
+     * убивался процесс целиком (что закрывает вообще все fd процесса).
+     * Подстраховываемся, закрывая сырой fd явно через adoptFd(...).close().
+     */
+    private fun releaseTun() {
+        runCatching { core?.stop() }
+        core = null
+        runCatching { tun?.close() }
+        tun = null
+        if (tunFd >= 0) {
+            runCatching { ParcelFileDescriptor.adoptFd(tunFd).close() }
+            tunFd = -1
         }
     }
 
@@ -142,10 +184,7 @@ class HydraVpnService : VpnService() {
         connectJob?.cancel()
         connectJob = null
         scope.launch {
-            runCatching { core?.stop() }
-            core = null
-            runCatching { tun?.close() }
-            tun = null
+            releaseTun()
             VpnState.state.value = ConnectionState.DISCONNECTED
             VpnState.activeServer.value = null
             VpnState.connectedSince.value = 0L
