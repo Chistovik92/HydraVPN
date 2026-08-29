@@ -83,7 +83,7 @@ UI (Compose) → MainViewModel → ServerRepository (Room + подписки)
 ```
 
 Подробно — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-Что осталось сделать — [docs/HANDOFF.md](docs/HANDOFF.md) и CHANGELOG.md.
+Что осталось сделать — [docs/HANDOFF.md](docs/HANDOFF.md) и [CHANGELOG.md](CHANGELOG.md).
 
 ## Документация
 
@@ -94,7 +94,7 @@ UI (Compose) → MainViewModel → ServerRepository (Room + подписки)
 - [docs/PANELS.md](docs/PANELS.md) — совместимость с панелями подписок
 - [docs/SECURITY.md](docs/SECURITY.md) — политика безопасности
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — как контрибьютить
-- CHANGELOG.md — детальный лог 0.1.0 → 0.5.4
+- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.5.4
 
 ## Лицензия
 
