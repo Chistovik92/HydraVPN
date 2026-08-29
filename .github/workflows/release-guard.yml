@@ -1,0 +1,45 @@
+name: Release guard
+
+# Страховка на случай, если релиз опубликовали вручную, в обход scripts/release.sh.
+# Проверяет, что к релизу приложен full-APK и что внутри него реально есть ядро
+# sing-box. Предыстория — docs/HANDOFF.md, «Честные оговорки» (0.6.0).
+
+on:
+  release:
+    types: [published, edited]
+
+jobs:
+  verify-release-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Проверить состав ассетов
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          assets="$(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name')"
+          echo "Ассеты релиза $TAG:"; echo "$assets" | sed 's/^/  /'
+
+          full="$(echo "$assets" | grep -E '^Hydra-full-.*\.apk$' | head -1 || true)"
+          if [ -z "$full" ]; then
+            echo "::error::В релизе $TAG нет full-APK (Hydra-full-*.apk). Stub-сборка — не рабочее приложение, в ней соединение симулируется. Выпускайте релиз через scripts/release.sh."
+            exit 1
+          fi
+          echo "FULL_APK=$full" >> "$GITHUB_ENV"
+
+      - name: Проверить, что внутри full-APK есть ядро sing-box
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --repo "$REPO" --pattern "$FULL_APK" --dir /tmp/rg
+          so="$(unzip -l "/tmp/rg/$FULL_APK" | awk '{print $NF}' | grep -E '^lib/[^/]+/libbox\.so$' || true)"
+          if [ -z "$so" ]; then
+            echo "::error::В $FULL_APK нет lib/*/libbox.so — приложение не сможет поднять туннель. Пересоберите через scripts/release.sh."
+            exit 1
+          fi
+          echo "Ядро на месте:"; echo "$so" | sed 's/^/  /'

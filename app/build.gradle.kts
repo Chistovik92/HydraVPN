@@ -69,6 +69,43 @@ android {
     }
 }
 
+/**
+ * Предохранитель от «пустых» сборок.
+ *
+ * Без `app/libs/libbox.aar` flavor `native` падает невнятной ошибкой резолва
+ * зависимости `:libbox@aar`, которую легко принять за «native собрать нельзя» —
+ * именно так в 0.6.0 релиз чуть не уехал с одной stub-сборкой (симуляция
+ * соединения вместо VPN). Здесь ошибка становится объяснением, что положить.
+ * Подробности — docs/HANDOFF.md, «Честные оговорки» (0.6.0).
+ */
+val checkNativeCores = tasks.register("checkNativeCores") {
+    group = "verification"
+    description = "Проверяет наличие нативных ядер (.aar) перед сборкой flavor `native`"
+    val libbox = layout.projectDirectory.file("libs/libbox.aar").asFile
+    doLast {
+        if (!libbox.exists()) throw GradleException(
+            """
+            |
+            |Нет app/libs/libbox.aar — flavor `native` собрать нельзя.
+            |
+            |Это ядро sing-box; без него приложение не умеет поднимать туннель.
+            |Что делать:
+            |  • положить готовый libbox.aar в app/libs/, либо
+            |  • собрать его самому — docs/BUILD.md, раздел 2.1, либо
+            |  • для работы над UI/CI собрать stub:  gradlew :app:assembleStubDebug
+            |
+            |ВАЖНО: stub-сборка симулирует соединение и не годится для релиза.
+            |Релиз выпускается только через scripts/release.sh.
+            |
+            """.trimMargin()
+        )
+    }
+}
+
+tasks.matching { it.name.matches(Regex("^preNative.*Build$")) }.configureEach {
+    dependsOn(checkNativeCores)
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.09.02")
     implementation(composeBom)

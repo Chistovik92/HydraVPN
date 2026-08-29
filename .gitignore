@@ -22,3 +22,6 @@ gradle/wrapper/gradle-wrapper.jar
 *.jks
 *.keystore
 keystore.properties
+
+# Артефакты релиза (собираются scripts/release.sh, живут только на GitHub Releases)
+/Hydra-*.apk
