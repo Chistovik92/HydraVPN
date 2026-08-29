@@ -2,7 +2,7 @@
 
 Документ для продолжения работы (в т.ч. под другим аккаунтом/у другого
 разработчика). Главные источники контекста: `CHANGELOG.md` (детальный лог
-по версиям 0.1.0 → 0.5.3) и `docs/PROTOCOLS.md`.
+по версиям 0.1.0 → 0.5.4) и `docs/PROTOCOLS.md`.
 
 ## Что это
 
@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.5.3** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.5.4** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -84,11 +84,18 @@ app/src/native/.../vpn/core/   SingBoxCore(+Runtime), XrayCore(+ConfigBuilder),
                                WdttCore, OlcRtcCore, NativeCoreFactory
 app/src/stub/.../vpn/core/     StubCore (NoopCore — симуляция для stub/CI)
 docs/   PROTOCOLS · SECURITY · BUILD · ARCHITECTURE · SERVICES · PANELS · CONTRIBUTING
-CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.5.3 (главный источник контекста)
+CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.5.4 (главный источник контекста)
 ```
 
 ## Честные оговорки
 
+- **0.5.4**: второе устройство в матрице живой проверки — Realme X2 Pro
+  (Android 11). Живой тест переключения серверов на реальном устройстве
+  сразу вскрыл утечку core/tun при повторном `connect()` и полностью
+  нерабочее живое переключение сервера (см. CHANGELOG.md) — оба бага
+  невозможно было заметить без реального многократного подключения/
+  переключения на устройстве. Split tunneling по приложениям проверен и
+  подтверждён рабочим (`dumpsys connectivity`, точный UID-диапазон).
 - **0.5.3**: первая версия, реально проверенная живым подключением на
   физическом устройстве (OnePlus 15, Android 16) — до этого весь native-flavor
   был проверен только статически/сборкой. Живая проверка сразу же вскрыла
