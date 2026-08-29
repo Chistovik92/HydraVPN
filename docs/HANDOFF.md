@@ -42,6 +42,29 @@
 Ознакомительные/экспериментальные (WDTT, olcRTC) помечены в UI плашкой **BETA-доступ**
 (`Protocol.beta = true`, компонент `BetaBadge`).
 
+## Дорожная карта UI/фич (согласована с пользователем, не в TODO ниже)
+
+Живое тестирование на реальных устройствах регулярно обнаруживало критические
+баги (см. «Честные оговорки») — поэтому, помимо инженерных TODO ниже, идёт
+отдельный трек UI/UX-доработок по референсу стороннего клиента (показан
+пользователем как пример хорошей организации экранов, не как код):
+
+- ✅ **Фаза 0** (0.5.4-0.5.5): live-переключение сервера, утечка core/tun/fd,
+  ANSI-мусор в логах, split tunneling верифицирован.
+- ✅ **Фаза 1** (0.5.5): Настройки — хаб с подэкранами (Туннель/Split/Логи/
+  О приложении), нижняя навигация свёрнута до 3 вкладок.
+- ⬜ **Фаза 2**: маршрутизация по IP/доменам (второй тип split tunneling,
+  вдобавок к по-приложениям) — `SingBoxConfigBuilder.route.rules` уже готов
+  к расширению этими правилами.
+- ⬜ **Фаза 3**: список серверов — измерение пинга (поле `ServerProfile.pingMs`
+  и отображение уже есть, не хватает только action'а измерения), группировка
+  по подписке (`ServerProfile.subscriptionId` уже есть), значок протокола/движка.
+- ⬜ **Фаза 4**: тест на Xiaomi 12T Pro (Android 15, HyperOS) — Realme X2 Pro
+  (Android 11) уже прошёл несколько раундов живого тестирования, Xiaomi ещё нет.
+
+Полный план с деталями реализации каждой фазы — в
+`.claude/plans/modular-kindling-stardust.md` (внутри worktree, не в git).
+
 ## Открытые задачи (TODO)
 
 1. **Собрать нативные ядра** и положить как `.aar`/`.so` — `docs/BUILD.md`:
@@ -79,6 +102,9 @@ app/src/main/java/ru/gidravpn/hydra/
   vpn/ppp/            Md4, MsChapV2, Ppp, PppSession, TunBridge  (общий userspace-PPP)
   vpn/core/           VpnCore (интерфейс)
   ui/                 экраны (Main/Servers/SplitTunnel/Settings/Logs), components/Common (BetaBadge)
+                      Settings — хаб с подэкранами (см. фазу 1 роадмапа выше),
+                      Split/Logs теперь рендерятся ВНУТРИ SettingsScreen, а не
+                      как отдельные top-level экраны
 app/src/native/.../vpn/core/   SingBoxCore(+Runtime), XrayCore(+ConfigBuilder),
                                AmneziaWgCore, SstpCore, L2tpCore(+Transport), PptpCore,
                                WdttCore, OlcRtcCore, NativeCoreFactory
