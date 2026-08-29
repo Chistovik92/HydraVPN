@@ -5,45 +5,127 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ru.gidravpn.hydra.ui.MainViewModel
 import ru.gidravpn.hydra.ui.components.Card
+import ru.gidravpn.hydra.ui.components.clickableNoRipple
 import ru.gidravpn.hydra.ui.theme.*
 
+/** Подэкраны Настроек — Split и Логи переехали сюда из верхнего уровня навигации. */
+private enum class SettingsSection { HUB, TUNNEL, SPLIT, LOGS, ABOUT }
+
 @Composable
-fun SettingsScreen() {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+fun SettingsScreen(vm: MainViewModel) {
+    var section by remember { mutableStateOf(SettingsSection.HUB) }
+
+    when (section) {
+        SettingsSection.HUB -> SettingsHub(onSelect = { section = it })
+        SettingsSection.TUNNEL -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { TunnelInfoContent() }
+        SettingsSection.SPLIT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { SplitTunnelScreen(vm) }
+        SettingsSection.LOGS -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { LogsScreen(vm) }
+        SettingsSection.ABOUT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { AboutContent() }
+    }
+}
+
+@Composable
+private fun SettingsHub(onSelect: (SettingsSection) -> Unit) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         Text("Настройки", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
 
-        SettingsGroup("SSTP / L2TP (userspace PPP)", AccentCyan) {
+        HubRow("🌐", "Туннель", "Протоколы и движки", AccentViolet) { onSelect(SettingsSection.TUNNEL) }
+        HubRow("🔀", "Split-туннелинг", "Приложения через VPN / мимо VPN", AccentCyan) { onSelect(SettingsSection.SPLIT) }
+        HubRow("📋", "Логи", "Журнал подключения", TextSecondary) { onSelect(SettingsSection.LOGS) }
+        HubRow("ℹ️", "О приложении", "Версия, лицензия", TextSecondary) { onSelect(SettingsSection.ABOUT) }
+    }
+}
+
+@Composable
+private fun HubRow(icon: String, title: String, subtitle: String, accent: Color, onClick: () -> Unit) {
+    Card(Modifier.fillMaxWidth().clickableNoRipple(onClick)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(icon, fontSize = 20.sp)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(title, color = accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(subtitle, color = TextMuted, fontSize = 11.sp)
+                }
+            }
+            Text("→", color = TextMuted, fontSize = 16.sp)
+        }
+    }
+}
+
+@Composable
+private fun SettingsSubScreen(onBack: () -> Unit, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "← Настройки", color = AccentCyan, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickableNoRipple(onBack).padding(8.dp)
+            )
+        }
+        Box(Modifier.weight(1f)) { content() }
+    }
+}
+
+@Composable
+private fun TunnelInfoContent() {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Туннель", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+
+        InfoGroup("SSTP / L2TP (userspace PPP)", AccentCyan) {
             Text("Полностью на Kotlin, без нативных .aar: PPP-стек (LCP, MS-CHAPv2, IPCP), SSTP поверх TLS с crypto-binding, L2TP по UDP (без IPsec/ESP). Нужен тест на устройстве.",
                 color = TextMuted, fontSize = 12.sp)
         }
-        SettingsGroup("PPTP", Danger) {
+        InfoGroup("PPTP", Danger) {
             Text("Недоступно: данные в GRE (IP-протокол 47) требуют raw-сокетов/root, стек удалён из Android 12/13. Альтернативы: SSTP, L2TP, WireGuard.",
                 color = TextMuted, fontSize = 12.sp)
         }
-        SettingsGroup("Xray Core", AccentIndigo) {
+        InfoGroup("Xray Core", AccentIndigo) {
             Text("Транспорт: XTLS Vision / WS / gRPC. Flow: xtls-rprx-vision. Движок: libXray.aar.",
                 color = TextMuted, fontSize = 12.sp)
         }
-        SettingsGroup("sing-box", AccentViolet) {
+        InfoGroup("sing-box", AccentViolet) {
             Text("Протоколы: VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5. Движок: libbox.aar.",
                 color = TextMuted, fontSize = 12.sp)
         }
-        SettingsGroup("WireGuard / AmneziaWG", Success) {
+        InfoGroup("WireGuard / AmneziaWG", Success) {
             Text("Обычный WireGuard — через sing-box (libbox.aar). AmneziaWG 1.0/1.5/2.0 — отдельный движок amneziawg-go.aar: обфускация Jc/Jmin/Jmax/S1/S2/H1–H4 и маркеры I1–I5. Генерация .conf/uapi готова.",
                 color = TextMuted, fontSize = 12.sp)
         }
-        SettingsGroup("WDTT и olcRTC (BETA)", AccentViolet) {
+        InfoGroup("WDTT и olcRTC (BETA)", AccentViolet) {
             Text("Ознакомительные движки. WDTT — WireGuard через TURN-релей облака ВК (libclient.so + VK-авторизация). olcRTC — TCP поверх WebRTC DataChannel (olcrtc.aar + tun2socks). Отмечены плашкой BETA в интерфейсе.",
                 color = TextMuted, fontSize = 12.sp)
         }
-        SettingsGroup("О приложении", TextSecondary) {
+    }
+}
+
+@Composable
+private fun AboutContent() {
+    Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("О приложении", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        InfoGroup("Hydra", TextSecondary) {
             Text("Hydra ${ru.gidravpn.hydra.BuildConfig.VERSION_NAME} — мультипротокольный VPN-клиент. Лицензия GPL-3.0.",
                 color = TextMuted, fontSize = 12.sp)
         }
@@ -51,7 +133,7 @@ fun SettingsScreen() {
 }
 
 @Composable
-private fun SettingsGroup(title: String, accent: Color, content: @Composable () -> Unit) {
+private fun InfoGroup(title: String, accent: Color, content: @Composable () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Text(title, color = accent, fontSize = 14.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 12.dp))
