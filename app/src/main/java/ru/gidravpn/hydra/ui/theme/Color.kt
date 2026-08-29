@@ -22,48 +22,58 @@ data class HydraPalette(
     val danger: Color,
 )
 
-/** Hydra Emerald — основная тёмная тема (Abyss/Cyber Slate + неоновый изумруд). */
-val EmeraldPalette = HydraPalette(
-    bg = Color(0xFF0B0F12),
-    surface = Color(0xFF121C1F),
-    surfaceDim = Color(0xCC121C1F),
-    cardBg = Color(0x66121C1F),
-    inputBg = Color(0xCC0B0F12),
-    border = Color(0x14FFFFFF),
-    textPrimary = Color(0xFFE2E8F0),
+/**
+ * Hydra Ambient — основная тема. Значения сняты с макета
+ * `hydra_vpn_home_screen_fixed.html` (bg-abyss / bg-card / neon-emerald).
+ */
+val AmbientPalette = HydraPalette(
+    bg = Color(0xFF070A0D),
+    surface = Color(0xFF0E181B),
+    surfaceDim = Color(0xCC0E181B),
+    cardBg = Color(0x660E181B),
+    inputBg = Color(0xCC070A0D),
+    border = Color(0x3800E599),
+    textPrimary = Color(0xFFF1F5F9),
     textSecondary = Color(0xFF94A3B8),
     textMuted = Color(0xFF64748B),
     accent = Color(0xFF00E599),
-    accentSecondary = Color(0xFF00B37A),
+    accentSecondary = Color(0xFF38BDF8),
     betaAccent = Color(0xFFC084FC),
     success = Color(0xFF00E599),
-    danger = Color(0xFFFF4D5E),
+    danger = Color(0xFFEF4444),
 )
 
-/** Monochrome Stealth — контрастная ч/б тема, багровый акцент только для тревожных статусов. */
+/**
+ * Monochrome Stealth — монохромная тема с багровым ядром. Значения сняты с
+ * макета `hydra_vpn_monochrome_all_tabs.html` (crimson-core / crimson-bright).
+ * Изумрудный здесь остаётся только как сигнал «всё хорошо» (успех, быстрый пинг).
+ */
 val StealthPalette = HydraPalette(
-    bg = Color(0xFF0A0A0A),
-    surface = Color(0xFF1A1A1A),
-    surfaceDim = Color(0xCC1A1A1A),
-    cardBg = Color(0x661A1A1A),
-    inputBg = Color(0xCC0A0A0A),
-    border = Color(0x14FFFFFF),
-    textPrimary = Color(0xFFF5F5F5),
-    textSecondary = Color(0xFFA3A3A3),
-    textMuted = Color(0xFF6B6B6B),
-    accent = Color(0xFFE5E5E5),
-    accentSecondary = Color(0xFF9CA3AF),
-    betaAccent = Color(0xFFA3A3A3),
-    success = Color(0xFFE5E5E5),
-    danger = Color(0xFFFF3B4E),
+    bg = Color(0xFF06080A),
+    surface = Color(0xFF12161A),
+    surfaceDim = Color(0xCC12161A),
+    cardBg = Color(0x6612161A),
+    inputBg = Color(0xCC06080A),
+    border = Color(0x40C5162E),
+    textPrimary = Color(0xFFF8FAFC),
+    textSecondary = Color(0xFF94A3B8),
+    textMuted = Color(0xFF64748B),
+    accent = Color(0xFFFF3B56),
+    accentSecondary = Color(0xFF38BDF8),
+    betaAccent = Color(0xFFFF3B56),
+    success = Color(0xFF00E599),
+    danger = Color(0xFFEF4444),
 )
 
-val LocalHydraPalette = compositionLocalOf { EmeraldPalette }
+val LocalHydraPalette = compositionLocalOf { AmbientPalette }
 
-// Раскраска пинга в списке серверов — семантический цвет, не завязан на тему.
-val Warning = Color(0xFFF5A623)
-// Заливка бейджей/колец тревоги (Crimson Core) — насыщенный тон для фона, не для текста.
-val CrimsonFill = Color(0xFF8B1D2C)
+// Пороговые цвета пинга — одинаковы в обеих темах (как в макетах).
+val PingFast = Color(0xFF00E599)
+val PingMed = Color(0xFFEAB308)
+val PingSlow = Color(0xFFF97316)
+
+/** Багровое ядро Marvel-Hydra — заливки тревожных плашек и колец. */
+val CrimsonCore = Color(0xFFC5162E)
 
 // Ниже — совместимость с существующими экранами: те же имена, что и раньше,
 // но теперь читают текущую палитру, поэтому переключение темы подхватывается

@@ -145,11 +145,14 @@ private fun ServerCard(
     }
 }
 
+// Пороги как в макетах: быстрый — изумруд, средний — янтарь, медленный — оранжевый.
+// Не завязано на палитру темы: смысл цвета одинаков в обеих.
 @Composable
 private fun pingColor(pingMs: Int): Color = when {
-    pingMs in 0..99 -> AccentCyan
-    pingMs in 100..200 -> Warning
-    else -> TextMuted
+    pingMs in 0..99 -> PingFast
+    pingMs in 100..200 -> PingMed
+    pingMs > 200 -> PingSlow
+    else -> TextMuted   // -1 — ещё не измеряли
 }
 
 @Composable

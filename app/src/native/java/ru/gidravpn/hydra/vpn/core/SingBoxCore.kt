@@ -53,18 +53,22 @@ class SingBoxCore : VpnCore {
         val config = SingBoxConfigBuilder.build(profile, splitTunnel = split).toString(2)
         onLog("sing-box: конфиг сгенерирован (${config.length} байт)")
 
+        // Command-server поднимается ДО сервиса — к нему затем подключается
+        // клиент за статистикой трафика (см. SingBoxRuntime).
+        SingBoxRuntime.startCommandServer(onLog)
+
         val platform = HydraPlatformInterface(existingTun = tun, onLogLine = onLog)
         val svc = Libbox.newService(config, platform)
         service = svc
         svc.start()
         onLog("sing-box: сервис запущен")
 
-        // Периодический опрос статистики через CommandClient (см. SingBoxRuntime)
-        SingBoxRuntime.startStatsPolling(onStats)
+        SingBoxRuntime.attachService(svc)
+        SingBoxRuntime.startStatsPolling(onStats, onLog)
     }
 
     override fun stop() {
-        SingBoxRuntime.stopStatsPolling()
+        SingBoxRuntime.shutdown()
         runCatching { service?.close() }
         service = null
     }

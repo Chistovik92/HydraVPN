@@ -1,7 +1,9 @@
 package ru.gidravpn.hydra.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Home
@@ -13,10 +15,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ru.gidravpn.hydra.R
 import ru.gidravpn.hydra.ui.components.clickableNoRipple
 import ru.gidravpn.hydra.ui.screens.*
 import ru.gidravpn.hydra.ui.theme.*
@@ -30,12 +35,22 @@ enum class Tab(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun HydraRoot(vm: MainViewModel) {
+fun HydraRoot(
+    vm: MainViewModel,
+    openServers: Boolean = false,
+    onOpenServersHandled: () -> Unit = {},
+) {
     var tab by remember { mutableStateOf(Tab.MAIN) }
+    val themeMode by vm.themeMode.collectAsState()
+
+    // Переход по кнопке «Серверы» из уведомления.
+    LaunchedEffect(openServers) {
+        if (openServers) { tab = Tab.SERVERS; onOpenServersHandled() }
+    }
 
     Surface(color = Bg, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            TopBrandBar()
+            TopBrandBar(themeMode)
             Box(Modifier.weight(1f)) {
                 when (tab) {
                     Tab.MAIN -> MainScreen(vm, onGoServers = { tab = Tab.SERVERS })
@@ -50,11 +65,20 @@ fun HydraRoot(vm: MainViewModel) {
 }
 
 @Composable
-private fun TopBrandBar() {
+private fun TopBrandBar(themeMode: ThemeMode) {
+    // Герб меняется вместе с темой: Cyber Emerald / Crimson Core.
+    val mark = if (themeMode == ThemeMode.STEALTH) R.drawable.ic_hydra_stealth
+    else R.drawable.ic_hydra_ambient
     Row(
         Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Image(
+            painter = painterResource(mark),
+            contentDescription = null,
+            modifier = Modifier.size(26.dp).clip(RoundedCornerShape(7.dp))
+        )
+        Spacer(Modifier.width(10.dp))
         Text("HYDRA", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Text(" VPN", color = AccentCyan, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }

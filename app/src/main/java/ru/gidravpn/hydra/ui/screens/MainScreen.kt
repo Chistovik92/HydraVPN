@@ -32,6 +32,7 @@ import kotlin.math.sin
 import ru.gidravpn.hydra.ui.MainViewModel
 import ru.gidravpn.hydra.ui.components.BetaBadge
 import ru.gidravpn.hydra.ui.components.Card
+import ru.gidravpn.hydra.ui.components.humanBytes
 import ru.gidravpn.hydra.ui.components.Label
 import ru.gidravpn.hydra.ui.components.clickableNoRipple
 import ru.gidravpn.hydra.ui.theme.*
@@ -220,8 +221,8 @@ private fun ConnectionInfo(
         if (connected) {
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                InfoCell("↓ Загружено", mb(stats.downBytes), AccentCyan)
-                InfoCell("↑ Отправлено", mb(stats.upBytes), AccentIndigo)
+                InfoCell("↓ Загружено", humanBytes(stats.downBytes), AccentCyan)
+                InfoCell("↑ Отправлено", humanBytes(stats.upBytes), AccentIndigo)
             }
         }
     }
@@ -236,4 +237,3 @@ private fun InfoCell(title: String, value: String, valueColor: androidx.compose.
     }
 }
 
-private fun mb(bytes: Long) = "%.1f MB".format(bytes / 1_000_000.0)

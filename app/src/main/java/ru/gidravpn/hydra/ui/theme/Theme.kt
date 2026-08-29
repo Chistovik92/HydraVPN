@@ -6,9 +6,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 
 @Composable
-fun HydraTheme(themeMode: ThemeMode = ThemeMode.EMERALD, content: @Composable () -> Unit) {
+fun HydraTheme(themeMode: ThemeMode = ThemeMode.AMBIENT, content: @Composable () -> Unit) {
     val palette = when (themeMode) {
-        ThemeMode.EMERALD -> EmeraldPalette
+        ThemeMode.AMBIENT -> AmbientPalette
         ThemeMode.STEALTH -> StealthPalette
     }
     CompositionLocalProvider(LocalHydraPalette provides palette) {

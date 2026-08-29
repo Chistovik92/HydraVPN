@@ -1,9 +1,26 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
+
+/**
+ * Ключ подписи не хранится в репозитории. Положите keystore.properties в корень
+ * проекта (он в .gitignore) — см. docs/BUILD.md, раздел «Подпись релиза»:
+ *   storeFile=... storePassword=... keyAlias=... keyPassword=...
+ * Если файла нет, release собирается как раньше (debug-подпись) — чтобы сборка
+ * не ломалась у того, у кого ключа нет.
+ */
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile.exists()) FileInputStream(keystorePropsFile).use { load(it) }
+}
+val hasReleaseKeystore = keystorePropsFile.exists() &&
+    keystoreProps.getProperty("storeFile")?.isNotBlank() == true
 
 android {
     namespace = "ru.gidravpn.hydra"
@@ -13,12 +30,23 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.6.0"
+        versionCode = 13
+        versionName = "0.6.1"
 
         // ABI, под которые собраны нативные ядра (libbox / libXray)
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
+    }
+
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
         }
     }
 
@@ -30,6 +58,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (hasReleaseKeystore) signingConfig = signingConfigs.getByName("release")
         }
         debug {
             applicationIdSuffix = ".debug"
