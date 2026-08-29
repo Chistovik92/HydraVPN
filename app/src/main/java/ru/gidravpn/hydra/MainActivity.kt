@@ -12,6 +12,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
@@ -22,7 +24,15 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        /** Открыть вкладку «Серверы» — из кнопки в уведомлении. */
+        const val EXTRA_OPEN_SERVERS = "open_servers"
+    }
+
     private val vm: MainViewModel by viewModels()
+
+    // Разовый сигнал «открыть Серверы»; сбрасывается после применения.
+    private var openServers by mutableStateOf(false)
 
     // Системный VPN-consent
     private val vpnConsent = registerForActivityResult(
@@ -48,15 +58,20 @@ class MainActivity : ComponentActivity() {
             vm.requestPermission.collect { requestVpnPermission() }
         }
 
+        openServers = intent?.getBooleanExtra(EXTRA_OPEN_SERVERS, false) == true
+
         setContent {
             val themeMode by vm.themeMode.collectAsState()
-            HydraTheme(themeMode) { HydraRoot(vm) }
+            HydraTheme(themeMode) {
+                HydraRoot(vm, openServers = openServers, onOpenServersHandled = { openServers = false })
+            }
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleImportIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_OPEN_SERVERS, false)) openServers = true
     }
 
     private fun handleImportIntent(intent: Intent?) {

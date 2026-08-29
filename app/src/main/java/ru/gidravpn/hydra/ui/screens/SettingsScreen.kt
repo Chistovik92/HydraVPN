@@ -1,9 +1,16 @@
 package ru.gidravpn.hydra.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import ru.gidravpn.hydra.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -127,10 +134,39 @@ private fun TunnelInfoContent() {
 @Composable
 private fun ThemeContent(vm: MainViewModel) {
     val current by vm.themeMode.collectAsState()
-    Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val dynamicIcon by vm.dynamicLauncherIcon.collectAsState()
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         Text("Тема", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
         ru.gidravpn.hydra.ui.theme.ThemeMode.entries.forEach { mode ->
             ThemeOptionCard(mode, selected = mode == current) { vm.setThemeMode(mode) }
+        }
+
+        Card(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Менять и ярлык на рабочем столе", color = TextPrimary,
+                        fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Иконка приложения будет соответствовать теме. Лаунчер при этом " +
+                            "пересоздаёт ярлык: он может на миг пропасть, уехать в конец " +
+                            "списка приложений, а вынесенные вручную ярлыки — слететь.",
+                        color = TextMuted, fontSize = 11.sp
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(
+                    checked = dynamicIcon,
+                    onCheckedChange = { vm.setDynamicLauncherIcon(it) },
+                    colors = SwitchDefaults.colors(checkedTrackColor = AccentCyan)
+                )
+            }
         }
     }
 }
@@ -141,24 +177,23 @@ private fun ThemeOptionCard(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val palette = when (mode) {
-        ru.gidravpn.hydra.ui.theme.ThemeMode.EMERALD -> EmeraldPalette
-        ru.gidravpn.hydra.ui.theme.ThemeMode.STEALTH -> StealthPalette
-    }
     Card(
         Modifier.fillMaxWidth().clickableNoRipple(onClick),
         borderColor = if (selected) AccentCyan else Border
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                listOf(palette.bg, palette.surface, palette.accent).forEach { swatch ->
-                    androidx.compose.foundation.Canvas(Modifier.size(16.dp)) {
-                        drawCircle(swatch)
-                    }
-                    Spacer(Modifier.width(4.dp))
-                }
-                Spacer(Modifier.width(8.dp))
-                Column {
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                // Живое превью иконки этой темы — та же, что уйдёт на рабочий стол.
+                Image(
+                    painter = painterResource(
+                        if (mode == ru.gidravpn.hydra.ui.theme.ThemeMode.STEALTH) R.drawable.ic_hydra_stealth
+                        else R.drawable.ic_hydra_ambient
+                    ),
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(11.dp))
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
                     Text(mode.label, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Text(mode.description, color = TextMuted, fontSize = 11.sp)
                 }

@@ -66,6 +66,17 @@ fun BetaBadge() {
     }
 }
 
+/**
+ * Байты в человекочитаемый вид. Раньше везде было "%.1f MB", из-за чего
+ * реальные килобайты трафика показывались как «0,0 MB» и выглядели поломкой.
+ */
+fun humanBytes(bytes: Long): String = when {
+    bytes >= 1_000_000_000 -> "%.2f ГБ".format(bytes / 1_000_000_000.0)
+    bytes >= 1_000_000 -> "%.1f МБ".format(bytes / 1_000_000.0)
+    bytes >= 1_000 -> "%.0f КБ".format(bytes / 1_000.0)
+    else -> "$bytes Б"
+}
+
 /** Простой линейный график по последним замерам — для экрана Профиля. */
 @Composable
 fun Sparkline(samples: List<Float>, color: Color, modifier: Modifier = Modifier) {

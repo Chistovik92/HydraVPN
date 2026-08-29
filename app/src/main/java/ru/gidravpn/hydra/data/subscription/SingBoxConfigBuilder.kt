@@ -21,6 +21,12 @@ object SingBoxConfigBuilder {
 
         root.put("log", JSONObject().put("level", "info").put("timestamp", true))
 
+        // Счётчики трафика libbox отдаёт из clash-сервера: без этого блока
+        // StatusMessage.trafficAvailable = false и в UI вечные 0,0 MB.
+        // external_controller не задаём — HTTP-слушатель наружу не нужен,
+        // менеджер трафика работает и без него.
+        root.put("experimental", JSONObject().put("clash_api", JSONObject()))
+
         // DNS (схема 1.12: серверы с явным type)
         root.put("dns", JSONObject().apply {
             put("servers", JSONArray().apply {

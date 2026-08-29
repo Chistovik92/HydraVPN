@@ -25,8 +25,15 @@ object VpnState {
     // Ядро sing-box/xray шлёт строки лога с терминальными цветовыми
     // escape-последовательностями. Compose Text их не интерпретирует и
     // показывает как мусорные символы, поэтому вырезаем перед сохранением.
-    private val ansiCodes = Regex("""\Q[\E[0-9;]*m""")
-    private fun stripAnsi(msg: String) = ansiCodes.replace(msg, "")
+    //
+    // Прошлый регекс начинался с литерала '[' и не захватывал сам символ ESC
+    // (0x1B): тот оставался в строке и рисовался в UI «точками» — в живом логе
+    // sing-box это выглядело как ".INFO." вместо "INFO". Теперь матчим полную
+    // CSI-последовательность (ESC + '[' + параметры + финальный байт) и на
+    // всякий случай подчищаем одиночные ESC.
+    private const val ESC = "\u001B"
+    private val ansiCodes = Regex("$ESC\\[[0-9;?]*[ -/]*[@-~]")
+    private fun stripAnsi(msg: String) = ansiCodes.replace(msg, "").replace(ESC, "")
 
     private val _logs = MutableStateFlow<List<String>>(
         listOf(line("Приложение запущено"))

@@ -2,7 +2,7 @@
 
 Документ для продолжения работы (в т.ч. под другим аккаунтом/у другого
 разработчика). Главные источники контекста: `CHANGELOG.md` (детальный лог
-по версиям 0.1.0 → 0.6.0) и `docs/PROTOCOLS.md`.
+по версиям 0.1.0 → 0.6.1) и `docs/PROTOCOLS.md`.
 
 ## Что это
 
@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.6.0** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.6.1** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -147,6 +147,19 @@
   не проходит (`SecurityException: INJECT_EVENTS`); включается в
   Настройках разработчика, применяется не сразу, обычно требует
   переподключения кабеля или перезагрузки устройства.
+- ✅ **Фаза 5** (0.6.1): темы приведены к HTML-макетам пользователя. Основная
+  переименована в **Hydra Ambient** (в DataStore старое значение `EMERALD`
+  читается как `AMBIENT`, чтобы выбор не сбрасывался), стелс-тема стала
+  **багровой** (Crimson Core) вместо нейтрально-серой. Две фирменные иконки
+  (Cyber Emerald / Crimson Core) как VectorDrawable: в приложении герб
+  меняется с темой, ярлык на рабочем столе — по отдельному тумблеру
+  (по умолчанию выключен, см. `ui/LauncherIcon.kt`). Уведомление получило
+  статус, живой трафик и кнопки «Отключить»/«Серверы». Починены счётчики
+  трафика и ANSI-мусор в логах (TODO №8 и №9).
+  **Осознанные упрощения при переносе SVG → VectorDrawable**: в формате нет
+  аналогов SVG-фильтров (`feDropShadow` — свечение/тень) и `stroke-dasharray`,
+  поэтому мягкое свечение герба и пунктир радарных колец не воспроизведены;
+  геометрия, градиенты и цвета перенесены один в один.
 
 Полный план с деталями реализации каждой фазы — в
 `.claude/plans/modular-kindling-stardust.md` (внутри worktree, не в git).
@@ -170,14 +183,18 @@
 6. **WDTT**: JNI к `libclient.so` + поток VK-авторизации (WebView) в `WdttCore`;
    проверить лицензию upstream перед включением бинарника.
 7. (Опц.) UI-переключатель движка Xray↔sing-box для vless/vmess.
-8. (Опц.) статистика sing-box через `CommandClient` (`SingBoxRuntime`, сейчас каркас) —
-   в 0.5.3 подтверждено, что счётчики трафика в UI всегда показывают 0,0 MB
-   именно поэтому (реальный трафик при этом идёт нормально).
+8. ~~статистика sing-box через `CommandClient`~~ — **сделано в 0.6.1**:
+   `SingBoxRuntime` поднимает `CommandServer`, подключает `CommandClient` на
+   `COMMAND_STATUS`, конфиг получил `experimental.clash_api`. Счётчики
+   подтверждены на живом туннеле (росли `154 Б` → `24 КБ`). Отдельно
+   починен формат: `"%.1f MB"` округлял килобайты в «0,0» — теперь
+   `humanBytes()` (Б/КБ/МБ/ГБ).
 9. Известные open items из 0.5.3 (не блокируют работу, чинить отдельно):
    `no available network interface` всё ещё проскакивает в первую долю
-   секунды при старте подключения (до первого колбэка монитора интерфейса);
-   ANSI-коды цвета из лога sing-box (`\x1b[36mINFO...`) выводятся в UI как
-   есть, не отфильтрованы.
+   секунды при старте подключения (до первого колбэка монитора интерфейса).
+   ~~ANSI-коды цвета из лога sing-box~~ — **починено в 0.6.1**: регекс
+   вырезал `[36m`, но не захватывал сам ESC (0x1B), из-за чего тот оставался
+   и рисовался в UI «точками» (`.INFO.`).
 10. **AmneziaWG IP/домен split tunneling паритет** (отложено при Фазе 2,
     см. выше) — делать одним пакетом с TODO №1 (когда появится
     `amneziawg-go.aar` и `AmneziaWgCore` реально заработает), и только вместе
@@ -200,9 +217,12 @@ app/src/main/java/ru/gidravpn/hydra/
   vpn/ppp/            Md4, MsChapV2, Ppp, PppSession, TunBridge  (общий userspace-PPP)
   vpn/core/           VpnCore (интерфейс)
   ui/theme/           Color.kt (HydraPalette + LocalHydraPalette + два инстанса
-                      EmeraldPalette/StealthPalette), ThemeMode, Theme.kt, Type.kt
+                      AmbientPalette/StealthPalette), ThemeMode, Theme.kt, Type.kt
+  ui/LauncherIcon.kt  смена ярлыка через activity-alias (по тумблеру, off по умолч.)
   ui/                 экраны (Main/Servers/Profile/SplitTunnel/Settings/Logs),
-                      components/Common (BetaBadge, Sparkline)
+                      components/Common (BetaBadge, Sparkline, humanBytes)
+  res/drawable/       ic_hydra_ambient / ic_hydra_stealth — гербы тем (в UI),
+                      ic_launcher_* / ic_launcher_stealth_* — адаптивные иконки
                       Settings — хаб с подэкранами (см. фазу 1 роадмапа выше,
                       включая под-экран «Тема» из Фазы 1.5),
                       Split/Logs теперь рендерятся ВНУТРИ SettingsScreen, а не
@@ -212,7 +232,7 @@ app/src/native/.../vpn/core/   SingBoxCore(+Runtime), XrayCore(+ConfigBuilder),
                                WdttCore, OlcRtcCore, NativeCoreFactory
 app/src/stub/.../vpn/core/     StubCore (NoopCore — симуляция для stub/CI)
 docs/   PROTOCOLS · SECURITY · BUILD · ARCHITECTURE · SERVICES · PANELS · CONTRIBUTING
-CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.6.0 (главный источник контекста)
+CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.6.1 (главный источник контекста)
 ```
 
 ## Честные оговорки

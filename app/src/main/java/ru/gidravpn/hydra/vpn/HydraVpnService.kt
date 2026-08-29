@@ -41,6 +41,8 @@ class HydraVpnService : VpnService() {
     // Сырой fd tun-интерфейса, снятый ДО detachFd() (см. releaseTun()).
     private var tunFd: Int = -1
     private var connectJob: Job? = null
+    // Держит уведомление в актуальном состоянии по мере роста трафика.
+    private var notifJob: Job? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
@@ -120,6 +122,13 @@ class HydraVpnService : VpnService() {
             VpnState.state.value = ConnectionState.CONNECTED
             VpnState.log("✓ Соединение установлено")
             updateNotification(ConnectionState.CONNECTED, profile.name)
+
+            // StateFlow не эмитит одинаковые значения, так что при нулевом
+            // трафике уведомление не перерисовывается впустую.
+            notifJob?.cancel()
+            notifJob = scope.launch {
+                VpnState.stats.collect { updateNotification(ConnectionState.CONNECTED, profile.name) }
+            }
         } catch (t: Throwable) {
             runCatching { newCore?.stop() }
             runCatching { newTun?.close() }
@@ -142,6 +151,8 @@ class HydraVpnService : VpnService() {
      * Подстраховываемся, закрывая сырой fd явно через adoptFd(...).close().
      */
     private fun releaseTun() {
+        notifJob?.cancel()
+        notifJob = null
         runCatching { core?.stop() }
         core = null
         runCatching { tun?.close() }
@@ -206,26 +217,62 @@ class HydraVpnService : VpnService() {
                     NotificationManager.IMPORTANCE_LOW)
             )
         }
-        val pi = PendingIntent.getActivity(
+        val openApp = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE
         )
-        val text = when (state) {
-            ConnectionState.CONNECTED -> "Подключено • $server"
+        val title = when (state) {
+            ConnectionState.CONNECTED -> "Туннель зашифрован"
             ConnectionState.CONNECTING -> "Подключение…"
+            ConnectionState.ERROR -> "Ошибка подключения"
             else -> "Отключено"
         }
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Hydra")
-            .setContentText(text)
+        val b = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(title)
             .setSmallIcon(android.R.drawable.ic_lock_lock)
-            .setContentIntent(pi)
+            .setContentIntent(openApp)
             .setOngoing(true)
-            .build()
+            .setShowWhen(false)
+
+        if (state == ConnectionState.CONNECTED) {
+            val s = VpnState.stats.value
+            // Строка трафика имеет смысл только когда счётчики ненулевые;
+            // иначе показываем один сервер, чтобы не рисовать «0 B / 0 B».
+            val traffic = if (s.downBytes > 0 || s.upBytes > 0) {
+                "  ·  ↓ ${humanBytes(s.downBytes)}  ↑ ${humanBytes(s.upBytes)}"
+            } else ""
+            b.setContentText("$server$traffic")
+
+            val disconnect = PendingIntent.getService(
+                this, 1,
+                Intent(this, HydraVpnService::class.java).setAction(ACTION_DISCONNECT),
+                PendingIntent.FLAG_IMMUTABLE
+            )
+            val servers = PendingIntent.getActivity(
+                this, 2,
+                Intent(this, MainActivity::class.java)
+                    .putExtra(MainActivity.EXTRA_OPEN_SERVERS, true)
+                    .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                PendingIntent.FLAG_IMMUTABLE
+            )
+            b.addAction(0, "Отключить", disconnect)
+            b.addAction(0, "Серверы", servers)
+        } else {
+            b.setContentText(server)
+        }
+        return b.build()
     }
 
     private fun updateNotification(state: ConnectionState, server: String) {
         getSystemService(NotificationManager::class.java)
             .notify(NOTIF_ID, buildNotification(state, server))
+    }
+
+    /** Байты в человекочитаемый вид: «0,0 MB» для килобайт выглядело как поломка. */
+    private fun humanBytes(bytes: Long): String = when {
+        bytes >= 1_000_000_000 -> "%.2f ГБ".format(bytes / 1_000_000_000.0)
+        bytes >= 1_000_000 -> "%.1f МБ".format(bytes / 1_000_000.0)
+        bytes >= 1_000 -> "%.0f КБ".format(bytes / 1_000.0)
+        else -> "$bytes Б"
     }
 }

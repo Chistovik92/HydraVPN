@@ -28,9 +28,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val themeRepo = ThemeRepository(app)
 
     val themeMode: StateFlow<ThemeMode> = themeRepo.mode
-        .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.EMERALD)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.AMBIENT)
 
-    fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { themeRepo.setMode(mode) }
+    /** Менять ли ярлык на рабочем столе вместе с темой (по умолчанию — нет). */
+    val dynamicLauncherIcon: StateFlow<Boolean> = themeRepo.dynamicLauncherIcon
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setThemeMode(mode: ThemeMode) = viewModelScope.launch {
+        themeRepo.setMode(mode)
+        if (dynamicLauncherIcon.value) LauncherIcon.apply(getApplication(), mode)
+    }
+
+    fun setDynamicLauncherIcon(enabled: Boolean) = viewModelScope.launch {
+        themeRepo.setDynamicLauncherIcon(enabled)
+        // Включили — сразу подгоняем ярлык под текущую тему; выключили — возвращаем базовый.
+        if (enabled) LauncherIcon.apply(getApplication(), themeMode.value)
+        else LauncherIcon.reset(getApplication())
+    }
 
     val servers: StateFlow<List<ServerProfile>> = repo.allServers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

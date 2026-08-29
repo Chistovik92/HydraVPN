@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import ru.gidravpn.hydra.BuildConfig
 import ru.gidravpn.hydra.ui.MainViewModel
 import ru.gidravpn.hydra.ui.components.Card
+import ru.gidravpn.hydra.ui.components.humanBytes
 import ru.gidravpn.hydra.ui.components.Label
 import ru.gidravpn.hydra.ui.components.Sparkline
 import ru.gidravpn.hydra.ui.components.clickableNoRipple
@@ -94,8 +95,8 @@ fun ProfileScreen(vm: MainViewModel) {
             }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("↓ ${mb(stats.downBytes)}", color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                Text("↑ ${mb(stats.upBytes)}", color = AccentIndigo, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text("↓ ${humanBytes(stats.downBytes)}", color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text("↑ ${humanBytes(stats.upBytes)}", color = AccentIndigo, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
             Spacer(Modifier.height(6.dp))
             Sparkline(downHistory, AccentCyan, Modifier.fillMaxWidth().height(48.dp))
@@ -134,4 +135,3 @@ private fun GithubCard() {
     }
 }
 
-private fun mb(bytes: Long) = "%.1f MB".format(bytes / 1_000_000.0)

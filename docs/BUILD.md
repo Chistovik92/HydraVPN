@@ -151,15 +151,28 @@ scripts/release.sh             # собрать, проверить и опуб�
 
 ## 4. Подпись релиза
 
+Подключение к Gradle **уже сделано** (`app/build.gradle.kts`): если в корне
+проекта лежит `keystore.properties`, release-сборка подписывается им; если файла
+нет — собирается как раньше, чтобы сборка не ломалась у того, у кого ключа нет.
+
+От вас нужен только сам ключ — он намеренно не хранится в репозитории и не
+создаётся автоматически:
+
+```bash
+keytool -genkey -v -keystore Hydra.jks -alias Hydra \
+  -keyalg RSA -keysize 4096 -validity 10000
+```
+
 ```properties
-# keystore.properties (в .gitignore)
+# keystore.properties (в .gitignore, рядом с settings.gradle.kts)
 storeFile=Hydra.jks
 storePassword=...
 keyAlias=Hydra
 keyPassword=...
 ```
 
-Добавьте `signingConfigs` в `app/build.gradle.kts` и подключите к `release`.
+> Потеряете ключ — обновления уже установленного приложения станут невозможны
+> (Android не примет APK с другой подписью). Храните `.jks` и пароли вне репозитория.
 
 ## 5. ABI
 
