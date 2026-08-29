@@ -2,7 +2,7 @@
 
 Документ для продолжения работы (в т.ч. под другим аккаунтом/у другого
 разработчика). Главные источники контекста: `CHANGELOG.md` (детальный лог
-по версиям 0.1.0 → 0.5.5) и `docs/PROTOCOLS.md`.
+по версиям 0.1.0 → 0.6.0) и `docs/PROTOCOLS.md`.
 
 ## Что это
 
@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.5.5** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.6.0** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -186,11 +186,18 @@ app/src/native/.../vpn/core/   SingBoxCore(+Runtime), XrayCore(+ConfigBuilder),
                                WdttCore, OlcRtcCore, NativeCoreFactory
 app/src/stub/.../vpn/core/     StubCore (NoopCore — симуляция для stub/CI)
 docs/   PROTOCOLS · SECURITY · BUILD · ARCHITECTURE · SERVICES · PANELS · CONTRIBUTING
-CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.5.5 (главный источник контекста)
+CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.6.0 (главный источник контекста)
 ```
 
 ## Честные оговорки
 
+- **0.6.0**: весь объём (редизайн, IP/домен-роутинг, пинг, группировка,
+  тест на Xiaomi) проверен только на **stub-флейворе** — нативные ядра
+  (`libbox.aar` и др.) недоступны офлайн, поэтому реальное sing-box/AmneziaWG
+  соединение на новых экранах живьём не проверялось, только симуляция.
+  Правки в native-флейворе (`SingBoxCore.kt`, `SingBoxConfigBuilder.kt`)
+  проверены ревью diff, не компиляцией. Паритет IP/домен-маршрутизации для
+  AmneziaWG/SSTP-L2TP сознательно не сделан — см. TODO №10.
 - **0.5.5**: пользователь сам нашёл и сообщил баг «Отключено» в UI при
   реально ещё активной VPN-сети системы (интернет полностью пропадал) —
   не был найден предыдущим раундом живого тестирования, поскольку тесты
