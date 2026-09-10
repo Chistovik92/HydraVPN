@@ -1,5 +1,52 @@
 # Changelog
 
+## [0.6.5] — Релизный ключ подписи вместо debug
+
+### Исправлено
+- **Все релизы 0.5.1–0.6.1 публиковались подписанными Android debug-ключом,
+  а не релизным.** `scripts/release.sh` собирал `assembleStubDebug`/
+  `assembleNativeDebug` — то есть debug build type, а не `assembleRelease`.
+  Debug-ключ автогенерируется тулчейном отдельно на каждой машине сборки
+  (`~/.android/debug.keystore`), поэтому переезд сборки на другую машину
+  (или переустановка системы) тихо сделал бы следующий релиз несовместимым
+  для обновления с предыдущим — Android не ставит APK с другой подписью
+  поверх уже установленного. Заодно у всех прошлых релизов из-за
+  `applicationIdSuffix` debug build type был **другой `applicationId`** —
+  `ru.gidravpn.hydra.debug` вместо `ru.gidravpn.hydra`.
+  Обнаружено вручную: `apksigner verify --print-certs` на APK из релиза
+  v0.6.1 показал `CN=Android Debug`.
+- Сгенерирован настоящий релизный ключ (`Hydra.jks`, RSA 4096, self-signed,
+  10000 дней) — хранится вне репозитория, `keystore.properties` в
+  `.gitignore` (создание описано в `docs/BUILD.md`, раздел «Подпись
+  релиза» — эта часть кода существовала с 0.6.1, но реально ни разу не
+  использовалась до сих пор).
+- `scripts/release.sh`: `assembleStubDebug`/`assembleNativeDebug` →
+  `assembleStubRelease`/`assembleNativeRelease`; добавлена проверка
+  наличия `keystore.properties` перед сборкой; новая, четвёртая страховка —
+  `apksigner verify` после сборки блокирует публикацию, если сертификат
+  снова окажется `Android Debug`. Имена артефактов лишились суффикса
+  `-debug` (`Hydra-full-X.Y.Z.apk` / `Hydra-stub-X.Y.Z.apk`).
+
+### Важно — разрыв обновлений
+Начиная с этого релиза `applicationId` — `ru.gidravpn.hydra` (был
+`ru.gidravpn.hydra.debug`), подпись — релизный ключ (была debug). Для
+Android это фактически **другое приложение**: у тех, кто уже поставил
+0.5.1–0.6.1, апдейт «поверх» не встанет — нужно поставить 0.6.5 отдельно
+и вручную удалить старую версию (`ru.gidravpn.hydra.debug`). Все релизы
+начиная с 0.6.5 подписаны одним и тем же ключом — дальше обновления снова
+пойдут штатно.
+
+### Верификация
+- `assembleNativeRelease`/`assembleStubRelease` — BUILD SUCCESSFUL, включая
+  R8/minify и shrinkResources (впервые реально отработали для release
+  build type — раньше релиз всегда шёл через debug, где minify выключен).
+- `apksigner verify --print-certs` → `CN=Hydra VPN` (не Android Debug).
+- `aapt2 dump badging` → `package: name='ru.gidravpn.hydra'`.
+- `unzip -l` → `lib/{arm64-v8a,armeabi-v7a,x86_64}/libbox.so` внутри
+  full-APK, размер ~103 МБ.
+- `scripts/release.sh --dry-run` — полный прогон скрипта, все проверки
+  (наличие ключа, наличие ядра, размер, подпись) прошли.
+
 ## [0.6.1] — Темы по макетам, две иконки, живые счётчики трафика
 
 ### Добавлено

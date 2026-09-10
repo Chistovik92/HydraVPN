@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.6.1** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.6.5** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -237,6 +237,24 @@ CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.6.1
 
 ## Честные оговорки
 
+- **0.6.5 — все релизы 0.5.1–0.6.1 были подписаны Android debug-ключом,
+  не релизным.** `scripts/release.sh` собирал `assembleXxxDebug`, а не
+  `assembleXxxRelease` — `keystore.properties`/`signingConfigs` в
+  `app/build.gradle.kts` существовали с 0.6.1, но реально ни разу не
+  использовались до этого релиза. Debug-ключ уникален на каждой сборочной
+  машине, поэтому любой следующий релиз с настоящей подписью в любом
+  случае стал бы несовместимым обновлением — обнаружено раньше, чем это
+  случилось само по себе (`apksigner verify` на APK из v0.6.1 → `CN=Android
+  Debug`). Заодно всплыло: из-за `applicationIdSuffix` debug build type
+  у всех прошлых релизов был `applicationId=ru.gidravpn.hydra.debug`, а не
+  `ru.gidravpn.hydra`. Исправлено: сгенерирован `Hydra.jks` (RSA 4096,
+  хранится вне репозитория), `scripts/release.sh` переключён на
+  `assembleStubRelease`/`assembleNativeRelease`, добавлена проверка
+  `apksigner verify` после сборки (публикация блокируется, если сертификат
+  снова `Android Debug`). **Следствие**: 0.6.5 для тех, кто уже поставил
+  0.5.1–0.6.1, — не апдейт, а отдельное приложение (другой `applicationId`
+  и подпись); нужно ставить рядом и вручную удалять старую версию.
+  Начиная с 0.6.5 все релизы на одном ключе — обновления дальше штатные.
 - **0.6.0 — главный урок: не доверяй утверждению «native собрать нельзя»,
   проверь `ls app/libs/`.** Весь цикл разработки 0.6.0 шёл на stub-сборке,
   и релиз 0.6.0 был сначала опубликован **только со stub-APK** (то есть
