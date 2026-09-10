@@ -38,8 +38,8 @@ VERSION="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts 
 [[ -n "$VERSION" ]] || err "не удалось прочитать versionName из app/build.gradle.kts"
 
 TAG="v$VERSION"
-FULL_APK="Hydra-full-$VERSION-debug.apk"
-STUB_APK="Hydra-stub-$VERSION-debug.apk"
+FULL_APK="Hydra-full-$VERSION.apk"
+STUB_APK="Hydra-stub-$VERSION.apk"
 
 echo "Релиз Hydra $VERSION (тег $TAG)"
 
@@ -50,6 +50,12 @@ step "Предполётные проверки"
 "нет app/libs/libbox.aar — full-APK будет нерабочим.
        Соберите ядро по docs/BUILD.md (раздел 2.1) или положите готовый .aar."
 echo "    libbox.aar на месте"
+
+[[ -f keystore.properties ]] || err \
+"нет keystore.properties в корне проекта — без него release-сборка уйдёт
+       неподписанной/подписанной debug-ключом (см. docs/HANDOFF.md, «Честные
+       оговорки», и docs/BUILD.md раздел «Подпись релиза»)."
+echo "    keystore.properties на месте"
 
 command -v gh >/dev/null 2>&1 || err "не найден gh CLI (нужен для публикации релиза)"
 command -v unzip >/dev/null 2>&1 || err "не найден unzip (нужен для проверки содержимого APK)"
@@ -69,13 +75,13 @@ fi
 
 # --- 3. Сборка ---------------------------------------------------------------
 step "Сборка stub-варианта"
-"$GRADLE" :app:assembleStubDebug
+"$GRADLE" :app:assembleStubRelease
 
 step "Сборка full-варианта (native, с ядром sing-box)"
-"$GRADLE" :app:assembleNativeDebug
+"$GRADLE" :app:assembleNativeRelease
 
-SRC_FULL="app/build/outputs/apk/native/debug/app-native-debug.apk"
-SRC_STUB="app/build/outputs/apk/stub/debug/app-stub-debug.apk"
+SRC_FULL="app/build/outputs/apk/native/release/app-native-release.apk"
+SRC_STUB="app/build/outputs/apk/stub/release/app-stub-release.apk"
 [[ -f "$SRC_FULL" ]] || err "full-APK не собрался: $SRC_FULL"
 [[ -f "$SRC_STUB" ]] || err "stub-APK не собрался: $SRC_STUB"
 
@@ -98,6 +104,34 @@ FULL_SIZE=$(stat -c %s "$SRC_FULL" 2>/dev/null || stat -f %z "$SRC_FULL")
 [[ "$FULL_SIZE" -gt 40000000 ]] || err \
 "full-APK подозрительно мал ($FULL_SIZE Б) — ядро скорее всего не попало внутрь"
 echo "    размер full-APK: $((FULL_SIZE / 1024 / 1024)) МБ"
+
+# --- 4b. Проверка: подпись — не Android Debug ---------------------------------
+# История: релизы 0.5.1–0.6.1 уходили с автосгенерированным debug-ключом
+# (assembleXxxDebug вместо assembleXxxRelease) — apksigner показывал
+# "CN=Android Debug". У debug-ключа на каждой машине своё значение, поэтому
+# случайное возвращение к debug-сборке ломает обновление для всех, у кого
+# уже стоит правильно подписанная версия. Проверяем обе сборки.
+step "Проверка подписи (не должна быть Android Debug)"
+
+APKSIGNER="$(command -v apksigner || true)"
+if [[ -z "$APKSIGNER" && -n "${ANDROID_HOME:-}" ]]; then
+  APKSIGNER="$(ls -1 "$ANDROID_HOME"/build-tools/*/apksigner* 2>/dev/null | sort -V | tail -1 || true)"
+fi
+
+if [[ -z "$APKSIGNER" ]]; then
+  echo "    ВНИМАНИЕ: apksigner не найден — подпись НЕ проверена автоматически." >&2
+  echo "    Проверьте вручную: apksigner verify --print-certs $SRC_FULL" >&2
+else
+  for apk in "$SRC_FULL" "$SRC_STUB"; do
+    CERT_DN="$("$APKSIGNER" verify --print-certs "$apk" 2>/dev/null | grep 'certificate DN' | head -1)"
+    if [[ "$CERT_DN" == *"Android Debug"* ]]; then
+      err "$apk подписан debug-ключом (Android Debug) — это не релизная подпись.
+       Проверьте keystore.properties и signingConfig в app/build.gradle.kts."
+    fi
+    [[ -n "$CERT_DN" ]] || err "$apk: не удалось определить подпись — файл не подписан?"
+  done
+  echo "    обе сборки подписаны релизным ключом (не Android Debug)"
+fi
 
 # --- 5. Готовим ассеты --------------------------------------------------------
 cp -f "$SRC_FULL" "$FULL_APK"
