@@ -4,7 +4,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.6.5**
+- Статус: **0.6.5.1**
 
 ---
 
@@ -85,6 +85,19 @@ UI (Compose) → MainViewModel → ServerRepository (Room + подписки)
 Подробно — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 Что осталось сделать — [docs/HANDOFF.md](docs/HANDOFF.md) и [CHANGELOG.md](CHANGELOG.md).
 
+## Мультиплатформенность (план)
+
+Сейчас Hydra — Android-only. В планах — iOS и Desktop (Windows/macOS/Linux)
+через Kotlin Multiplatform для слоя данных (модели, парсер ссылок, билдеры
+конфигов) при отдельной, нативной реализации VPN-core и UI на каждой
+платформе — общий tun-слой через абстракцию сознательно не делается, это
+исторически самая хрупкая часть системы. Порядок: сначала Desktop (ниже
+порог входа, sing-box можно запускать отдельным процессом), затем iOS
+(`NetworkExtension`, отдельный extension-процесс с memory limit). Отдельным
+треком — свой формат ссылок для обмена конфигами между платформами
+(`hydra://`, по образцу `incy-link-encoder`). Подробности, включая честную
+оценку что в текущем коде уже переносимо, а что нет — [docs/MULTIPLATFORM.md](docs/MULTIPLATFORM.md).
+
 ## Документация
 
 - [docs/PROTOCOLS.md](docs/PROTOCOLS.md) — протоколы, форматы ссылок, ограничения
@@ -94,7 +107,7 @@ UI (Compose) → MainViewModel → ServerRepository (Room + подписки)
 - [docs/PANELS.md](docs/PANELS.md) — совместимость с панелями подписок
 - [docs/SECURITY.md](docs/SECURITY.md) — политика безопасности
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — как контрибьютить
-- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.6.5
+- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.6.5.1
 
 ## Лицензия
 
