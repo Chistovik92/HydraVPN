@@ -87,5 +87,16 @@
             </intent-filter>
         </service>
 
+        <!-- Xray-core (libXray.aar) — в ОТДЕЛЬНОМ процессе: gomobile-сборки
+             libbox и libXray каждая тащит свой Go-рантайм, а Go не поддерживает
+             два независимо собранных рантайма в одном процессе (см. docs/BUILD.md,
+             раздел 2.2, и README github.com/XTLS/libXray). XrayCore (main-процесс,
+             HydraVpnService) общается с этим сервисом через AIDL (IXrayEngine) —
+             только строки/ParcelFileDescriptor, без Go-типов через границу. -->
+        <service
+            android:name=".vpn.core.xray.XrayEngineService"
+            android:process=":xray"
+            android:exported="false" />
+
     </application>
 </manifest>

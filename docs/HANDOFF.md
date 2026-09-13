@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.6.5.1** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.6.6** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -161,6 +161,32 @@
   поэтому мягкое свечение герба и пунктир радарных колец не воспроизведены;
   геометрия, градиенты и цвета перенесены один в один.
 
+- 🚧 **Фаза 6a** (0.6.6, BETA — собрано, но не проверено на устройстве):
+  оживление Xray Core (см. TODO №4 и «Честные
+  оговорки» выше) — код готов, сборка `.aar` и проверка на устройстве не
+  сделаны. Дальше — паритет с референсным Xray-клиентом (INCY) по остальным
+  настройкам, отдельными фазами:
+  - **6b. Безопасность соединения**: Kill Switch (блокировать трафик при
+    разрыве VPN — сейчас `HydraVpnService` этого не делает), автоподключение
+    при старте приложения и при загрузке устройства (`BOOT_COMPLETED` —
+    разрешение в манифесте уже есть, `BroadcastReceiver` нет).
+  - **6c. Расширение sing-box-конфига**: пользовательский DNS (DoH сейчас
+    жёстко `1.1.1.1`), MTU, фрагментация пакетов, `route.rules`+`sniff`
+    (сейчас только статичные правила по доменам/IP, без реального
+    TLS-sniffing SNI/host).
+  - **6d. Настройки/инфраструктура**: единый `SettingsRepository` (сейчас
+    3 независимых DataStore-файла — `settings`/`theme_settings`/`engine_settings`
+    + Room), backup/restore всей конфигурации в файл/QR, сброс настроек,
+    персистентные логи с уровнями и периодом хранения (сейчас — только
+    in-memory, cap 500 строк, без уровней).
+  - **6e. UI/косметика**: локализация (`values-ru`/`values-en`/... — сейчас
+    `strings.xml` пустой, весь текст хардкожен по-русски в Compose), Material
+    You, AMOLED-чёрный, доп. варианты иконки лаунчера (сейчас только 2 —
+    Ambient/Stealth).
+  - **6f. Хотспот-прокси**: локальный SOCKS5/HTTP listener на `0.0.0.0` с
+    логином/паролем — раздать VPN другим устройствам в той же сети (сейчас
+    в проекте нет вообще никакого внешнего прокси-листенера).
+
 Полный план с деталями реализации каждой фазы — в
 `.claude/plans/modular-kindling-stardust.md` (внутри worktree, не в git).
 
@@ -177,8 +203,25 @@
    готово в 0.5.3: `getInterfaces`/`startDefaultInterfaceMonitor`/`systemCertificates`
    проверены живым подключением на реальном устройстве (см. CHANGELOG 0.5.3).
    `readWIFIState` осознанно `null` (policy-based routing не используется).
-4. **Xray**: мост tun2socks (`hev-socks5-tunnel`) + запуск ядра в `XrayCore`
-   (streamSettings уже готовы в `XrayConfigBuilder`).
+4. **Xray**: код готов и **собран** (0.6.6, BETA — тумблер выключен по
+   умолчанию) — `libXray.aar` реально собран (Go 1.27, официальный
+   `python3 build/main.py android`) и `:app:assembleNativeDebug` с ним —
+   `BUILD SUCCESSFUL`. По пути обнаружилось и решено: два независимых
+   `gomobile bind` (`libbox.aar` и `libXray.aar`) не могут жить в одном
+   процессе (общий Go-рантайм) — Xray-core вынесен в отдельный процесс
+   (`:xray`, `XrayEngineService`), общение через AIDL (`IXrayEngine`); плюс
+   отдельная Gradle-задача `dedupLibXrayClasses` вырезает дублирующиеся
+   generic-классы gobind (`go.Seq`/`go.Universe`/`go.error`) из `libXray.aar`,
+   иначе даже раздельные процессы не спасают от ошибки сборки
+   (`checkNativeDebugDuplicateClasses` смотрит на classes.jar ДО packaging).
+   Xray поднимается headless с локальным socks5-inbound, sing-box в главном
+   процессе — как tun2socks-мост (`SingBoxConfigBuilder.buildXrayBridge()`).
+   Тумблер «Xray Core для VLESS/VMess/Trojan/SS» — Настройки → Туннель.
+   Реальный API (`LibXray.invoke(requestJson)`, `DialerController.protectFd(long)`)
+   сверен декомпиляцией собранного `.aar`, не по памяти. Подробности —
+   docs/BUILD.md, раздел 2.2. Осталось: живой тест на устройстве (см. «Честные
+   оговорки» ниже) — межпроцессный protect() через `ParcelFileDescriptor`
+   не проверялся вживую, это самое рискованное место реализации.
 5. **olcRTC**: gomobile-биндинг (`cnc` → локальный SOCKS5) + tun2socks в `OlcRtcCore`.
 6. **WDTT**: JNI к `libclient.so` + поток VK-авторизации (WebView) в `WdttCore`;
    проверить лицензию upstream перед включением бинарника.
@@ -237,6 +280,36 @@ CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.6.1
 
 ## Честные оговорки
 
+- **0.6.6 — Xray Core собран и упаковывается, но не проверен живьём на
+  устройстве (BETA, тумблер выключен по умолчанию).**
+  Пользователь прислал скриншоты настроек стороннего Xray-based клиента (INCY)
+  и попросил довести Hydra до паритета; начали с того, что `XrayCore` был
+  чистой заглушкой (`throw NotImplementedError`). По ходу дела на машину
+  разработки поставлены Go 1.27 и gomobile, `libXray.aar` реально собран
+  официальным скриптом `XTLS/libXray` (`python3 build/main.py android`).
+  Первая архитектурная идея — Xray (headless, локальный socks5-inbound) +
+  sing-box как tun2socks-мост в ОДНОМ процессе — не собралась:
+  `checkNativeDebugDuplicateClasses` завалил сборку (`libbox.aar` и
+  `libXray.aar` — два независимых `gomobile bind`, каждый со своей копией
+  Go-рантайма и generic-обвязки gobind; апстрим `XTLS/libXray` в README прямо
+  предупреждает, что Go не поддерживает два независимых рантайма в одном
+  процессе). Решение — вынести Xray-core в отдельный процесс (`:xray`,
+  `XrayEngineService`), связь через AIDL (`IXrayEngine`/`IXraySocketProtector`,
+  только `String`/`ParcelFileDescriptor` через границу), плюс отдельная
+  Gradle-задача `dedupLibXrayClasses` — раздельных процессов недостаточно,
+  чтобы пройти саму проверку дублей классов (она смотрит на classes.jar
+  каждого `.aar` ДО этапа packaging), поэтому дублирующиеся generic-классы
+  gobind физически вырезаются из `classes.jar` внутри `libXray.aar`
+  отдельным шагом сборки. `:app:assembleNativeDebug` с обоими `.aar` —
+  `BUILD SUCCESSFUL`, в APK подтверждены нужные классы и оба разных `.so`
+  (декомпиляцией/dex-грепом, не на веру). Отдельный нативный tun2socks
+  (`hev-socks5-tunnel`), который планировался изначально, не понадобился.
+  **Не проверено**: живое подключение на устройстве — межпроцессный protect()
+  сокетов (`ParcelFileDescriptor` через Binder, `:xray` → главный процесс) не
+  тестировался вживую, это самое рискованное место реализации (если не
+  сработает — исходящие соединения Xray могут не выйти из-под VPN-петли).
+  Урок в духе 0.5.3/0.5.4: пока это не проверено на устройстве — это код,
+  прошедший только сборку, а не подтверждённо рабочая фича.
 - **0.6.5 — все релизы 0.5.1–0.6.1 были подписаны Android debug-ключом,
   не релизным.** `scripts/release.sh` собирал `assembleXxxDebug`, а не
   `assembleXxxRelease` — `keystore.properties`/`signingConfigs` в

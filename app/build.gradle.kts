@@ -1,5 +1,10 @@
+import java.io.ByteArrayOutputStream
 import java.io.FileInputStream
 import java.util.Properties
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
 plugins {
     id("com.android.application")
@@ -30,8 +35,8 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 15
-        versionName = "0.6.5.1"
+        versionCode = 16
+        versionName = "0.6.6"
 
         // ABI, под которые собраны нативные ядра (libbox / libXray)
         ndk {
@@ -74,11 +79,25 @@ android {
         create("stub") {
             dimension = "engine"
             versionNameSuffix = "-stub"
+            buildConfigField("boolean", "XRAY_AVAILABLE", "false")
         }
         // Реальная интеграция с libbox.aar (sing-box) и libXray.aar (Xray).
         // Требует положить .aar в app/libs (см. docs/BUILD.md).
         create("native") {
             dimension = "engine"
+            buildConfigField("boolean", "XRAY_AVAILABLE", file("libs/libXray.aar").exists().toString())
+        }
+    }
+
+    // XrayCore.kt существует в двух вариантах (см. docs/BUILD.md, раздел 2.2):
+    // заглушка (nativeXrayStub) и рабочая реализация на libXray.aar (nativeXrayReal).
+    // Какая из них попадает в сборку flavor `native` — решает наличие .aar,
+    // тем же условием, что и подключение зависимости `:libXray@aar` ниже —
+    // так `assembleNativeDebug` не ломается, если libXray.aar ещё не собран.
+    sourceSets {
+        getByName("native") {
+            val xraySrc = if (file("libs/libXray.aar").exists()) "src/nativeXrayReal/java" else "src/nativeXrayStub/java"
+            java.srcDir(xraySrc)
         }
     }
 
@@ -91,10 +110,22 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        aidl = true   // IXrayEngine/IXraySocketProtector — мост к процессу :xray
     }
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // libbox.aar и libXray.aar — каждый собран отдельным `gomobile bind` и
+        // тащит свою копию generic-обвязки gobind (golang.org/x/mobile/bind/java,
+        // общий для ЛЮБОГО gomobile-биндинга код, без нативной части — сам Go-код
+        // и его рантайм остаются в разных .so, изолированы через отдельный
+        // процесс :xray, см. AndroidManifest.xml). Идентичные классы — оставляем
+        // одну копию, иначе checkNativeDebugDuplicateClasses валит сборку.
+        resources.excludes += setOf(
+            "go/Seq.class", "go/Seq\$*.class",
+            "go/Universe.class", "go/Universe\$*.class",
+            "go/error.class",
+        )
     }
 }
 
@@ -135,6 +166,71 @@ tasks.matching { it.name.matches(Regex("^preNative.*Build$")) }.configureEach {
     dependsOn(checkNativeCores)
 }
 
+/**
+ * libbox.aar и libXray.aar собраны двумя независимыми `gomobile bind` —
+ * каждый несёт свою копию generic-обвязки gobind (`go.Seq`/`go.Universe`/
+ * `go.error`, пакет `golang.org/x/mobile/bind/java`, без нативного кода —
+ * это чистый Java-мост, реальные Go-рантаймы остаются в разных .so и
+ * изолированы отдельным процессом `:xray`, см. AndroidManifest.xml). Байт в
+ * байт одинаковые классы под одним именем валят `checkNativeDebugDuplicateClasses`,
+ * а обычный `packagingOptions.resources.excludes` эту проверку не обходит —
+ * она смотрит на исходные classes.jar каждого модуля ДО этапа packaging.
+ * Поэтому вырезаем дубли прямо из classes.jar внутри libXray.aar здесь и
+ * скармливаем Gradle уже очищенную копию.
+ */
+val libXrayRaw = layout.projectDirectory.file("libs/libXray.aar").asFile
+val libXrayDeduped = layout.buildDirectory.file("libXrayDedup/libXray.aar")
+
+val dedupLibXrayClasses = tasks.register("dedupLibXrayClasses") {
+    inputs.file(libXrayRaw)
+    outputs.file(libXrayDeduped)
+    onlyIf { libXrayRaw.exists() }
+    doLast {
+        val output = libXrayDeduped.get().asFile
+        output.parentFile.mkdirs()
+        val dupPatterns = listOf(
+            Regex("""^go/Seq(\$.*)?\.class$"""),
+            Regex("""^go/Universe(\$.*)?\.class$"""),
+            Regex("""^go/error\.class$"""),
+        )
+        fun isDup(name: String) = dupPatterns.any { it.matches(name) }
+
+        ZipFile(libXrayRaw).use { srcAar ->
+            val classesEntry = srcAar.getEntry("classes.jar")
+                ?: throw GradleException("libXray.aar: classes.jar не найден внутри архива")
+
+            val newClassesBytes = ByteArrayOutputStream().also { bos ->
+                ZipOutputStream(bos).use { zos ->
+                    ZipInputStream(srcAar.getInputStream(classesEntry)).use { zis ->
+                        var entry = zis.nextEntry
+                        while (entry != null) {
+                            if (!isDup(entry.name)) {
+                                zos.putNextEntry(ZipEntry(entry.name))
+                                zis.copyTo(zos)
+                                zos.closeEntry()
+                            }
+                            zis.closeEntry()
+                            entry = zis.nextEntry
+                        }
+                    }
+                }
+            }.toByteArray()
+
+            ZipOutputStream(output.outputStream()).use { zos ->
+                val entries = srcAar.entries()
+                while (entries.hasMoreElements()) {
+                    val e = entries.nextElement()
+                    zos.putNextEntry(ZipEntry(e.name))
+                    if (e.name == "classes.jar") zos.write(newClassesBytes)
+                    else srcAar.getInputStream(e).copyTo(zos)
+                    zos.closeEntry()
+                }
+            }
+        }
+        logger.lifecycle("libXray.aar: удалены дублирующиеся с libbox классы go.Seq/go.Universe/go.error -> $output")
+    }
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.09.02")
     implementation(composeBom)
@@ -169,5 +265,7 @@ dependencies {
     "nativeImplementation"(":libbox@aar")
     // Xray-core: github.com/XTLS/libXray — опционален (XrayCore честно откажет
     // при подключении, пока .aar не собран); включается при наличии файла.
-    if (file("libs/libXray.aar").exists()) "nativeImplementation"(":libXray@aar")
+    // Не сырой :libXray@aar — очищенная от дублей с libbox копия, см.
+    // dedupLibXrayClasses выше.
+    if (libXrayRaw.exists()) "nativeImplementation"(files(dedupLibXrayClasses))
 }

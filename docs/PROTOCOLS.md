@@ -32,10 +32,24 @@
 ### Про движки
 - **sing-box** обслуживает tun сам (через `PlatformInterface.openTun`) и покрывает
   протоколы выше **и WireGuard** — рекомендуемый движок по умолчанию.
-- **Xray-core** сам tun **не** обслуживает. Схема: `tun → tun2socks → socks-inbound Xray`.
-  Xray поднимается с локальным socks5 (напр. `127.0.0.1:10808`), а tun2socks
-  (`hev-socks5-tunnel`) перекладывает пакеты из tun-fd в этот socks. Xray оставлен
-  как альтернатива для сценариев, где важна именно его реализация XTLS.
+- **Xray-core** сам tun **не** обслуживает. Схема: `tun → sing-box (мост) →
+  socks-inbound Xray`. Xray поднимается headless с локальным socks5
+  (`127.0.0.1:10808`, `XrayConfigBuilder`), а роль моста берёт на себя сам
+  sing-box — `SingBoxConfigBuilder.buildXrayBridge()` строит конфиг с
+  единственным `socks`-outbound на этот же порт. Отдельный нативный tun2socks
+  (`hev-socks5-tunnel`) не нужен — весь TUN/статистика/split tunneling по
+  IP-доменам работают так же, как у обычного sing-box-соединения. Xray оставлен
+  как опциональный движок для VLESS/VMess/Trojan/Shadowsocks (тумблер в
+  Настройки → Туннель), нужен `libXray.aar` — см. `docs/BUILD.md`, раздел 2.2.
+  **Важно**: Xray-core работает в **отдельном процессе** (`:xray`,
+  `XrayEngineService`) — libbox и libXray, собранные независимыми `gomobile
+  bind`, не могут делить один процесс (два Go-рантайма в одном процессе Go не
+  поддерживает; на практике даже сборка валится дублирующимися классами
+  generic-обвязки gobind без обхода этого разделения). `XrayCore` (главный
+  процесс) и `XrayEngineService` (`:xray`) общаются через AIDL (`IXrayEngine`/
+  `IXraySocketProtector`) — только `String`/`ParcelFileDescriptor`, без
+  Go-типов через границу; protect() сокетов идёт в обратную сторону тем же
+  путём. Подробности и полная схема — docs/BUILD.md, раздел 2.2.
 
 ## WireGuard / AmneziaWG
 

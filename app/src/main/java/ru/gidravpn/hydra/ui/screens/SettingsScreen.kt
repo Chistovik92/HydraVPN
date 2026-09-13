@@ -37,7 +37,7 @@ fun SettingsScreen(vm: MainViewModel) {
 
     when (section) {
         SettingsSection.HUB -> SettingsHub(onSelect = { section = it })
-        SettingsSection.TUNNEL -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { TunnelInfoContent() }
+        SettingsSection.TUNNEL -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { TunnelInfoContent(vm) }
         SettingsSection.SPLIT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { SplitTunnelScreen(vm) }
         SettingsSection.LOGS -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { LogsScreen(vm) }
         SettingsSection.THEME -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { ThemeContent(vm) }
@@ -99,10 +99,12 @@ private fun SettingsSubScreen(onBack: () -> Unit, content: @Composable () -> Uni
 }
 
 @Composable
-private fun TunnelInfoContent() {
+private fun TunnelInfoContent(vm: MainViewModel) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Туннель", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+
+        XrayEngineToggle(vm)
 
         InfoGroup("SSTP / L2TP (userspace PPP)", AccentCyan) {
             Text("Полностью на Kotlin, без нативных .aar: PPP-стек (LCP, MS-CHAPv2, IPCP), SSTP поверх TLS с crypto-binding, L2TP по UDP (без IPsec/ESP). Нужен тест на устройстве.",
@@ -127,6 +129,40 @@ private fun TunnelInfoContent() {
         InfoGroup("WDTT и olcRTC (BETA)", AccentViolet) {
             Text("Ознакомительные движки. WDTT — WireGuard через TURN-релей облака ВК (libclient.so + VK-авторизация). olcRTC — TCP поверх WebRTC DataChannel (olcrtc.aar + tun2socks). Отмечены плашкой BETA в интерфейсе.",
                 color = TextMuted, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun XrayEngineToggle(vm: MainViewModel) {
+    val available = ru.gidravpn.hydra.BuildConfig.XRAY_AVAILABLE
+    val preferXray by vm.preferXray.collectAsState()
+    Card(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Xray Core для VLESS/VMess/Trojan/SS", color = TextPrimary,
+                        fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.width(6.dp))
+                    ru.gidravpn.hydra.ui.components.BetaBadge()
+                }
+                Text(
+                    if (available) "Вместо sing-box — ради его реализации XTLS Vision (отдельный процесс, sing-box остаётся мостом к TUN). Не проверено на реальных устройствах — включайте на свой риск."
+                    else "Нужен app/libs/libXray.aar — см. docs/BUILD.md, раздел 2.2.",
+                    color = TextMuted, fontSize = 11.sp
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(
+                checked = preferXray && available,
+                onCheckedChange = { vm.setPreferXray(it) },
+                enabled = available,
+                colors = SwitchDefaults.colors(checkedTrackColor = AccentCyan)
+            )
         }
     }
 }
