@@ -54,22 +54,85 @@ cp libbox.aar /path/to/Hydra/app/libs/
 
 ### 2.2 Xray-core → `libXray.aar`
 
+Официальный (единственный поддерживаемый апстримом) способ сборки — не голый
+`gomobile bind`, а Python-скрипт репозитория:
+
 ```bash
 git clone https://github.com/XTLS/libXray
 cd libXray
-go install github.com/golang/mobile/cmd/gomobile@latest
-go install github.com/golang/mobile/cmd/gobind@latest
-export PATH="$PATH:$(go env GOPATH)/bin"
-gomobile init
-gomobile bind -v -androidapi 26 -target=android \
-  -o libXray.aar ./
-
+export ANDROID_HOME=<путь к Android SDK>
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/<версия>"   # см. `ls "$ANDROID_HOME/ndk"`
+python3 build/main.py android
+```
+Нужны `git`, `go` (проект собран и проверен на Go 1.27), `python3`. Скрипт сам
+ставит `gomobile`/`gobind` нужной версии (`prepare_gomobile()`), качает geo-данные
+(`download_geo()`) и вызывает
+`gomobile bind -target android -androidapi 21 -ldflags="-checklinkname=0 -extldflags=-Wl,-z,max-page-size=16384"`
+(флаг `max-page-size=16384` — под 16 KB page size Android 15+). Результат —
+`libXray.aar` в корне репозитория:
+```bash
 cp libXray.aar /path/to/Hydra/app/libs/
 ```
 
-> Для Xray дополнительно нужен tun2socks-мост (Xray не обслуживает tun напрямую).
-> Соберите `hev-socks5-tunnel` под Android или переиспользуйте `libtun2socks`
-> из v2rayNG. См. [PROTOCOLS.md](PROTOCOLS.md), раздел «Xray».
+> Xray-core сам tun не обслуживает — но **отдельный tun2socks-мост
+> (hev-socks5-tunnel) не нужен**: Xray поднимается headless с локальным
+> socks5-inbound (`127.0.0.1:10808`, см. `XrayConfigBuilder`), а роль моста
+> берёт на себя уже проверенный на устройстве sing-box —
+> `SingBoxConfigBuilder.buildXrayBridge()` строит tun-конфиг с единственным
+> `socks`-outbound на этот же порт. Подробности — [PROTOCOLS.md](PROTOCOLS.md),
+> раздел «Xray».
+
+**Реальный API (сверено декомпиляцией собранного `.aar`, не догадкой)**:
+библиотека НЕ экспортирует отдельные `runXray()`/`stopXray()` — единственная
+точка входа `LibXray.invoke(requestJson): String`, где `requestJson` —
+`{"apiVersion":3,"method":"runXray","payload":{"xrayJson":"..."}}`, ответ —
+`{"success":bool,"data":..,"error":".."}`. Поддерживаемые `method`:
+`getFreePorts, convertShareLinksToXrayJson, convertXrayJsonToShareLinks,
+generateAgeKeyPair, countGeoData, pingBatch, testXray, runXray, stopXray,
+xrayVersion, getXrayState`. Для protect() сокетов — `LibXray.registerDialerController(...)`
+с интерфейсом `DialerController { protectFd(fd: Long): Boolean }`
+(параметр — `long`, не `int`). Java-пакет сгенерированных классов — `libXray`
+(`libXray.LibXray`, `libXray.DialerController`), сверено `javap` по факту сборки.
+
+> **Критично: `libXray.aar` работает в ОТДЕЛЬНОМ процессе, не вместе с
+> `libbox.aar`.** Оба — независимые `gomobile bind`-сборки, каждая тащит свою
+> копию Go-рантайма; апстрим (README `XTLS/libXray`) прямо предупреждает, что
+> Go не поддерживает два независимо собранных рантайма в одном процессе —
+> может упасть при сборке/линковке или крашнуться в рантайме. Проверено на
+> практике при подключении этого проекта: одновременное наличие обеих `.aar`
+> в зависимостях `native` flavor валит `checkNativeDebugDuplicateClasses`
+> (`Duplicate class go.Seq found in modules libXray.aar ... and libbox.aar`) —
+> обе несут одинаковую generic-обвязку gobind (`go.Seq`/`go.Universe`/`go.error`,
+> пакет `golang.org/x/mobile/bind/java`, без нативного кода). Решение в этом
+> проекте — два независимых шага:
+> 1. **Процесс.** `XrayEngineService` (`app/src/nativeXrayReal/.../vpn/core/xray/`)
+>    объявлен в `AndroidManifest.xml` с `android:process=":xray"` — реальный
+>    Go-рантайм Xray живёт в отдельном ОС-процессе, полностью изолированном от
+>    основного процесса (там же — sing-box/`libbox.so`). Общение — AIDL
+>    (`IXrayEngine`/`IXraySocketProtector`, `app/src/main/aidl/`), через
+>    границу летают только `String`/`ParcelFileDescriptor`, без Go-типов.
+>    `protect()` сокетов идёт в обратную сторону (`:xray` → главный процесс,
+>    где живёт `VpnService`) тем же путём: `ParcelFileDescriptor.fromFd()` —
+>    Binder дублирует fd на уровне ядра при передаче, поэтому закрытие локальной
+>    копии после вызова не трогает исходный fd (Xray продолжает им пользоваться).
+> 2. **Дубли классов.** Раздельного процесса недостаточно для самой ошибки
+>    сборки — `checkNativeDebugDuplicateClasses` смотрит на classes.jar внутри
+>    каждого `.aar` ДО этапа packaging, `packagingOptions.resources.excludes`
+>    её не обходит. `app/build.gradle.kts` вырезает дубли (`go/Seq*.class`,
+>    `go/Universe*.class`, `go/error.class`) прямо из `classes.jar` внутри
+>    `libXray.aar` отдельной задачей `dedupLibXrayClasses` (чистая Java-обвязка
+>    без нативного кода — безопасно оставить одну копию) и подключает уже
+>    очищенный `.aar` вместо сырого файла. Работает автоматически, ничего
+>    руками делать не нужно — просто положите `libXray.aar` в `app/libs/`.
+
+**Проверено сборкой** (в этом окружении, 2026-09): `libXray.aar` собран
+официальным скриптом (Go 1.27.0, geo-данные скачаны, `gomobile bind
+-androidapi 21 -ldflags="-checklinkname=0 -extldflags=-Wl,-z,max-page-size=16384"`),
+`:app:assembleNativeDebug` с обоими `.aar` — `BUILD SUCCESSFUL`, в собранном
+APK подтверждены `XrayEngineService`/`IXrayEngine`/`LibXray`/`DialerController`
+(dex) и оба разных `.so` (`libbox.so` + `libgojni.so` — имена не совпадают,
+конфликта нет). **Не проверено**: живое подключение на устройстве (см.
+docs/HANDOFF.md, «Честные оговорки»).
 
 ### 2.3 amneziawg-go → `amneziawg-go.aar`
 
@@ -107,7 +170,12 @@ gomobile bind -v -androidapi 26 -target=android -o olcrtc.aar ./
 cp olcrtc.aar /path/to/Hydra/app/libs/
 ```
 
-Плюс tun2socks (см. 2.2). Мост описан в `OlcRtcCore`.
+Плюс tun2socks (`hev-socks5-tunnel`, тот, от которого отказались для Xray в
+2.2) — либо переиспользовать тот же приём «sing-box как мост», что и для
+`XrayCore`: `SingBoxConfigBuilder.buildXrayBridge()`/`SingBoxCore.runConfig()`
+уже общие, `olcrtc`-клиенту достаточно поднять свой локальный socks5-порт
+и передать его туда же. Мост описан в `OlcRtcCore` (не реализовано —
+см. HANDOFF.md).
 
 ### 2.6 Сборка приложения с ядрами (flavor `native`)
 

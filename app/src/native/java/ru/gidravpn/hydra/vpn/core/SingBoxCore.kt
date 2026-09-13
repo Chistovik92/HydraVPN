@@ -44,14 +44,28 @@ class SingBoxCore : VpnCore {
         onLog: (String) -> Unit,
         onStats: (TrafficStats) -> Unit,
     ) {
-        // libbox.setup вызывается один раз за процесс (idempotent guard в SingBoxRuntime)
-        SingBoxRuntime.ensureSetup()
-
         val split = AppCtx.appContext?.let { ctx ->
             runBlocking { SplitTunnelRepository(ctx).settings.firstOrNull() }
         } ?: SplitTunnel()
         val config = SingBoxConfigBuilder.build(profile, splitTunnel = split).toString(2)
         onLog("sing-box: конфиг сгенерирован (${config.length} байт)")
+        runConfig(tun, config, onLog, onStats)
+    }
+
+    /**
+     * Поднимает libbox с уже готовым JSON-конфигом, без привязки к [ServerProfile].
+     * Используется мостом Xray → tun (см. `XrayCore` в nativeXrayReal): Xray сам
+     * tun не обслуживает, поэтому sing-box берёт эту роль на себя — весь конфиг
+     * тут состоит из tun-inbound + одного socks-outbound на локальный порт Xray.
+     */
+    internal fun runConfig(
+        tun: ParcelFileDescriptor,
+        config: String,
+        onLog: (String) -> Unit,
+        onStats: (TrafficStats) -> Unit,
+    ) {
+        // libbox.setup вызывается один раз за процесс (idempotent guard в SingBoxRuntime)
+        SingBoxRuntime.ensureSetup()
 
         // Command-server поднимается ДО сервиса — к нему затем подключается
         // клиент за статистикой трафика (см. SingBoxRuntime).

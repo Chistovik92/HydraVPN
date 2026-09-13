@@ -12,6 +12,7 @@ import ru.gidravpn.hydra.data.model.SplitTunnel
 import ru.gidravpn.hydra.data.model.SplitTunnelMode
 import ru.gidravpn.hydra.data.net.PingMeasurer
 import ru.gidravpn.hydra.data.model.Subscription
+import ru.gidravpn.hydra.data.repository.EngineRepository
 import ru.gidravpn.hydra.data.repository.ServerRepository
 import ru.gidravpn.hydra.data.repository.SplitTunnelRepository
 import ru.gidravpn.hydra.data.repository.ThemeRepository
@@ -26,6 +27,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ServerRepository(app)
     private val splitRepo = SplitTunnelRepository(app)
     private val themeRepo = ThemeRepository(app)
+    private val engineRepo = EngineRepository(app)
 
     val themeMode: StateFlow<ThemeMode> = themeRepo.mode
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.AMBIENT)
@@ -45,6 +47,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (enabled) LauncherIcon.apply(getApplication(), themeMode.value)
         else LauncherIcon.reset(getApplication())
     }
+
+    /** Xray Core вместо sing-box для VLESS/VMess/Trojan/SS (см. NativeCoreFactory). */
+    val preferXray: StateFlow<Boolean> = engineRepo.preferXray
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setPreferXray(enabled: Boolean) = viewModelScope.launch { engineRepo.setPreferXray(enabled) }
 
     val servers: StateFlow<List<ServerProfile>> = repo.allServers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

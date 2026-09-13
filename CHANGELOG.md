@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.6.6] — Xray Core (BETA)
+
+### Добавлено
+- **Xray-core как опциональный движок для VLESS/VMess/Trojan/Shadowsocks**
+  (тумблер «Xray Core для VLESS/VMess/Trojan/SS», Настройки → Туннель,
+  **выключен по умолчанию**, помечен BETA). Xray-core сам TUN не обслуживает —
+  поднимается headless с локальным socks5-inbound, а TUN/статистику/split
+  tunneling по-прежнему держит sing-box, работающий как мост
+  (`SingBoxConfigBuilder.buildXrayBridge()`).
+- Xray-core вынесен в **отдельный процесс** (`:xray`, `XrayEngineService`,
+  AIDL-мост `IXrayEngine`/`IXraySocketProtector`) — независимо собранные
+  `libbox.aar` (sing-box) и `libXray.aar` (Xray) каждый несёт свой Go-рантайм,
+  и Go не поддерживает два таких рантайма в одном процессе (см.
+  docs/BUILD.md, раздел 2.2). Дублирующиеся Java-классы generic-обвязки
+  gobind (`go.Seq`/`go.Universe`/`go.error`) вырезаются из `libXray.aar`
+  отдельной Gradle-задачей `dedupLibXrayClasses`.
+- Реальный API `LibXray.invoke(...)`/`DialerController.protectFd(long)` —
+  сверен декомпиляцией собранного `.aar`, не документацией/памятью.
+
+### Честная оговорка
+- **Xray Core не проверен на реальном устройстве.** Собран (Go 1.27,
+  официальный build-скрипт `XTLS/libXray`), `:app:assembleNativeDebug` с
+  обоими `.aar` — `BUILD SUCCESSFUL`, в APK подтверждены нужные классы и
+  оба разных `.so`. Но межпроцессный `protect()` сокетов (`:xray` → главный
+  процесс через `ParcelFileDescriptor`/Binder) живьём не тестировался — это
+  самое рискованное место: если не сработает, исходящие соединения Xray
+  теоретически могут не выйти из-под VPN-петли. Поэтому тумблер выключен по
+  умолчанию и помечен BETA — на существующих пользователей (sing-box для
+  остальных протоколов) это никак не влияет. См. docs/HANDOFF.md.
+
 ## [0.6.5.1] — Дорожная карта мультиплатформенности (только документация)
 
 Тег без сборки/публикации APK — версия поднята для отметки состояния

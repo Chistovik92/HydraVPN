@@ -15,8 +15,22 @@ import org.json.JSONObject
  */
 object SingBoxConfigBuilder {
 
-    fun build(profile: ServerProfile, socksPort: Int = 0, splitTunnel: SplitTunnel = SplitTunnel()): JSONObject {
-        val outbound = outboundFor(profile)
+    fun build(profile: ServerProfile, socksPort: Int = 0, splitTunnel: SplitTunnel = SplitTunnel()): JSONObject =
+        baseConfig(outboundFor(profile), splitTunnel)
+
+    /**
+     * Мост Xray → tun (см. `XrayCore` в native-flavor): Xray сам tun не
+     * обслуживает, поэтому он поднимается headless с локальным socks5-inbound
+     * (`127.0.0.1:$socksPort`), а весь TUN/статистику/split tunneling берёт на
+     * себя sing-box — единственный outbound здесь указывает на этот же порт.
+     */
+    fun buildXrayBridge(socksPort: Int, splitTunnel: SplitTunnel = SplitTunnel()): JSONObject {
+        val outbound = JSONObject().put("type", "socks").put("tag", "proxy")
+            .put("server", "127.0.0.1").put("server_port", socksPort)
+        return baseConfig(outbound, splitTunnel)
+    }
+
+    private fun baseConfig(outbound: JSONObject, splitTunnel: SplitTunnel): JSONObject {
         val root = JSONObject()
 
         root.put("log", JSONObject().put("level", "info").put("timestamp", true))
