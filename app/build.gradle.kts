@@ -232,9 +232,15 @@ val libXrayToDex = tasks.register("libXrayToDex") {
 
         val outDir = outAsset.get().asFile.parentFile
         outDir.mkdirs()
-        exec {
+        // Project.exec{} убран в Gradle 9 (был deprecated с 7.x) — CI генерирует
+        // wrapper системным Gradle ДО того, как появляется закреплённая версия
+        // (gradle-wrapper.jar сознательно не в репозитории, см. docs/BUILD.md),
+        // так что скрипт должен компилироваться и под 9.x. providers.exec{} —
+        // текущая замена, доступна уже в 7.5+, так что работает и под локальный
+        // портативный Gradle 8.9.
+        providers.exec {
             commandLine(d8.absolutePath, "--release", "--min-api", "26", "--output", outDir.absolutePath, jarFile.absolutePath)
-        }
+        }.result.get()
         val produced = File(outDir, "classes.dex")
         produced.copyTo(outAsset.get().asFile, overwrite = true)
         produced.delete()
