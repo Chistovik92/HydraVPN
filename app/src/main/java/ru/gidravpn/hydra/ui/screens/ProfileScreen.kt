@@ -30,6 +30,7 @@ import ru.gidravpn.hydra.ui.theme.*
 import ru.gidravpn.hydra.vpn.core.ConnectionState
 
 private const val GITHUB_REPO = "Chistovik92/HydraVPN"
+private const val WEBSITE_URL = "https://hydravpn.us"
 private const val MAX_SAMPLES = 30
 
 @Composable
@@ -109,6 +110,7 @@ fun ProfileScreen(vm: MainViewModel) {
             Text("[скрыт]", color = TextSecondary, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
         }
 
+        WebsiteCard()
         GithubCard()
     }
 }
@@ -118,6 +120,20 @@ private fun StatCell(title: String, value: String, valueColor: androidx.compose.
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(title, color = TextMuted, fontSize = 11.sp)
         Text(value, color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun WebsiteCard() {
+    val uriHandler = LocalUriHandler.current
+    Card(Modifier.fillMaxWidth().clickableNoRipple { uriHandler.openUri(WEBSITE_URL) }) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column {
+                Text("Сайт", color = TextMuted, fontSize = 11.sp)
+                Text(WEBSITE_URL.removePrefix("https://"), color = TextPrimary, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+            }
+            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Открыть сайт", tint = AccentCyan)
+        }
     }
 }
 

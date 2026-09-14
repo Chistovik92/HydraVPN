@@ -42,14 +42,20 @@
   как опциональный движок для VLESS/VMess/Trojan/Shadowsocks (тумблер в
   Настройки → Туннель), нужен `libXray.aar` — см. `docs/BUILD.md`, раздел 2.2.
   **Важно**: Xray-core работает в **отдельном процессе** (`:xray`,
-  `XrayEngineService`) — libbox и libXray, собранные независимыми `gomobile
-  bind`, не могут делить один процесс (два Go-рантайма в одном процессе Go не
-  поддерживает; на практике даже сборка валится дублирующимися классами
-  generic-обвязки gobind без обхода этого разделения). `XrayCore` (главный
+  `XrayEngineService`) И грузится изолированным `DexClassLoader`
+  (`parent = null`, свой `classes.dex`) — libbox и libXray, собранные
+  независимыми `gomobile bind`, несут несовместимую обвязку gobind
+  (`go.Seq` и т.п. — у каждой свой `System.loadLibrary`, а JNI у gomobile
+  жёстко привязан к исходному имени класса, переименование не работает);
+  ни отдельного процесса, ни дедупа/переименования классов по отдельности
+  недостаточно — только оба вместе (полный разбор пяти найденных по пути
+  багов — docs/HANDOFF.md, «Честные оговорки»). `XrayCore` (главный
   процесс) и `XrayEngineService` (`:xray`) общаются через AIDL (`IXrayEngine`/
   `IXraySocketProtector`) — только `String`/`ParcelFileDescriptor`, без
   Go-типов через границу; protect() сокетов идёт в обратную сторону тем же
-  путём. Подробности и полная схема — docs/BUILD.md, раздел 2.2.
+  путём. **Подтверждено на реальном устройстве** (OnePlus CPH2747): VLESS
+  через Xray Core поднимается и передаёт трафик. Подробности и полная схема
+  — docs/BUILD.md, раздел 2.2.
 
 ## WireGuard / AmneziaWG
 

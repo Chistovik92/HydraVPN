@@ -1,10 +1,6 @@
-import java.io.ByteArrayOutputStream
 import java.io.FileInputStream
 import java.util.Properties
-import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
-import java.util.zip.ZipInputStream
-import java.util.zip.ZipOutputStream
 
 plugins {
     id("com.android.application")
@@ -35,8 +31,8 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 16
-        versionName = "0.6.6"
+        versionCode = 17
+        versionName = "0.6.7"
 
         // ABI, под которые собраны нативные ядра (libbox / libXray)
         ndk {
@@ -91,13 +87,18 @@ android {
 
     // XrayCore.kt существует в двух вариантах (см. docs/BUILD.md, раздел 2.2):
     // заглушка (nativeXrayStub) и рабочая реализация на libXray.aar (nativeXrayReal).
-    // Какая из них попадает в сборку flavor `native` — решает наличие .aar,
-    // тем же условием, что и подключение зависимости `:libXray@aar` ниже —
+    // Какая из них попадает в сборку flavor `native` — решает наличие .aar —
     // так `assembleNativeDebug` не ломается, если libXray.aar ещё не собран.
+    // .so и classes.dex для процесса :xray подключаются НЕ как Gradle-зависимость
+    // (см. extractLibXrayNativeLibs/libXrayToDex ниже и комментарий там же).
     sourceSets {
         getByName("native") {
-            val xraySrc = if (file("libs/libXray.aar").exists()) "src/nativeXrayReal/java" else "src/nativeXrayStub/java"
-            java.srcDir(xraySrc)
+            val hasLibXray = file("libs/libXray.aar").exists()
+            java.srcDir(if (hasLibXray) "src/nativeXrayReal/java" else "src/nativeXrayStub/java")
+            if (hasLibXray) {
+                jniLibs.srcDir(layout.buildDirectory.dir("libXrayJni"))
+                assets.srcDir(layout.buildDirectory.dir("libXrayDexAsset"))
+            }
         }
     }
 
@@ -115,17 +116,8 @@ android {
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        // libbox.aar и libXray.aar — каждый собран отдельным `gomobile bind` и
-        // тащит свою копию generic-обвязки gobind (golang.org/x/mobile/bind/java,
-        // общий для ЛЮБОГО gomobile-биндинга код, без нативной части — сам Go-код
-        // и его рантайм остаются в разных .so, изолированы через отдельный
-        // процесс :xray, см. AndroidManifest.xml). Идентичные классы — оставляем
-        // одну копию, иначе checkNativeDebugDuplicateClasses валит сборку.
-        resources.excludes += setOf(
-            "go/Seq.class", "go/Seq\$*.class",
-            "go/Universe.class", "go/Universe\$*.class",
-            "go/error.class",
-        )
+        // Требование AGP при android:extractNativeLibs="true" (см. AndroidManifest.xml).
+        jniLibs.useLegacyPackaging = true
     }
 }
 
@@ -168,67 +160,96 @@ tasks.matching { it.name.matches(Regex("^preNative.*Build$")) }.configureEach {
 
 /**
  * libbox.aar и libXray.aar собраны двумя независимыми `gomobile bind` —
- * каждый несёт свою копию generic-обвязки gobind (`go.Seq`/`go.Universe`/
- * `go.error`, пакет `golang.org/x/mobile/bind/java`, без нативного кода —
- * это чистый Java-мост, реальные Go-рантаймы остаются в разных .so и
- * изолированы отдельным процессом `:xray`, см. AndroidManifest.xml). Байт в
- * байт одинаковые классы под одним именем валят `checkNativeDebugDuplicateClasses`,
- * а обычный `packagingOptions.resources.excludes` эту проверку не обходит —
- * она смотрит на исходные classes.jar каждого модуля ДО этапа packaging.
- * Поэтому вырезаем дубли прямо из classes.jar внутри libXray.aar здесь и
- * скармливаем Gradle уже очищенную копию.
+ * каждый несёт свою копию обвязки gobind (пакет `go.*`: Seq/Universe/error).
+ *
+ * Она не взаимозаменяема между сборками (у каждой свой
+ * `System.loadLibrary(...)` — "box" vs "gojni" — зашитый в `go.Seq.<clinit>`)
+ * И НЕ ПЕРЕИМЕНОВЫВАЕТСЯ: JNI у gomobile — implicit-linking, символы в
+ * `libgojni.so` жёстко экспортированы как `Java_go_Seq_init` и т.п.
+ * (по исходному имени класса). Проверено на практике (0.6.6):
+ *   1. Оставить одну копию (от libbox) — процесс `:xray` грузит `libbox.so`
+ *      вместо `libgojni.so` → `UnsatisfiedLinkError` на `LibXray._init()`.
+ *   2. Переименовать пакет `go`→`xraygo` (ASM) — грузится уже правильный
+ *      `.so`, но JNI ищет `Java_xraygo_Seq_init`, а .so экспортирует только
+ *      `Java_go_Seq_init` → тот же `UnsatisfiedLinkError`, другая точка.
+ *
+ * Единственный работающий вариант — НЕ подключать классы libXray.aar в общий
+ * classpath приложения вообще. Java/нативный код Xray грузится в рантайме
+ * (в процессе `:xray`, см. `XrayEngineService`) через ИЗОЛИРОВАННЫЙ
+ * `DexClassLoader` со своим `classes.dex` и своим native library search
+ * path — тогда его `go.Seq` живёт в отдельном classloader'е, не пересекаясь
+ * с libbox'овским, и грузит именно свою `.so` по своим же JNI-символам.
+ * `XrayEngineService` обращается к загруженным классам через reflection —
+ * компилировать `libXray.*` напрямую (значит, и включать как обычную Gradle
+ * зависимость) не нужно вовсе.
  */
 val libXrayRaw = layout.projectDirectory.file("libs/libXray.aar").asFile
-val libXrayDeduped = layout.buildDirectory.file("libXrayDedup/libXray.aar")
+val libXrayJniDir = layout.buildDirectory.dir("libXrayJni")
+val libXrayDexAssetDir = layout.buildDirectory.dir("libXrayDexAsset")
 
-val dedupLibXrayClasses = tasks.register("dedupLibXrayClasses") {
+/** .so для процесса :xray — обычные jniLibs, распаковка АPK делает всё сама. */
+val extractLibXrayNativeLibs = tasks.register("extractLibXrayNativeLibs") {
     inputs.file(libXrayRaw)
-    outputs.file(libXrayDeduped)
+    outputs.dir(libXrayJniDir)
     onlyIf { libXrayRaw.exists() }
     doLast {
-        val output = libXrayDeduped.get().asFile
-        output.parentFile.mkdirs()
-        val dupPatterns = listOf(
-            Regex("""^go/Seq(\$.*)?\.class$"""),
-            Regex("""^go/Universe(\$.*)?\.class$"""),
-            Regex("""^go/error\.class$"""),
-        )
-        fun isDup(name: String) = dupPatterns.any { it.matches(name) }
+        val outDir = libXrayJniDir.get().asFile
+        outDir.deleteRecursively()
+        ZipFile(libXrayRaw).use { srcAar ->
+            val entries = srcAar.entries()
+            while (entries.hasMoreElements()) {
+                val e = entries.nextElement()
+                if (!e.name.startsWith("jni/") || e.isDirectory) continue
+                val dest = File(outDir, e.name.removePrefix("jni/"))
+                dest.parentFile.mkdirs()
+                srcAar.getInputStream(e).use { input -> dest.outputStream().use { input.copyTo(it) } }
+            }
+        }
+        logger.lifecycle("libXray.aar: .so извлечены в $outDir")
+    }
+}
 
+// classes.jar (нетронутый, оригинальные имена go.* и libXray.*) -> classes.dex через d8, как asset.
+val libXrayToDex = tasks.register("libXrayToDex") {
+    inputs.file(libXrayRaw)
+    val extractedJar = layout.buildDirectory.file("libXrayDex/classes.jar")
+    val outAsset = libXrayDexAssetDir.map { it.file("libxray.dex") }
+    outputs.file(outAsset)
+    onlyIf { libXrayRaw.exists() }
+    doLast {
+        val jarFile = extractedJar.get().asFile
+        jarFile.parentFile.mkdirs()
         ZipFile(libXrayRaw).use { srcAar ->
             val classesEntry = srcAar.getEntry("classes.jar")
                 ?: throw GradleException("libXray.aar: classes.jar не найден внутри архива")
-
-            val newClassesBytes = ByteArrayOutputStream().also { bos ->
-                ZipOutputStream(bos).use { zos ->
-                    ZipInputStream(srcAar.getInputStream(classesEntry)).use { zis ->
-                        var entry = zis.nextEntry
-                        while (entry != null) {
-                            if (!isDup(entry.name)) {
-                                zos.putNextEntry(ZipEntry(entry.name))
-                                zis.copyTo(zos)
-                                zos.closeEntry()
-                            }
-                            zis.closeEntry()
-                            entry = zis.nextEntry
-                        }
-                    }
-                }
-            }.toByteArray()
-
-            ZipOutputStream(output.outputStream()).use { zos ->
-                val entries = srcAar.entries()
-                while (entries.hasMoreElements()) {
-                    val e = entries.nextElement()
-                    zos.putNextEntry(ZipEntry(e.name))
-                    if (e.name == "classes.jar") zos.write(newClassesBytes)
-                    else srcAar.getInputStream(e).copyTo(zos)
-                    zos.closeEntry()
-                }
-            }
+            srcAar.getInputStream(classesEntry).use { input -> jarFile.outputStream().use { input.copyTo(it) } }
         }
-        logger.lifecycle("libXray.aar: удалены дублирующиеся с libbox классы go.Seq/go.Universe/go.error -> $output")
+
+        val d8 = fileTree(android.sdkDirectory)
+            .matching { include("build-tools/*/d8.bat", "build-tools/*/d8") }
+            .files.maxByOrNull { it.parentFile.name }
+            ?: throw GradleException("d8 не найден в \$ANDROID_HOME/build-tools/*/")
+
+        val outDir = outAsset.get().asFile.parentFile
+        outDir.mkdirs()
+        exec {
+            commandLine(d8.absolutePath, "--release", "--min-api", "26", "--output", outDir.absolutePath, jarFile.absolutePath)
+        }
+        val produced = File(outDir, "classes.dex")
+        produced.copyTo(outAsset.get().asFile, overwrite = true)
+        produced.delete()
+        logger.lifecycle("libXray.aar: classes.jar -> ${outAsset.get().asFile} (через d8)")
     }
+}
+
+// Множество задач читает assets/jniLibs сгенерированного сорсета (merge,
+// packaging, lint-vital и т.д.) — гонять regex по каждой из них хрупко (уже
+// не совпало один раз с lint-задачей). Вместо этого — тот же хук
+// `preNative*Build`, что и у checkNativeCores выше: он гарантированно стоит
+// в графе ДО всех остальных задач flavor `native`, так что достаточно
+// одной явной связи здесь.
+tasks.matching { it.name.matches(Regex("^preNative.*Build\$")) }.configureEach {
+    dependsOn(extractLibXrayNativeLibs, libXrayToDex)
 }
 
 dependencies {
@@ -264,8 +285,10 @@ dependencies {
     // Проверено против libbox 1.12.9 (docs/BUILD.md: сборка с -checklinkname=0).
     "nativeImplementation"(":libbox@aar")
     // Xray-core: github.com/XTLS/libXray — опционален (XrayCore честно откажет
-    // при подключении, пока .aar не собран); включается при наличии файла.
-    // Не сырой :libXray@aar — очищенная от дублей с libbox копия, см.
-    // dedupLibXrayClasses выше.
-    if (libXrayRaw.exists()) "nativeImplementation"(files(dedupLibXrayClasses))
+    // при подключении, пока .aar не собран). НЕ подключаем как обычную
+    // Gradle-зависимость (`libXray@aar`) — её classes.jar конфликтует с
+    // libbox'овским go.* на уровне JNI (см. комментарий у
+    // extractLibXrayNativeLibs/libXrayToDex выше). .so и classes.dex для
+    // изолированного рантайм-загрузчика (XrayEngineService) подключены
+    // через jniLibs.srcDir/assets.srcDir в sourceSets["native"] выше.
 }

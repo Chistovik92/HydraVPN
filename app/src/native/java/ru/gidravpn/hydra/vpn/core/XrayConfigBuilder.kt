@@ -20,6 +20,13 @@ import org.json.JSONObject
  */
 object XrayConfigBuilder {
 
+    /** RFC 1918/5735/4193 + IPv4/IPv6 loopback и link-local — без geoip.dat. */
+    private val PRIVATE_IP_RANGES = listOf(
+        "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+        "127.0.0.0/8", "169.254.0.0/16",
+        "::1/128", "fc00::/7", "fe80::/10",
+    )
+
     fun build(p: ServerProfile, socksPort: Int = 10808): String {
         val extra = runCatching { JSONObject(p.extra) }.getOrDefault(JSONObject())
         val root = JSONObject()
@@ -49,13 +56,16 @@ object XrayConfigBuilder {
             put(JSONObject().put("tag", "block").put("protocol", "blackhole"))
         })
 
-        // маршрутизация: приватные адреса — напрямую, остальное — в прокси
+        // маршрутизация: приватные адреса — напрямую, остальное — в прокси.
+        // Явные CIDR вместо "geoip:private" — тому нужен файл geoip.dat,
+        // которого нет (embedded-сборка без ассетов), с ним Xray падает:
+        // "failed to open geoip.dat: stat ...: no such file or directory".
         root.put("routing", JSONObject().apply {
             put("domainStrategy", "IPIfNonMatch")
             put("rules", JSONArray().apply {
                 put(JSONObject().apply {
                     put("type", "field")
-                    put("ip", JSONArray().put("geoip:private"))
+                    put("ip", JSONArray(PRIVATE_IP_RANGES))
                     put("outboundTag", "direct")
                 })
             })

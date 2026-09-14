@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.6.6** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.6.7** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -161,10 +161,11 @@
   поэтому мягкое свечение герба и пунктир радарных колец не воспроизведены;
   геометрия, градиенты и цвета перенесены один в один.
 
-- 🚧 **Фаза 6a** (0.6.6, BETA — собрано, но не проверено на устройстве):
-  оживление Xray Core (см. TODO №4 и «Честные
-  оговорки» выше) — код готов, сборка `.aar` и проверка на устройстве не
-  сделаны. Дальше — паритет с референсным Xray-клиентом (INCY) по остальным
+- ✅ **Фаза 6a** (0.6.6/0.6.7, BETA — подтверждено на устройстве):
+  оживление Xray Core (см. TODO №4 и «Честные оговорки» выше) — VLESS через
+  Xray Core поднимается живьём (OnePlus CPH2747). Полная база GeoIP для
+  гео-маршрутизации по странам — отдельная будущая фича, не блокирует.
+  Дальше — паритет с референсным Xray-клиентом (INCY) по остальным
   настройкам, отдельными фазами:
   - **6b. Безопасность соединения**: Kill Switch (блокировать трафик при
     разрыве VPN — сейчас `HydraVpnService` этого не делает), автоподключение
@@ -203,25 +204,27 @@
    готово в 0.5.3: `getInterfaces`/`startDefaultInterfaceMonitor`/`systemCertificates`
    проверены живым подключением на реальном устройстве (см. CHANGELOG 0.5.3).
    `readWIFIState` осознанно `null` (policy-based routing не используется).
-4. **Xray**: код готов и **собран** (0.6.6, BETA — тумблер выключен по
-   умолчанию) — `libXray.aar` реально собран (Go 1.27, официальный
-   `python3 build/main.py android`) и `:app:assembleNativeDebug` с ним —
-   `BUILD SUCCESSFUL`. По пути обнаружилось и решено: два независимых
-   `gomobile bind` (`libbox.aar` и `libXray.aar`) не могут жить в одном
-   процессе (общий Go-рантайм) — Xray-core вынесен в отдельный процесс
-   (`:xray`, `XrayEngineService`), общение через AIDL (`IXrayEngine`); плюс
-   отдельная Gradle-задача `dedupLibXrayClasses` вырезает дублирующиеся
-   generic-классы gobind (`go.Seq`/`go.Universe`/`go.error`) из `libXray.aar`,
-   иначе даже раздельные процессы не спасают от ошибки сборки
-   (`checkNativeDebugDuplicateClasses` смотрит на classes.jar ДО packaging).
-   Xray поднимается headless с локальным socks5-inbound, sing-box в главном
-   процессе — как tun2socks-мост (`SingBoxConfigBuilder.buildXrayBridge()`).
+4. ~~Xray~~ — **сделано и подтверждено живьём (0.6.6/0.6.7, BETA)**.
+   `libXray.aar` собран (Go 1.27, официальный `python3 build/main.py android`).
+   Xray-core в отдельном процессе (`:xray`, `XrayEngineService`) — классы
+   грузятся ИЗОЛИРОВАННЫМ `DexClassLoader` (`parent = null`, свой
+   `classes.dex` собран из нетронутого `classes.jar` через `d8`,
+   `.so` — обычные `jniLibs`), а не как обычная Gradle-зависимость: libbox
+   и libXray несут несовместимую обвязку gobind (`go.Seq` и т.п. — у каждой
+   свой `System.loadLibrary`, JNI-символы жёстко привязаны к исходному имени
+   класса), ни дедуп, ни переименование пакета не работают — подробный разбор
+   всех пяти багов по пути (два Go-рантайма, неверная `.so`, JNI-символы,
+   read-only dex, parent-делегация classloader'а, `fdsan`-краш в
+   `HydraVpnService`, `geoip:private` без `geoip.dat`) — «Честные оговорки»
+   ниже. Xray поднимается headless с локальным socks5-inbound, sing-box в
+   главном процессе — tun2socks-мост (`SingBoxConfigBuilder.buildXrayBridge()`).
    Тумблер «Xray Core для VLESS/VMess/Trojan/SS» — Настройки → Туннель.
-   Реальный API (`LibXray.invoke(requestJson)`, `DialerController.protectFd(long)`)
-   сверен декомпиляцией собранного `.aar`, не по памяти. Подробности —
-   docs/BUILD.md, раздел 2.2. Осталось: живой тест на устройстве (см. «Честные
-   оговорки» ниже) — межпроцессный protect() через `ParcelFileDescriptor`
-   не проверялся вживую, это самое рискованное место реализации.
+   **Подтверждено на устройстве** (OnePlus CPH2747): VLESS через Xray Core
+   поднимается и передаёт трафик. Реальный API (`LibXray.invoke(requestJson)`,
+   `DialerController.protectFd(long)`) сверен декомпиляцией `.aar`. Подробности
+   — docs/BUILD.md, раздел 2.2. Осталось по мелочи: полноценная база GeoIP
+   для маршрутизации по странам (сейчас только явные CIDR для приватных
+   адресов) — отдельная будущая задача, не блокирует базовое подключение.
 5. **olcRTC**: gomobile-биндинг (`cnc` → локальный SOCKS5) + tun2socks в `OlcRtcCore`.
 6. **WDTT**: JNI к `libclient.so` + поток VK-авторизации (WebView) в `WdttCore`;
    проверить лицензию upstream перед включением бинарника.
@@ -280,36 +283,54 @@ CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.6.1
 
 ## Честные оговорки
 
-- **0.6.6 — Xray Core собран и упаковывается, но не проверен живьём на
-  устройстве (BETA, тумблер выключен по умолчанию).**
-  Пользователь прислал скриншоты настроек стороннего Xray-based клиента (INCY)
-  и попросил довести Hydra до паритета; начали с того, что `XrayCore` был
-  чистой заглушкой (`throw NotImplementedError`). По ходу дела на машину
-  разработки поставлены Go 1.27 и gomobile, `libXray.aar` реально собран
-  официальным скриптом `XTLS/libXray` (`python3 build/main.py android`).
-  Первая архитектурная идея — Xray (headless, локальный socks5-inbound) +
-  sing-box как tun2socks-мост в ОДНОМ процессе — не собралась:
-  `checkNativeDebugDuplicateClasses` завалил сборку (`libbox.aar` и
-  `libXray.aar` — два независимых `gomobile bind`, каждый со своей копией
-  Go-рантайма и generic-обвязки gobind; апстрим `XTLS/libXray` в README прямо
-  предупреждает, что Go не поддерживает два независимых рантайма в одном
-  процессе). Решение — вынести Xray-core в отдельный процесс (`:xray`,
-  `XrayEngineService`), связь через AIDL (`IXrayEngine`/`IXraySocketProtector`,
-  только `String`/`ParcelFileDescriptor` через границу), плюс отдельная
-  Gradle-задача `dedupLibXrayClasses` — раздельных процессов недостаточно,
-  чтобы пройти саму проверку дублей классов (она смотрит на classes.jar
-  каждого `.aar` ДО этапа packaging), поэтому дублирующиеся generic-классы
-  gobind физически вырезаются из `classes.jar` внутри `libXray.aar`
-  отдельным шагом сборки. `:app:assembleNativeDebug` с обоими `.aar` —
-  `BUILD SUCCESSFUL`, в APK подтверждены нужные классы и оба разных `.so`
-  (декомпиляцией/dex-грепом, не на веру). Отдельный нативный tun2socks
-  (`hev-socks5-tunnel`), который планировался изначально, не понадобился.
-  **Не проверено**: живое подключение на устройстве — межпроцессный protect()
-  сокетов (`ParcelFileDescriptor` через Binder, `:xray` → главный процесс) не
-  тестировался вживую, это самое рискованное место реализации (если не
-  сработает — исходящие соединения Xray могут не выйти из-под VPN-петли).
-  Урок в духе 0.5.3/0.5.4: пока это не проверено на устройстве — это код,
-  прошедший только сборку, а не подтверждённо рабочая фича.
+- **0.6.6/0.6.7 — Xray Core: от «собралось» до реально подтверждённого
+  подключения на устройстве потребовалось пройти пять отдельных живых
+  багов подряд** (классический урок 0.5.3/0.5.4: "собирается" ≠ "работает
+  на телефоне", здесь — в разы длиннее обычного). Пользователь прислал
+  скриншоты настроек стороннего Xray-based клиента (INCY) и попросил
+  довести Hydra до паритета; `XrayCore` был чистой заглушкой
+  (`throw NotImplementedError`). Go 1.27/gomobile поставлены на машину
+  разработки, `libXray.aar` собран официальным скриптом `XTLS/libXray`.
+  1. **Два Go-рантайма в одном процессе.** Первая идея — Xray (headless
+     socks5) + sing-box-мост в ОДНОМ процессе — не собралась:
+     `checkNativeDebugDuplicateClasses` (`libbox.aar`/`libXray.aar` —
+     независимые `gomobile bind`, каждый со своей копией generic-обвязки
+     gobind `go.Seq`/`go.Universe`/`go.error`; апстрим `XTLS/libXray`
+     прямо предупреждает — Go не поддерживает два рантайма в процессе).
+  2. **Наивный дедуп классов — грузит не ту `.so`.** Попытка оставить одну
+     копию `go.*` (от libbox) прошла сборку, но в проце `:xray` тянула
+     `libbox.so` вместо `libgojni.so` — `UnsatisfiedLinkError` на
+     `LibXray._init()`. `go.Seq.<clinit>` зашивает имя библиотеки
+     (`System.loadLibrary("box")` vs `"gojni"`) на этапе сборки — копии не
+     взаимозаменяемы.
+  3. **Переименование пакета тоже не работает.** Попытка `go`→`xraygo`
+     через ASM чинит п.2, но JNI у gomobile — implicit linking:
+     `libgojni.so` экспортирует `Java_go_Seq_init` (по ИСХОДНОМУ имени
+     класса), переименование класса ломает эту привязку, а не чинит.
+  4. **Единственный рабочий вариант — изолированный `DexClassLoader`.**
+     Классы Xray грузятся в процессе `:xray` из отдельного `classes.dex`
+     (нетронутый `classes.jar` → `d8`, задача `libXrayToDex`), `.so` — из
+     обычных `jniLibs` (`extractLibXrayNativeLibs`). Дальше ещё три живых
+     бага: (a) ART отказывался грузить dex, пока файл был доступен на
+     запись самому процессу — `dexFile.setReadOnly()`; (b) обычный
+     `parent`-classloader у `DexClassLoader` всё равно ДЕЛЕГИРУЕТ поиск
+     классов родителю первым — а родитель (classloader процесса) видит
+     `go.Seq` от libbox (та же проблема п.2, но через делегацию, а не
+     dex-merge) — фикс: `parent = null` (только boot-classloader, без
+     classpath приложения); (c) `fdsan`-краш в `HydraVpnService`: код
+     отката при ошибке подключения всегда пытался закрыть и
+     `ParcelFileDescriptor`, и raw fd через `adoptFd()` — безопасно, пока
+     ядро детачит fd СРАЗУ (как sing-box), но `XrayCore` мог упасть РАНЬШЕ
+     detach — двойное закрытие одного номера fd валило процесс SIGABRT.
+  5. **`geoip:private` без `geoip.dat`.** Последняя ошибка была уже внутри
+     самого Xray — `routing.rules` ссылались на `geoip:private`, а файла
+     базы GeoIP в embedded-сборке нет; заменено на явные CIDR приватных
+     диапазонов (RFC 1918 + loopback/link-local), без внешних файлов.
+  **Подтверждено на реальном устройстве** (OnePlus CPH2747, live-тест
+  09-2026): VLESS-соединение через Xray Core поднимается, лог показывает
+  реальный туннель. Полноценная база GeoIP для гео-маршрутизации по
+  странам — отдельная будущая фича (не нужна для базового подключения),
+  см. спавненную задачу про `geoip.dat`.
 - **0.6.5 — все релизы 0.5.1–0.6.1 были подписаны Android debug-ключом,
   не релизным.** `scripts/release.sh` собирал `assembleXxxDebug`, а не
   `assembleXxxRelease` — `keystore.properties`/`signingConfigs` в
