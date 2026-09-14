@@ -54,6 +54,10 @@ class MainActivity : ComponentActivity() {
         // Импорт по deep-link (vless:// и т.п.)
         handleImportIntent(intent)
 
+        // Только на холодном старте процесса — иначе пересоздание Activity
+        // (поворот, смена ярлыка и т.п.) пыталось бы подключаться повторно.
+        if (savedInstanceState == null) vm.autoConnectIfEnabled()
+
         lifecycleScope.launch {
             vm.requestPermission.collect { requestVpnPermission() }
         }

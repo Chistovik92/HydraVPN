@@ -94,6 +94,30 @@
             </intent-filter>
         </service>
 
+        <!-- Автоподключение при загрузке устройства (Фаза 6b, тумблер в
+             Настройках → Безопасность, выключен по умолчанию). exported=true
+             обязателен для системных broadcast-приёмников на API 31+ —
+             BOOT_COMPLETED защищён ОС, сторонние приложения послать его не могут. -->
+        <receiver
+            android:name=".vpn.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Плитка «Hydra VPN» в шторке быстрых настроек (Фаза 6b). -->
+        <service
+            android:name=".vpn.HydraQsTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_vpn"
+            android:label="Hydra VPN"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <!-- Xray-core (libXray.aar) — в ОТДЕЛЬНОМ процессе: gomobile-сборки
              libbox и libXray каждая тащит свой Go-рантайм, а Go не поддерживает
              два независимо собранных рантайма в одном процессе (см. docs/BUILD.md,

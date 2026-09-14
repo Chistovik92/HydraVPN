@@ -43,6 +43,8 @@ class HydraVpnService : VpnService() {
     private var connectJob: Job? = null
     // Держит уведомление в актуальном состоянии по мере роста трафика.
     private var notifJob: Job? = null
+    // true — tun держится поднятым намеренно, как «чёрная дыра» (Kill Switch), см. doConnect().
+    private var killSwitchBlocking = false
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
@@ -131,7 +133,12 @@ class HydraVpnService : VpnService() {
             }
         } catch (t: Throwable) {
             runCatching { newCore?.stop() }
-            // Ровно один из двух путей, не оба: если vpnCore.start() успел
+
+            // Отмена (новый connect()/stopTunnel() уже победили гонку за эти же
+            // локальные newTun/newCore) — не Kill Switch: закрываем свою половину
+            // ресурсов как раньше и уходим, ничего не решая за победившую сторону.
+            //
+            // Ровно один из двух путей ниже, не оба: если vpnCore.start() успел
             // detachFd() тот же fd (сделает почти любое нативное ядро сразу
             // в openTun()), newTun больше им не владеет — close() на нём
             // безопасный no-op, а закрывать нужно raw fd через adoptFd().
@@ -141,15 +148,54 @@ class HydraVpnService : VpnService() {
             // цепляет уже закрытый (и потенциально переиспользованный ядром
             // fd) номер — fdsan валит процесс SIGABRT
             // ("failed to exchange ownership... was expected to be unowned").
-            if (newTun?.fileDescriptor?.valid() == true) {
-                runCatching { newTun.close() }
-            } else if (newTunFd >= 0) {
-                runCatching { ParcelFileDescriptor.adoptFd(newTunFd).close() }
+            if (t is CancellationException) {
+                if (newTun?.fileDescriptor?.valid() == true) {
+                    runCatching { newTun.close() }
+                } else if (newTunFd >= 0) {
+                    runCatching { ParcelFileDescriptor.adoptFd(newTunFd).close() }
+                }
+                throw t
             }
-            if (t is CancellationException) throw t
+
             VpnState.log("Ошибка: ${t.message}")
-            VpnState.state.value = ConnectionState.ERROR
-            stopTunnel()
+
+            // Kill Switch: только если tun реально поднялся (establishTun()
+            // успел отработать) — иначе блокировать нечем, ведём себя как раньше.
+            val killSwitch = newTun != null && runCatching {
+                ru.gidravpn.hydra.data.repository.VpnSettingsRepository(applicationContext)
+                    .killSwitch.firstOrNull()
+            }.getOrNull() == true
+
+            if (killSwitch) {
+                // Держим tun поднятым как «чёрную дыру»: 0.0.0.0/0 по-прежнему
+                // маршрутизируется в этот fd (addRoute в establishTun), но core
+                // уже остановлен и больше ничего туда не пишет/не читает — трафик
+                // молча дропается вместо утечки в открытую сеть напрямую. Гасит
+                // это состояние только явный ACTION_DISCONNECT (releaseTun() ниже).
+                //
+                // Честная оговорка: если ядро успело detachFd() СЕБЕ и упало уже
+                // ПОСЛЕ этого (не до), сырой fd мог быть закрыт/переиспользован
+                // самим ядром при крахе — в этом редком случае tun фактически не
+                // защищает, потому что системе больше нечего держать поднятым.
+                // Не проверено на реальном устройстве — см. CHANGELOG.
+                tun = newTun
+                tunFd = newTunFd
+                core = null
+                killSwitchBlocking = true
+                VpnState.state.value = ConnectionState.ERROR
+                VpnState.activeServer.value = null
+                VpnState.connectedSince.value = 0L
+                VpnState.log("Kill Switch: трафик заблокирован (тоннель не поднялся)")
+                updateNotification(ConnectionState.ERROR, "Заблокировано")
+            } else {
+                if (newTun?.fileDescriptor?.valid() == true) {
+                    runCatching { newTun.close() }
+                } else if (newTunFd >= 0) {
+                    runCatching { ParcelFileDescriptor.adoptFd(newTunFd).close() }
+                }
+                VpnState.state.value = ConnectionState.ERROR
+                stopTunnel()
+            }
         }
     }
 
@@ -166,6 +212,7 @@ class HydraVpnService : VpnService() {
     private fun releaseTun() {
         notifJob?.cancel()
         notifJob = null
+        killSwitchBlocking = false
         runCatching { core?.stop() }
         core = null
         runCatching { tun?.close() }
@@ -234,10 +281,11 @@ class HydraVpnService : VpnService() {
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE
         )
-        val title = when (state) {
-            ConnectionState.CONNECTED -> "Туннель зашифрован"
-            ConnectionState.CONNECTING -> "Подключение…"
-            ConnectionState.ERROR -> "Ошибка подключения"
+        val title = when {
+            state == ConnectionState.CONNECTED -> "Туннель зашифрован"
+            state == ConnectionState.CONNECTING -> "Подключение…"
+            state == ConnectionState.ERROR && killSwitchBlocking -> "Kill Switch: трафик заблокирован"
+            state == ConnectionState.ERROR -> "Ошибка подключения"
             else -> "Отключено"
         }
         val b = NotificationCompat.Builder(this, CHANNEL_ID)
@@ -270,6 +318,14 @@ class HydraVpnService : VpnService() {
             )
             b.addAction(0, "Отключить", disconnect)
             b.addAction(0, "Серверы", servers)
+        } else if (state == ConnectionState.ERROR && killSwitchBlocking) {
+            b.setContentText(server)
+            val disconnect = PendingIntent.getService(
+                this, 1,
+                Intent(this, HydraVpnService::class.java).setAction(ACTION_DISCONNECT),
+                PendingIntent.FLAG_IMMUTABLE
+            )
+            b.addAction(0, "Отключить", disconnect)
         } else {
             b.setContentText(server)
         }

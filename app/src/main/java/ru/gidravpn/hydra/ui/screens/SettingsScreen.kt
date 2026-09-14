@@ -1,6 +1,11 @@
 package ru.gidravpn.hydra.ui.screens
 
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,6 +14,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import ru.gidravpn.hydra.R
 import androidx.compose.runtime.Composable
@@ -25,11 +31,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.gidravpn.hydra.ui.MainViewModel
 import ru.gidravpn.hydra.ui.components.Card
+import ru.gidravpn.hydra.ui.components.Label
 import ru.gidravpn.hydra.ui.components.clickableNoRipple
 import ru.gidravpn.hydra.ui.theme.*
+import ru.gidravpn.hydra.vpn.HydraQsTileService
 
 /** Подэкраны Настроек — Split и Логи переехали сюда из верхнего уровня навигации. */
-private enum class SettingsSection { HUB, TUNNEL, SPLIT, LOGS, THEME, ABOUT }
+private enum class SettingsSection { HUB, TUNNEL, SECURITY, ROUTING, SPLIT, LOGS, THEME, ABOUT }
 
 @Composable
 fun SettingsScreen(vm: MainViewModel) {
@@ -38,6 +46,8 @@ fun SettingsScreen(vm: MainViewModel) {
     when (section) {
         SettingsSection.HUB -> SettingsHub(onSelect = { section = it })
         SettingsSection.TUNNEL -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { TunnelInfoContent(vm) }
+        SettingsSection.SECURITY -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { SecurityContent(vm) }
+        SettingsSection.ROUTING -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { RoutingContent(vm) }
         SettingsSection.SPLIT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { SplitTunnelScreen(vm) }
         SettingsSection.LOGS -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { LogsScreen(vm) }
         SettingsSection.THEME -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { ThemeContent(vm) }
@@ -54,6 +64,8 @@ private fun SettingsHub(onSelect: (SettingsSection) -> Unit) {
         Text("Настройки", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
 
         HubRow("🌐", "Туннель", "Протоколы и движки", AccentViolet) { onSelect(SettingsSection.TUNNEL) }
+        HubRow("🛡️", "Безопасность", "Kill Switch, автоподключение", Danger) { onSelect(SettingsSection.SECURITY) }
+        HubRow("🧭", "Маршрутизация", "DNS, geoip по РФ", AccentIndigo) { onSelect(SettingsSection.ROUTING) }
         HubRow("🔀", "Split-туннелинг", "Приложения через VPN / мимо VPN", AccentCyan) { onSelect(SettingsSection.SPLIT) }
         HubRow("📋", "Логи", "Журнал подключения", TextSecondary) { onSelect(SettingsSection.LOGS) }
         HubRow("🎨", "Тема", "Hydra Emerald / Monochrome Stealth", AccentCyan) { onSelect(SettingsSection.THEME) }
@@ -165,6 +177,219 @@ private fun XrayEngineToggle(vm: MainViewModel) {
             )
         }
     }
+}
+
+@Composable
+private fun SecurityContent(vm: MainViewModel) {
+    val context = LocalContext.current
+    val killSwitch by vm.killSwitch.collectAsState()
+    val autoApp by vm.autoConnectOnAppStart.collectAsState()
+    val autoBoot by vm.autoConnectOnBoot.collectAsState()
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text("Безопасность", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+
+        SecurityToggleCard(
+            title = "Kill Switch",
+            description = "Если попытка подключения обрывается с ошибкой, туннель не " +
+                "откатывается на прямое соединение — трафик блокируется, пока вы не " +
+                "отключите VPN вручную. Не защищает от системного отзыва VPN (другое " +
+                "VPN-приложение, «Отключить» в системных настройках) — для полной " +
+                "гарантии на уровне ОС включите ниже «Блокировать соединения без VPN».",
+            checked = killSwitch,
+            onCheckedChange = { vm.setKillSwitch(it) }
+        )
+
+        SecurityToggleCard(
+            title = "Автоподключение при запуске приложения",
+            description = "Открыли Hydra — она сама поднимет туннель к последнему серверу, " +
+                "если системное согласие на VPN уже выдавалось раньше.",
+            checked = autoApp,
+            onCheckedChange = { vm.setAutoConnectOnAppStart(it) }
+        )
+
+        SecurityToggleCard(
+            title = "Автоподключение при загрузке устройства",
+            description = "Туннель поднимется сразу после перезагрузки телефона, без " +
+                "открытия приложения. Тоже требует ранее выданного VPN-согласия — " +
+                "диалог из фона показать нельзя.",
+            checked = autoBoot,
+            onCheckedChange = { vm.setAutoConnectOnBoot(it) }
+        )
+
+        InfoGroup("Плитка в шторке уведомлений", AccentCyan) {
+            Text(
+                "Подключает/отключает последний использованный сервер прямо из панели " +
+                    "быстрых настроек, без открытия приложения.",
+                color = TextMuted, fontSize = 12.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) "Добавить плитку →"
+                else "Как добавить вручную →",
+                color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickableNoRipple {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val statusBarManager = context.getSystemService(android.app.StatusBarManager::class.java)
+                        statusBarManager?.requestAddTileService(
+                            android.content.ComponentName(context, HydraQsTileService::class.java),
+                            "Hydra VPN",
+                            android.graphics.drawable.Icon.createWithResource(context, R.drawable.ic_tile_vpn),
+                            androidx.core.content.ContextCompat.getMainExecutor(context),
+                            {}
+                        )
+                    }
+                    // На Android 12 и ниже requestAddTileService() недоступен — плитка
+                    // добавляется вручную: Шторка → карандаш «Редактировать» → найти
+                    // «Hydra VPN» в списке и перетащить наверх.
+                }
+            )
+        }
+
+        InfoGroup("Системный Always-on VPN", TextSecondary) {
+            Text(
+                "Единственный способ гарантированно заблокировать трафик и при крахе " +
+                    "самого приложения/сервиса, не только при ошибке подключения. " +
+                    "Настройки → Сеть → VPN → Hydra → шестерёнка → «Постоянная VPN-сеть» + " +
+                    "«Блокировать соединения без VPN».",
+                color = TextMuted, fontSize = 12.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Открыть настройки VPN →", color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickableNoRipple {
+                    runCatching { context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS)) }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SecurityToggleCard(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(description, color = TextMuted, fontSize = 11.sp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = SwitchDefaults.colors(checkedTrackColor = AccentCyan)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RoutingContent(vm: MainViewModel) {
+    val dnsProvider by vm.dnsProvider.collectAsState()
+    val dnsCustom by vm.dnsCustomAddress.collectAsState()
+    val geoMode by vm.geoRoutingMode.collectAsState()
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("Маршрутизация", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+
+        Label("DNS (DoH внутри туннеля)")
+        ru.gidravpn.hydra.data.model.DnsProvider.entries.forEach { provider ->
+            RoutingOptionCard(
+                title = provider.label,
+                subtitle = provider.address
+                    ?: if (provider == ru.gidravpn.hydra.data.model.DnsProvider.CUSTOM) "Свой IP или хост"
+                    else "Резолвер устройства, без DoH",
+                selected = dnsProvider == provider,
+                onClick = { vm.setDnsProvider(provider) }
+            )
+        }
+        if (dnsProvider == ru.gidravpn.hydra.data.model.DnsProvider.CUSTOM) {
+            var text by remember { mutableStateOf(dnsCustom) }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.OutlinedTextField(
+                    value = text, onValueChange = { text = it },
+                    label = { Text("IP или хост DoH-сервера", color = TextMuted, fontSize = 12.sp) },
+                    singleLine = true,
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = AccentCyan, unfocusedBorderColor = Border,
+                        focusedContainerColor = InputBg, unfocusedContainerColor = InputBg
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+                RoutingSaveButton { vm.setDnsCustomAddress(text) }
+            }
+        }
+        Text(
+            "Применяется при следующем подключении.",
+            color = TextMuted, fontSize = 11.sp
+        )
+
+        Spacer(Modifier.height(8.dp))
+        Label("GeoIP-маршрутизация (РФ)")
+        Text(
+            "Базы geoip-ru/geosite-ru (sing-box rule-set, precompiled из MetaCubeX/meta-rules-dat). " +
+                "Работает и для sing-box, и для Xray Core — TUN и маршрутизацией в обоих случаях владеет " +
+                "sing-box. Не проверено на реальном устройстве.",
+            color = TextMuted, fontSize = 11.sp
+        )
+        Spacer(Modifier.height(4.dp))
+        ru.gidravpn.hydra.data.model.GeoRoutingMode.entries.forEach { mode ->
+            RoutingOptionCard(
+                title = mode.label,
+                subtitle = mode.description,
+                selected = geoMode == mode,
+                onClick = { vm.setGeoRoutingMode(mode) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun RoutingOptionCard(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
+    Card(
+        Modifier.fillMaxWidth().clickableNoRipple(onClick),
+        borderColor = if (selected) AccentCyan else Border
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, color = TextMuted, fontSize = 11.sp)
+            }
+            if (selected) {
+                Spacer(Modifier.width(8.dp))
+                Text("✓", color = AccentCyan, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RoutingSaveButton(onClick: () -> Unit) {
+    Box(
+        Modifier.clip(RoundedCornerShape(12.dp)).background(CardBg)
+            .border(1.dp, Border, RoundedCornerShape(12.dp))
+            .clickableNoRipple(onClick).padding(horizontal = 16.dp, vertical = 14.dp)
+    ) { Text("Сохранить", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
 }
 
 @Composable
