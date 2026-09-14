@@ -1,5 +1,8 @@
 package ru.gidravpn.hydra.ui.screens
 
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -9,6 +12,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import ru.gidravpn.hydra.R
 import androidx.compose.runtime.Composable
@@ -27,9 +31,10 @@ import ru.gidravpn.hydra.ui.MainViewModel
 import ru.gidravpn.hydra.ui.components.Card
 import ru.gidravpn.hydra.ui.components.clickableNoRipple
 import ru.gidravpn.hydra.ui.theme.*
+import ru.gidravpn.hydra.vpn.HydraQsTileService
 
 /** Подэкраны Настроек — Split и Логи переехали сюда из верхнего уровня навигации. */
-private enum class SettingsSection { HUB, TUNNEL, SPLIT, LOGS, THEME, ABOUT }
+private enum class SettingsSection { HUB, TUNNEL, SECURITY, SPLIT, LOGS, THEME, ABOUT }
 
 @Composable
 fun SettingsScreen(vm: MainViewModel) {
@@ -38,6 +43,7 @@ fun SettingsScreen(vm: MainViewModel) {
     when (section) {
         SettingsSection.HUB -> SettingsHub(onSelect = { section = it })
         SettingsSection.TUNNEL -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { TunnelInfoContent(vm) }
+        SettingsSection.SECURITY -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { SecurityContent(vm) }
         SettingsSection.SPLIT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { SplitTunnelScreen(vm) }
         SettingsSection.LOGS -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { LogsScreen(vm) }
         SettingsSection.THEME -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { ThemeContent(vm) }
@@ -54,6 +60,7 @@ private fun SettingsHub(onSelect: (SettingsSection) -> Unit) {
         Text("Настройки", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
 
         HubRow("🌐", "Туннель", "Протоколы и движки", AccentViolet) { onSelect(SettingsSection.TUNNEL) }
+        HubRow("🛡️", "Безопасность", "Kill Switch, автоподключение", Danger) { onSelect(SettingsSection.SECURITY) }
         HubRow("🔀", "Split-туннелинг", "Приложения через VPN / мимо VPN", AccentCyan) { onSelect(SettingsSection.SPLIT) }
         HubRow("📋", "Логи", "Журнал подключения", TextSecondary) { onSelect(SettingsSection.LOGS) }
         HubRow("🎨", "Тема", "Hydra Emerald / Monochrome Stealth", AccentCyan) { onSelect(SettingsSection.THEME) }
@@ -161,6 +168,122 @@ private fun XrayEngineToggle(vm: MainViewModel) {
                 checked = preferXray && available,
                 onCheckedChange = { vm.setPreferXray(it) },
                 enabled = available,
+                colors = SwitchDefaults.colors(checkedTrackColor = AccentCyan)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SecurityContent(vm: MainViewModel) {
+    val context = LocalContext.current
+    val killSwitch by vm.killSwitch.collectAsState()
+    val autoApp by vm.autoConnectOnAppStart.collectAsState()
+    val autoBoot by vm.autoConnectOnBoot.collectAsState()
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text("Безопасность", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+
+        SecurityToggleCard(
+            title = "Kill Switch",
+            description = "Если попытка подключения обрывается с ошибкой, туннель не " +
+                "откатывается на прямое соединение — трафик блокируется, пока вы не " +
+                "отключите VPN вручную. Не защищает от системного отзыва VPN (другое " +
+                "VPN-приложение, «Отключить» в системных настройках) — для полной " +
+                "гарантии на уровне ОС включите ниже «Блокировать соединения без VPN».",
+            checked = killSwitch,
+            onCheckedChange = { vm.setKillSwitch(it) }
+        )
+
+        SecurityToggleCard(
+            title = "Автоподключение при запуске приложения",
+            description = "Открыли Hydra — она сама поднимет туннель к последнему серверу, " +
+                "если системное согласие на VPN уже выдавалось раньше.",
+            checked = autoApp,
+            onCheckedChange = { vm.setAutoConnectOnAppStart(it) }
+        )
+
+        SecurityToggleCard(
+            title = "Автоподключение при загрузке устройства",
+            description = "Туннель поднимется сразу после перезагрузки телефона, без " +
+                "открытия приложения. Тоже требует ранее выданного VPN-согласия — " +
+                "диалог из фона показать нельзя.",
+            checked = autoBoot,
+            onCheckedChange = { vm.setAutoConnectOnBoot(it) }
+        )
+
+        InfoGroup("Плитка в шторке уведомлений", AccentCyan) {
+            Text(
+                "Подключает/отключает последний использованный сервер прямо из панели " +
+                    "быстрых настроек, без открытия приложения.",
+                color = TextMuted, fontSize = 12.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) "Добавить плитку →"
+                else "Как добавить вручную →",
+                color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickableNoRipple {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val statusBarManager = context.getSystemService(android.app.StatusBarManager::class.java)
+                        statusBarManager?.requestAddTileService(
+                            android.content.ComponentName(context, HydraQsTileService::class.java),
+                            "Hydra VPN",
+                            android.graphics.drawable.Icon.createWithResource(context, R.drawable.ic_tile_vpn),
+                            androidx.core.content.ContextCompat.getMainExecutor(context),
+                            {}
+                        )
+                    }
+                    // На Android 12 и ниже requestAddTileService() недоступен — плитка
+                    // добавляется вручную: Шторка → карандаш «Редактировать» → найти
+                    // «Hydra VPN» в списке и перетащить наверх.
+                }
+            )
+        }
+
+        InfoGroup("Системный Always-on VPN", TextSecondary) {
+            Text(
+                "Единственный способ гарантированно заблокировать трафик и при крахе " +
+                    "самого приложения/сервиса, не только при ошибке подключения. " +
+                    "Настройки → Сеть → VPN → Hydra → шестерёнка → «Постоянная VPN-сеть» + " +
+                    "«Блокировать соединения без VPN».",
+                color = TextMuted, fontSize = 12.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Открыть настройки VPN →", color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickableNoRipple {
+                    runCatching { context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS)) }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SecurityToggleCard(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(description, color = TextMuted, fontSize = 11.sp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
                 colors = SwitchDefaults.colors(checkedTrackColor = AccentCyan)
             )
         }

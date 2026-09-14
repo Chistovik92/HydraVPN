@@ -2,6 +2,7 @@ package ru.gidravpn.hydra.ui
 
 import android.app.Application
 import android.content.Intent
+import android.net.VpnService
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ru.gidravpn.hydra.data.model.Engine
@@ -16,6 +17,7 @@ import ru.gidravpn.hydra.data.repository.EngineRepository
 import ru.gidravpn.hydra.data.repository.ServerRepository
 import ru.gidravpn.hydra.data.repository.SplitTunnelRepository
 import ru.gidravpn.hydra.data.repository.ThemeRepository
+import ru.gidravpn.hydra.data.repository.VpnSettingsRepository
 import ru.gidravpn.hydra.ui.theme.ThemeMode
 import ru.gidravpn.hydra.vpn.HydraVpnService
 import ru.gidravpn.hydra.vpn.VpnState
@@ -28,6 +30,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val splitRepo = SplitTunnelRepository(app)
     private val themeRepo = ThemeRepository(app)
     private val engineRepo = EngineRepository(app)
+    private val vpnSettingsRepo = VpnSettingsRepository(app)
 
     val themeMode: StateFlow<ThemeMode> = themeRepo.mode
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.AMBIENT)
@@ -53,6 +56,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun setPreferXray(enabled: Boolean) = viewModelScope.launch { engineRepo.setPreferXray(enabled) }
+
+    // ----- Фаза 6b: безопасность соединения -----
+
+    val killSwitch: StateFlow<Boolean> = vpnSettingsRepo.killSwitch
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    fun setKillSwitch(enabled: Boolean) = viewModelScope.launch { vpnSettingsRepo.setKillSwitch(enabled) }
+
+    val autoConnectOnAppStart: StateFlow<Boolean> = vpnSettingsRepo.autoConnectOnAppStart
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    fun setAutoConnectOnAppStart(enabled: Boolean) = viewModelScope.launch { vpnSettingsRepo.setAutoConnectOnAppStart(enabled) }
+
+    val autoConnectOnBoot: StateFlow<Boolean> = vpnSettingsRepo.autoConnectOnBoot
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    fun setAutoConnectOnBoot(enabled: Boolean) = viewModelScope.launch { vpnSettingsRepo.setAutoConnectOnBoot(enabled) }
 
     val servers: StateFlow<List<ServerProfile>> = repo.allServers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -84,6 +101,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _selectedId = MutableStateFlow<Long?>(null)
     val selectedId = _selectedId.asStateFlow()
 
+    init {
+        // Восстанавливаем выбор сервера между запусками — нужно и UI (чтобы
+        // "Подключить" на первом экране сразу знал сервер), и autoConnectIfEnabled()
+        // ниже; BootReceiver/HydraQsTileService читают то же значение напрямую
+        // из VpnSettingsRepository, минуя эту viewmodel.
+        viewModelScope.launch {
+            vpnSettingsRepo.lastServerId.firstOrNull()?.let { _selectedId.value = it }
+        }
+    }
+
     val selectedServer: StateFlow<ServerProfile?> =
         combine(servers, _selectedId) { list, id ->
             list.firstOrNull { it.id == id } ?: list.firstOrNull()
@@ -100,9 +127,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun select(id: Long) {
         _selectedId.value = id
+        viewModelScope.launch { vpnSettingsRepo.setLastServerId(id) }
         if (state.value == ConnectionState.CONNECTED || state.value == ConnectionState.CONNECTING) {
             servers.value.firstOrNull { it.id == id }?.let { startTunnelWith(it) }
         }
+    }
+
+    /**
+     * Автоподключение при холодном старте приложения — вызывается из
+     * MainActivity.onCreate() ровно один раз (savedInstanceState == null).
+     * Работает только если VPN-согласие уже выдавалось раньше (VpnService.prepare
+     * вернёт null): без этого пришлось бы дёргать системный consent-диалог сразу
+     * при открытии приложения, что не отличить от обычного запуска пользователем.
+     */
+    fun autoConnectIfEnabled() = viewModelScope.launch {
+        if (vpnSettingsRepo.autoConnectOnAppStart.firstOrNull() != true) return@launch
+        if (state.value != ConnectionState.DISCONNECTED) return@launch
+        val id = vpnSettingsRepo.lastServerId.firstOrNull() ?: return@launch
+        val server = repo.byId(id) ?: return@launch
+        _selectedId.value = id
+        val ctx = getApplication<Application>()
+        if (VpnService.prepare(ctx) == null) startTunnelWith(server)
     }
 
     fun toggle() = viewModelScope.launch {
