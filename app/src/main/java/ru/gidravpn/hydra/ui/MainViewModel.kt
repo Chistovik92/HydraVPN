@@ -5,7 +5,9 @@ import android.content.Intent
 import android.net.VpnService
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import ru.gidravpn.hydra.data.model.DnsProvider
 import ru.gidravpn.hydra.data.model.Engine
+import ru.gidravpn.hydra.data.model.GeoRoutingMode
 import ru.gidravpn.hydra.data.model.NetworkRule
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
@@ -14,6 +16,7 @@ import ru.gidravpn.hydra.data.model.SplitTunnelMode
 import ru.gidravpn.hydra.data.net.PingMeasurer
 import ru.gidravpn.hydra.data.model.Subscription
 import ru.gidravpn.hydra.data.repository.EngineRepository
+import ru.gidravpn.hydra.data.repository.RoutingRepository
 import ru.gidravpn.hydra.data.repository.ServerRepository
 import ru.gidravpn.hydra.data.repository.SplitTunnelRepository
 import ru.gidravpn.hydra.data.repository.ThemeRepository
@@ -31,6 +34,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val themeRepo = ThemeRepository(app)
     private val engineRepo = EngineRepository(app)
     private val vpnSettingsRepo = VpnSettingsRepository(app)
+    private val routingRepo = RoutingRepository(app)
 
     val themeMode: StateFlow<ThemeMode> = themeRepo.mode
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.AMBIENT)
@@ -70,6 +74,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val autoConnectOnBoot: StateFlow<Boolean> = vpnSettingsRepo.autoConnectOnBoot
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     fun setAutoConnectOnBoot(enabled: Boolean) = viewModelScope.launch { vpnSettingsRepo.setAutoConnectOnBoot(enabled) }
+
+    // ----- Фаза 6c: DNS и geoip-маршрутизация -----
+
+    val dnsProvider: StateFlow<DnsProvider> = routingRepo.dnsProvider
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DnsProvider.CLOUDFLARE)
+    fun setDnsProvider(provider: DnsProvider) = viewModelScope.launch { routingRepo.setDnsProvider(provider) }
+
+    val dnsCustomAddress: StateFlow<String> = routingRepo.dnsCustomAddress
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    fun setDnsCustomAddress(address: String) = viewModelScope.launch { routingRepo.setDnsCustomAddress(address) }
+
+    val geoRoutingMode: StateFlow<GeoRoutingMode> = routingRepo.geoRoutingMode
+        .stateIn(viewModelScope, SharingStarted.Eagerly, GeoRoutingMode.OFF)
+    fun setGeoRoutingMode(mode: GeoRoutingMode) = viewModelScope.launch { routingRepo.setGeoRoutingMode(mode) }
 
     val servers: StateFlow<List<ServerProfile>> = repo.allServers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

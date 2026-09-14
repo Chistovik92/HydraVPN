@@ -1,0 +1,53 @@
+package ru.gidravpn.hydra.data.repository
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
+import ru.gidravpn.hydra.data.model.DnsProvider
+import ru.gidravpn.hydra.data.model.GeoRoutingMode
+
+/** Отдельный DataStore-файл — не пересекается с "settings"/"theme_settings"/"engine_settings"/"vpn_settings". */
+private val Context.routingStore: DataStore<Preferences> by preferencesDataStore(name = "routing_settings")
+
+/** Настройки Фазы 6c: DNS-резолвер и geoip/geosite-маршрутизация (SingBoxConfigBuilder). */
+class RoutingRepository(private val context: Context) {
+
+    private val KEY_DNS_PROVIDER = stringPreferencesKey("dns_provider")
+    private val KEY_DNS_CUSTOM = stringPreferencesKey("dns_custom_address")
+    private val KEY_GEO_MODE = stringPreferencesKey("geo_routing_mode")
+
+    val dnsProvider: Flow<DnsProvider> = context.routingStore.data
+        .map { DnsProvider.fromId(it[KEY_DNS_PROVIDER]) }
+    suspend fun setDnsProvider(provider: DnsProvider) {
+        context.routingStore.edit { it[KEY_DNS_PROVIDER] = provider.name }
+    }
+
+    val dnsCustomAddress: Flow<String> = context.routingStore.data
+        .map { it[KEY_DNS_CUSTOM] ?: "" }
+    suspend fun setDnsCustomAddress(address: String) {
+        context.routingStore.edit { it[KEY_DNS_CUSTOM] = address.trim() }
+    }
+
+    val geoRoutingMode: Flow<GeoRoutingMode> = context.routingStore.data
+        .map { GeoRoutingMode.fromId(it[KEY_GEO_MODE]) }
+    suspend fun setGeoRoutingMode(mode: GeoRoutingMode) {
+        context.routingStore.edit { it[KEY_GEO_MODE] = mode.name }
+    }
+
+    /** Действующий адрес DoH-сервера: пресет, кроме SYSTEM (null) и CUSTOM (свой текст). */
+    suspend fun resolveDnsAddress(): String? =
+        combine(dnsProvider, dnsCustomAddress) { provider, custom ->
+            when (provider) {
+                DnsProvider.SYSTEM -> null
+                DnsProvider.CUSTOM -> custom.ifBlank { DnsProvider.CLOUDFLARE.address }
+                else -> provider.address
+            }
+        }.firstOrNull()
+}

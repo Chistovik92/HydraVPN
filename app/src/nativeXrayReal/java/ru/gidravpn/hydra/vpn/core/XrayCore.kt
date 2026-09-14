@@ -61,8 +61,9 @@ class XrayCore : VpnCore {
             "XrayCore.start() не должен вызываться на главном потоке"
         }
         val ctx = AppCtx.appContext ?: error("AppCtx не инициализирован")
+        val (dnsAddress, geoRouting) = resolveRouting(ctx)
 
-        val xrayConfig = XrayConfigBuilder.build(profile, socksPort)
+        val xrayConfig = XrayConfigBuilder.build(profile, socksPort, dnsAddress = dnsAddress)
         onLog("Xray: конфиг сгенерирован (${xrayConfig.length} байт)")
 
         val svc = bindEngine(ctx)
@@ -82,7 +83,9 @@ class XrayCore : VpnCore {
         onLog("Xray: ядро запущено в процессе :xray (127.0.0.1:$socksPort)")
 
         val split = runBlocking { SplitTunnelRepository(ctx).settings.firstOrNull() } ?: SplitTunnel()
-        val bridgeConfig = SingBoxConfigBuilder.buildXrayBridge(socksPort, split).toString(2)
+        val bridgeConfig = SingBoxConfigBuilder.buildXrayBridge(
+            socksPort, split, dnsAddress = dnsAddress, geoRouting = geoRouting
+        ).toString(2)
         onLog("Xray: sing-box-мост, конфиг сгенерирован (${bridgeConfig.length} байт)")
 
         val b = SingBoxCore()

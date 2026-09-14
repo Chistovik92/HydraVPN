@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.6.9] — Фаза 6c: DNS-пресеты + GeoIP-маршрутизация по РФ
+
+### Добавлено
+- **Выбор DNS-резолвера** (Настройки → Маршрутизация): Cloudflare/Google/
+  Quad9/AdGuard по well-known IP через DoH, «Системный резолвер» (без DoH,
+  резолвер платформы) или свой IP/хост. Применяется и в sing-box (`dns.servers`),
+  и во внутреннем DNS Xray-core (резолв адреса самого прокси-сервера) —
+  `RoutingRepository`, DataStore `routing_settings`.
+- **GeoIP/geosite-маршрутизация по РФ** (тот же экран): «Выключено» /
+  «РФ напрямую, остальное — через прокси» / «РФ через прокси, остальное —
+  напрямую». Реализовано через `route.rule_set` sing-box 1.12 на bundled
+  `.srs`-базах (`app/src/main/assets/geoip-ru.srs`, `geosite-ru.srs` —
+  precompiled из `MetaCubeX/meta-rules-dat`, ветка `sing`, ~114 КБ суммарно,
+  извлекаются в `filesDir` при первом использовании — `GeoAssets.kt`).
+  Работает одинаково для native sing-box и для Xray-моста: TUN и
+  `route.rules` в обоих случаях держит sing-box (`SingBoxConfigBuilder.
+  buildXrayBridge`), поэтому маршрутизация не зависит от выбранного движка.
+
+### Архитектурное уточнение (см. память "xray-geoip-routing-idea")
+Идея geoip-маршрутизации изначально формулировалась вокруг `geoip.dat`/
+`geosite.dat` — формата v2fly/Xray (ссылки на `v2fly/geoip` и
+`runetfreedom/russia-blocked-geoip`, обе публикуют именно этот формат).
+На практике маршрутизацией и TUN всегда владеет sing-box — даже когда
+выбран движок Xray Core, тот лишь поднимается headless с локальным
+socks5-inbound, а весь `route.rules`/TUN берёт на себя sing-box-мост.
+`route.geoip`/`.dat` в sing-box объявлены deprecated в 1.8 и полностью
+удалены в 1.12 (текущая схема конфига проекта) в пользу `route.rule_set`
+на `.srs`. Поэтому вместо `v2fly/geoip`/`runetfreedom` использован
+sing-box-совместимый источник (`MetaCubeX/meta-rules-dat`, ветка `sing`) —
+`geoip:private` в `XrayConfigBuilder.kt` по-прежнему на явных CIDR
+(см. код) ровно по той же причине, что и раньше: это внутренняя
+маршрутизация Xray, которая не участвует в решении «РФ/не РФ» и потому не
+блокирует данную фичу.
+
+### Честная оговорка
+Не проверено на реальном устройстве полным сценарием (реальное сравнение
+IP до/после под RU_DIRECT/RU_VIA_PROXY). Проверено: `assembleNativeDebug`/
+`assembleStubDebug` с реальными `libbox.aar` и `libXray.aar` — BUILD
+SUCCESSFUL; экран Настройки → Маршрутизация на реальном устройстве
+(OnePlus CPH2747) — все пресеты DNS, поле своего адреса с кнопкой
+«Сохранить» и все 3 режима GeoIP выбираются, переключаются и переживают
+повторные открытия экрана (DataStore); краши не найдены.
+
 ## [0.6.8] — Фаза 6b: Kill Switch, автоподключение, плитка в шторке
 
 ### Добавлено

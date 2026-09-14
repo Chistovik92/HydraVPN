@@ -1,5 +1,6 @@
 package ru.gidravpn.hydra.data.subscription
 
+import ru.gidravpn.hydra.data.model.GeoRoutingMode
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.SplitTunnel
@@ -15,8 +16,20 @@ import org.json.JSONObject
  */
 object SingBoxConfigBuilder {
 
-    fun build(profile: ServerProfile, socksPort: Int = 0, splitTunnel: SplitTunnel = SplitTunnel()): JSONObject =
-        baseConfig(outboundFor(profile), splitTunnel)
+    /**
+     * geoip/geosite-маршрутизация (Фаза 6c) — [mode] + пути к bundled
+     * `.srs`-файлам (см. GeoAssets). null/OFF — правило rule_set не
+     * добавляется вовсе, поведение как раньше.
+     */
+    data class GeoRouting(val mode: GeoRoutingMode, val geoipPath: String, val geositePath: String)
+
+    fun build(
+        profile: ServerProfile,
+        socksPort: Int = 0,
+        splitTunnel: SplitTunnel = SplitTunnel(),
+        dnsAddress: String? = "1.1.1.1",
+        geoRouting: GeoRouting? = null,
+    ): JSONObject = baseConfig(outboundFor(profile), splitTunnel, dnsAddress, geoRouting)
 
     /**
      * Мост Xray → tun (см. `XrayCore` в native-flavor): Xray сам tun не
@@ -24,13 +37,23 @@ object SingBoxConfigBuilder {
      * (`127.0.0.1:$socksPort`), а весь TUN/статистику/split tunneling берёт на
      * себя sing-box — единственный outbound здесь указывает на этот же порт.
      */
-    fun buildXrayBridge(socksPort: Int, splitTunnel: SplitTunnel = SplitTunnel()): JSONObject {
+    fun buildXrayBridge(
+        socksPort: Int,
+        splitTunnel: SplitTunnel = SplitTunnel(),
+        dnsAddress: String? = "1.1.1.1",
+        geoRouting: GeoRouting? = null,
+    ): JSONObject {
         val outbound = JSONObject().put("type", "socks").put("tag", "proxy")
             .put("server", "127.0.0.1").put("server_port", socksPort)
-        return baseConfig(outbound, splitTunnel)
+        return baseConfig(outbound, splitTunnel, dnsAddress, geoRouting)
     }
 
-    private fun baseConfig(outbound: JSONObject, splitTunnel: SplitTunnel): JSONObject {
+    private fun baseConfig(
+        outbound: JSONObject,
+        splitTunnel: SplitTunnel,
+        dnsAddress: String?,
+        geoRouting: GeoRouting?,
+    ): JSONObject {
         val root = JSONObject()
 
         root.put("log", JSONObject().put("level", "info").put("timestamp", true))
@@ -41,11 +64,15 @@ object SingBoxConfigBuilder {
         // менеджер трафика работает и без него.
         root.put("experimental", JSONObject().put("clash_api", JSONObject()))
 
-        // DNS (схема 1.12: серверы с явным type)
+        // DNS (схема 1.12: серверы с явным type). dnsAddress == null (пресет
+        // "Системный резолвер") — DoH-сервер не добавляется вовсе, остаётся
+        // только локальный резолвер платформы.
         root.put("dns", JSONObject().apply {
             put("servers", JSONArray().apply {
-                put(JSONObject().put("type", "https").put("tag", "remote")
-                    .put("server", "1.1.1.1").put("detour", "proxy"))
+                if (dnsAddress != null) {
+                    put(JSONObject().put("type", "https").put("tag", "remote")
+                        .put("server", dnsAddress).put("detour", "proxy"))
+                }
                 put(JSONObject().put("type", "local").put("tag", "local"))
             })
             put("strategy", "prefer_ipv4")
@@ -74,7 +101,19 @@ object SingBoxConfigBuilder {
 
         // маршрутизация (+ пользовательские правила split tunneling по IP/доменам — Фаза 2)
         val netRules = splitTunnel.netRules.takeIf { splitTunnel.netActive }.orEmpty()
+        val geoActive = geoRouting != null && geoRouting.mode != GeoRoutingMode.OFF
         root.put("route", JSONObject().apply {
+            // rule_set — bundled .srs (см. GeoAssets/data/model/GeoRoutingMode).
+            // Пустой массив, если geoip-маршрутизация выключена — валидный JSON,
+            // sing-box просто не грузит никаких rule_set.
+            put("rule_set", JSONArray().apply {
+                if (geoActive) {
+                    put(JSONObject().put("type", "local").put("tag", "geoip-ru")
+                        .put("format", "binary").put("path", geoRouting!!.geoipPath))
+                    put(JSONObject().put("type", "local").put("tag", "geosite-ru")
+                        .put("format", "binary").put("path", geoRouting.geositePath))
+                }
+            })
             put("rules", JSONArray().apply {
                 if (netRules.isNotEmpty()) {
                     val ruleOutbound = if (splitTunnel.netMode == SplitTunnelMode.EXCLUDE) "direct" else "proxy"
@@ -84,9 +123,24 @@ object SingBoxConfigBuilder {
                 }
                 put(JSONObject().put("protocol", "dns").put("outbound", "dns-out"))
                 put(JSONObject().put("ip_is_private", true).put("outbound", "direct"))
+                // geoip-ru ИЛИ geosite-ru (OR внутри одного правила — стандартная
+                // семантика sing-box для массива в одном поле) — RU_DIRECT ведёт
+                // их мимо VPN, RU_VIA_PROXY — наоборот, единственное, что идёт в прокси.
+                if (geoActive) {
+                    val geoOutbound = if (geoRouting!!.mode == GeoRoutingMode.RU_DIRECT) "direct" else "proxy"
+                    put(JSONObject()
+                        .put("rule_set", JSONArray().put("geoip-ru").put("geosite-ru"))
+                        .put("outbound", geoOutbound))
+                }
             })
-            // INCLUDE: через прокси идёт только явно перечисленное, всё остальное — мимо VPN.
-            put("final", if (netRules.isNotEmpty() && splitTunnel.netMode == SplitTunnelMode.INCLUDE) "direct" else "proxy")
+            // Явный whitelist по IP/доменам (INCLUDE) — сильнее geo-режима: то, что
+            // не попало под явные правила, идёт мимо VPN независимо от geoRouting.
+            val netIncludeActive = netRules.isNotEmpty() && splitTunnel.netMode == SplitTunnelMode.INCLUDE
+            put("final", when {
+                netIncludeActive -> "direct"
+                geoActive && geoRouting!!.mode == GeoRoutingMode.RU_VIA_PROXY -> "direct"
+                else -> "proxy"
+            })
             put("auto_detect_interface", true)
         })
 

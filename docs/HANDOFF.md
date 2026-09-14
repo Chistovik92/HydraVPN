@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.6.8** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.6.9** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -163,8 +163,7 @@
 
 - ✅ **Фаза 6a** (0.6.6/0.6.7, BETA — подтверждено на устройстве):
   оживление Xray Core (см. TODO №4 и «Честные оговорки» выше) — VLESS через
-  Xray Core поднимается живьём (OnePlus CPH2747). Полная база GeoIP для
-  гео-маршрутизации по странам — отдельная будущая фича, не блокирует.
+  Xray Core поднимается живьём (OnePlus CPH2747).
   Дальше — паритет с референсным Xray-клиентом (INCY) по остальным
   настройкам, отдельными фазами:
   - ✅ **6b. Безопасность соединения** (0.6.8, не проверено на устройстве
@@ -176,10 +175,15 @@
     шторке быстрых настроек (`HydraQsTileService`). Все три — на последнем
     выбранном сервере (`VpnSettingsRepository`, DataStore `vpn_settings`).
     Настройки → Безопасность.
-  - **6c. Расширение sing-box-конфига**: пользовательский DNS (DoH сейчас
-    жёстко `1.1.1.1`), MTU, фрагментация пакетов, `route.rules`+`sniff`
-    (сейчас только статичные правила по доменам/IP, без реального
-    TLS-sniffing SNI/host).
+  - ✅ **6c. DNS + geoip-маршрутизация** (0.6.9, экран проверен на
+    устройстве, живой трафик под RU_DIRECT/RU_VIA_PROXY — нет, см. CHANGELOG
+    «Честная оговорка»): выбор DNS-резолвера (Cloudflare/Google/Quad9/
+    AdGuard/системный/свой — `RoutingRepository`, DataStore
+    `routing_settings`) и geoip/geosite-маршрутизация по РФ через
+    `route.rule_set` sing-box 1.12 на bundled `.srs` (`GeoAssets.kt`,
+    precompiled из `MetaCubeX/meta-rules-dat`). Полная база GeoIP по всем
+    странам (не только РФ) и MTU/фрагментация/реальный TLS-sniffing SNI —
+    остаются в 6c на будущее, не блокируют. Настройки → Маршрутизация.
   - **6d. Настройки/инфраструктура**: единый `SettingsRepository` (сейчас
     3 независимых DataStore-файла — `settings`/`theme_settings`/`engine_settings`
     + Room), backup/restore всей конфигурации в файл/QR, сброс настроек,
