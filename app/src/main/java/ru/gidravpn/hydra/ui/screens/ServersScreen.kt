@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -101,6 +103,23 @@ private fun ServerCard(
     s: ServerProfile, selected: Boolean, measuring: Boolean,
     onClick: () -> Unit, onDelete: () -> Unit, onMeasure: () -> Unit
 ) {
+    var confirmDelete by remember { mutableStateOf(false) }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            containerColor = Surface,
+            title = { Text("Удалить сервер?", color = TextPrimary) },
+            text = { Text("«${s.name}» будет удалён без возможности восстановить.", color = TextMuted) },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete = false; onDelete() }) {
+                    Text("Удалить", color = PingSlow)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("Отмена", color = TextMuted) }
+            }
+        )
+    }
     Row(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
@@ -142,6 +161,10 @@ private fun ServerCard(
         }
         Spacer(Modifier.width(8.dp))
         s.protocol?.let { ProtocolChip(it.shortCode) }
+        Spacer(Modifier.width(4.dp))
+        IconButton(onClick = { confirmDelete = true }, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Filled.DeleteOutline, contentDescription = "Удалить сервер", tint = TextMuted)
+        }
     }
 }
 

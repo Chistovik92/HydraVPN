@@ -94,17 +94,29 @@ xrayVersion, getXrayState`. Для protect() сокетов — `LibXray.registe
 (параметр — `long`, не `int`). Java-пакет сгенерированных классов — `libXray`
 (`libXray.LibXray`, `libXray.DialerController`), сверено `javap` по факту сборки.
 
-> **Критично: `libXray.aar` работает в ОТДЕЛЬНОМ процессе, не вместе с
-> `libbox.aar`.** Оба — независимые `gomobile bind`-сборки, каждая тащит свою
-> копию Go-рантайма; апстрим (README `XTLS/libXray`) прямо предупреждает, что
-> Go не поддерживает два независимо собранных рантайма в одном процессе —
-> может упасть при сборке/линковке или крашнуться в рантайме. Проверено на
-> практике при подключении этого проекта: одновременное наличие обеих `.aar`
-> в зависимостях `native` flavor валит `checkNativeDebugDuplicateClasses`
-> (`Duplicate class go.Seq found in modules libXray.aar ... and libbox.aar`) —
-> обе несут одинаковую generic-обвязку gobind (`go.Seq`/`go.Universe`/`go.error`,
-> пакет `golang.org/x/mobile/bind/java`, без нативного кода). Решение в этом
-> проекте — два независимых шага:
+> **Критично: `libXray.aar` работает в ОТДЕЛЬНОМ процессе И грузится
+> изолированным `DexClassLoader` — не как обычная Gradle-зависимость.**
+> Оба — независимые `gomobile bind`-сборки (`libbox.aar`/`libXray.aar`),
+> каждая тащит свою копию generic-обвязки gobind (`go.Seq`/`go.Universe`/
+> `go.error`, пакет `golang.org/x/mobile/bind/java`) — апстрим (README
+> `XTLS/libXray`) прямо предупреждает: Go не поддерживает два независимо
+> собранных рантайма в одном процессе.
+>
+> На практике этот путь прошёл через пять живых багов подряд (см.
+> docs/HANDOFF.md, «Честные оговорки», за полным разбором) — коротко:
+> - Оставить одну копию `go.*` (дедуп) собирается, но в рантайме грузит
+>   НЕ ТУ `.so` — `go.Seq.<clinit>` зашивает имя библиотеки на этапе сборки
+>   (`System.loadLibrary("box")` у libbox vs `"gojni"` у libXray), копии
+>   не взаимозаменяемы.
+> - Переименовать пакет (`go`→`xraygo`, через ASM) тоже не работает — у
+>   gomobile implicit JNI-linking, `.so` экспортирует символы вида
+>   `Java_go_Seq_init` по ИСХОДНОМУ имени класса; переименование ломает
+>   связь, а не чинит её.
+> - Обычный `DexClassLoader` с parent = classloader процесса тоже не
+>   спасает — родитель всё равно РЕЗОЛВИТ `go.Seq` от libbox (та же
+>   проблема, но через делегацию классов, а не merge дексов).
+>
+> Итоговая рабочая схема — два независимых шага:
 > 1. **Процесс.** `XrayEngineService` (`app/src/nativeXrayReal/.../vpn/core/xray/`)
 >    объявлен в `AndroidManifest.xml` с `android:process=":xray"` — реальный
 >    Go-рантайм Xray живёт в отдельном ОС-процессе, полностью изолированном от
@@ -115,24 +127,31 @@ xrayVersion, getXrayState`. Для protect() сокетов — `LibXray.registe
 >    где живёт `VpnService`) тем же путём: `ParcelFileDescriptor.fromFd()` —
 >    Binder дублирует fd на уровне ядра при передаче, поэтому закрытие локальной
 >    копии после вызова не трогает исходный fd (Xray продолжает им пользоваться).
-> 2. **Дубли классов.** Раздельного процесса недостаточно для самой ошибки
->    сборки — `checkNativeDebugDuplicateClasses` смотрит на classes.jar внутри
->    каждого `.aar` ДО этапа packaging, `packagingOptions.resources.excludes`
->    её не обходит. `app/build.gradle.kts` вырезает дубли (`go/Seq*.class`,
->    `go/Universe*.class`, `go/error.class`) прямо из `classes.jar` внутри
->    `libXray.aar` отдельной задачей `dedupLibXrayClasses` (чистая Java-обвязка
->    без нативного кода — безопасно оставить одну копию) и подключает уже
->    очищенный `.aar` вместо сырого файла. Работает автоматически, ничего
->    руками делать не нужно — просто положите `libXray.aar` в `app/libs/`.
+> 2. **Изоляция классов.** Даже отдельный процесс не спасает, пока классы
+>    Xray попадают в ОБЩИЙ дех приложения (та же проблема — что дедуп, что
+>    переименование). Поэтому `libXray.aar` НЕ подключён как обычная
+>    Gradle-зависимость вовсе: `app/build.gradle.kts` двумя задачами
+>    (`extractLibXrayNativeLibs`/`libXrayToDex`) вынимает из него `.so`
+>    (в обычные `jniLibs`, как всегда) и НЕТРОНУТЫЙ `classes.jar` пересобирает
+>    через `d8` в отдельный `classes.dex`-ассет. В рантайме `XrayEngineService`
+>    грузит его через `DexClassLoader` с **`parent = null`** (только
+>    boot-classloader — до classpath приложения, где сидит libbox'овский
+>    `go.Seq`, достать неоткуда) и работает с классами через reflection
+>    (`Class.forName`/`Method.invoke`/`Proxy` для `DialerController`).
+>    ART при этом требует, чтобы dex-файл был **read-only** для самого
+>    процесса (`dexFile.setReadOnly()`) — иначе `DexClassLoader` откажет с
+>    `Writable dex file ... is not allowed`. Всё автоматически, руками
+>    ничего делать не нужно — просто положите `libXray.aar` в `app/libs/`.
 
-**Проверено сборкой** (в этом окружении, 2026-09): `libXray.aar` собран
-официальным скриптом (Go 1.27.0, geo-данные скачаны, `gomobile bind
--androidapi 21 -ldflags="-checklinkname=0 -extldflags=-Wl,-z,max-page-size=16384"`),
-`:app:assembleNativeDebug` с обоими `.aar` — `BUILD SUCCESSFUL`, в собранном
-APK подтверждены `XrayEngineService`/`IXrayEngine`/`LibXray`/`DialerController`
-(dex) и оба разных `.so` (`libbox.so` + `libgojni.so` — имена не совпадают,
-конфликта нет). **Не проверено**: живое подключение на устройстве (см.
-docs/HANDOFF.md, «Честные оговорки»).
+**Подтверждено на реальном устройстве** (OnePlus CPH2747, 2026-09): VLESS
+через Xray Core поднимается и передаёт трафик. `libXray.aar` собран
+официальным скриптом (Go 1.27.0), `:app:assembleNativeDebug`/`assembleNativeRelease`
+с обоими `.aar` — `BUILD SUCCESSFUL`. Дополнительно по пути нашлись и
+починены: `fdsan`-краш в `HydraVpnService` (двойное закрытие tun-fd при
+ранней ошибке `XrayCore.start()`) и `geoip:private` в маршрутизации без
+файла `geoip.dat` (заменено на явные CIDR приватных диапазонов,
+`XrayConfigBuilder.PRIVATE_IP_RANGES`) — см. docs/HANDOFF.md, «Честные
+оговорки», за полным разбором.
 
 ### 2.3 amneziawg-go → `amneziawg-go.aar`
 

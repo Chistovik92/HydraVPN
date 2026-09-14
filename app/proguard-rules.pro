@@ -1,6 +1,9 @@
-# Нативные ядра, вызываемые через JNI/gomobile — не переименовывать
+# Нативные ядра, вызываемые через JNI/gomobile — не переименовывать.
+# libXray НЕ подключён как обычная зависимость (classes.jar конфликтует с
+# libbox'овским go.* на уровне JNI-связывания, см. app/build.gradle.kts,
+# extractLibXrayNativeLibs/libXrayToDex) — его классы грузятся в рантайме
+# изолированным DexClassLoader (XrayEngineService), R8 их вообще не видит.
 -keep class io.nekohasekai.libbox.** { *; }
--keep class libXray.** { *; }
 -keep class go.** { *; }
 
 # Room

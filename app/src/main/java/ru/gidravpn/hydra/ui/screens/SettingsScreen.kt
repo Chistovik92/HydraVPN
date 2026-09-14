@@ -151,7 +151,7 @@ private fun XrayEngineToggle(vm: MainViewModel) {
                     ru.gidravpn.hydra.ui.components.BetaBadge()
                 }
                 Text(
-                    if (available) "Вместо sing-box — ради его реализации XTLS Vision (отдельный процесс, sing-box остаётся мостом к TUN). Не проверено на реальных устройствах — включайте на свой риск."
+                    if (available) "Вместо sing-box — ради его реализации XTLS Vision (отдельный процесс, sing-box остаётся мостом к TUN). VLESS проверен на реальном устройстве; VMess/Trojan/SS и долгая стабильность — ещё нет."
                     else "Нужен app/libs/libXray.aar — см. docs/BUILD.md, раздел 2.2.",
                     color = TextMuted, fontSize = 11.sp
                 )

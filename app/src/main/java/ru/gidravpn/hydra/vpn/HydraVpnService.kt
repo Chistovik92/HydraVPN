@@ -131,8 +131,21 @@ class HydraVpnService : VpnService() {
             }
         } catch (t: Throwable) {
             runCatching { newCore?.stop() }
-            runCatching { newTun?.close() }
-            if (newTunFd >= 0) runCatching { ParcelFileDescriptor.adoptFd(newTunFd).close() }
+            // Ровно один из двух путей, не оба: если vpnCore.start() успел
+            // detachFd() тот же fd (сделает почти любое нативное ядро сразу
+            // в openTun()), newTun больше им не владеет — close() на нём
+            // безопасный no-op, а закрывать нужно raw fd через adoptFd().
+            // Если же ядро упало РАНЬШЕ detachFd() (например, XrayCore на
+            // таймауте bindService к процессу :xray) — newTun ещё владеет
+            // дескриптором, и adoptFd() того же номера ПОСЛЕ newTun.close()
+            // цепляет уже закрытый (и потенциально переиспользованный ядром
+            // fd) номер — fdsan валит процесс SIGABRT
+            // ("failed to exchange ownership... was expected to be unowned").
+            if (newTun?.fileDescriptor?.valid() == true) {
+                runCatching { newTun.close() }
+            } else if (newTunFd >= 0) {
+                runCatching { ParcelFileDescriptor.adoptFd(newTunFd).close() }
+            }
             if (t is CancellationException) throw t
             VpnState.log("Ошибка: ${t.message}")
             VpnState.state.value = ConnectionState.ERROR
