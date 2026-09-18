@@ -27,12 +27,37 @@ class SingBoxConfigBuilderTest {
         uuidOrPassword = "b831381d-6324-4d53-ad4f-8cda48b30811", security = "tls", sni = "example.com",
     )
 
-    private val geo = { mode: GeoRoutingMode ->
-        SingBoxConfigBuilder.GeoRouting(
-            mode,
-            File("src/main/assets/geoip-ru.srs").absolutePath,
-            File("src/main/assets/geosite-ru.srs").absolutePath,
-        )
+    /** Страна из реальных bundled-ассетов; geosite — если для неё есть доменная база. */
+    private fun country(cc: String) = SingBoxConfigBuilder.GeoCountry(
+        code = cc,
+        geoipPath = File("src/main/assets/geoip/$cc.srs").also { assertTrue(it.exists()) }.absolutePath,
+        geositePath = File("src/main/assets/geosite/$cc.srs").takeIf { it.exists() }?.absolutePath,
+    )
+
+    private val geo = { mode: GeoRoutingMode -> SingBoxConfigBuilder.GeoRouting(mode, listOf(country("ru"))) }
+
+    @Test fun severalCountriesSomeWithoutDomains() {
+        val cfg = dump("geo_ru_by_kz", SingBoxConfigBuilder.build(
+            profile, geoRouting = SingBoxConfigBuilder.GeoRouting(
+                GeoRoutingMode.DIRECT, listOf(country("ru"), country("by"), country("kz")),
+            ),
+        ))
+        val tags = cfg.getJSONObject("route").getJSONArray("rule_set").objects().map { it.getString("tag") }
+        assertEquals(listOf("geoip-ru", "geosite-ru", "geoip-by", "geoip-kz"), tags)
+        val geoRule = cfg.rules().objects().single { it.has("rule_set") }
+        assertEquals(tags, (0 until geoRule.getJSONArray("rule_set").length()).map { geoRule.getJSONArray("rule_set").getString(it) })
+    }
+
+    @Test fun emptyCountryListIsOff() {
+        val cfg = SingBoxConfigBuilder.build(profile, geoRouting = SingBoxConfigBuilder.GeoRouting(GeoRoutingMode.VIA_PROXY, emptyList()))
+        assertFalse(cfg.getJSONObject("route").has("rule_set"))
+        assertEquals("proxy", cfg.getJSONObject("route").getString("final"))
+    }
+
+    @Test fun legacyRuModesMigrate() {
+        assertEquals(GeoRoutingMode.DIRECT, GeoRoutingMode.fromId("RU_DIRECT"))
+        assertEquals(GeoRoutingMode.VIA_PROXY, GeoRoutingMode.fromId("RU_VIA_PROXY"))
+        assertEquals(GeoRoutingMode.OFF, GeoRoutingMode.fromId(null))
     }
 
     private fun dump(name: String, cfg: JSONObject): JSONObject {
@@ -65,7 +90,7 @@ class SingBoxConfigBuilderTest {
     }
 
     @Test fun ruDirect() {
-        val cfg = dump("ru_direct", SingBoxConfigBuilder.build(profile, geoRouting = geo(GeoRoutingMode.RU_DIRECT)))
+        val cfg = dump("ru_direct", SingBoxConfigBuilder.build(profile, geoRouting = geo(GeoRoutingMode.DIRECT)))
         val route = cfg.getJSONObject("route")
         assertEquals(2, route.getJSONArray("rule_set").length())
         val geoRule = cfg.rules().objects().single { it.has("rule_set") }
@@ -74,7 +99,7 @@ class SingBoxConfigBuilderTest {
     }
 
     @Test fun ruViaProxy() {
-        val cfg = dump("ru_via_proxy", SingBoxConfigBuilder.build(profile, geoRouting = geo(GeoRoutingMode.RU_VIA_PROXY)))
+        val cfg = dump("ru_via_proxy", SingBoxConfigBuilder.build(profile, geoRouting = geo(GeoRoutingMode.VIA_PROXY)))
         val geoRule = cfg.rules().objects().single { it.has("rule_set") }
         assertEquals("proxy", geoRule.getString("outbound"))
         assertEquals("direct", cfg.getJSONObject("route").getString("final"))
@@ -99,7 +124,7 @@ class SingBoxConfigBuilderTest {
             netRules = listOf(NetworkRule(NetRuleType.DOMAIN_SUFFIX, "example.org")),
         )
         val cfg = dump("net_include_geo", SingBoxConfigBuilder.build(
-            profile, splitTunnel = split, geoRouting = geo(GeoRoutingMode.RU_DIRECT),
+            profile, splitTunnel = split, geoRouting = geo(GeoRoutingMode.DIRECT),
         ))
         val rules = cfg.rules().objects()
         val domainIdx = rules.indexOfFirst { it.has("domain_suffix") }
@@ -171,7 +196,7 @@ class SingBoxConfigBuilderTest {
     }
 
     @Test fun xrayBridgeUsesLocalSocks() {
-        val cfg = dump("xray_bridge", SingBoxConfigBuilder.buildXrayBridge(10808, geoRouting = geo(GeoRoutingMode.RU_DIRECT)))
+        val cfg = dump("xray_bridge", SingBoxConfigBuilder.buildXrayBridge(10808, geoRouting = geo(GeoRoutingMode.DIRECT)))
         val proxy = cfg.getJSONArray("outbounds").objects().single { it.getString("tag") == "proxy" }
         assertEquals("socks", proxy.getString("type"))
         assertEquals(10808, proxy.getInt("server_port"))

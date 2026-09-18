@@ -65,7 +65,7 @@ private fun SettingsHub(onSelect: (SettingsSection) -> Unit) {
 
         HubRow("🌐", "Туннель", "Протоколы и движки", AccentViolet) { onSelect(SettingsSection.TUNNEL) }
         HubRow("🛡️", "Безопасность", "Kill Switch, автоподключение", Danger) { onSelect(SettingsSection.SECURITY) }
-        HubRow("🧭", "Маршрутизация", "DNS, geoip по РФ, фрагментация, MTU", AccentIndigo) { onSelect(SettingsSection.ROUTING) }
+        HubRow("🧭", "Маршрутизация", "DNS, GeoIP по странам, фрагментация, MTU", AccentIndigo) { onSelect(SettingsSection.ROUTING) }
         HubRow("🔀", "Split-туннелинг", "Приложения через VPN / мимо VPN", AccentCyan) { onSelect(SettingsSection.SPLIT) }
         HubRow("📋", "Логи", "Журнал подключения", TextSecondary) { onSelect(SettingsSection.LOGS) }
         HubRow("🎨", "Тема", "Hydra Emerald / Monochrome Stealth", AccentCyan) { onSelect(SettingsSection.THEME) }
@@ -355,11 +355,11 @@ private fun RoutingContent(vm: MainViewModel) {
         )
 
         Spacer(Modifier.height(8.dp))
-        Label("GeoIP-маршрутизация (РФ)")
+        Label("GeoIP-маршрутизация по странам")
         Text(
-            "Базы geoip-ru/geosite-ru (sing-box rule-set, precompiled из MetaCubeX/meta-rules-dat). " +
-                "Работает и для sing-box, и для Xray Core — TUN и маршрутизацией в обоих случаях владеет " +
-                "sing-box. Не проверено на реальном устройстве.",
+            "Базы IP ~250 стран встроены в приложение (sing-box rule-set из MetaCubeX/meta-rules-dat), " +
+                "работают без интернета. Работает и для sing-box, и для Xray Core — маршрутизацией в " +
+                "обоих случаях владеет sing-box.",
             color = TextMuted, fontSize = 11.sp
         )
         Spacer(Modifier.height(4.dp))
@@ -371,6 +371,7 @@ private fun RoutingContent(vm: MainViewModel) {
                 onClick = { vm.setGeoRoutingMode(mode) }
             )
         }
+        if (geoMode != ru.gidravpn.hydra.data.model.GeoRoutingMode.OFF) GeoCountryPicker(vm)
 
         Spacer(Modifier.height(8.dp))
         Label("Фрагментация TLS (обход DPI)")
@@ -410,6 +411,63 @@ private fun RoutingContent(vm: MainViewModel) {
             )
         }
         Text("Применяется при следующем подключении.", color = TextMuted, fontSize = 11.sp)
+    }
+}
+
+/** Выбранные страны сверху, ниже — поиск по всем ~250 (название по-русски или ISO-код). */
+@Composable
+private fun GeoCountryPicker(vm: MainViewModel) {
+    val selected by vm.geoCountries.collectAsState()
+    val all = remember { vm.geoAvailable.map { it to ru.gidravpn.hydra.data.model.countryName(it) } }
+    var query by remember { mutableStateOf("") }
+
+    Card(Modifier.fillMaxWidth()) {
+        Text("Страны", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            if (selected.isEmpty()) "Не выбрано ни одной — правило не действует"
+            else selected.sorted().joinToString(", ") { ru.gidravpn.hydra.data.model.countryName(it) },
+            color = if (selected.isEmpty()) Danger else AccentCyan, fontSize = 12.sp
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "По доменам (не только по IP) — только ${vm.geoWithDomains.sorted().joinToString(", ") {
+                ru.gidravpn.hydra.data.model.countryName(it) }}: для остальных нет доменных баз. " +
+                "Сайты на зарубежных CDN у таких стран определятся как «не их».",
+            color = TextMuted, fontSize = 11.sp
+        )
+        Spacer(Modifier.height(8.dp))
+        androidx.compose.material3.OutlinedTextField(
+            value = query, onValueChange = { query = it },
+            label = { Text("Найти страну", color = TextMuted, fontSize = 12.sp) },
+            singleLine = true,
+            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                focusedBorderColor = AccentCyan, unfocusedBorderColor = Border,
+                focusedContainerColor = InputBg, unfocusedContainerColor = InputBg
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+        val q = query.trim()
+        val shown = if (q.isEmpty()) all.filter { it.first in selected }
+        else all.filter { (code, name) -> name.contains(q, ignoreCase = true) || code.equals(q, ignoreCase = true) }
+            .sortedBy { it.second }.take(30)
+        shown.forEach { (code, name) ->
+            Row(
+                Modifier.fillMaxWidth().clickableNoRipple { vm.toggleGeoCountry(code) }.padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                androidx.compose.material3.Checkbox(
+                    checked = code in selected, onCheckedChange = { vm.toggleGeoCountry(code) },
+                    colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = AccentCyan)
+                )
+                Text(name, color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                Text(
+                    code.uppercase() + if (code in vm.geoWithDomains) " · IP+домены" else " · IP",
+                    color = TextMuted, fontSize = 11.sp
+                )
+            }
+        }
+        if (q.isNotEmpty() && shown.isEmpty()) Text("Ничего не найдено", color = TextMuted, fontSize = 12.sp)
     }
 }
 

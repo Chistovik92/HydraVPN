@@ -89,6 +89,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, GeoRoutingMode.OFF)
     fun setGeoRoutingMode(mode: GeoRoutingMode) = viewModelScope.launch { routingRepo.setGeoRoutingMode(mode) }
 
+    val geoCountries: StateFlow<Set<String>> = routingRepo.geoCountries
+        .stateIn(viewModelScope, SharingStarted.Eagerly, setOf("ru"))
+    fun toggleGeoCountry(code: String) = viewModelScope.launch {
+        val current = geoCountries.value
+        routingRepo.setGeoCountries(if (code in current) current - code else current + code)
+    }
+
+    /** Страны с IP-базой и (подмножество) с доменной — для экрана выбора. */
+    val geoAvailable: List<String> by lazy { ru.gidravpn.hydra.data.subscription.GeoAssets.availableCountries(getApplication()) }
+    val geoWithDomains: Set<String> by lazy { ru.gidravpn.hydra.data.subscription.GeoAssets.countriesWithDomains(getApplication()) }
+
     val mtu: StateFlow<ru.gidravpn.hydra.data.model.MtuPreset> = routingRepo.mtu
         .stateIn(viewModelScope, SharingStarted.Eagerly, ru.gidravpn.hydra.data.model.MtuPreset.AUTO)
     fun setMtu(preset: ru.gidravpn.hydra.data.model.MtuPreset) = viewModelScope.launch { routingRepo.setMtu(preset) }

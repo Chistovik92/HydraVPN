@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.6.11** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.6.12** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -189,9 +189,12 @@
     настоящим `sing-box check` 1.12.9 (см. `SingBoxConfigBuilderTest`).
     **0.6.11:** TLS-фрагментация рукопожатия с прокси (`tls.record_fragment`/
     `tls.fragment`, только sing-box + VLESS/VMess/Trojan) и MTU-пресеты.
-    Осталось в 6c (не блокирует 6d): база GeoIP по всем странам, не только
-    РФ; `route.default_domain_resolver` (предупреждение sing-box, устареет в
-    1.14 — меняет резолв домена прокси-сервера, нужен живой тест).
+    **0.6.12:** GeoIP по ~250 странам с выбором нескольких (`assets/geoip/`,
+    `assets/geosite/` — доменные базы только у ru/cn/ir/pt/tm), режимы
+    `DIRECT`/`VIA_PROXY` с миграцией старых `RU_*`.
+    Осталось в 6c: только `route.default_domain_resolver` (предупреждение
+    sing-box, устареет в 1.14 — меняет резолв домена прокси-сервера, нужен
+    живой тест).
   - **6d. Настройки/инфраструктура**: единый `SettingsRepository` (сейчас
     3 независимых DataStore-файла — `settings`/`theme_settings`/`engine_settings`
     + Room), backup/restore всей конфигурации в файл/QR, сброс настроек,

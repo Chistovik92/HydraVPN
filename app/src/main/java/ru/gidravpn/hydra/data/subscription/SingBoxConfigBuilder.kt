@@ -19,12 +19,16 @@ import org.json.JSONObject
  */
 object SingBoxConfigBuilder {
 
+    /** Базы одной страны: IP есть всегда, домены — только у некоторых (см. GeoAssets). */
+    data class GeoCountry(val code: String, val geoipPath: String, val geositePath: String? = null)
+
     /**
-     * geoip/geosite-маршрутизация (Фаза 6c) — [mode] + пути к bundled
-     * `.srs`-файлам (см. GeoAssets). null/OFF — правило rule_set не
-     * добавляется вовсе, поведение как раньше.
+     * geoip/geosite-маршрутизация (Фаза 6c). null/OFF/пустой список — правило
+     * rule_set не добавляется вовсе, поведение как раньше.
      */
-    data class GeoRouting(val mode: GeoRoutingMode, val geoipPath: String, val geositePath: String)
+    data class GeoRouting(val mode: GeoRoutingMode, val countries: List<GeoCountry>) {
+        val active get() = mode != GeoRoutingMode.OFF && countries.isNotEmpty()
+    }
 
     fun build(
         profile: ServerProfile,
@@ -122,14 +126,18 @@ object SingBoxConfigBuilder {
 
         // маршрутизация (+ пользовательские правила split tunneling по IP/доменам — Фаза 2)
         val netRules = splitTunnel.netRules.takeIf { splitTunnel.netActive }.orEmpty()
-        val geoActive = geoRouting != null && geoRouting.mode != GeoRoutingMode.OFF
+        val geo = geoRouting?.takeIf { it.active }
+        // Теги в том же порядке, что и rule_set: geoip-<cc>, затем geosite-<cc>.
+        val geoTags = geo?.countries.orEmpty().flatMap { c ->
+            listOfNotNull("geoip-${c.code}" to c.geoipPath, c.geositePath?.let { "geosite-${c.code}" to it })
+        }
         root.put("route", JSONObject().apply {
-            if (geoActive) {
+            if (geo != null) {
                 put("rule_set", JSONArray().apply {
-                    put(JSONObject().put("type", "local").put("tag", "geoip-ru")
-                        .put("format", "binary").put("path", geoRouting!!.geoipPath))
-                    put(JSONObject().put("type", "local").put("tag", "geosite-ru")
-                        .put("format", "binary").put("path", geoRouting.geositePath))
+                    geoTags.forEach { (tag, path) ->
+                        put(JSONObject().put("type", "local").put("tag", tag)
+                            .put("format", "binary").put("path", path))
+                    }
                 })
             }
             put("rules", JSONArray().apply {
@@ -146,13 +154,13 @@ object SingBoxConfigBuilder {
                     }
                 }
                 put(JSONObject().put("ip_is_private", true).put("outbound", "direct"))
-                // geoip-ru ИЛИ geosite-ru (OR внутри одного правила — стандартная
-                // семантика sing-box для массива в одном поле) — RU_DIRECT ведёт
-                // их мимо VPN, RU_VIA_PROXY — наоборот, единственное, что идёт в прокси.
-                if (geoActive) {
-                    val geoOutbound = if (geoRouting!!.mode == GeoRoutingMode.RU_DIRECT) "direct" else "proxy"
+                // Любой из rule_set выбранных стран (OR внутри одного правила —
+                // стандартная семантика sing-box для массива в одном поле): DIRECT
+                // ведёт их мимо VPN, VIA_PROXY — наоборот, единственное, что идёт в прокси.
+                if (geo != null) {
+                    val geoOutbound = if (geo.mode == GeoRoutingMode.DIRECT) "direct" else "proxy"
                     put(JSONObject()
-                        .put("rule_set", JSONArray().put("geoip-ru").put("geosite-ru"))
+                        .put("rule_set", JSONArray(geoTags.map { it.first }))
                         .put("outbound", geoOutbound))
                 }
             })
@@ -161,7 +169,7 @@ object SingBoxConfigBuilder {
             val netIncludeActive = netRules.isNotEmpty() && splitTunnel.netMode == SplitTunnelMode.INCLUDE
             put("final", when {
                 netIncludeActive -> "direct"
-                geoActive && geoRouting!!.mode == GeoRoutingMode.RU_VIA_PROXY -> "direct"
+                geo?.mode == GeoRoutingMode.VIA_PROXY -> "direct"
                 else -> "proxy"
             })
             put("auto_detect_interface", true)
