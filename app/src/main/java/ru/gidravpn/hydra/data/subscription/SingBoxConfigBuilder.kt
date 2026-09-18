@@ -2,6 +2,8 @@ package ru.gidravpn.hydra.data.subscription
 
 import ru.gidravpn.hydra.data.model.DnsEndpoint
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
+import ru.gidravpn.hydra.data.model.MtuPreset
+import ru.gidravpn.hydra.data.model.TlsFragmentMode
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.SplitTunnel
@@ -30,7 +32,9 @@ object SingBoxConfigBuilder {
         splitTunnel: SplitTunnel = SplitTunnel(),
         dns: DnsEndpoint? = DnsEndpoint.doh("1.1.1.1"),
         geoRouting: GeoRouting? = null,
-    ): JSONObject = baseConfig(outboundFor(profile), splitTunnel, dns, geoRouting)
+        mtu: Int = MtuPreset.AUTO.value,
+        tlsFragment: TlsFragmentMode = TlsFragmentMode.OFF,
+    ): JSONObject = baseConfig(outboundFor(profile, tlsFragment), splitTunnel, dns, geoRouting, mtu)
 
     /**
      * Мост Xray → tun (см. `XrayCore` в native-flavor): Xray сам tun не
@@ -43,10 +47,11 @@ object SingBoxConfigBuilder {
         splitTunnel: SplitTunnel = SplitTunnel(),
         dns: DnsEndpoint? = DnsEndpoint.doh("1.1.1.1"),
         geoRouting: GeoRouting? = null,
+        mtu: Int = MtuPreset.AUTO.value,
     ): JSONObject {
         val outbound = JSONObject().put("type", "socks").put("tag", "proxy")
             .put("server", "127.0.0.1").put("server_port", socksPort)
-        return baseConfig(outbound, splitTunnel, dns, geoRouting)
+        return baseConfig(outbound, splitTunnel, dns, geoRouting, mtu)
     }
 
     private fun baseConfig(
@@ -54,6 +59,7 @@ object SingBoxConfigBuilder {
         splitTunnel: SplitTunnel,
         dns: DnsEndpoint?,
         geoRouting: GeoRouting?,
+        mtu: Int,
     ): JSONObject {
         val root = JSONObject()
 
@@ -100,7 +106,7 @@ object SingBoxConfigBuilder {
             put("type", "tun")
             put("tag", "tun-in")
             put("interface_name", "hydra-tun")
-            put("mtu", 9000)
+            put("mtu", mtu)
             put("address", JSONArray().put("172.19.0.1/28"))
             put("auto_route", false)
             put("strict_route", false)
@@ -164,7 +170,7 @@ object SingBoxConfigBuilder {
         return root
     }
 
-    private fun outboundFor(p: ServerProfile): JSONObject {
+    private fun outboundFor(p: ServerProfile, tlsFragment: TlsFragmentMode = TlsFragmentMode.OFF): JSONObject {
         val o = JSONObject().put("tag", "proxy").put("server", p.address).put("server_port", p.port)
         val extra = runCatching { JSONObject(p.extra) }.getOrDefault(JSONObject())
 
@@ -172,18 +178,18 @@ object SingBoxConfigBuilder {
             Protocol.VLESS -> {
                 o.put("type", "vless").put("uuid", p.uuidOrPassword)
                 if (p.flow.isNotEmpty()) o.put("flow", p.flow)
-                o.put("tls", tlsBlock(p, extra))
+                o.put("tls", tlsBlock(p, extra, tlsFragment))
                 transportBlock(p)?.let { o.put("transport", it) }
             }
             Protocol.VMESS -> {
                 o.put("type", "vmess").put("uuid", p.uuidOrPassword)
                     .put("security", "auto").put("alter_id", extra.optInt("aid", 0))
-                if (p.security == "tls") o.put("tls", tlsBlock(p, extra))
+                if (p.security == "tls") o.put("tls", tlsBlock(p, extra, tlsFragment))
                 transportBlock(p)?.let { o.put("transport", it) }
             }
             Protocol.TROJAN -> {
                 o.put("type", "trojan").put("password", p.uuidOrPassword)
-                o.put("tls", tlsBlock(p, extra))
+                o.put("tls", tlsBlock(p, extra, tlsFragment))
                 transportBlock(p)?.let { o.put("transport", it) }
             }
             Protocol.SHADOWSOCKS -> {
@@ -220,7 +226,11 @@ object SingBoxConfigBuilder {
         return o
     }
 
-    private fun tlsBlock(p: ServerProfile, extra: JSONObject): JSONObject {
+    private fun tlsBlock(
+        p: ServerProfile,
+        extra: JSONObject,
+        fragment: TlsFragmentMode = TlsFragmentMode.OFF,
+    ): JSONObject {
         val tls = JSONObject().put("enabled", true)
             .put("server_name", p.sni.ifBlank { p.address })
         if (p.alpn.isNotBlank()) tls.put("alpn", JSONArray(p.alpn.split(",").map { it.trim() }))
@@ -232,6 +242,11 @@ object SingBoxConfigBuilder {
                 .put("enabled", true)
                 .put("public_key", extra.optString("reality_pbk"))
                 .put("short_id", extra.optString("reality_sid")))
+        }
+        when (fragment) {
+            TlsFragmentMode.OFF -> Unit
+            TlsFragmentMode.RECORD -> tls.put("record_fragment", true)
+            TlsFragmentMode.TCP -> tls.put("fragment", true)
         }
         return tls
     }

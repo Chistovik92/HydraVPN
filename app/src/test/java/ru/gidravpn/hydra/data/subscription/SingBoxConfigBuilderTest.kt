@@ -129,6 +129,47 @@ class SingBoxConfigBuilderTest {
         assertFalse(remote.has("path"))
     }
 
+    private fun JSONObject.proxyTls(): JSONObject =
+        getJSONArray("outbounds").objects().single { it.getString("tag") == "proxy" }.getJSONObject("tls")
+
+    @Test fun recordFragmentOnVlessReality() {
+        val reality = profile.copy(
+            security = "reality",
+            extra = """{"reality_pbk":"Z84J2IelR9ch3k8VtlVhhs5ycBUlXA7wHBWcBrjqnAw","reality_sid":"6ba85179e30d4fc2"}""",
+        )
+        val tls = dump("reality_record_fragment", SingBoxConfigBuilder.build(
+            reality, tlsFragment = ru.gidravpn.hydra.data.model.TlsFragmentMode.RECORD,
+        )).proxyTls()
+        assertTrue(tls.getBoolean("record_fragment"))
+        assertFalse(tls.has("fragment"))
+        assertTrue(tls.getJSONObject("reality").getBoolean("enabled"))
+    }
+
+    @Test fun tcpFragmentOnTrojan() {
+        val trojan = profile.copy(protocolId = "trojan")
+        val tls = dump("trojan_tcp_fragment", SingBoxConfigBuilder.build(
+            trojan, tlsFragment = ru.gidravpn.hydra.data.model.TlsFragmentMode.TCP,
+        )).proxyTls()
+        assertTrue(tls.getBoolean("fragment"))
+        assertFalse(tls.has("record_fragment"))
+    }
+
+    @Test fun noFragmentOnQuicProtocols() {
+        listOf("hysteria2", "tuic").forEach { id ->
+            val tls = SingBoxConfigBuilder.build(
+                profile.copy(protocolId = id), tlsFragment = ru.gidravpn.hydra.data.model.TlsFragmentMode.RECORD,
+            ).proxyTls()
+            assertFalse("$id: фрагментации в QUIC быть не должно", tls.has("record_fragment") || tls.has("fragment"))
+        }
+    }
+
+    @Test fun mtuReachesTunInbound() {
+        val cfg = dump("mtu_1280", SingBoxConfigBuilder.build(profile, mtu = 1280))
+        assertEquals(1280, cfg.getJSONArray("inbounds").getJSONObject(0).getInt("mtu"))
+        val bridge = SingBoxConfigBuilder.buildXrayBridge(10808, mtu = 1400)
+        assertEquals(1400, bridge.getJSONArray("inbounds").getJSONObject(0).getInt("mtu"))
+    }
+
     @Test fun xrayBridgeUsesLocalSocks() {
         val cfg = dump("xray_bridge", SingBoxConfigBuilder.buildXrayBridge(10808, geoRouting = geo(GeoRoutingMode.RU_DIRECT)))
         val proxy = cfg.getJSONArray("outbounds").objects().single { it.getString("tag") == "proxy" }

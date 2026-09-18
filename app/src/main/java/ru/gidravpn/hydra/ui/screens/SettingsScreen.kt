@@ -65,7 +65,7 @@ private fun SettingsHub(onSelect: (SettingsSection) -> Unit) {
 
         HubRow("🌐", "Туннель", "Протоколы и движки", AccentViolet) { onSelect(SettingsSection.TUNNEL) }
         HubRow("🛡️", "Безопасность", "Kill Switch, автоподключение", Danger) { onSelect(SettingsSection.SECURITY) }
-        HubRow("🧭", "Маршрутизация", "DNS, geoip по РФ", AccentIndigo) { onSelect(SettingsSection.ROUTING) }
+        HubRow("🧭", "Маршрутизация", "DNS, geoip по РФ, фрагментация, MTU", AccentIndigo) { onSelect(SettingsSection.ROUTING) }
         HubRow("🔀", "Split-туннелинг", "Приложения через VPN / мимо VPN", AccentCyan) { onSelect(SettingsSection.SPLIT) }
         HubRow("📋", "Логи", "Журнал подключения", TextSecondary) { onSelect(SettingsSection.LOGS) }
         HubRow("🎨", "Тема", "Hydra Emerald / Monochrome Stealth", AccentCyan) { onSelect(SettingsSection.THEME) }
@@ -371,6 +371,45 @@ private fun RoutingContent(vm: MainViewModel) {
                 onClick = { vm.setGeoRoutingMode(mode) }
             )
         }
+
+        Spacer(Modifier.height(8.dp))
+        Label("Фрагментация TLS (обход DPI)")
+        Text(
+            "Режет рукопожатие с прокси-сервером, чтобы DPI не увидел имя сайта в одном пакете. " +
+                "Только движок sing-box и только VLESS/VMess/Trojan с TLS — не действует на " +
+                "Hysteria2/TUIC (там QUIC) и при включённом Xray Core. Не проверено на реальных серверах.",
+            color = TextMuted, fontSize = 11.sp
+        )
+        Spacer(Modifier.height(4.dp))
+        val fragment by vm.tlsFragment.collectAsState()
+        ru.gidravpn.hydra.data.model.TlsFragmentMode.entries.forEach { mode ->
+            RoutingOptionCard(
+                title = mode.label,
+                subtitle = mode.description,
+                selected = fragment == mode,
+                onClick = { vm.setTlsFragment(mode) }
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Label("MTU туннеля")
+        Text(
+            "Меняйте, только если часть сайтов «висит» при загрузке, а мелкие запросы проходят — " +
+                "признак потери крупных пакетов. Для SSTP/L2TP действует не выше 1400.",
+            color = TextMuted, fontSize = 11.sp
+        )
+        Spacer(Modifier.height(4.dp))
+        val mtu by vm.mtu.collectAsState()
+        ru.gidravpn.hydra.data.model.MtuPreset.entries.forEach { preset ->
+            RoutingOptionCard(
+                title = preset.label,
+                subtitle = if (preset == ru.gidravpn.hydra.data.model.MtuPreset.AUTO) "Как было до этой настройки"
+                    else "${preset.value} байт",
+                selected = mtu == preset,
+                onClick = { vm.setMtu(preset) }
+            )
+        }
+        Text("Применяется при следующем подключении.", color = TextMuted, fontSize = 11.sp)
     }
 }
 

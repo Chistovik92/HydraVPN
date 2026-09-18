@@ -89,6 +89,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, GeoRoutingMode.OFF)
     fun setGeoRoutingMode(mode: GeoRoutingMode) = viewModelScope.launch { routingRepo.setGeoRoutingMode(mode) }
 
+    val mtu: StateFlow<ru.gidravpn.hydra.data.model.MtuPreset> = routingRepo.mtu
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ru.gidravpn.hydra.data.model.MtuPreset.AUTO)
+    fun setMtu(preset: ru.gidravpn.hydra.data.model.MtuPreset) = viewModelScope.launch { routingRepo.setMtu(preset) }
+
+    val tlsFragment: StateFlow<ru.gidravpn.hydra.data.model.TlsFragmentMode> = routingRepo.tlsFragment
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ru.gidravpn.hydra.data.model.TlsFragmentMode.OFF)
+    fun setTlsFragment(mode: ru.gidravpn.hydra.data.model.TlsFragmentMode) =
+        viewModelScope.launch { routingRepo.setTlsFragment(mode) }
+
     val servers: StateFlow<List<ServerProfile>> = repo.allServers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val subscriptions: StateFlow<List<Subscription>> = repo.allSubscriptions
