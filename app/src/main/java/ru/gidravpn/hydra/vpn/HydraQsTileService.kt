@@ -11,6 +11,8 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import ru.gidravpn.hydra.MainActivity
@@ -27,8 +29,15 @@ import ru.gidravpn.hydra.vpn.core.ConnectionState
  */
 class HydraQsTileService : TileService() {
 
-    private val scope = CoroutineScope(Dispatchers.IO)
+    // Main: qsTile/updateTile() — API TileService, трогаем с главного потока.
+    // Room и DataStore main-safe, так что onClick тоже живёт здесь.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var listenJob: Job? = null
+
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
+    }
 
     override fun onStartListening() {
         super.onStartListening()

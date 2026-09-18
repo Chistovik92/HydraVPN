@@ -125,7 +125,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         // ниже; BootReceiver/HydraQsTileService читают то же значение напрямую
         // из VpnSettingsRepository, минуя эту viewmodel.
         viewModelScope.launch {
-            vpnSettingsRepo.lastServerId.firstOrNull()?.let { _selectedId.value = it }
+            // Не перетираем выбор, если пользователь успел ткнуть сервер раньше.
+            vpnSettingsRepo.lastServerId.firstOrNull()?.let { _selectedId.compareAndSet(null, it) }
         }
     }
 

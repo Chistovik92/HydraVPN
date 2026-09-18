@@ -307,24 +307,29 @@ private fun RoutingContent(vm: MainViewModel) {
     ) {
         Text("Маршрутизация", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
 
-        Label("DNS (DoH внутри туннеля)")
+        Label("DNS (внутри туннеля)")
         ru.gidravpn.hydra.data.model.DnsProvider.entries.forEach { provider ->
             RoutingOptionCard(
                 title = provider.label,
-                subtitle = provider.address
-                    ?: if (provider == ru.gidravpn.hydra.data.model.DnsProvider.CUSTOM) "Свой IP или хост"
-                    else "Резолвер устройства, без DoH",
+                subtitle = when {
+                    provider.address != null -> "${provider.address} · DoH"
+                    provider == ru.gidravpn.hydra.data.model.DnsProvider.CUSTOM ->
+                        if (dnsCustom.isNotBlank()) dnsCustom else "IP, хост или DoH/DoT-URL"
+                    else -> "Резолвер устройства, без шифрования — запросы идут мимо туннеля"
+                },
                 selected = dnsProvider == provider,
                 onClick = { vm.setDnsProvider(provider) }
             )
         }
         if (dnsProvider == ru.gidravpn.hydra.data.model.DnsProvider.CUSTOM) {
-            var text by remember { mutableStateOf(dnsCustom) }
+            var text by remember(dnsCustom) { mutableStateOf(dnsCustom) }
+            var invalid by remember { mutableStateOf(false) }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 androidx.compose.material3.OutlinedTextField(
-                    value = text, onValueChange = { text = it },
-                    label = { Text("IP или хост DoH-сервера", color = TextMuted, fontSize = 12.sp) },
+                    value = text, onValueChange = { text = it; invalid = false },
+                    label = { Text("https://dns.example/dns-query", color = TextMuted, fontSize = 12.sp) },
                     singleLine = true,
+                    isError = invalid,
                     colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
                         focusedBorderColor = AccentCyan, unfocusedBorderColor = Border,
@@ -332,8 +337,17 @@ private fun RoutingContent(vm: MainViewModel) {
                     ),
                     modifier = Modifier.weight(1f)
                 )
-                RoutingSaveButton { vm.setDnsCustomAddress(text) }
+                RoutingSaveButton {
+                    if (ru.gidravpn.hydra.data.model.DnsEndpoint.parse(text) != null) vm.setDnsCustomAddress(text)
+                    else invalid = true
+                }
             }
+            Text(
+                if (invalid) "Не похоже на адрес DNS. Примеры: 94.140.14.14, dns.example.com, " +
+                    "https://dns.example.com/dns-query/токен, tls://dns.example.com"
+                else "Поддерживаются IP, хост (→ DoH), https://… (DoH, можно с путём и токеном), tls://… (DoT), udp://…",
+                color = if (invalid) Danger else TextMuted, fontSize = 11.sp
+            )
         }
         Text(
             "Применяется при следующем подключении.",
