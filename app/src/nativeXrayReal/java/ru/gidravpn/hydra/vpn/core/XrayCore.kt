@@ -61,9 +61,9 @@ class XrayCore : VpnCore {
             "XrayCore.start() не должен вызываться на главном потоке"
         }
         val ctx = AppCtx.appContext ?: error("AppCtx не инициализирован")
-        val (dns, geoRouting) = resolveRouting(ctx)
+        val opts = resolveRouting(ctx)
 
-        val xrayConfig = XrayConfigBuilder.build(profile, socksPort, dnsUrl = dns?.toXrayAddress())
+        val xrayConfig = XrayConfigBuilder.build(profile, socksPort, dnsUrl = opts.dns?.toXrayAddress())
         onLog("Xray: конфиг сгенерирован (${xrayConfig.length} байт)")
 
         // Процесс :xray без клиентов прошивка (замечено на OnePlus) убивает быстро —
@@ -85,7 +85,7 @@ class XrayCore : VpnCore {
 
         val split = runBlocking { SplitTunnelRepository(ctx).settings.firstOrNull() } ?: SplitTunnel()
         val bridgeConfig = SingBoxConfigBuilder.buildXrayBridge(
-            socksPort, split, dns = dns, geoRouting = geoRouting
+            socksPort, split, dns = opts.dns, geoRouting = opts.geoRouting, mtu = opts.mtu,
         ).toString(2)
         onLog("Xray: sing-box-мост, конфиг сгенерирован (${bridgeConfig.length} байт)")
 

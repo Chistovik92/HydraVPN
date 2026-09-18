@@ -235,9 +235,12 @@ class HydraVpnService : VpnService() {
     private suspend fun establishTun(profile: ServerProfile): ParcelFileDescriptor {
         // PPP-движки (SSTP/L2TP): MRU 1400, иначе фрагментация на TLS/UDP-транспорте
         val userspace = profile.protocol?.engine == ru.gidravpn.hydra.data.model.Engine.USERSPACE
+        // Должен совпадать с tun-инбаундом sing-box (тот же RoutingRepository.mtu).
+        val mtu = (ru.gidravpn.hydra.data.repository.RoutingRepository(applicationContext).mtu.firstOrNull()
+            ?: ru.gidravpn.hydra.data.model.MtuPreset.AUTO).value
         val builder = Builder()
             .setSession("Hydra")
-            .setMtu(if (userspace) 1400 else 9000)
+            .setMtu(if (userspace) minOf(1400, mtu) else mtu)
             .addAddress("172.19.0.1", 28)
             .addDnsServer("1.1.1.1")
             .addRoute("0.0.0.0", 0)

@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.map
 import ru.gidravpn.hydra.data.model.DnsEndpoint
 import ru.gidravpn.hydra.data.model.DnsProvider
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
+import ru.gidravpn.hydra.data.model.MtuPreset
+import ru.gidravpn.hydra.data.model.TlsFragmentMode
 
 /** Отдельный DataStore-файл — не пересекается с "settings"/"theme_settings"/"engine_settings"/"vpn_settings". */
 private val Context.routingStore: DataStore<Preferences> by preferencesDataStore(name = "routing_settings")
@@ -23,6 +25,19 @@ class RoutingRepository(private val context: Context) {
     private val KEY_DNS_PROVIDER = stringPreferencesKey("dns_provider")
     private val KEY_DNS_CUSTOM = stringPreferencesKey("dns_custom_address")
     private val KEY_GEO_MODE = stringPreferencesKey("geo_routing_mode")
+    private val KEY_MTU = stringPreferencesKey("tun_mtu")
+    private val KEY_TLS_FRAGMENT = stringPreferencesKey("tls_fragment")
+
+    val mtu: Flow<MtuPreset> = context.routingStore.data.map { MtuPreset.fromId(it[KEY_MTU]) }
+    suspend fun setMtu(preset: MtuPreset) {
+        context.routingStore.edit { it[KEY_MTU] = preset.name }
+    }
+
+    val tlsFragment: Flow<TlsFragmentMode> = context.routingStore.data
+        .map { TlsFragmentMode.fromId(it[KEY_TLS_FRAGMENT]) }
+    suspend fun setTlsFragment(mode: TlsFragmentMode) {
+        context.routingStore.edit { it[KEY_TLS_FRAGMENT] = mode.name }
+    }
 
     val dnsProvider: Flow<DnsProvider> = context.routingStore.data
         .map { DnsProvider.fromId(it[KEY_DNS_PROVIDER]) }

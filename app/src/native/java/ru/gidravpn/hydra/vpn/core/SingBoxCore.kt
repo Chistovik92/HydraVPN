@@ -22,6 +22,8 @@ import kotlinx.coroutines.runBlocking
 import ru.gidravpn.hydra.AppCtx
 import ru.gidravpn.hydra.data.model.DnsEndpoint
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
+import ru.gidravpn.hydra.data.model.MtuPreset
+import ru.gidravpn.hydra.data.model.TlsFragmentMode
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.SplitTunnel
 import ru.gidravpn.hydra.data.repository.RoutingRepository
@@ -50,9 +52,10 @@ class SingBoxCore : VpnCore {
     ) {
         val ctx = AppCtx.appContext
         val split = ctx?.let { runBlocking { SplitTunnelRepository(it).settings.firstOrNull() } } ?: SplitTunnel()
-        val (dns, geoRouting) = resolveRouting(ctx)
+        val opts = resolveRouting(ctx)
         val config = SingBoxConfigBuilder.build(
-            profile, splitTunnel = split, dns = dns, geoRouting = geoRouting
+            profile, splitTunnel = split, dns = opts.dns, geoRouting = opts.geoRouting,
+            mtu = opts.mtu, tlsFragment = opts.tlsFragment,
         ).toString(2)
         onLog("sing-box: конфиг сгенерирован (${config.length} байт)")
         runConfig(tun, config, onLog, onStats)
@@ -100,17 +103,29 @@ class SingBoxCore : VpnCore {
  * тот же пакет `ru.gidravpn.hydra.vpn.core`): в обоих случаях TUN и
  * `route.rules` держит sing-box, так что настройки одни и те же.
  */
-internal fun resolveRouting(ctx: android.content.Context?): Pair<DnsEndpoint?, SingBoxConfigBuilder.GeoRouting?> {
-    if (ctx == null) return DnsEndpoint.doh("1.1.1.1") to null
+internal data class RoutingOptions(
+    val dns: DnsEndpoint?,
+    val geoRouting: SingBoxConfigBuilder.GeoRouting?,
+    val mtu: Int,
+    val tlsFragment: TlsFragmentMode,
+)
+
+internal fun resolveRouting(ctx: android.content.Context?): RoutingOptions {
+    if (ctx == null) return RoutingOptions(DnsEndpoint.doh("1.1.1.1"), null, MtuPreset.AUTO.value, TlsFragmentMode.OFF)
     val routing = RoutingRepository(ctx)
-    val dns = runBlocking { routing.resolveDns() }
-    val geoMode = runBlocking { routing.geoRoutingMode.firstOrNull() } ?: GeoRoutingMode.OFF
-    val geoRouting = if (geoMode == GeoRoutingMode.OFF) null else SingBoxConfigBuilder.GeoRouting(
-        mode = geoMode,
-        geoipPath = GeoAssets.geoipRuPath(ctx),
-        geositePath = GeoAssets.geositeRuPath(ctx),
-    )
-    return dns to geoRouting
+    return runBlocking {
+        val geoMode = routing.geoRoutingMode.firstOrNull() ?: GeoRoutingMode.OFF
+        RoutingOptions(
+            dns = routing.resolveDns(),
+            geoRouting = if (geoMode == GeoRoutingMode.OFF) null else SingBoxConfigBuilder.GeoRouting(
+                mode = geoMode,
+                geoipPath = GeoAssets.geoipRuPath(ctx),
+                geositePath = GeoAssets.geositeRuPath(ctx),
+            ),
+            mtu = (routing.mtu.firstOrNull() ?: MtuPreset.AUTO).value,
+            tlsFragment = routing.tlsFragment.firstOrNull() ?: TlsFragmentMode.OFF,
+        )
+    }
 }
 
 /**
