@@ -61,21 +61,22 @@ class XrayCore : VpnCore {
             "XrayCore.start() не должен вызываться на главном потоке"
         }
         val ctx = AppCtx.appContext ?: error("AppCtx не инициализирован")
-        val (dnsAddress, geoRouting) = resolveRouting(ctx)
+        val (dns, geoRouting) = resolveRouting(ctx)
 
-        val xrayConfig = XrayConfigBuilder.build(profile, socksPort, dnsAddress = dnsAddress)
+        val xrayConfig = XrayConfigBuilder.build(profile, socksPort, dnsUrl = dns?.toXrayAddress())
         onLog("Xray: конфиг сгенерирован (${xrayConfig.length} байт)")
 
-        val svc = bindEngine(ctx)
-        svc.setProtector(object : IXraySocketProtector.Stub() {
-            override fun protect(pfd: ParcelFileDescriptor?): Boolean {
-                val ok = pfd?.let { SocketGuard.protect(it.fd) } ?: false
-                runCatching { pfd?.close() }
-                return ok
-            }
-        })
-
-        val runResponse = JSONObject(svc.runXray(xrayConfig))
+        // Процесс :xray без клиентов прошивка (замечено на OnePlus) убивает быстро —
+        // в т.ч. между unbind прошлой неудачной попытки и вызовом в этой. Мёртвый
+        // binder даёт DeadObjectException без сообщения («Ошибка: null» в логе) —
+        // один раз переподключаемся к свежему процессу.
+        val runResponse = try {
+            runEngine(ctx, xrayConfig)
+        } catch (e: android.os.DeadObjectException) {
+            onLog("Xray: процесс :xray перезапущен системой, переподключение")
+            runCatching { connection?.let { ctx.unbindService(it) } }
+            runEngine(ctx, xrayConfig)
+        }
         if (!runResponse.optBoolean("success")) {
             error("Xray: ${runResponse.optString("error", "runXray failed")}")
         }
@@ -84,7 +85,7 @@ class XrayCore : VpnCore {
 
         val split = runBlocking { SplitTunnelRepository(ctx).settings.firstOrNull() } ?: SplitTunnel()
         val bridgeConfig = SingBoxConfigBuilder.buildXrayBridge(
-            socksPort, split, dnsAddress = dnsAddress, geoRouting = geoRouting
+            socksPort, split, dns = dns, geoRouting = geoRouting
         ).toString(2)
         onLog("Xray: sing-box-мост, конфиг сгенерирован (${bridgeConfig.length} байт)")
 
@@ -101,6 +102,18 @@ class XrayCore : VpnCore {
         runCatching { connection?.let { AppCtx.appContext?.unbindService(it) } }
         engine = null
         connection = null
+    }
+
+    private fun runEngine(ctx: Context, xrayConfig: String): JSONObject {
+        val svc = bindEngine(ctx)
+        svc.setProtector(object : IXraySocketProtector.Stub() {
+            override fun protect(pfd: ParcelFileDescriptor?): Boolean {
+                val ok = pfd?.let { SocketGuard.protect(it.fd) } ?: false
+                runCatching { pfd?.close() }
+                return ok
+            }
+        })
+        return JSONObject(svc.runXray(xrayConfig) ?: error("Xray: runXray вернул null"))
     }
 
     private fun bindEngine(ctx: Context): IXrayEngine {

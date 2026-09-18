@@ -96,8 +96,12 @@ class HydraVpnService : VpnService() {
         var newCore: VpnCore? = null
         try {
             VpnState.state.value = ConnectionState.CONNECTING
-            val profile = ru.gidravpn.hydra.data.repository.ServerRepository(applicationContext).byId(serverId)
-                ?: throw IllegalStateException("Сервер #$serverId не найден")
+            val settings = ru.gidravpn.hydra.data.repository.VpnSettingsRepository(applicationContext)
+            // serverId < 0 — перезапуск системой по START_STICKY (intent == null):
+            // поднимаем то же, что было, а не «Сервер #-1 не найден».
+            val id = if (serverId >= 0) serverId else settings.lastServerId.firstOrNull() ?: -1
+            val profile = ru.gidravpn.hydra.data.repository.ServerRepository(applicationContext).byId(id)
+                ?: throw IllegalStateException("Сервер #$id не найден")
 
             VpnState.activeServer.value = profile
             VpnState.log("Подключение к ${profile.address}…")
@@ -123,6 +127,9 @@ class HydraVpnService : VpnService() {
             VpnState.connectedSince.value = System.currentTimeMillis()
             VpnState.state.value = ConnectionState.CONNECTED
             VpnState.log("✓ Соединение установлено")
+            // Плитка/автозагрузка берут отсюда сервер — в т.ч. когда в UI его явно
+            // не выбирали (кнопка «Подключить» берёт первый из списка).
+            settings.setLastServerId(profile.id)
             updateNotification(ConnectionState.CONNECTED, profile.name)
 
             // StateFlow не эмитит одинаковые значения, так что при нулевом
@@ -157,7 +164,9 @@ class HydraVpnService : VpnService() {
                 throw t
             }
 
-            VpnState.log("Ошибка: ${t.message}")
+            // У DeadObjectException и части NPE сообщения нет — без имени класса
+            // в логе оставалось неразбираемое «Ошибка: null».
+            VpnState.log("Ошибка: ${t.message ?: t.javaClass.simpleName}")
 
             // Kill Switch: только если tun реально поднялся (establishTun()
             // успел отработать) — иначе блокировать нечем, ведём себя как раньше.

@@ -31,8 +31,8 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 19
-        versionName = "0.6.9"
+        versionCode = 20
+        versionName = "0.6.10"
 
         // ABI, под которые собраны нативные ядра (libbox / libXray)
         ndk {
@@ -285,6 +285,11 @@ dependencies {
     // Сеть (загрузка подписок)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+
+    // JVM unit-тесты. org.json из android.jar в unit-тестах — заглушки
+    // ("Method ... not mocked"), поэтому настоящая реализация отдельно.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 
     // === Нативные ядра. Файлы .aar кладутся в app/libs вручную (см. docs/BUILD.md) ===
     // sing-box: github.com/SagerNet/sing-box (experimental/libbox), собран через gomobile.

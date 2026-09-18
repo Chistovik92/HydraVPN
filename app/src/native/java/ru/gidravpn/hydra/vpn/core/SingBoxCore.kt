@@ -20,6 +20,7 @@ import io.nekohasekai.libbox.WIFIState
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 import ru.gidravpn.hydra.AppCtx
+import ru.gidravpn.hydra.data.model.DnsEndpoint
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.SplitTunnel
@@ -49,9 +50,9 @@ class SingBoxCore : VpnCore {
     ) {
         val ctx = AppCtx.appContext
         val split = ctx?.let { runBlocking { SplitTunnelRepository(it).settings.firstOrNull() } } ?: SplitTunnel()
-        val (dnsAddress, geoRouting) = resolveRouting(ctx)
+        val (dns, geoRouting) = resolveRouting(ctx)
         val config = SingBoxConfigBuilder.build(
-            profile, splitTunnel = split, dnsAddress = dnsAddress, geoRouting = geoRouting
+            profile, splitTunnel = split, dns = dns, geoRouting = geoRouting
         ).toString(2)
         onLog("sing-box: конфиг сгенерирован (${config.length} байт)")
         runConfig(tun, config, onLog, onStats)
@@ -99,17 +100,17 @@ class SingBoxCore : VpnCore {
  * тот же пакет `ru.gidravpn.hydra.vpn.core`): в обоих случаях TUN и
  * `route.rules` держит sing-box, так что настройки одни и те же.
  */
-internal fun resolveRouting(ctx: android.content.Context?): Pair<String?, SingBoxConfigBuilder.GeoRouting?> {
-    if (ctx == null) return "1.1.1.1" to null
+internal fun resolveRouting(ctx: android.content.Context?): Pair<DnsEndpoint?, SingBoxConfigBuilder.GeoRouting?> {
+    if (ctx == null) return DnsEndpoint.doh("1.1.1.1") to null
     val routing = RoutingRepository(ctx)
-    val dnsAddress = runBlocking { routing.resolveDnsAddress() }
+    val dns = runBlocking { routing.resolveDns() }
     val geoMode = runBlocking { routing.geoRoutingMode.firstOrNull() } ?: GeoRoutingMode.OFF
     val geoRouting = if (geoMode == GeoRoutingMode.OFF) null else SingBoxConfigBuilder.GeoRouting(
         mode = geoMode,
         geoipPath = GeoAssets.geoipRuPath(ctx),
         geositePath = GeoAssets.geositeRuPath(ctx),
     )
-    return dnsAddress to geoRouting
+    return dns to geoRouting
 }
 
 /**
@@ -127,6 +128,9 @@ class HydraPlatformInterface(
     private val appContext get() = ru.gidravpn.hydra.AppCtx.appContext
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var monitorThread: HandlerThread? = null
+    // Последняя реальная (не-VPN) сеть от монитора — через неё идёт local DNS.
+    @Volatile private var underlyingNetwork: Network? = null
+    private val localDns = HydraLocalDns { underlyingNetwork }
 
     /** libbox запрашивает tun через openTun — отдаём дескриптор нашего VpnService. */
     override fun openTun(options: TunOptions): Int = existingTun.detachFd()
@@ -240,6 +244,7 @@ class HydraPlatformInterface(
         }
         monitorThread?.quitSafely()
         monitorThread = null
+        underlyingNetwork = null
     }
 
     private fun notify(network: Network, listener: InterfaceUpdateListener) {
@@ -254,6 +259,7 @@ class HydraPlatformInterface(
                 ?: run { onLogLine("sing-box: notify: нет interfaceName в $lp"); return }
             val index = java.net.NetworkInterface.getByName(name)?.index ?: 0
             val isMetered = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) == false
+            underlyingNetwork = network
             listener.updateDefaultInterface(name, index, isMetered, false)
         }.onFailure { onLogLine("sing-box: notify: исключение: ${it}") }
     }
@@ -326,8 +332,8 @@ class HydraPlatformInterface(
         return StringIteratorImpl(names)
     }
 
-    /** Локальный DNS-транспорт платформы: null → sing-box использует свои серверы. */
-    override fun localDNSTransport(): io.nekohasekai.libbox.LocalDNSTransport? = null
+    /** DNS-сервер `type: local` — на Android sing-box резолвит только через него (см. HydraLocalDns). */
+    override fun localDNSTransport(): io.nekohasekai.libbox.LocalDNSTransport = localDns
 
     /** Уведомления ядра (например, об обновлении geodata) — в лог. */
     override fun sendNotification(notification: Notification) {

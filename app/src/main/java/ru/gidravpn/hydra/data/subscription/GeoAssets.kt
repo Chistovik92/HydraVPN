@@ -26,7 +26,12 @@ object GeoAssets {
 
     private fun extract(context: Context, assetName: String): String {
         val file = File(context.filesDir, assetName)
-        if (!file.exists() || file.length() == 0L) {
+        // lastUpdateTime растёт при каждом обновлении APK — иначе свежая база из
+        // нового релиза никогда не заменила бы копию, извлечённую старым.
+        val apkUpdated = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime
+        }.getOrDefault(Long.MAX_VALUE)
+        if (!file.exists() || file.length() == 0L || file.lastModified() < apkUpdated) {
             context.assets.open(assetName).use { input ->
                 file.outputStream().use { output -> input.copyTo(output) }
             }

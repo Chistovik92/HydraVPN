@@ -1,5 +1,6 @@
 package ru.gidravpn.hydra.data.subscription
 
+import ru.gidravpn.hydra.data.model.DnsEndpoint
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
@@ -27,9 +28,9 @@ object SingBoxConfigBuilder {
         profile: ServerProfile,
         socksPort: Int = 0,
         splitTunnel: SplitTunnel = SplitTunnel(),
-        dnsAddress: String? = "1.1.1.1",
+        dns: DnsEndpoint? = DnsEndpoint.doh("1.1.1.1"),
         geoRouting: GeoRouting? = null,
-    ): JSONObject = baseConfig(outboundFor(profile), splitTunnel, dnsAddress, geoRouting)
+    ): JSONObject = baseConfig(outboundFor(profile), splitTunnel, dns, geoRouting)
 
     /**
      * Мост Xray → tun (см. `XrayCore` в native-flavor): Xray сам tun не
@@ -40,18 +41,18 @@ object SingBoxConfigBuilder {
     fun buildXrayBridge(
         socksPort: Int,
         splitTunnel: SplitTunnel = SplitTunnel(),
-        dnsAddress: String? = "1.1.1.1",
+        dns: DnsEndpoint? = DnsEndpoint.doh("1.1.1.1"),
         geoRouting: GeoRouting? = null,
     ): JSONObject {
         val outbound = JSONObject().put("type", "socks").put("tag", "proxy")
             .put("server", "127.0.0.1").put("server_port", socksPort)
-        return baseConfig(outbound, splitTunnel, dnsAddress, geoRouting)
+        return baseConfig(outbound, splitTunnel, dns, geoRouting)
     }
 
     private fun baseConfig(
         outbound: JSONObject,
         splitTunnel: SplitTunnel,
-        dnsAddress: String?,
+        dns: DnsEndpoint?,
         geoRouting: GeoRouting?,
     ): JSONObject {
         val root = JSONObject()
@@ -64,17 +65,32 @@ object SingBoxConfigBuilder {
         // менеджер трафика работает и без него.
         root.put("experimental", JSONObject().put("clash_api", JSONObject()))
 
-        // DNS (схема 1.12: серверы с явным type). dnsAddress == null (пресет
-        // "Системный резолвер") — DoH-сервер не добавляется вовсе, остаётся
-        // только локальный резолвер платформы.
+        // DNS (схема 1.12: серверы с явным type). Сюда попадают DNS-запросы
+        // приложений — их перехватывает правило hijack-dns ниже. dns == null
+        // (пресет "Системный резолвер") — своего сервера нет, остаётся только
+        // резолвер платформы (запросы идут мимо туннеля).
         root.put("dns", JSONObject().apply {
             put("servers", JSONArray().apply {
-                if (dnsAddress != null) {
-                    put(JSONObject().put("type", "https").put("tag", "remote")
-                        .put("server", dnsAddress).put("detour", "proxy"))
+                if (dns != null) {
+                    put(JSONObject().apply {
+                        put("type", dns.type); put("tag", "remote"); put("server", dns.host)
+                        dns.port?.let { put("server_port", it) }
+                        dns.path?.let { put("path", it) }
+                        put("detour", "proxy")
+                        // Хост DoH/DoT (например приватный dns.hydravpn.us) sing-box
+                        // 1.12 без domain_resolver не принимает вовсе. Резолвим его
+                        // через публичный DoH по IP и тоже через прокси — чтобы
+                        // провайдер не видел даже имя своего DNS-сервера.
+                        if (!dns.isIp) put("domain_resolver", "bootstrap")
+                    })
+                    if (!dns.isIp) {
+                        put(JSONObject().put("type", "https").put("tag", "bootstrap")
+                            .put("server", "1.1.1.1").put("detour", "proxy"))
+                    }
                 }
                 put(JSONObject().put("type", "local").put("tag", "local"))
             })
+            put("final", if (dns != null) "remote" else "local")
             put("strategy", "prefer_ipv4")
         })
 
@@ -91,37 +107,38 @@ object SingBoxConfigBuilder {
             put("stack", "gvisor")
         }))
 
-        // outbounds: proxy + direct + dns + block
+        // outbounds: proxy + direct. Спецаутбаунды dns/block (устарели в 1.11,
+        // удаляются в 1.13) заменены rule actions — см. sniff/hijack-dns ниже.
         root.put("outbounds", JSONArray().apply {
             put(outbound)
             put(JSONObject().put("type", "direct").put("tag", "direct"))
-            put(JSONObject().put("type", "dns").put("tag", "dns-out"))
-            put(JSONObject().put("type", "block").put("tag", "block"))
         })
 
         // маршрутизация (+ пользовательские правила split tunneling по IP/доменам — Фаза 2)
         val netRules = splitTunnel.netRules.takeIf { splitTunnel.netActive }.orEmpty()
         val geoActive = geoRouting != null && geoRouting.mode != GeoRoutingMode.OFF
         root.put("route", JSONObject().apply {
-            // rule_set — bundled .srs (см. GeoAssets/data/model/GeoRoutingMode).
-            // Пустой массив, если geoip-маршрутизация выключена — валидный JSON,
-            // sing-box просто не грузит никаких rule_set.
-            put("rule_set", JSONArray().apply {
-                if (geoActive) {
+            if (geoActive) {
+                put("rule_set", JSONArray().apply {
                     put(JSONObject().put("type", "local").put("tag", "geoip-ru")
                         .put("format", "binary").put("path", geoRouting!!.geoipPath))
                     put(JSONObject().put("type", "local").put("tag", "geosite-ru")
                         .put("format", "binary").put("path", geoRouting.geositePath))
-                }
-            })
+                })
+            }
             put("rules", JSONArray().apply {
+                // sniff обязан идти первым: без него у соединения нет ни протокола,
+                // ни домена. Раньше его не было вовсе — `protocol: dns` не срабатывал
+                // (DNS уходил в прокси сырым UDP мимо dns-серверов выше), а доменные
+                // правила (netRules DOMAIN*, geosite-ru) не матчились никогда.
+                put(JSONObject().put("action", "sniff"))
+                put(JSONObject().put("protocol", "dns").put("action", "hijack-dns"))
                 if (netRules.isNotEmpty()) {
                     val ruleOutbound = if (splitTunnel.netMode == SplitTunnelMode.EXCLUDE) "direct" else "proxy"
                     netRules.groupBy({ it.type }, { it.value }).forEach { (type, values) ->
                         put(JSONObject().put(type.singBoxKey, JSONArray(values)).put("outbound", ruleOutbound))
                     }
                 }
-                put(JSONObject().put("protocol", "dns").put("outbound", "dns-out"))
                 put(JSONObject().put("ip_is_private", true).put("outbound", "direct"))
                 // geoip-ru ИЛИ geosite-ru (OR внутри одного правила — стандартная
                 // семантика sing-box для массива в одном поле) — RU_DIRECT ведёт

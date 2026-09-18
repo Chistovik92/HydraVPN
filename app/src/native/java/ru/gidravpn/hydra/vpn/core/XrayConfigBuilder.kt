@@ -27,18 +27,19 @@ object XrayConfigBuilder {
         "::1/128", "fc00::/7", "fe80::/10",
     )
 
-    fun build(p: ServerProfile, socksPort: Int = 10808, dnsAddress: String? = "1.1.1.1"): String {
+    fun build(p: ServerProfile, socksPort: Int = 10808, dnsUrl: String? = "https://1.1.1.1/dns-query"): String {
         val extra = runCatching { JSONObject(p.extra) }.getOrDefault(JSONObject())
         val root = JSONObject()
 
         root.put("log", JSONObject().put("loglevel", "warning"))
 
-        // DNS: через прокси, иначе локально. dnsAddress == null (пресет
-        // "Системный резолвер") — DoH-сервер не добавляется, остаётся localhost.
+        // Внутренний DNS Xray — нужен только для имени самого прокси-сервера:
+        // DNS приложений перехватывает sing-box-мост (hijack-dns). dnsUrl == null
+        // ("Системный резолвер" или DoT, которого Xray не умеет) — только localhost.
         root.put("dns", JSONObject().apply {
             put("servers", JSONArray().apply {
-                if (dnsAddress != null) {
-                    put(JSONObject().put("address", "https://$dnsAddress/dns-query").put("domains", JSONArray()))
+                if (dnsUrl != null) {
+                    put(JSONObject().put("address", dnsUrl).put("domains", JSONArray()))
                 }
                 put("localhost")
             })

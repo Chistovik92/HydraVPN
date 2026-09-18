@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.6.9** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.6.10** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -181,9 +181,14 @@
     AdGuard/системный/свой — `RoutingRepository`, DataStore
     `routing_settings`) и geoip/geosite-маршрутизация по РФ через
     `route.rule_set` sing-box 1.12 на bundled `.srs` (`GeoAssets.kt`,
-    precompiled из `MetaCubeX/meta-rules-dat`). Полная база GeoIP по всем
-    странам (не только РФ) и MTU/фрагментация/реальный TLS-sniffing SNI —
-    остаются в 6c на будущее, не блокируют. Настройки → Маршрутизация.
+    precompiled из `MetaCubeX/meta-rules-dat`). Настройки → Маршрутизация.
+    **0.6.10:** до этой версии DNS-выбор и geosite фактически не работали —
+    не было `action: sniff` (подробно — CHANGELOG 0.6.10). Теперь sniff +
+    `hijack-dns`, свой DNS по URL (`DnsEndpoint`: DoH с путём/DoT/UDP),
+    `HydraLocalDns` для `type: local`. Конфиги проверяются unit-тестами и
+    настоящим `sing-box check` 1.12.9 (см. `SingBoxConfigBuilderTest`).
+    Осталось в 6c: MTU (сейчас 9000 жёстко), TLS-фрагментация, база GeoIP
+    по всем странам, `route.default_domain_resolver`.
   - **6d. Настройки/инфраструктура**: единый `SettingsRepository` (сейчас
     3 независимых DataStore-файла — `settings`/`theme_settings`/`engine_settings`
     + Room), backup/restore всей конфигурации в файл/QR, сброс настроек,

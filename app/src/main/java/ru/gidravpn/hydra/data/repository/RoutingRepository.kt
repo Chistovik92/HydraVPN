@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
+import ru.gidravpn.hydra.data.model.DnsEndpoint
 import ru.gidravpn.hydra.data.model.DnsProvider
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
 
@@ -41,13 +42,17 @@ class RoutingRepository(private val context: Context) {
         context.routingStore.edit { it[KEY_GEO_MODE] = mode.name }
     }
 
-    /** Действующий адрес DoH-сервера: пресет, кроме SYSTEM (null) и CUSTOM (свой текст). */
-    suspend fun resolveDnsAddress(): String? =
+    /**
+     * Действующий DNS-сервер: null — SYSTEM (резолвер платформы). Невалидный
+     * свой адрес откатывается на Cloudflare — UI не даёт такой сохранить, но
+     * значения из старых версий приложения могли остаться.
+     */
+    suspend fun resolveDns(): DnsEndpoint? =
         combine(dnsProvider, dnsCustomAddress) { provider, custom ->
             when (provider) {
                 DnsProvider.SYSTEM -> null
-                DnsProvider.CUSTOM -> custom.ifBlank { DnsProvider.CLOUDFLARE.address }
-                else -> provider.address
+                DnsProvider.CUSTOM -> DnsEndpoint.parse(custom) ?: DnsEndpoint.doh(DnsProvider.CLOUDFLARE.address!!)
+                else -> DnsEndpoint.doh(provider.address!!)
             }
         }.firstOrNull()
 }
