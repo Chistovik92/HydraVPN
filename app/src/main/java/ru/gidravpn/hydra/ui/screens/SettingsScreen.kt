@@ -37,7 +37,7 @@ import ru.gidravpn.hydra.ui.theme.*
 import ru.gidravpn.hydra.vpn.HydraQsTileService
 
 /** Подэкраны Настроек — Split и Логи переехали сюда из верхнего уровня навигации. */
-private enum class SettingsSection { HUB, TUNNEL, SECURITY, ROUTING, SPLIT, LOGS, THEME, ABOUT }
+private enum class SettingsSection { HUB, TUNNEL, SECURITY, ROUTING, SPLIT, LOGS, THEME, BACKUP, ABOUT }
 
 @Composable
 fun SettingsScreen(vm: MainViewModel) {
@@ -51,6 +51,7 @@ fun SettingsScreen(vm: MainViewModel) {
         SettingsSection.SPLIT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { SplitTunnelScreen(vm) }
         SettingsSection.LOGS -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { LogsScreen(vm) }
         SettingsSection.THEME -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { ThemeContent(vm) }
+        SettingsSection.BACKUP -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { BackupContent(vm) }
         SettingsSection.ABOUT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { AboutContent() }
     }
 }
@@ -69,6 +70,7 @@ private fun SettingsHub(onSelect: (SettingsSection) -> Unit) {
         HubRow("🔀", "Split-туннелинг", "Приложения через VPN / мимо VPN", AccentCyan) { onSelect(SettingsSection.SPLIT) }
         HubRow("📋", "Логи", "Журнал подключения", TextSecondary) { onSelect(SettingsSection.LOGS) }
         HubRow("🎨", "Тема", "Hydra Emerald / Monochrome Stealth", AccentCyan) { onSelect(SettingsSection.THEME) }
+        HubRow("💾", "Резервная копия", "Сохранить / восстановить всё, сброс настроек", AccentViolet) { onSelect(SettingsSection.BACKUP) }
         HubRow("ℹ️", "О приложении", "Версия, лицензия", TextSecondary) { onSelect(SettingsSection.ABOUT) }
     }
 }
@@ -573,6 +575,106 @@ private fun ThemeOptionCard(
             if (selected) Text("✓", color = AccentCyan, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     }
+}
+
+@Composable
+private fun BackupContent(vm: MainViewModel) {
+    val message by vm.backupMessage.collectAsState()
+    var confirmImport by remember { mutableStateOf<android.net.Uri?>(null) }
+    var confirmReset by remember { mutableStateOf(false) }
+
+    val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> uri?.let { vm.exportBackup(it) } }
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> confirmImport = uri }
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text("Резервная копия", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+
+        message?.let {
+            Card(Modifier.fillMaxWidth().clickableNoRipple { vm.dismissBackupMessage() }, borderColor = AccentCyan) {
+                Text(it, color = TextPrimary, fontSize = 13.sp)
+                Text("Нажмите, чтобы скрыть", color = TextMuted, fontSize = 10.sp)
+            }
+        }
+
+        InfoGroup("Сохранить копию", AccentCyan) {
+            Text(
+                "Все серверы, подписки и настройки — в один JSON-файл. Внимание: в файле ключи и пароли " +
+                    "серверов открытым текстом — храните его как пароль.",
+                color = TextMuted, fontSize = 12.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            BackupActionButton("Сохранить в файл →", AccentCyan) {
+                val date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+                exportLauncher.launch("hydra-backup-$date.json")
+            }
+        }
+
+        InfoGroup("Восстановить из копии", AccentViolet) {
+            Text(
+                "Заменяет ВСЕ текущие серверы, подписки и настройки содержимым файла. VPN должен быть отключён.",
+                color = TextMuted, fontSize = 12.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            BackupActionButton("Выбрать файл →", AccentViolet) {
+                importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+            }
+        }
+
+        InfoGroup("Сброс настроек", Danger) {
+            Text(
+                "Все настройки — к значениям по умолчанию (тема, DNS, маршрутизация, Kill Switch, " +
+                    "split-туннелинг и т.д.). Серверы и подписки останутся.",
+                color = TextMuted, fontSize = 12.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            BackupActionButton("Сбросить настройки →", Danger) { confirmReset = true }
+        }
+    }
+
+    confirmImport?.let { uri ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmImport = null },
+            title = { Text("Восстановить из копии?") },
+            text = { Text("Текущие серверы, подписки и настройки будут заменены. Отменить это нельзя — " +
+                "при сомнениях сначала сохраните текущую копию.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { vm.importBackup(uri); confirmImport = null }) {
+                    Text("Заменить", color = Danger)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirmImport = null }) { Text("Отмена") }
+            },
+        )
+    }
+    if (confirmReset) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmReset = false },
+            title = { Text("Сбросить все настройки?") },
+            text = { Text("Серверы и подписки останутся, всё остальное вернётся к значениям по умолчанию.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { vm.resetSettings(); confirmReset = false }) {
+                    Text("Сбросить", color = Danger)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirmReset = false }) { Text("Отмена") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun BackupActionButton(text: String, color: Color, onClick: () -> Unit) {
+    Text(text, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.clickableNoRipple(onClick).padding(vertical = 4.dp))
 }
 
 @Composable

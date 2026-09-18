@@ -247,6 +247,48 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun delete(server: ServerProfile) = viewModelScope.launch { repo.delete(server) }
     fun clearLogs() = VpnState.clearLogs()
 
+    // ----- Фаза 6d: резервная копия и сброс -----
+
+    private val _backupMessage = MutableStateFlow<String?>(null)
+    /** Результат последней операции с копией — показывается на экране, пока не сброшен. */
+    val backupMessage = _backupMessage.asStateFlow()
+    fun dismissBackupMessage() { _backupMessage.value = null }
+
+    fun exportBackup(uri: android.net.Uri) = viewModelScope.launch {
+        val app = getApplication<Application>()
+        _backupMessage.value = runCatching {
+            val text = ru.gidravpn.hydra.data.backup.BackupManager.export(app)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                app.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(text.toByteArray()) }
+            }
+            "Копия сохранена: ${servers.value.size} серв., все настройки"
+        }.getOrElse { "Не удалось сохранить: ${it.message ?: it.javaClass.simpleName}" }
+    }
+
+    fun importBackup(uri: android.net.Uri) = viewModelScope.launch {
+        if (state.value != ConnectionState.DISCONNECTED) {
+            _backupMessage.value = "Отключите VPN перед восстановлением — иначе туннель останется со старыми настройками"
+            return@launch
+        }
+        val app = getApplication<Application>()
+        _backupMessage.value = runCatching {
+            val text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                app.contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) }
+            }
+            val s = ru.gidravpn.hydra.data.backup.BackupManager.import(app, text)
+            _selectedId.value = vpnSettingsRepo.lastServerId.firstOrNull()
+            VpnState.log("Восстановлено из копии: ${s.servers} серв., ${s.subscriptions} подп., ${s.settings} настроек")
+            "Восстановлено: ${s.servers} серверов, ${s.subscriptions} подписок, ${s.settings} настроек"
+        }.getOrElse { "Не удалось восстановить: ${it.message ?: it.javaClass.simpleName}" }
+    }
+
+    fun resetSettings() = viewModelScope.launch {
+        ru.gidravpn.hydra.data.backup.BackupManager.resetSettings(getApplication())
+        LauncherIcon.reset(getApplication())
+        VpnState.log("Настройки сброшены к значениям по умолчанию")
+        _backupMessage.value = "Настройки сброшены. Серверы и подписки не тронуты."
+    }
+
     private val _measuringIds = MutableStateFlow<Set<Long>>(emptySet())
     val measuringIds: StateFlow<Set<Long>> = _measuringIds.asStateFlow()
 
