@@ -1,11 +1,8 @@
 package ru.gidravpn.hydra.data.repository
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
@@ -15,9 +12,6 @@ import ru.gidravpn.hydra.data.model.DnsProvider
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
 import ru.gidravpn.hydra.data.model.MtuPreset
 import ru.gidravpn.hydra.data.model.TlsFragmentMode
-
-/** Отдельный DataStore-файл — не пересекается с "settings"/"theme_settings"/"engine_settings"/"vpn_settings". */
-private val Context.routingStore: DataStore<Preferences> by preferencesDataStore(name = "routing_settings")
 
 /** Настройки Фазы 6c: DNS-резолвер и geoip/geosite-маршрутизация (SingBoxConfigBuilder). */
 class RoutingRepository(private val context: Context) {

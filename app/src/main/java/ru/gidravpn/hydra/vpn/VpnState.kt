@@ -43,7 +43,9 @@ object VpnState {
     fun log(msg: String) {
         val clean = stripAnsi(msg)
         android.util.Log.d("HydraCore", clean)
-        _logs.value = (_logs.value + line(clean)).takeLast(500)
+        val stamped = line(clean)
+        _logs.value = (_logs.value + stamped).takeLast(500)
+        ru.gidravpn.hydra.data.log.LogStore.append(stamped, ru.gidravpn.hydra.data.log.LogLevel.of(clean))
     }
 
     fun clearLogs() { _logs.value = listOf(line("Логи очищены")) }

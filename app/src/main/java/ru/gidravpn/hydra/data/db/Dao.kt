@@ -24,6 +24,12 @@ interface ServerDao {
 
     @Query("DELETE FROM servers WHERE subscriptionId = :subId")
     suspend fun deleteBySubscription(subId: Long)
+
+    @Query("SELECT * FROM servers ORDER BY id")
+    suspend fun getAll(): List<ServerProfile>
+
+    @Query("DELETE FROM servers")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -36,4 +42,13 @@ interface SubscriptionDao {
 
     @Delete
     suspend fun delete(sub: Subscription)
+
+    @Query("SELECT * FROM subscriptions ORDER BY id")
+    suspend fun getAll(): List<Subscription>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(subs: List<Subscription>)
+
+    @Query("DELETE FROM subscriptions")
+    suspend fun deleteAll()
 }

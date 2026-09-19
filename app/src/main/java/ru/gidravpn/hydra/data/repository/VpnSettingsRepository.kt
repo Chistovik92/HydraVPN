@@ -1,17 +1,11 @@
 package ru.gidravpn.hydra.data.repository
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-
-/** Отдельный DataStore-файл — не пересекается с "settings"/"theme_settings"/"engine_settings". */
-private val Context.vpnSettingsStore: DataStore<Preferences> by preferencesDataStore(name = "vpn_settings")
 
 /**
  * Настройки Фазы 6b («Безопасность соединения») и последний выбранный сервер —

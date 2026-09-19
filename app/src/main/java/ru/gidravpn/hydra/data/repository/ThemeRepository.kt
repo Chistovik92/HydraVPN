@@ -1,17 +1,11 @@
 package ru.gidravpn.hydra.data.repository
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import ru.gidravpn.hydra.ui.theme.ThemeMode
-
-/** Отдельный DataStore-файл — не пересекается с "settings" из SplitTunnelRepository. */
-private val Context.themeStore: DataStore<Preferences> by preferencesDataStore(name = "theme_settings")
 
 class ThemeRepository(private val context: Context) {
 
