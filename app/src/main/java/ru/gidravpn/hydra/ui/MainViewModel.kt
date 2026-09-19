@@ -127,18 +127,38 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val splitTunnel: StateFlow<SplitTunnel> = splitRepo.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SplitTunnel())
 
+    private var splitReapplyJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Настройки split tunneling читаются при подъёме туннеля. Если VPN уже включён,
+     * без перезапуска изменение выглядело как «не работает» — поэтому после серии
+     * правок (дебаунс 1,2 с) туннель перезапускается на текущем сервере.
+     */
+    private fun reapplySplitIfConnected() {
+        splitReapplyJob?.cancel()
+        splitReapplyJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(1200)
+            if (state.value != ConnectionState.CONNECTED) return@launch
+            val server = selectedServer.value ?: return@launch
+            VpnState.log("Split tunneling: настройки изменены — переподключение")
+            startTunnelWith(server)
+        }
+    }
+
     fun setSplitMode(mode: SplitTunnelMode) = viewModelScope.launch {
         splitRepo.setMode(mode)
         VpnState.log("Split tunneling: режим ${mode.name}")
+        reapplySplitIfConnected()
     }
 
     fun toggleSplitApp(pkg: String) = viewModelScope.launch {
         splitRepo.toggleApp(pkg)
+        reapplySplitIfConnected()
     }
 
-    fun setNetMode(mode: SplitTunnelMode) = viewModelScope.launch { splitRepo.setNetMode(mode) }
-    fun addNetRule(rule: NetworkRule) = viewModelScope.launch { splitRepo.addNetRule(rule) }
-    fun removeNetRule(rule: NetworkRule) = viewModelScope.launch { splitRepo.removeNetRule(rule) }
+    fun setNetMode(mode: SplitTunnelMode) = viewModelScope.launch { splitRepo.setNetMode(mode); reapplySplitIfConnected() }
+    fun addNetRule(rule: NetworkRule) = viewModelScope.launch { splitRepo.addNetRule(rule); reapplySplitIfConnected() }
+    fun removeNetRule(rule: NetworkRule) = viewModelScope.launch { splitRepo.removeNetRule(rule); reapplySplitIfConnected() }
 
     val state = VpnState.state
     val logs = VpnState.logs

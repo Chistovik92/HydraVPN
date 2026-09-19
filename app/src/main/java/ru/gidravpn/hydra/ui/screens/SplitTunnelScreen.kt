@@ -135,7 +135,7 @@ private fun AppsSection(vm: MainViewModel, split: SplitTunnel) {
             Text(stringResource(R.string.split_apps_off_hint),
                 color = TextMuted, fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
-            Text(stringResource(R.string.apply_next_connect), color = TextMuted, fontSize = 11.sp)
+            Text(stringResource(R.string.split_apply_live), color = TextMuted, fontSize = 11.sp)
         }
     }
 }
@@ -212,7 +212,7 @@ private fun NetRulesSection(vm: MainViewModel, split: SplitTunnel) {
             Text(stringResource(R.string.split_net_off_hint),
                 color = TextMuted, fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
-            Text(stringResource(R.string.apply_next_connect), color = TextMuted, fontSize = 11.sp)
+            Text(stringResource(R.string.split_apply_live), color = TextMuted, fontSize = 11.sp)
         }
     }
 }

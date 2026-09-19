@@ -238,4 +238,5 @@
     <string name="notif_action_disconnect">Disconnect</string>
     <string name="notif_action_servers">Servers</string>
     <string name="notif_conn_dropped">Connection dropped</string>
+    <string name="split_apply_live">If the VPN is on, it reconnects automatically a moment after each change.</string>
 </resources>
