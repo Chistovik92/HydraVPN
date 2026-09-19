@@ -120,69 +120,74 @@ private fun SettingsSubScreen(onBack: () -> Unit, content: @Composable () -> Uni
 
 @Composable
 private fun TunnelInfoContent(vm: MainViewModel) {
+    val t by vm.engineToggles.collectAsState()
+    val xrayBuilt = ru.gidravpn.hydra.BuildConfig.XRAY_AVAILABLE
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.set_tunnel), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Text(stringResource(R.string.eng_intro), color = TextMuted, fontSize = 12.sp)
 
-        XrayEngineToggle(vm)
+        EngineCard(stringResource(R.string.eng_singbox), stringResource(R.string.eng_singbox_desc), AccentViolet,
+            checked = t.singBox) { vm.setEngineEnabled(ru.gidravpn.hydra.data.model.EngineToggles.Kind.SINGBOX, it) }
 
-        InfoGroup("SSTP / L2TP (userspace PPP)", AccentCyan) {
-            Text(stringResource(R.string.tunnel_sstp_l2tp),
-                color = TextMuted, fontSize = 12.sp)
+        EngineCard(stringResource(R.string.eng_xray), stringResource(if (xrayBuilt) R.string.eng_xray_desc else R.string.xray_toggle_missing),
+            AccentIndigo, checked = t.xray && xrayBuilt, enabled = xrayBuilt, beta = true) { vm.setEngineEnabled(ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY, it) }
+        if (xrayBuilt && t.xray) {
+            Card(Modifier.fillMaxWidth().padding(start = 16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.eng_prefer_xray), color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.eng_prefer_xray_desc), color = TextMuted, fontSize = 11.sp)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(checked = t.preferXray, onCheckedChange = { vm.setPreferXray(it) },
+                        colors = SwitchDefaults.colors(checkedTrackColor = AccentCyan))
+                }
+            }
         }
+
+        EngineCard(stringResource(R.string.eng_awg), stringResource(R.string.eng_awg_desc), Success,
+            checked = t.amneziaWg) { vm.setEngineEnabled(ru.gidravpn.hydra.data.model.EngineToggles.Kind.AWG, it) }
+        EngineCard(stringResource(R.string.eng_ppp), stringResource(R.string.eng_ppp_desc), AccentCyan,
+            checked = t.ppp) { vm.setEngineEnabled(ru.gidravpn.hydra.data.model.EngineToggles.Kind.PPP, it) }
+        EngineCard(stringResource(R.string.eng_olcrtc), stringResource(R.string.eng_olcrtc_desc), AccentViolet,
+            checked = t.olcRtc, beta = true) { vm.setEngineEnabled(ru.gidravpn.hydra.data.model.EngineToggles.Kind.OLCRTC, it) }
+        EngineCard(stringResource(R.string.eng_openflux), stringResource(R.string.eng_openflux_desc), AccentViolet,
+            checked = t.openFlux, beta = true) { vm.setEngineEnabled(ru.gidravpn.hydra.data.model.EngineToggles.Kind.OPENFLUX, it) }
+
         InfoGroup("PPTP", Danger) {
-            Text(stringResource(R.string.tunnel_pptp),
-                color = TextMuted, fontSize = 12.sp)
-        }
-        InfoGroup("Xray Core", AccentIndigo) {
-            Text(stringResource(R.string.tunnel_xray),
-                color = TextMuted, fontSize = 12.sp)
-        }
-        InfoGroup("sing-box", AccentViolet) {
-            Text(stringResource(R.string.tunnel_singbox),
-                color = TextMuted, fontSize = 12.sp)
-        }
-        InfoGroup("WireGuard / AmneziaWG", Success) {
-            Text(stringResource(R.string.tunnel_wg),
-                color = TextMuted, fontSize = 12.sp)
-        }
-        InfoGroup("WDTT / olcRTC (BETA)", AccentViolet) {
-            Text(stringResource(R.string.tunnel_beta),
-                color = TextMuted, fontSize = 12.sp)
+            Text(stringResource(R.string.tunnel_pptp), color = TextMuted, fontSize = 12.sp)
         }
     }
 }
 
+/** Карточка ядра с тумблером (0.6.22). */
 @Composable
-private fun XrayEngineToggle(vm: MainViewModel) {
-    val available = ru.gidravpn.hydra.BuildConfig.XRAY_AVAILABLE
-    val preferXray by vm.preferXray.collectAsState()
-    Card(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+private fun EngineCard(
+    title: String,
+    description: String,
+    accent: Color,
+    checked: Boolean,
+    enabled: Boolean = true,
+    beta: Boolean = false,
+    onChange: (Boolean) -> Unit,
+) {
+    Card(Modifier.fillMaxWidth(), borderColor = if (checked) accent.copy(alpha = 0.5f) else Border) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.xray_toggle_title), color = TextPrimary,
-                        fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.width(6.dp))
-                    ru.gidravpn.hydra.ui.components.BetaBadge()
+                    Text(title, color = if (checked) accent else TextSecondary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    if (beta) {
+                        Spacer(Modifier.width(6.dp))
+                        ru.gidravpn.hydra.ui.components.BetaBadge()
+                    }
                 }
-                Text(
-                    if (available) stringResource(R.string.xray_toggle_desc)
-                    else stringResource(R.string.xray_toggle_missing),
-                    color = TextMuted, fontSize = 11.sp
-                )
+                Spacer(Modifier.height(4.dp))
+                Text(description, color = TextMuted, fontSize = 11.sp, lineHeight = 15.sp)
             }
             Spacer(Modifier.width(12.dp))
-            Switch(
-                checked = preferXray && available,
-                onCheckedChange = { vm.setPreferXray(it) },
-                enabled = available,
-                colors = SwitchDefaults.colors(checkedTrackColor = AccentCyan)
-            )
+            Switch(checked = checked, onCheckedChange = onChange, enabled = enabled,
+                colors = SwitchDefaults.colors(checkedTrackColor = accent))
         }
     }
 }

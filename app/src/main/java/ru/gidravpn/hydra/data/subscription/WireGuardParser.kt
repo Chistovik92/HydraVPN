@@ -86,20 +86,11 @@ object WireGuardParser {
         peer["persistentkeepalive"]?.let { extra.put("keepalive", it) }
 
         // --- Обфускация AmneziaWG ---
-        var hasAwg = false
-        val awgParams = listOf(
-            "jc", "jmin", "jmax", "s1", "s2", "s3", "s4", "h1", "h2", "h3", "h4",
-            "i1", "i2", "i3", "i4", "i5"
-        )
-        awgParams.forEach { k ->
-            iface[k]?.let { extra.put(k, it); hasAwg = true }
-        }
-        // Версия: 2.0 определяется по маркерам I1–I5, иначе 1.x
-        val version = when {
-            !hasAwg -> "plain"
-            iface.keys.any { it in listOf("i1", "i2", "i3", "i4", "i5") } -> "2.0"
-            else -> "1.0"
-        }
+        // Все поколения 1.0 – 3.x (AwgParams).
+        val found = AwgParams.ALL.mapNotNull { p -> iface[p.conf]?.let { p.conf to it } }.toMap()
+        found.forEach { (k, v) -> extra.put(k, v) }
+        val hasAwg = found.isNotEmpty()
+        val version = AwgParams.version(found)
         extra.put("awg_version", version)
 
         val meta = mapOf(

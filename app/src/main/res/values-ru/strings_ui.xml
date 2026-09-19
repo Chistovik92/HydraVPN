@@ -134,7 +134,6 @@
     <!-- Settings hub -->
     <string name="set_back">← Настройки</string>
     <string name="set_tunnel">Туннель</string>
-    <string name="set_tunnel_sub">Протоколы и движки</string>
     <string name="set_security">Безопасность</string>
     <string name="set_security_sub">Kill Switch, автоподключение</string>
     <string name="set_routing">Маршрутизация</string>
@@ -274,5 +273,22 @@
     <string name="sub_delete_msg">Подписка «%1$s» и её серверы (%2$d) будут удалены.</string>
     <string name="sub_refreshed">«%1$s» обновлена: серверов %2$d, добавлено %3$d, удалено %4$d</string>
     <string name="profile_hwid">Аппаратный ID (HWID)</string>
-    <string name="profile_hwid_hint">Передаётся панелям подписок заголовком x-hwid, как у Happ и INCY. Панели с лимитом устройств по нему учитывают этот телефон.</string>
+    <string name="eng_intro">По умолчанию включены все ядра. Выключенное ядро не поднимает туннель, а его серверы помечаются в списке «Серверы».</string>
+    <string name="eng_singbox">sing-box</string>
+    <string name="eng_singbox_desc">VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5, WireGuard. Внутри продолжает работать мостом к TUN для Xray, olcRTC и OpenFlux, даже если выключен.</string>
+    <string name="eng_xray">Xray Core</string>
+    <string name="eng_xray_desc">VLESS, VMess, Trojan, Shadowsocks с XTLS Vision / REALITY, в отдельном процессе. Обслуживает эти протоколы, если выбран ниже или если sing-box выключен.</string>
+    <string name="eng_prefer_xray">Использовать Xray вместо sing-box</string>
+    <string name="eng_prefer_xray_desc">Для VLESS / VMess / Trojan / SS.</string>
+    <string name="eng_awg">AmneziaWG 1.0 – 3.1</string>
+    <string name="eng_awg_desc">Обфусцированный WireGuard, все поколения протокола: 1.0 (Jc/Jmin/Jmax, S1/S2, H1–H4), 1.5 (I1–I5), 2.0 (S3/S4, диапазоны заголовков) и 3.x (ключ защиты заголовков, дополнение содержимого, случайные хвосты, таймеры). Ядро: amneziawg-go 3.1.</string>
+    <string name="eng_ppp">SSTP / L2TP</string>
+    <string name="eng_ppp_desc">Собственный PPP-стек на Kotlin (LCP, MS-CHAPv2, IPCP): SSTP поверх TLS с crypto-binding, L2TP по UDP без IPsec.</string>
+    <string name="eng_olcrtc">olcRTC</string>
+    <string name="eng_olcrtc_desc">TCP поверх WebRTC через сервисы видеозвонков (Jitsi, Телемост, WB Stream). Нужен свой сервер olcrtc.</string>
+    <string name="eng_openflux">OpenFlux</string>
+    <string name="eng_openflux_desc">TCP-туннель через сервисы документов и мессенджеров (Яндекс, MAX, Mail.ru, Cups). Нужен свой узел выхода.</string>
+    <string name="srv_engine_off">ядро выключено</string>
+    <string name="profile_hwid_hint">Передаётся панелям подписок заголовком x-hwid. Панели с лимитом устройств по нему учитывают этот телефон.</string>
+    <string name="set_tunnel_sub">Ядра: включить / выключить</string>
 </resources>

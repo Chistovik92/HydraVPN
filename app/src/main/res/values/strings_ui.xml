@@ -135,7 +135,7 @@
     <!-- Settings hub -->
     <string name="set_back">← Settings</string>
     <string name="set_tunnel">Tunnel</string>
-    <string name="set_tunnel_sub">Protocols and engines</string>
+    <string name="set_tunnel_sub">Cores: turn on / off</string>
     <string name="set_security">Security</string>
     <string name="set_security_sub">Kill Switch, auto-connect</string>
     <string name="set_routing">Routing</string>
@@ -275,5 +275,21 @@
     <string name="sub_delete_msg">Subscription \"%1$s\" and its %2$d server(s) will be deleted.</string>
     <string name="sub_refreshed">\"%1$s\" updated: %2$d server(s), added %3$d, removed %4$d</string>
     <string name="profile_hwid">Hardware ID (HWID)</string>
-    <string name="profile_hwid_hint">Sent to subscription panels as x-hwid, like Happ and INCY do. Panels with a device limit use it to count this phone.</string>
+    <string name="profile_hwid_hint">Sent to subscription panels as x-hwid. Panels with a device limit use it to count this phone.</string>
+    <string name="eng_intro">Every core is on by default. A turned-off core does not start the tunnel; its servers are marked in the Servers list.</string>
+    <string name="eng_singbox">sing-box</string>
+    <string name="eng_singbox_desc">VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5, WireGuard. Stays running inside as the TUN bridge for Xray, olcRTC and OpenFlux even when off.</string>
+    <string name="eng_xray">Xray Core</string>
+    <string name="eng_xray_desc">VLESS, VMess, Trojan, Shadowsocks with XTLS Vision / REALITY, in a separate process. Used for these protocols when preferred below or when sing-box is off.</string>
+    <string name="eng_prefer_xray">Use Xray instead of sing-box</string>
+    <string name="eng_prefer_xray_desc">For VLESS / VMess / Trojan / SS.</string>
+    <string name="eng_awg">AmneziaWG 1.0 â 3.1</string>
+    <string name="eng_awg_desc">Obfuscated WireGuard, all protocol generations: 1.0 (Jc/Jmin/Jmax, S1/S2, H1âH4), 1.5 (I1âI5), 2.0 (S3/S4, header ranges) and 3.x (header protection key, content padding, random trailers, timers). Core: amneziawg-go 3.1.</string>
+    <string name="eng_ppp">SSTP / L2TP</string>
+    <string name="eng_ppp_desc">Our own PPP stack in Kotlin (LCP, MS-CHAPv2, IPCP): SSTP over TLS with crypto-binding, L2TP over UDP without IPsec.</string>
+    <string name="eng_olcrtc">olcRTC</string>
+    <string name="eng_olcrtc_desc">TCP over WebRTC through video-call services (Jitsi, Telemost, WB Stream). Needs your own olcrtc server.</string>
+    <string name="eng_openflux">OpenFlux</string>
+    <string name="eng_openflux_desc">TCP tunnel through document and messenger services (Yandex, MAX, Mail.ru, Cups). Needs your own exit node.</string>
+    <string name="srv_engine_off">core is off</string>
 </resources>

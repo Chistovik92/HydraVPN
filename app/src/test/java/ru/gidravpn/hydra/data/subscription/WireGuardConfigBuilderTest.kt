@@ -41,4 +41,34 @@ class WireGuardConfigBuilderTest {
         assertEquals(1280, WireGuardConfigBuilder.mtu(p))
         assertEquals(1380, WireGuardConfigBuilder.mtu(awg()))
     }
+
+    @Test fun awg3ParamsGoToUapiConverted() {
+        val u = WireGuardConfigBuilder.buildUapi(awg(JSONObject()
+            .put("jc", "4").put("s3", "10").put("h1", "100-200").put("i1", "<b 0xf6ab>")
+            .put("headerprotectionkey", key).put("contentpaddingaddition", "16")
+            .put("randomtrailers", "on").put("disablecookies", "off").put("maxhandshakeattempts", "5")))
+        val lines = u.lines()
+        val firstPeer = lines.indexOfFirst { it.startsWith("public_key=") }
+        listOf("jc=4", "s3=10", "h1=100-200", "i1=<b 0xf6ab>", "header_protection_key=" + "0".repeat(64),
+            "content_padding_addition=16", "random_trailers=1", "disable_cookies=0", "max_handshake_attempts=5",
+        ).forEach {
+            val i = lines.indexOf(it)
+            assertTrue("$it нет в:\n$u", i >= 0)
+            assertTrue("$it должен идти до public_key", i < firstPeer)
+        }
+    }
+
+    @Test fun awgVersionDetection() {
+        assertEquals("plain", AwgParams.version(emptyMap()))
+        assertEquals("1.0", AwgParams.version(mapOf("jc" to "4", "h1" to "123")))
+        assertEquals("1.5", AwgParams.version(mapOf("jc" to "4", "i1" to "<b 0x1>")))
+        assertEquals("2.0", AwgParams.version(mapOf("jc" to "4", "s3" to "1")))
+        assertEquals("2.0", AwgParams.version(mapOf("h1" to "100-200")))
+        assertEquals("3.x", AwgParams.version(mapOf("jc" to "4", "randomtrailers" to "on")))
+    }
+
+    @Test fun awgConfKeepsAllGenerations() {
+        val conf = WireGuardConfigBuilder.buildConf(awg(JSONObject().put("s4", "7").put("headerprotectionkey", key)))
+        assertTrue(conf, "S4 = 7" in conf && "HeaderProtectionKey = $key" in conf)
+    }
 }

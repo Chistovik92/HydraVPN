@@ -71,6 +71,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setPreferXray(enabled: Boolean) = viewModelScope.launch { engineRepo.setPreferXray(enabled) }
 
+    /** Тумблеры ядер (0.6.22), по умолчанию все включены. */
+    val engineToggles: StateFlow<ru.gidravpn.hydra.data.model.EngineToggles> = engineRepo.toggles
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ru.gidravpn.hydra.data.model.EngineToggles())
+
+    fun setEngineEnabled(kind: ru.gidravpn.hydra.data.model.EngineToggles.Kind, enabled: Boolean) =
+        viewModelScope.launch { engineRepo.setEnabled(kind, enabled) }
+
     // ----- Фаза 6b: безопасность соединения -----
 
     val killSwitch: StateFlow<Boolean> = vpnSettingsRepo.killSwitch

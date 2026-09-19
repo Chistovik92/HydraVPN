@@ -173,6 +173,13 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             lastServerId = profile.id
             VpnState.log((if (reconnecting) "Переподключение к " else "Подключение к ") + "${profile.address}…")
 
+            // Тумблеры ядер (0.6.22): выключенное ядро не поднимает туннель — проверяем ДО establish(),
+            // чтобы не открывать tun впустую.
+            val toggles = ru.gidravpn.hydra.data.repository.EngineRepository(applicationContext).toggles.firstOrNull()
+                ?: ru.gidravpn.hydra.data.model.EngineToggles()
+            if (toggles.isDisabled(profile.protocol, ru.gidravpn.hydra.BuildConfig.XRAY_AVAILABLE)) {
+                throw IllegalStateException("ядро для ${profile.protocol?.displayName} выключено (Настройки → Туннель)")
+            }
             newTun = establishTun(profile)
             newTunFd = newTun.fd // снимаем ДО openTun()/detachFd() внутри vpnCore.start()
             if (reconnecting && (oldTun != null || oldTunFd >= 0)) {

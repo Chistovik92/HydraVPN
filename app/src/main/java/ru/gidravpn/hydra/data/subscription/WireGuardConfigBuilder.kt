@@ -13,9 +13,6 @@ import ru.gidravpn.hydra.data.model.ServerProfile
  */
 object WireGuardConfigBuilder {
 
-    // s3/s4 — 2.0 (проверено по device/uapi.go amneziawg-go v3.1.x)
-    private val AWG_V1_PARAMS = listOf("jc", "jmin", "jmax", "s1", "s2", "s3", "s4", "h1", "h2", "h3", "h4")
-    private val AWG_V2_PARAMS = listOf("i1", "i2", "i3", "i4", "i5")
 
     /** Полный .conf (для amneziawg-go tun-режима). */
     fun buildConf(p: ServerProfile): String = buildString {
@@ -28,8 +25,8 @@ object WireGuardConfigBuilder {
 
         // Обфускация AmneziaWG (только для awg-профиля)
         if (p.protocol == Protocol.AMNEZIAWG) {
-            (AWG_V1_PARAMS + AWG_V2_PARAMS).forEach { k ->
-                extra.optString(k).takeIf { it.isNotBlank() }?.let { appendLine("${k.uppercase()} = $it") }
+            AwgParams.ALL.forEach { prm ->
+                extra.optString(prm.conf).takeIf { it.isNotBlank() }?.let { appendLine("${prm.confName} = $it") }
             }
         }
 
@@ -56,8 +53,14 @@ object WireGuardConfigBuilder {
             // иначе amneziawg-go отвергает их как «unknown key». Раньше они уходили после пира с
             // префиксом awg_ — такого ключа в uapi нет.
             if (p.protocol == Protocol.AMNEZIAWG) {
-                (AWG_V1_PARAMS + AWG_V2_PARAMS).forEach { k ->
-                    extra.optString(k).takeIf { it.isNotBlank() }?.let { appendLine("$k=$it") }
+                AwgParams.ALL.forEach { prm ->
+                    val v = extra.optString(prm.conf).takeIf { it.isNotBlank() } ?: return@forEach
+                    val out = when (prm.kind) {
+                        AwgParams.Kind.NUMBER -> v
+                        AwgParams.Kind.KEY_B64 -> b64ToHex(v)
+                        AwgParams.Kind.BOOL -> AwgParams.uapiBool(v)
+                    }
+                    appendLine("${prm.uapi}=$out")
                 }
             }
             appendLine("replace_peers=true")

@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import ru.gidravpn.hydra.AppCtx
 import ru.gidravpn.hydra.BuildConfig
 import ru.gidravpn.hydra.data.model.Engine
+import ru.gidravpn.hydra.data.model.EngineToggles
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.repository.EngineRepository
@@ -31,7 +32,9 @@ class NativeCoreFactory : CoreFactory {
             Protocol.OPENFLUX -> OpenFluxCore()
             else -> when {
                 proto?.engine == Engine.AWG -> AmneziaWgCore()
-                proto in XRAY_CAPABLE && BuildConfig.XRAY_AVAILABLE && preferXray() -> XrayCore()
+                // Тумблеры ядер (0.6.22): Xray берёт VLESS/VMess/Trojan/SS, если он предпочтён или
+                // sing-box выключен. Что ядро вообще разрешено, HydraVpnService проверяет до фабрики.
+                toggles().engineFor(proto, BuildConfig.XRAY_AVAILABLE) == EngineToggles.Kind.XRAY -> XrayCore()
                 else -> SingBoxCore()
             }
         }
@@ -44,14 +47,9 @@ class NativeCoreFactory : CoreFactory {
      * `libXray.aar`, тихо откатываемся на sing-box вместо падения в
      * `NotImplementedError` заглушки XrayCore.
      */
-    private fun preferXray(): Boolean = AppCtx.appContext?.let { ctx ->
-        runBlocking { EngineRepository(ctx).preferXray.firstOrNull() }
-    } == true
-
-    private companion object {
-        /** Ровно то, что умеет [XrayConfigBuilder.outboundFor] — не Hysteria2/TUIC/WireGuard. */
-        val XRAY_CAPABLE = setOf(Protocol.VLESS, Protocol.VMESS, Protocol.TROJAN, Protocol.SHADOWSOCKS)
-    }
+    private fun toggles(): EngineToggles = AppCtx.appContext?.let { ctx ->
+        runBlocking { EngineRepository(ctx).toggles.firstOrNull() }
+    } ?: EngineToggles()
 }
 
 /** Провайдер фабрики для native-сборки. */
