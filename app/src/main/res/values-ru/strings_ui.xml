@@ -237,5 +237,5 @@
     <string name="notif_action_disconnect">Отключить</string>
     <string name="notif_action_servers">Серверы</string>
     <string name="notif_conn_dropped">Соединение разорвано</string>
-    <string name="split_apply_live">ÐÑÐ»Ð¸ VPN Ð²ÐºÐ»ÑÑÑÐ½, Ð¾Ð½ Ð¿ÐµÑÐµÐ¿Ð¾Ð´ÐºÐ»ÑÑÐ¸ÑÑÑ ÑÐ°Ð¼ ÑÐµÑÐµÐ· ÑÐµÐºÑÐ½Ð´Ñ Ð¿Ð¾ÑÐ»Ðµ Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹.</string>
+    <string name="split_apply_live">Если VPN включён, он переподключится сам через секунду после изменений.</string>
 </resources>
