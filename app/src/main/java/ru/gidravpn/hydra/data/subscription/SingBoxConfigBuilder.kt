@@ -2,6 +2,7 @@ package ru.gidravpn.hydra.data.subscription
 
 import ru.gidravpn.hydra.data.model.DnsEndpoint
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
+import ru.gidravpn.hydra.data.model.HotspotSettings
 import ru.gidravpn.hydra.data.model.MtuPreset
 import ru.gidravpn.hydra.data.model.TlsFragmentMode
 import ru.gidravpn.hydra.data.model.Protocol
@@ -38,7 +39,8 @@ object SingBoxConfigBuilder {
         geoRouting: GeoRouting? = null,
         mtu: Int = MtuPreset.AUTO.value,
         tlsFragment: TlsFragmentMode = TlsFragmentMode.OFF,
-    ): JSONObject = baseConfig(outboundFor(profile, tlsFragment), splitTunnel, dns, geoRouting, mtu)
+        hotspot: HotspotSettings? = null,
+    ): JSONObject = baseConfig(outboundFor(profile, tlsFragment), splitTunnel, dns, geoRouting, mtu, hotspot)
 
     /**
      * Мост Xray → tun (см. `XrayCore` в native-flavor): Xray сам tun не
@@ -52,10 +54,11 @@ object SingBoxConfigBuilder {
         dns: DnsEndpoint? = DnsEndpoint.doh("1.1.1.1"),
         geoRouting: GeoRouting? = null,
         mtu: Int = MtuPreset.AUTO.value,
+        hotspot: HotspotSettings? = null,
     ): JSONObject {
         val outbound = JSONObject().put("type", "socks").put("tag", "proxy")
             .put("server", "127.0.0.1").put("server_port", socksPort)
-        return baseConfig(outbound, splitTunnel, dns, geoRouting, mtu)
+        return baseConfig(outbound, splitTunnel, dns, geoRouting, mtu, hotspot)
     }
 
     private fun baseConfig(
@@ -64,6 +67,7 @@ object SingBoxConfigBuilder {
         dns: DnsEndpoint?,
         geoRouting: GeoRouting?,
         mtu: Int,
+        hotspot: HotspotSettings?,
     ): JSONObject {
         val root = JSONObject()
 
@@ -106,16 +110,31 @@ object SingBoxConfigBuilder {
 
         // inbound: tun (пакеты берёт наш VpnService через файловый дескриптор;
         // auto_route/strict_route выключены — маршрутизацией владеет VpnService.Builder)
-        root.put("inbounds", JSONArray().put(JSONObject().apply {
-            put("type", "tun")
-            put("tag", "tun-in")
-            put("interface_name", "hydra-tun")
-            put("mtu", mtu)
-            put("address", JSONArray().put("172.19.0.1/28"))
-            put("auto_route", false)
-            put("strict_route", false)
-            put("stack", "gvisor")
-        }))
+        root.put("inbounds", JSONArray().apply {
+            put(JSONObject().apply {
+                put("type", "tun")
+                put("tag", "tun-in")
+                put("interface_name", "hydra-tun")
+                put("mtu", mtu)
+                put("address", JSONArray().put("172.19.0.1/28"))
+                put("auto_route", false)
+                put("strict_route", false)
+                put("stack", "gvisor")
+            })
+            // Хотспот-прокси (6f): SOCKS+HTTP на всех интерфейсах, только с логином/
+            // паролем. Идёт через те же route.rules, что и tun: sniff, DNS, split, geo.
+            if (hotspot != null && hotspot.isUsable) {
+                put(JSONObject().apply {
+                    put("type", "mixed")
+                    put("tag", "hotspot-in")
+                    put("listen", "0.0.0.0")
+                    put("listen_port", hotspot.port)
+                    put("users", JSONArray().put(
+                        JSONObject().put("username", hotspot.username).put("password", hotspot.password)
+                    ))
+                })
+            }
+        })
 
         // outbounds: proxy + direct. Спецаутбаунды dns/block (устарели в 1.11,
         // удаляются в 1.13) заменены rule actions — см. sniff/hijack-dns ниже.
@@ -173,6 +192,11 @@ object SingBoxConfigBuilder {
                 else -> "proxy"
             })
             put("auto_detect_interface", true)
+            // Домен самого прокси-сервера резолвим платформенным резолвером, мимо
+            // туннеля и мимо dns.final ("remote" идёт через этот же прокси —
+            // резолвить его адрес через него самого = замкнутый круг). Без этого
+            // поля sing-box 1.12 предупреждает, а в 1.14 откажется стартовать.
+            put("default_domain_resolver", "local")
         })
 
         return root

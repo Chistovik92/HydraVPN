@@ -55,7 +55,7 @@ class SingBoxCore : VpnCore {
         val opts = resolveRouting(ctx)
         val config = SingBoxConfigBuilder.build(
             profile, splitTunnel = split, dns = opts.dns, geoRouting = opts.geoRouting,
-            mtu = opts.mtu, tlsFragment = opts.tlsFragment,
+            mtu = opts.mtu, tlsFragment = opts.tlsFragment, hotspot = resolveHotspot(ctx),
         ).toString(2)
         onLog("sing-box: конфиг сгенерирован (${config.length} байт)")
         runConfig(tun, config, onLog, onStats)
@@ -109,6 +109,12 @@ internal data class RoutingOptions(
     val mtu: Int,
     val tlsFragment: TlsFragmentMode,
 )
+
+/** Хотспот-прокси (6f): null, если выключен или нет контекста. */
+internal fun resolveHotspot(ctx: android.content.Context?): ru.gidravpn.hydra.data.model.HotspotSettings? =
+    ctx?.let {
+        runBlocking { ru.gidravpn.hydra.data.repository.HotspotRepository(it).settings.firstOrNull() }
+    }?.takeIf { it.isUsable }
 
 internal fun resolveRouting(ctx: android.content.Context?): RoutingOptions {
     if (ctx == null) return RoutingOptions(DnsEndpoint.doh("1.1.1.1"), null, MtuPreset.AUTO.value, TlsFragmentMode.OFF)

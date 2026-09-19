@@ -202,4 +202,37 @@ class SingBoxConfigBuilderTest {
         assertEquals(10808, proxy.getInt("server_port"))
         assertEquals("sniff", cfg.rules().getJSONObject(0).getString("action"))
     }
+
+    @Test fun hotspotAddsAuthenticatedMixedInbound() {
+        val hs = ru.gidravpn.hydra.data.model.HotspotSettings(enabled = true, port = 2080, username = "hydra", password = "s3cretPw")
+        val cfg = dump("hotspot", SingBoxConfigBuilder.build(profile, hotspot = hs))
+        val inbounds = cfg.getJSONArray("inbounds").objects()
+        assertEquals(listOf("tun", "mixed"), inbounds.map { it.getString("type") })
+        val mixed = inbounds.last()
+        assertEquals("0.0.0.0", mixed.getString("listen"))
+        assertEquals(2080, mixed.getInt("listen_port"))
+        assertEquals("s3cretPw", mixed.getJSONArray("users").getJSONObject(0).getString("password"))
+    }
+
+    @Test fun hotspotWithoutPasswordOrDisabledIsIgnored() {
+        listOf(
+            ru.gidravpn.hydra.data.model.HotspotSettings(enabled = true, password = ""),
+            ru.gidravpn.hydra.data.model.HotspotSettings(enabled = true, password = "123"),
+            ru.gidravpn.hydra.data.model.HotspotSettings(enabled = false, password = "s3cretPw"),
+            ru.gidravpn.hydra.data.model.HotspotSettings(enabled = true, port = 80, password = "s3cretPw"),
+        ).forEach {
+            val cfg = SingBoxConfigBuilder.build(profile, hotspot = it)
+            assertEquals("открытый/невалидный прокси не должен попасть в конфиг: $it", 1, cfg.getJSONArray("inbounds").length())
+        }
+    }
+
+    @Test fun hotspotWorksThroughXrayBridge() {
+        val hs = ru.gidravpn.hydra.data.model.HotspotSettings(enabled = true, password = "s3cretPw")
+        val cfg = SingBoxConfigBuilder.buildXrayBridge(10808, hotspot = hs)
+        assertEquals(2, cfg.getJSONArray("inbounds").length())
+    }
+
+    @Test fun domainResolverForProxyServerIsLocal() {
+        assertEquals("local", SingBoxConfigBuilder.build(profile).getJSONObject("route").getString("default_domain_resolver"))
+    }
 }

@@ -89,6 +89,7 @@ class XrayCore : VpnCore {
         val split = runBlocking { SplitTunnelRepository(ctx).settings.firstOrNull() } ?: SplitTunnel()
         val bridgeConfig = SingBoxConfigBuilder.buildXrayBridge(
             socksPort, split, dns = opts.dns, geoRouting = opts.geoRouting, mtu = opts.mtu,
+            hotspot = resolveHotspot(ctx),
         ).toString(2)
         onLog("Xray: sing-box-мост, конфиг сгенерирован (${bridgeConfig.length} байт)")
 

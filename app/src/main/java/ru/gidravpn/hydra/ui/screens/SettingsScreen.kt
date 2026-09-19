@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import ru.gidravpn.hydra.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ru.gidravpn.hydra.ui.LauncherIconChoice
 import ru.gidravpn.hydra.ui.MainViewModel
 import ru.gidravpn.hydra.ui.components.Card
 import ru.gidravpn.hydra.ui.components.Label
@@ -37,7 +39,7 @@ import ru.gidravpn.hydra.ui.theme.*
 import ru.gidravpn.hydra.vpn.HydraQsTileService
 
 /** Подэкраны Настроек — Split и Логи переехали сюда из верхнего уровня навигации. */
-private enum class SettingsSection { HUB, TUNNEL, SECURITY, ROUTING, SPLIT, LOGS, THEME, BACKUP, ABOUT }
+private enum class SettingsSection { HUB, TUNNEL, SECURITY, ROUTING, SPLIT, HOTSPOT, LOGS, THEME, BACKUP, ABOUT }
 
 @Composable
 fun SettingsScreen(vm: MainViewModel) {
@@ -49,6 +51,7 @@ fun SettingsScreen(vm: MainViewModel) {
         SettingsSection.SECURITY -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { SecurityContent(vm) }
         SettingsSection.ROUTING -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { RoutingContent(vm) }
         SettingsSection.SPLIT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { SplitTunnelScreen(vm) }
+        SettingsSection.HOTSPOT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { HotspotContent(vm) }
         SettingsSection.LOGS -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { LogsScreen(vm) }
         SettingsSection.THEME -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { ThemeContent(vm) }
         SettingsSection.BACKUP -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { BackupContent(vm) }
@@ -68,8 +71,9 @@ private fun SettingsHub(onSelect: (SettingsSection) -> Unit) {
         HubRow("🛡️", "Безопасность", "Kill Switch, автоподключение", Danger) { onSelect(SettingsSection.SECURITY) }
         HubRow("🧭", "Маршрутизация", "DNS, GeoIP по странам, фрагментация, MTU", AccentIndigo) { onSelect(SettingsSection.ROUTING) }
         HubRow("🔀", "Split-туннелинг", "Приложения через VPN / мимо VPN", AccentCyan) { onSelect(SettingsSection.SPLIT) }
+        HubRow("📡", stringResource(R.string.hotspot_hub_title), stringResource(R.string.hotspot_hub_subtitle), AccentIndigo) { onSelect(SettingsSection.HOTSPOT) }
         HubRow("📋", "Логи", "Журнал подключения", TextSecondary) { onSelect(SettingsSection.LOGS) }
-        HubRow("🎨", "Тема", "Hydra Emerald / Monochrome Stealth", AccentCyan) { onSelect(SettingsSection.THEME) }
+        HubRow("🎨", stringResource(R.string.theme_title), "Ambient · Stealth · AMOLED · Material You", AccentCyan) { onSelect(SettingsSection.THEME) }
         HubRow("💾", "Резервная копия", "Сохранить / восстановить всё, сброс настроек", AccentViolet) { onSelect(SettingsSection.BACKUP) }
         HubRow("ℹ️", "О приложении", "Версия, лицензия", TextSecondary) { onSelect(SettingsSection.ABOUT) }
     }
@@ -508,39 +512,37 @@ private fun RoutingSaveButton(onClick: () -> Unit) {
 @Composable
 private fun ThemeContent(vm: MainViewModel) {
     val current by vm.themeMode.collectAsState()
-    val dynamicIcon by vm.dynamicLauncherIcon.collectAsState()
+    val iconChoice by vm.launcherIcon.collectAsState()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Тема", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Text(stringResource(R.string.theme_title), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
         ru.gidravpn.hydra.ui.theme.ThemeMode.entries.forEach { mode ->
-            ThemeOptionCard(mode, selected = mode == current) { vm.setThemeMode(mode) }
+            ThemeOptionCard(mode, selected = mode == current) {
+                if (mode.isSupported) vm.setThemeMode(mode)
+            }
         }
 
-        Card(Modifier.fillMaxWidth()) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Менять и ярлык на рабочем столе", color = TextPrimary,
-                        fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Иконка приложения будет соответствовать теме. Лаунчер при этом " +
-                            "пересоздаёт ярлык: он может на миг пропасть, уехать в конец " +
-                            "списка приложений, а вынесенные вручную ярлыки — слететь.",
-                        color = TextMuted, fontSize = 11.sp
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Switch(
-                    checked = dynamicIcon,
-                    onCheckedChange = { vm.setDynamicLauncherIcon(it) },
-                    colors = SwitchDefaults.colors(checkedTrackColor = AccentCyan)
-                )
-            }
+        Spacer(Modifier.height(8.dp))
+        Label(stringResource(R.string.icon_title))
+        Text(stringResource(R.string.icon_hint), color = TextMuted, fontSize = 11.sp)
+        Spacer(Modifier.height(4.dp))
+        LauncherIconChoice.entries.forEach { choice ->
+            RoutingOptionCard(
+                title = stringResource(
+                    when (choice) {
+                        LauncherIconChoice.FOLLOW_THEME -> R.string.icon_follow_theme
+                        LauncherIconChoice.AMBIENT -> R.string.icon_ambient
+                        LauncherIconChoice.STEALTH -> R.string.icon_stealth
+                        LauncherIconChoice.OCEAN -> R.string.icon_ocean
+                        LauncherIconChoice.AMBER -> R.string.icon_amber
+                    }
+                ),
+                subtitle = "",
+                selected = iconChoice == choice,
+                onClick = { vm.setLauncherIcon(choice) }
+            )
         }
     }
 }
@@ -557,7 +559,7 @@ private fun ThemeOptionCard(
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                // Живое превью иконки этой темы — та же, что уйдёт на рабочий стол.
+                // Живое превью герба этой темы.
                 Image(
                     painter = painterResource(
                         if (mode == ru.gidravpn.hydra.ui.theme.ThemeMode.STEALTH) R.drawable.ic_hydra_stealth
@@ -568,12 +570,127 @@ private fun ThemeOptionCard(
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(mode.label, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Text(mode.description, color = TextMuted, fontSize = 11.sp)
+                    Text(stringResource(mode.labelRes), color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        stringResource(if (mode.isSupported) mode.descriptionRes else R.string.theme_unsupported),
+                        color = TextMuted, fontSize = 11.sp
+                    )
                 }
             }
             if (selected) Text("✓", color = AccentCyan, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
+    }
+}
+
+/** Локальные IPv4-адреса устройства (Wi-Fi, точка доступа), без loopback и tun самого VPN. */
+private fun localAddresses(): List<Pair<String, String>> = runCatching {
+    java.net.NetworkInterface.getNetworkInterfaces().toList()
+        .filter { it.isUp && !it.isLoopback && !it.name.startsWith("tun") && !it.name.startsWith("hydra") }
+        .flatMap { ni ->
+            ni.inetAddresses.toList()
+                .filterIsInstance<java.net.Inet4Address>()
+                .map { ni.name to (it.hostAddress ?: "") }
+        }
+        .filter { it.second.isNotBlank() }
+}.getOrDefault(emptyList())
+
+@Composable
+private fun HotspotContent(vm: MainViewModel) {
+    val context = LocalContext.current
+    val hs by vm.hotspot.collectAsState()
+    var portText by remember(hs.port) { mutableStateOf(hs.port.toString()) }
+    var userText by remember(hs.username) { mutableStateOf(hs.username) }
+    var passText by remember(hs.password) { mutableStateOf(hs.password) }
+    var invalid by remember { mutableStateOf(false) }
+    val addresses = remember(hs.enabled) { localAddresses() }
+
+    val fieldColors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+        focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+        focusedBorderColor = AccentCyan, unfocusedBorderColor = Border,
+        focusedContainerColor = InputBg, unfocusedContainerColor = InputBg
+    )
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(stringResource(R.string.hotspot_title), fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold, color = TextPrimary)
+
+        SecurityToggleCard(
+            title = stringResource(R.string.hotspot_enable),
+            description = stringResource(R.string.hotspot_enable_desc),
+            checked = hs.enabled,
+            onCheckedChange = { vm.setHotspotEnabled(it) }
+        )
+
+        if (hs.enabled) {
+            androidx.compose.material3.OutlinedTextField(
+                value = portText, onValueChange = { portText = it.filter(Char::isDigit).take(5); invalid = false },
+                label = { Text(stringResource(R.string.hotspot_port), color = TextMuted, fontSize = 12.sp) },
+                singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth()
+            )
+            androidx.compose.material3.OutlinedTextField(
+                value = userText, onValueChange = { userText = it; invalid = false },
+                label = { Text(stringResource(R.string.hotspot_login), color = TextMuted, fontSize = 12.sp) },
+                singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth()
+            )
+            androidx.compose.material3.OutlinedTextField(
+                value = passText, onValueChange = { passText = it; invalid = false },
+                label = { Text(stringResource(R.string.hotspot_password), color = TextMuted, fontSize = 12.sp) },
+                singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth()
+            )
+            if (invalid) Text(stringResource(R.string.hotspot_invalid), color = Danger, fontSize = 11.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                RoutingSaveButton {
+                    val port = portText.toIntOrNull()
+                    if (port != null && port in ru.gidravpn.hydra.data.model.HotspotSettings.PORT_RANGE &&
+                        userText.isNotBlank() &&
+                        passText.length >= ru.gidravpn.hydra.data.model.HotspotSettings.MIN_PASSWORD
+                    ) {
+                        vm.setHotspotPort(port)
+                        vm.setHotspotCredentials(userText, passText)
+                    } else invalid = true
+                }
+                Box(
+                    Modifier.clip(RoundedCornerShape(12.dp)).background(CardBg)
+                        .border(1.dp, Border, RoundedCornerShape(12.dp))
+                        .clickableNoRipple { vm.regenerateHotspotPassword() }
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Text(stringResource(R.string.hotspot_regenerate), color = TextPrimary,
+                        fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+            Label(stringResource(R.string.hotspot_addresses))
+            if (addresses.isEmpty()) {
+                Text(stringResource(R.string.hotspot_no_address), color = TextMuted, fontSize = 12.sp)
+            } else {
+                val copiedMsg = stringResource(R.string.hotspot_copied)
+                addresses.forEach { (iface, ip) ->
+                    val socks = "socks5://${hs.username}:${hs.password}@$ip:${hs.port}"
+                    Card(Modifier.fillMaxWidth()) {
+                        Text("$iface · $ip:${hs.port}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text("SOCKS5 / HTTP", color = TextMuted, fontSize = 11.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            stringResource(R.string.hotspot_copy), color = AccentCyan, fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.clickableNoRipple {
+                                val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+                                cm?.setPrimaryClip(android.content.ClipData.newPlainText("proxy", socks))
+                                android.widget.Toast.makeText(context, copiedMsg, android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        Text(stringResource(R.string.hotspot_apply_note), color = TextMuted, fontSize = 11.sp)
+        Text(stringResource(R.string.hotspot_warning), color = Danger, fontSize = 11.sp)
     }
 }
 

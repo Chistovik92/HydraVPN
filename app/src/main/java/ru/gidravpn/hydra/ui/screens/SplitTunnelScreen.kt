@@ -80,6 +80,10 @@ private fun AppsSection(vm: MainViewModel, split: SplitTunnel) {
     }
 
     Text(split.summary, color = TextMuted, fontSize = 12.sp)
+    if (apps.isNotEmpty()) {
+        Text("Приложений в списке: ${apps.count { showSystem || !it.isSystem }}",
+            color = TextMuted, fontSize = 11.sp)
+    }
     Spacer(Modifier.height(16.dp))
 
     // Режим

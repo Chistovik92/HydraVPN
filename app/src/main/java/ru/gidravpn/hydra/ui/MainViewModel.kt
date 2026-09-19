@@ -40,21 +40,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val themeMode: StateFlow<ThemeMode> = themeRepo.mode
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.AMBIENT)
 
-    /** Менять ли ярлык на рабочем столе вместе с темой (по умолчанию — нет). */
-    val dynamicLauncherIcon: StateFlow<Boolean> = themeRepo.dynamicLauncherIcon
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    /** Выбранный ярлык рабочего стола: по умолчанию базовый, либо «следовать за темой», либо один из вариантов. */
+    val launcherIcon: StateFlow<LauncherIconChoice> = themeRepo.launcherIcon
+        .stateIn(viewModelScope, SharingStarted.Eagerly, LauncherIconChoice.AMBIENT)
 
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch {
         themeRepo.setMode(mode)
-        if (dynamicLauncherIcon.value) LauncherIcon.apply(getApplication(), mode)
+        // No-op, если ярлык не следует за темой и alias уже нужный.
+        LauncherIcon.apply(getApplication(), launcherIcon.value, mode)
     }
 
-    fun setDynamicLauncherIcon(enabled: Boolean) = viewModelScope.launch {
-        themeRepo.setDynamicLauncherIcon(enabled)
-        // Включили — сразу подгоняем ярлык под текущую тему; выключили — возвращаем базовый.
-        if (enabled) LauncherIcon.apply(getApplication(), themeMode.value)
-        else LauncherIcon.reset(getApplication())
+    fun setLauncherIcon(choice: LauncherIconChoice) = viewModelScope.launch {
+        themeRepo.setLauncherIcon(choice)
+        LauncherIcon.apply(getApplication(), choice, themeMode.value)
     }
+
+    // Хотспот-прокси (Фаза 6f)
+    private val hotspotRepo = ru.gidravpn.hydra.data.repository.HotspotRepository(app)
+    val hotspot: StateFlow<ru.gidravpn.hydra.data.model.HotspotSettings> = hotspotRepo.settings
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ru.gidravpn.hydra.data.model.HotspotSettings())
+    fun setHotspotEnabled(enabled: Boolean) = viewModelScope.launch { hotspotRepo.setEnabled(enabled) }
+    fun setHotspotPort(port: Int) = viewModelScope.launch { hotspotRepo.setPort(port) }
+    fun setHotspotCredentials(user: String, password: String) =
+        viewModelScope.launch { hotspotRepo.setCredentials(user, password) }
+    fun regenerateHotspotPassword() = viewModelScope.launch { hotspotRepo.regeneratePassword() }
 
     /** Xray Core вместо sing-box для VLESS/VMess/Trojan/SS (см. NativeCoreFactory). */
     val preferXray: StateFlow<Boolean> = engineRepo.preferXray
@@ -316,6 +325,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             val s = ru.gidravpn.hydra.data.backup.BackupManager.import(app, text)
             _selectedId.value = vpnSettingsRepo.lastServerId.firstOrNull()
+            LauncherIcon.apply(getApplication(), themeRepo.launcherIcon.first(), themeRepo.mode.first())
             VpnState.log("Восстановлено из копии: ${s.servers} серв., ${s.subscriptions} подп., ${s.settings} настроек")
             "Восстановлено: ${s.servers} серверов, ${s.subscriptions} подписок, ${s.settings} настроек"
         }.getOrElse { "Не удалось восстановить: ${it.message ?: it.javaClass.simpleName}" }
@@ -323,7 +333,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun resetSettings() = viewModelScope.launch {
         ru.gidravpn.hydra.data.backup.BackupManager.resetSettings(getApplication())
-        LauncherIcon.reset(getApplication())
+        LauncherIcon.apply(getApplication(), LauncherIconChoice.AMBIENT, ThemeMode.AMBIENT)
         VpnState.log("Настройки сброшены к значениям по умолчанию")
         _backupMessage.value = "Настройки сброшены. Серверы и подписки не тронуты."
     }

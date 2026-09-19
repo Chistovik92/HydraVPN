@@ -95,3 +95,15 @@ val AccentViolet: Color @Composable get() = LocalHydraPalette.current.betaAccent
 
 val Success: Color @Composable get() = LocalHydraPalette.current.success
 val Danger: Color @Composable get() = LocalHydraPalette.current.danger
+
+/**
+ * AMOLED — тот же изумрудный акцент, но фон и поверхности чисто чёрные: на OLED
+ * такие пиксели физически выключены (экономия батареи, максимальный контраст).
+ */
+val AmoledPalette = AmbientPalette.copy(
+    bg = Color(0xFF000000),
+    surface = Color(0xFF000000),
+    surfaceDim = Color(0xCC000000),
+    cardBg = Color(0x660A0F11),
+    inputBg = Color(0xFF000000),
+)

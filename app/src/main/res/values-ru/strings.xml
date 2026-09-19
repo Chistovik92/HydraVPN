@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hydra</string>
+    <string name="tagline">Мультипротокольный VPN-клиент</string>
+    <string name="vpn_notification_channel">Статус VPN</string>
+    <string name="connected">Подключено</string>
+    <string name="disconnected">Отключено</string>
+    <string name="connecting">Подключение…</string>
+
+    <!-- Themes -->
+    <string name="theme_ambient">Hydra Ambient</string>
+    <string name="theme_ambient_desc">Основная — изумрудный неон на тёмном титане</string>
+    <string name="theme_stealth">Monochrome Stealth</string>
+    <string name="theme_stealth_desc">Монохромная — стелс-контраст и багровое ядро</string>
+    <string name="theme_amoled">AMOLED Black</string>
+    <string name="theme_amoled_desc">Чисто чёрный фон — экономит батарею на OLED-экранах</string>
+    <string name="theme_material_you">Material You</string>
+    <string name="theme_material_you_desc">Цвета из обоев системы (Android 12+)</string>
+    <string name="theme_title">Тема</string>
+    <string name="theme_unsupported">Недоступно на этой версии Android</string>
+
+    <!-- Launcher icon -->
+    <string name="icon_title">Иконка приложения</string>
+    <string name="icon_hint">При смене иконки лаунчер пересоздаёт ярлык: он может на миг пропасть, уехать в конец списка приложений, а вынесенные вручную ярлыки — слететь.</string>
+    <string name="icon_follow_theme">Как у темы</string>
+    <string name="icon_ambient">Изумруд</string>
+    <string name="icon_stealth">Багровая</string>
+    <string name="icon_ocean">Океан</string>
+    <string name="icon_amber">Янтарь</string>
+
+    <!-- Hotspot proxy -->
+    <string name="hotspot_hub_title">Хотспот-прокси</string>
+    <string name="hotspot_hub_subtitle">Раздать VPN другим устройствам (SOCKS5 / HTTP)</string>
+    <string name="hotspot_title">Хотспот-прокси</string>
+    <string name="hotspot_enable">Включить прокси</string>
+    <string name="hotspot_enable_desc">Локальный SOCKS5/HTTP-сервер на всех интерфейсах. Другие устройства в той же сети (точка доступа телефона, Wi-Fi) подключаются к нему и получают трафик через VPN. Логин и пароль обязательны.</string>
+    <string name="hotspot_port">Порт</string>
+    <string name="hotspot_login">Логин</string>
+    <string name="hotspot_password">Пароль</string>
+    <string name="hotspot_save">Сохранить</string>
+    <string name="hotspot_regenerate">Новый пароль</string>
+    <string name="hotspot_copy">Копировать</string>
+    <string name="hotspot_copied">Скопировано</string>
+    <string name="hotspot_addresses">Подключение с другого устройства</string>
+    <string name="hotspot_no_address">Локальный адрес не найден. Включите Wi-Fi или точку доступа.</string>
+    <string name="hotspot_invalid">Порт — 1024–65535, логин не пустой, пароль не короче 6 символов.</string>
+    <string name="hotspot_apply_note">Применяется при следующем подключении. Работает с протоколами sing-box и Xray Core; для SSTP, L2TP и AmneziaWG недоступно.</string>
+    <string name="hotspot_warning">Любой, кто знает пароль, сможет пользоваться вашим соединением. Не включайте в общественных сетях.</string>
+</resources>

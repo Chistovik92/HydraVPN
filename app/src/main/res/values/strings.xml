@@ -1,8 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Язык по умолчанию — английский; русские тексты — в values-ru/strings.xml. -->
 <resources>
     <string name="app_name">Hydra</string>
-    <string name="tagline">Мультипротокольный VPN-клиент</string>
-    <string name="vpn_notification_channel">Статус VPN</string>
-    <string name="connected">Подключено</string>
-    <string name="disconnected">Отключено</string>
-    <string name="connecting">Подключение…</string>
+    <string name="tagline">Multi-protocol VPN client</string>
+    <string name="vpn_notification_channel">VPN status</string>
+    <string name="connected">Connected</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="connecting">Connecting…</string>
+
+    <!-- Themes -->
+    <string name="theme_ambient">Hydra Ambient</string>
+    <string name="theme_ambient_desc">Default — emerald neon on dark titanium</string>
+    <string name="theme_stealth">Monochrome Stealth</string>
+    <string name="theme_stealth_desc">Monochrome — stealth contrast and a crimson core</string>
+    <string name="theme_amoled">AMOLED Black</string>
+    <string name="theme_amoled_desc">Pure black background — saves battery on OLED screens</string>
+    <string name="theme_material_you">Material You</string>
+    <string name="theme_material_you_desc">Colors from your wallpaper (Android 12+)</string>
+    <string name="theme_title">Theme</string>
+    <string name="theme_unsupported">Not available on this Android version</string>
+
+    <!-- Launcher icon -->
+    <string name="icon_title">App icon</string>
+    <string name="icon_hint">The launcher recreates the shortcut when the icon changes: it may briefly disappear, move to the end of the app list, and shortcuts you placed by hand may be lost.</string>
+    <string name="icon_follow_theme">Follow the theme</string>
+    <string name="icon_ambient">Emerald</string>
+    <string name="icon_stealth">Crimson</string>
+    <string name="icon_ocean">Ocean</string>
+    <string name="icon_amber">Amber</string>
+
+    <!-- Hotspot proxy -->
+    <string name="hotspot_hub_title">Hotspot proxy</string>
+    <string name="hotspot_hub_subtitle">Share the VPN with other devices (SOCKS5 / HTTP)</string>
+    <string name="hotspot_title">Hotspot proxy</string>
+    <string name="hotspot_enable">Enable proxy</string>
+    <string name="hotspot_enable_desc">A local SOCKS5/HTTP server on all interfaces. Other devices on the same network (your phone\'s hotspot, Wi-Fi) connect to it and get VPN traffic. Login and password are required.</string>
+    <string name="hotspot_port">Port</string>
+    <string name="hotspot_login">Login</string>
+    <string name="hotspot_password">Password</string>
+    <string name="hotspot_save">Save</string>
+    <string name="hotspot_regenerate">New password</string>
+    <string name="hotspot_copy">Copy</string>
+    <string name="hotspot_copied">Copied</string>
+    <string name="hotspot_addresses">Connect from another device</string>
+    <string name="hotspot_no_address">No local network address found. Turn on Wi-Fi or the hotspot.</string>
+    <string name="hotspot_invalid">Port must be 1024–65535, login not empty, password at least 6 characters.</string>
+    <string name="hotspot_apply_note">Applied on the next connection. Works with sing-box and Xray Core protocols; not available for SSTP, L2TP and AmneziaWG.</string>
+    <string name="hotspot_warning">Anyone who knows the password can use your connection. Do not enable this on public networks.</string>
 </resources>
