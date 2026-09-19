@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.6.19** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.6.20** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -100,8 +100,8 @@
    — docs/BUILD.md, раздел 2.2. Осталось по мелочи: полноценная база GeoIP
    для маршрутизации по странам (сейчас только явные CIDR для приватных
    адресов) — отдельная будущая задача, не блокирует базовое подключение.
-5. **olcRTC**: gomobile-биндинг (`cnc` → локальный SOCKS5) + tun2socks в `OlcRtcCore`.
-6. **WDTT**: JNI к `libclient.so` + поток VK-авторизации (WebView) в `WdttCore`;
+5. ✅ **(0.6.19: подпроцесс+SOCKS5→sing-box; апстрим архивирован 14.09.2026, см. docs/ECOSYSTEM.md; не проверено на устройстве)** olcRTC: gomobile-биндинг (`cnc` → локальный SOCKS5) + tun2socks в `OlcRtcCore`.
+6. ⛔ **(не берём: апстрим заархивирован, автоматически обходит VK-капчу — docs/ECOSYSTEM.md)** WDTT: JNI к `libclient.so` + поток VK-авторизации (WebView) в `WdttCore`;
    проверить лицензию upstream перед включением бинарника.
 7. ~~(Опц.) UI-переключатель движка Xray↔sing-box~~ — уже есть: Настройки → Туннель, `EngineRepository.preferXray`, по умолчанию выключен (sing-box).
 8. ~~статистика sing-box через `CommandClient`~~ — **сделано в 0.6.1**:

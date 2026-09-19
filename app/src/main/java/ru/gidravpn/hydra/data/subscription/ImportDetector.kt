@@ -29,7 +29,7 @@ object ImportDetector {
     enum class Reason { JSON_CONFIG, UNKNOWN }
 
     private val wrapperSchemes = setOf(
-        "sing-box", "clash", "clashmeta", "hiddify", "v2rayng", "v2raytun", "happ", "flclash",
+        "sing-box", "clash", "clashmeta", "hiddify", "v2rayng", "v2raytun", "happ", "flclash", "olcbox",
     )
 
     fun classify(raw: String): Result {

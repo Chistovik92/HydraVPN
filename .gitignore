@@ -30,3 +30,5 @@ keystore.properties
 /app/libs/awg/
 # olcRTC: libolcrtc.so по ABI (scripts/build-olcrtc.sh)
 /app/libs/olcrtc/
+# OpenFlux: libopenflux.so по ABI (scripts/build-openflux.sh)
+/app/libs/openflux/

@@ -41,11 +41,21 @@
 ### olcRTC — TCP поверх WebRTC
 - **Что это:** транспорт, маскирующий VPN-потоки под WebRTC DataChannel
   (шум DPI-фингерпринтинга), сигналинг — через сервер `cnc`.
-- **Как устроено:** gomobile-биндинг `olcrtc.aar` поднимает WebRTC-сессию и
-  локальный SOCKS5; tun2socks (hev-socks5-tunnel) заворачивает в него пакеты
-  из tun (схема как у XrayCore).
-- **Статус:** BETA. Требуется сборка `olcrtc.aar` + tun2socks
-  (docs/BUILD.md, п. 2.5), мост в `OlcRtcCore`.
+- **Как устроено (0.6.19+):** клиент `cmd/olcrtc` (режим `cnc`) собран как исполняемый
+  `libolcrtc.so` и запускается подпроцессом; он выставляет локальный SOCKS5, а sing-box
+  берёт tun и шлёт трафик туда (схема Xray-моста, `SocksBridgeCore`). Не gomobile.
+- **Статус:** BETA. Апстрим **архивирован 14.09.2026** (уходит в snolc) — подробности и
+  клиенты (olcbox, owenclave) в docs/ECOSYSTEM.md. Сборка — `scripts/build-olcrtc.sh`.
+- В UI помечен плашкой BETA.
+
+### OpenFlux — TCP-туннель через сервисы документов и мессенджеров
+- **Что это:** клиент/узел выхода с транспортами Yandex.Docs, Volga, MAX, Cups.online, Mail.ru
+  Docs; кодек zstd, опциональное шифрование AES-256-GCM. Апстрим — GPL-3.0.
+- **Как устроено:** `libopenflux.so` (`--role client --inbound socks5`) подпроцессом, SOCKS5 →
+  sing-box → tun — как у официального OpenFluxAndroid. Нужен узел `openflux --role exit`.
+- **Ссылка:** `openflux://<transport>?url=…&maxToken=…&maxUid=…&codec=…&key=…#имя` — соглашение
+  Hydra (у апстрима ссылок нет).
+- **Статус:** BETA. Сборка — `scripts/build-openflux.sh`. Подробности — docs/ECOSYSTEM.md.
 - В UI помечен плашкой BETA.
 
 ## Честные ограничения (для поддержки)
@@ -55,4 +65,5 @@
 | PPTP | GRE требует root; стек удалён из Android 12/13 | SSTP / L2TP / WireGuard |
 | L2TP+IPsec | ESP недоступен в userspace | SSTP (TLS) или AWG |
 | SSTP+PAP | Нет crypto-binding (PAP не даёт CMK) | MS-CHAPv2 |
-| WDTT/olcRTC | Нет .aar/.so в дистрибутиве | Подождать сборку или собрать самим |
+| WDTT | Не интегрирован (обход VK-капчи) | AmneziaWG / WireGuard на своём сервере |
+| olcRTC / OpenFlux | Нужен свой сервер (`olcrtc srv` / `openflux --role exit`); BETA | См. docs/ECOSYSTEM.md |

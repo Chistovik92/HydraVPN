@@ -29,7 +29,8 @@ enum class Protocol(
     WIREGUARD ("wireguard", "WireGuard",             Engine.SINGBOX, shortCode = "WG"),
     AMNEZIAWG ("awg",    "AmneziaWG",                Engine.AWG,     shortCode = "AWG"),
     WDTT      ("wdtt",   "WDTT (WG over TURN, VK)",   Engine.WDTT,  beta = true),
-    OLCRTC    ("olcrtc", "olcRTC (TCP over WebRTC)", Engine.OLCRTC, beta = true);
+    OLCRTC    ("olcrtc", "olcRTC (TCP over WebRTC)", Engine.OLCRTC, beta = true),
+    OPENFLUX  ("openflux", "OpenFlux (Yandex/MAX/Mail.ru)", Engine.OPENFLUX, beta = true, shortCode = "OFX");
 
     companion object {
         fun fromId(id: String): Protocol? = entries.firstOrNull { it.id == id }
@@ -47,6 +48,7 @@ enum class Protocol(
             "awg", "amnezia" -> AMNEZIAWG
             "wdtt" -> WDTT
             "olcrtc" -> OLCRTC
+            "openflux" -> OPENFLUX
             else -> null
         }
     }
@@ -59,7 +61,8 @@ enum class Protocol(
  *  - [AWG] — amneziawg-go.aar (обфусцированный WireGuard);
  *  - [USERSPACE] — чистый Kotlin (PPP-стек): SSTP, L2TP;
  *  - [WDTT] — нативный libclient.so (WG через TURN, VK-auth) — beta;
- *  - [OLCRTC] — gomobile olcrtc.aar + tun2socks (TCP over WebRTC) — beta;
+ *  - [OLCRTC] — исполняемый libolcrtc.so, подпроцесс + SOCKS5 → sing-box (TCP over WebRTC) — beta;
+ *  - [OPENFLUX] — исполняемый libopenflux.so, подпроцесс + SOCKS5 → sing-box — beta;
  *  - [UNAVAILABLE] — протокол невозможен на Android (PPTP/GRE).
  */
-enum class Engine { SINGBOX, XRAY, AWG, USERSPACE, WDTT, OLCRTC, UNAVAILABLE }
+enum class Engine { SINGBOX, XRAY, AWG, USERSPACE, WDTT, OLCRTC, OPENFLUX, UNAVAILABLE }

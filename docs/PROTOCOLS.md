@@ -115,9 +115,12 @@
 - До сборки библиотеки ядро честно отказывает (`WdttCore`). См. docs/SERVICES.md.
 
 ### olcRTC — TCP поверх WebRTC
-- gomobile `olcrtc.aar`: компонент `cnc` устанавливает WebRTC-сессию и
-  выставляет локальный SOCKS5; tun2socks (hev-socks5-tunnel) заворачивает в
-  него пакеты из tun. См. docs/SERVICES.md.
+- Исполняемый `libolcrtc.so` (режим `cnc`) → локальный SOCKS5 → sing-box → tun.
+  Апстрим архивирован 14.09.2026. См. docs/SERVICES.md и docs/ECOSYSTEM.md.
+
+### OpenFlux — TCP-туннель с транспортами (Yandex/MAX/Mail.ru/Cups)
+- Исполняемый `libopenflux.so` (`--role client --inbound socks5`) → SOCKS5 → sing-box → tun.
+  Ссылка `openflux://…` — соглашение Hydra. См. docs/ECOSYSTEM.md.
 
 ## Лицензии встраиваемых компонентов
 - **sing-box** — GPL-3.0.

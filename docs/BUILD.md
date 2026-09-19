@@ -186,7 +186,7 @@ VK Smart Captcha автоматически (`captcha_v2*.go`). Автомати
 
 ### 2.5 olcRTC → `libolcrtc.so` (beta)
 
-Апстрим `openlibrecommunity/olcrtc` (WTFPL). Клиент (`cmd/olcrtc`, режим `cnc`) — обычный
+Апстрим `openlibrecommunity/olcrtc` (WTFPL; **архивирован 14.09.2026**, см. docs/ECOSYSTEM.md). Клиент (`cmd/olcrtc`, режим `cnc`) — обычный
 Go-**исполняемый файл**, поднимающий локальный SOCKS5; приложение запускает его подпроцессом
 из `nativeLibraryDir` (поэтому файл называется `libolcrtc.so`) и подключает sing-box как
 мост к tun (`buildXrayBridge`) — тот же приём, что у Xray.
@@ -200,6 +200,15 @@ scripts/build-olcrtc.sh       # → app/libs/olcrtc/<abi>/libolcrtc.so
 - Сервер (`olcrtc srv`) и ключ (64 hex) — на стороне пользователя; ссылка формата
   `olcrtc://<провайдер>?<транспорт>@<комната>#<ключ>$<комментарий>` (docs/uri.md апстрима)
   импортируется как обычная (в т.ч. по QR).
+
+### 2.5а OpenFlux → `libopenflux.so` (beta)
+
+Апстрим `p1neappleXpress/OpenFlux` (GPL-3.0). Исполняемый клиент (`--role client --inbound socks5`),
+запускается подпроцессом, как в официальном OpenFluxAndroid; CGO обязателен (иначе нет DNS на Android).
+
+```bash
+scripts/build-openflux.sh     # → app/libs/openflux/<abi>/libopenflux.so (около 14 МБ на ABI)
+```
 
 ### 2.6 Сборка приложения с ядрами (flavor `native`)
 

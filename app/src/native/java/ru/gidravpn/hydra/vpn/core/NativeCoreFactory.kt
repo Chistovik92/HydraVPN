@@ -28,6 +28,7 @@ class NativeCoreFactory : CoreFactory {
             Protocol.PPTP -> PptpCore()
             Protocol.WDTT -> WdttCore()
             Protocol.OLCRTC -> OlcRtcCore()
+            Protocol.OPENFLUX -> OpenFluxCore()
             else -> when {
                 proto?.engine == Engine.AWG -> AmneziaWgCore()
                 proto in XRAY_CAPABLE && BuildConfig.XRAY_AVAILABLE && preferXray() -> XrayCore()

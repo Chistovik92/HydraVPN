@@ -61,6 +61,8 @@
                 <data android:scheme="pptp" />
                 <data android:scheme="sing-box" />
                 <data android:scheme="olcrtc" />
+                <data android:scheme="openflux" />
+                <data android:scheme="olcbox" />
             </intent-filter>
             <!-- «Поделиться» ссылкой/текстом/картинкой с QR из другого приложения (0.6.18). -->
             <intent-filter>

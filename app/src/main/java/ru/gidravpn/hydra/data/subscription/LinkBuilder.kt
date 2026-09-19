@@ -32,6 +32,7 @@ object LinkBuilder {
             Protocol.WIREGUARD -> wireguard(p, "wireguard")
             Protocol.AMNEZIAWG -> wireguard(p, "awg")
             Protocol.OLCRTC -> OlcRtcLink.build(p)
+            Protocol.OPENFLUX -> OpenFluxLink.build(p)
             else -> null
         }
     }

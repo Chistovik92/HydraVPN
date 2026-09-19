@@ -40,6 +40,7 @@ object LinkParser {
             "l2tp"      -> parseUserPass(link, Protocol.L2TP, 1701)
             "pptp"      -> parseUserPass(link, Protocol.PPTP, 1723)
             "olcrtc"    -> OlcRtcLink.parse(link)
+            "openflux"  -> OpenFluxLink.parse(link)
             // вставленный целиком .conf (без схемы): AWG-параметры → AmneziaWG, иначе WireGuard
             else -> if ("[Interface]" in link) {
                 val awg = Regex("^(Jc|Jmin|Jmax|S1|S2|H[1-4]|I[1-5])\\s*=", RegexOption.IGNORE_CASE)
