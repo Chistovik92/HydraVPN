@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,6 +39,10 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
     val measuringIds by vm.measuringIds.collectAsState()
     var showAdd by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
+    // Что показывается в окне «Поделиться»: заголовок + ссылка (сервер или подписка).
+    var shareTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val shareNoLink = stringResource(R.string.share_no_link)
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     val importMessage by vm.importMessage.collectAsState()
     val scanPrompt = stringResource(R.string.qr_scan_prompt)
     val scanLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -99,19 +104,29 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             grouped.forEach { (sub, list) ->
                 if (sub != null) {
-                    item(key = "header_${sub.id}") { SubscriptionHeader(sub, list.size) }
+                    item(key = "header_${sub.id}") {
+                        SubscriptionHeader(sub, list.size, onShare = { shareTarget = sub.name to sub.url })
+                    }
                 }
                 items(list, key = { it.id }) { s ->
                     ServerCard(s, selected = (selectedId ?: servers.firstOrNull()?.id) == s.id,
                         measuring = s.id in measuringIds,
                         onClick = { vm.select(s.id); onSelected() },
                         onDelete = { vm.delete(s) },
+                        onShare = {
+                            val link = ru.gidravpn.hydra.data.subscription.LinkBuilder.toLink(s)
+                            if (link != null) shareTarget = s.name to link
+                            else android.widget.Toast.makeText(ctx, shareNoLink, android.widget.Toast.LENGTH_SHORT).show()
+                        },
                         onMeasure = { vm.measurePing(s) })
                 }
             }
         }
     }
 
+    shareTarget?.let { (title, link) ->
+        ru.gidravpn.hydra.ui.components.ShareDialog(title, link) { shareTarget = null }
+    }
     if (showAdd) AddServerDialog(
         onDismiss = { showAdd = false },
         onSave = { n, a, p, proto -> vm.addServer(n, a, p, proto); showAdd = false }
@@ -125,21 +140,25 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
 }
 
 @Composable
-private fun SubscriptionHeader(sub: Subscription, count: Int) {
+private fun SubscriptionHeader(sub: Subscription, count: Int, onShare: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(sub.name.uppercase(), color = TextMuted, fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp)
-        Text("$count", color = TextMuted, fontSize = 11.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.share_action), color = AccentCyan, fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold, modifier = Modifier.clickableNoRipple(onShare))
+            Text("$count", color = TextMuted, fontSize = 11.sp)
+        }
     }
 }
 
 @Composable
 private fun ServerCard(
     s: ServerProfile, selected: Boolean, measuring: Boolean,
-    onClick: () -> Unit, onDelete: () -> Unit, onMeasure: () -> Unit
+    onClick: () -> Unit, onDelete: () -> Unit, onMeasure: () -> Unit, onShare: () -> Unit
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
     if (confirmDelete) {
@@ -200,6 +219,9 @@ private fun ServerCard(
         Spacer(Modifier.width(8.dp))
         s.protocol?.let { ProtocolChip(it.shortCode) }
         Spacer(Modifier.width(4.dp))
+        IconButton(onClick = onShare, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.share_action), tint = TextMuted)
+        }
         IconButton(onClick = { confirmDelete = true }, modifier = Modifier.size(32.dp)) {
             Icon(Icons.Filled.DeleteOutline, contentDescription = stringResource(R.string.servers_delete_title), tint = TextMuted)
         }

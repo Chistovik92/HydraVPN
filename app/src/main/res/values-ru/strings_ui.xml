@@ -253,4 +253,10 @@
     <string name="import_done_servers">Добавлено серверов: %1$d</string>
     <string name="import_json_unsupported">Это целый JSON-конфиг (sing-box/Xray). Пока не поддерживается — импортируйте ссылку или подписку.</string>
     <string name="import_unknown">Не удалось распознать: это не ссылка на сервер, не подписка и не конфиг.</string>
+    <string name="share_action">Поделиться</string>
+    <string name="share_qr_desc">QR-код</string>
+    <string name="share_send">Отправить ссылку + QR</string>
+    <string name="share_too_long">Ссылка слишком длинная для QR-кода — поделитесь ею текстом.</string>
+    <string name="share_no_link">Для этого протокола нет общепринятого формата ссылки.</string>
+    <string name="share_warning">В ссылке — ключи или пароль сервера. Отправляйте её только тем, кому доверяете.</string>
 </resources>

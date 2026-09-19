@@ -254,4 +254,10 @@
     <string name="import_done_servers">Servers added: %1$d</string>
     <string name="import_json_unsupported">This is a full JSON config (sing-box/Xray). It is not supported yet — import a link or a subscription instead.</string>
     <string name="import_unknown">Could not recognize this as a server link, subscription or config.</string>
+    <string name="share_action">Share</string>
+    <string name="share_qr_desc">QR code</string>
+    <string name="share_send">Share link + QR</string>
+    <string name="share_too_long">The link is too long for a QR code — share it as text.</string>
+    <string name="share_no_link">This protocol has no shareable link format.</string>
+    <string name="share_warning">The link contains the server keys or password. Send it only to people you trust.</string>
 </resources>

@@ -124,6 +124,17 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- Отдаёт картинку QR другим приложениям при «Поделиться» (0.6.18+). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- Собственно VPN-туннель (Xray / sing-box) -->
         <service
             android:name=".vpn.HydraVpnService"
