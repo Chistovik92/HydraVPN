@@ -193,6 +193,7 @@ private fun SecurityContent(vm: MainViewModel) {
     val killSwitch by vm.killSwitch.collectAsState()
     val autoApp by vm.autoConnectOnAppStart.collectAsState()
     val autoBoot by vm.autoConnectOnBoot.collectAsState()
+    val autoReconnect by vm.autoReconnect.collectAsState()
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -205,6 +206,13 @@ private fun SecurityContent(vm: MainViewModel) {
 description = stringResource(R.string.sec_killswitch_desc),
             checked = killSwitch,
             onCheckedChange = { vm.setKillSwitch(it) }
+        )
+
+        SecurityToggleCard(
+            title = stringResource(R.string.sec_reconnect),
+            description = stringResource(R.string.sec_reconnect_desc),
+            checked = autoReconnect,
+            onCheckedChange = { vm.setAutoReconnect(it) }
         )
 
         SecurityToggleCard(

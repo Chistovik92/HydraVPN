@@ -4,7 +4,11 @@ import android.os.ParcelFileDescriptor
 import ru.gidravpn.hydra.data.model.ServerProfile
 
 /** Состояние соединения, наблюдаемое из UI. */
-enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED, ERROR }
+enum class ConnectionState {
+    DISCONNECTED, CONNECTING, CONNECTED, ERROR,
+    /** Туннель упал, сервис сам пробует поднять его снова (Фаза 7b). */
+    RECONNECTING,
+}
 
 /** Живая статистика соединения. */
 data class TrafficStats(val downBytes: Long = 0, val upBytes: Long = 0)

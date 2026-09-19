@@ -239,4 +239,8 @@
     <string name="notif_action_servers">Servers</string>
     <string name="notif_conn_dropped">Connection dropped</string>
     <string name="split_apply_live">If the VPN is on, it reconnects automatically a moment after each change.</string>
+    <string name="btn_reconnecting">RECONNECTING…</string>
+    <string name="notif_reconnecting">Reconnecting…</string>
+    <string name="sec_reconnect">Reconnect after a drop</string>
+    <string name="sec_reconnect_desc">If the tunnel drops, Hydra retries automatically with growing pauses (2 s → 30 s, up to 10 attempts) and picks up as soon as a network returns. With Kill Switch on, traffic stays blocked meanwhile.</string>
 </resources>

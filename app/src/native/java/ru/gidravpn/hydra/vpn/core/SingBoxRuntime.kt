@@ -38,6 +38,9 @@ object SingBoxRuntime {
     private val baseDir: File get() = ru.gidravpn.hydra.AppCtx.filesDir
 
     @Volatile private var commandServer: CommandServer? = null
+    /** Колбэк смерти сервиса (Фаза 7a) и защёлка штатной остановки. */
+    @Volatile var onServiceClosed: ((String) -> Unit)? = null
+    @Volatile private var stopping = false
     @Volatile private var statsClient: CommandClient? = null
 
     @Synchronized
@@ -55,14 +58,21 @@ object SingBoxRuntime {
 
     /** Поднимает command-server. Вызывать ДО `Libbox.newService(...)`. */
     @Synchronized
-    fun startCommandServer(onLog: (String) -> Unit) {
+fun startCommandServer(onLog: (String) -> Unit) {
+        stopping = false
         if (commandServer != null) return
         val handler = object : CommandServerHandler {
             // Системный прокси нам не нужен — VPN идёт через tun.
             override fun getSystemProxyStatus(): SystemProxyStatus =
                 SystemProxyStatus().apply { available = false; enabled = false }
 
-            override fun postServiceClose() {}
+/**
+             * libbox зовёт это, когда сервис закрылся не по нашей команде. Наша же
+             * остановка идёт через [shutdown] и защёлкой [stopping] смертью не считается.
+             */
+            override fun postServiceClose() {
+                if (!stopping) onServiceClosed?.invoke("sing-box закрыл сервис")
+            }
             override fun serviceReload() {}
             override fun setSystemProxyEnabled(isEnabled: Boolean) {}
         }
@@ -139,7 +149,8 @@ object SingBoxRuntime {
 
     /** Полное гашение: клиент + command-server. Вызывается при остановке ядра. */
     @Synchronized
-    fun shutdown() {
+fun shutdown() {
+        stopping = true
         stopStatsPolling()
         runCatching { commandServer?.close() }
         commandServer = null

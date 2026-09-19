@@ -57,7 +57,7 @@ class HydraQsTileService : TileService() {
     override fun onClick() {
         super.onClick()
         val current = VpnState.state.value
-        if (current == ConnectionState.CONNECTED || current == ConnectionState.CONNECTING) {
+        if (current == ConnectionState.CONNECTED || current == ConnectionState.CONNECTING || current == ConnectionState.RECONNECTING) {
             runCatching {
                 startService(Intent(this, HydraVpnService::class.java).setAction(HydraVpnService.ACTION_DISCONNECT))
             }
@@ -105,7 +105,7 @@ class HydraQsTileService : TileService() {
 
     private fun updateTile(state: ConnectionState) {
         val t = qsTile ?: return
-        t.state = if (state == ConnectionState.CONNECTED || state == ConnectionState.CONNECTING) {
+        t.state = if (state == ConnectionState.CONNECTED || state == ConnectionState.CONNECTING || state == ConnectionState.RECONNECTING) {
             Tile.STATE_ACTIVE
         } else {
             Tile.STATE_INACTIVE
@@ -116,6 +116,7 @@ class HydraQsTileService : TileService() {
             t.subtitle = when (state) {
                 ConnectionState.CONNECTED -> VpnState.activeServer.value?.name ?: getString(R.string.connected)
                 ConnectionState.CONNECTING -> getString(R.string.connecting)
+                ConnectionState.RECONNECTING -> getString(R.string.notif_reconnecting)
                 ConnectionState.ERROR -> getString(R.string.tile_blocked)
                 ConnectionState.DISCONNECTED -> getString(R.string.disconnected)
             }

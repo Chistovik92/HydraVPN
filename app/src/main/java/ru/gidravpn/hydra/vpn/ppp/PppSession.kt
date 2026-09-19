@@ -60,15 +60,72 @@ class PppSession(
 
     private fun id(): Int = (nextId++) and 0xFF
 
+    // ----- Restart-таймер (RFC 1661 §4.6) и LCP Echo (7d) -----
+    // Раньше ConfReq уходил ровно один раз: потерянный кадр = ожидание общего таймаута
+    // транспорта без единой повторной попытки, а «мёртвый» сервер за открытым PPP
+    // не замечался вовсе (свой Echo-Request мы не слали, только отвечали на чужой).
+    private var timer: java.util.concurrent.ScheduledExecutorService? = null
+    @Volatile private var lastRxMs = 0L
+    @Volatile private var lastLcpTxMs = 0L
+    @Volatile private var lastIpcpTxMs = 0L
+    @Volatile private var lastEchoMs = 0L
+    @Volatile private var lcpRetries = 0
+    @Volatile private var ipcpRetries = 0
+    @Volatile private var echoMisses = 0
+
+    private fun startTimers() {
+        val now = System.currentTimeMillis()
+        lastRxMs = now; lastEchoMs = now
+        timer?.shutdownNow()
+        timer = java.util.concurrent.Executors.newSingleThreadScheduledExecutor { r ->
+            Thread(r, "ppp-timer").apply { isDaemon = true }
+        }.also {
+            it.scheduleWithFixedDelay({ runCatching { tick() } }, 1, 1, java.util.concurrent.TimeUnit.SECONDS)
+        }
+    }
+
+    private fun stopTimers() {
+        timer?.shutdownNow()
+        timer = null
+    }
+
+    private fun tick() {
+        if (closed.get()) return
+        val now = System.currentTimeMillis()
+        when (phase) {
+            Phase.LCP -> if (!lcpAcked && now - lastLcpTxMs >= RESTART_MS) {
+                if (++lcpRetries > MAX_CONFIGURE) terminate("LCP: сервер не ответил на Configure-Request")
+                else { onLog("PPP LCP: повтор ConfReq (${lcpRetries}/$MAX_CONFIGURE)"); sendLcpConfigRequest() }
+            }
+            Phase.IPCP -> if (!ipcpAcked && now - lastIpcpTxMs >= RESTART_MS) {
+                if (++ipcpRetries > MAX_CONFIGURE) terminate("IPCP: сервер не ответил на Configure-Request")
+                else { onLog("PPP IPCP: повтор ConfReq (${ipcpRetries}/$MAX_CONFIGURE)"); sendIpcpConfigRequest() }
+            }
+            Phase.OPEN -> if (now - lastRxMs >= ECHO_IDLE_MS && now - lastEchoMs >= ECHO_IDLE_MS) {
+                if (echoMisses >= MAX_ECHO_MISSES) {
+                    terminate("LCP: сервер не отвечает на Echo-Request")
+                } else {
+                    echoMisses++; lastEchoMs = now
+                    val magic = Ppp.int32((ourMagic and 0xFFFFFFFFL).toInt())
+                    sendFrame(Ppp.controlFrame(Ppp.PROTO_LCP, Ppp.CODE_ECHO_REQ, id(), magic))
+                }
+            }
+            else -> Unit
+        }
+    }
+
     /** Начать согласование (вызывать после установки транспорта). */
     fun start() {
         phase = Phase.LCP
         ourMagic = random.nextLong()
         sendLcpConfigRequest()
+        startTimers()
     }
 
     /** Входящий кадр PPP от транспорта. */
     fun onFrame(frame: ByteArray) {
+        lastRxMs = System.currentTimeMillis()
+        echoMisses = 0
         val (proto, info) = Ppp.parseFrame(frame) ?: return
         when (proto) {
             Ppp.PROTO_LCP -> onLcp(info)
@@ -87,6 +144,7 @@ class PppSession(
     // ----- LCP -----
 
     private fun sendLcpConfigRequest() {
+        lastLcpTxMs = System.currentTimeMillis()
         val opts = mutableListOf(
             Ppp.optInt(Ppp.LCP_OPT_MRU, ourMru),
             Ppp.optInt(Ppp.LCP_OPT_MAGIC, (ourMagic and 0xFFFFFFFFL).toInt()),
@@ -287,6 +345,7 @@ class PppSession(
     }
 
     private fun sendIpcpConfigRequest() {
+        lastIpcpTxMs = System.currentTimeMillis()
         val opts = mutableListOf(
             Ppp.optIp(Ppp.IPCP_OPT_ADDR, intToIp(requestedIp)),
             Ppp.optIp(Ppp.IPCP_OPT_PRIMARY_DNS, "0.0.0.0"),
@@ -365,6 +424,7 @@ class PppSession(
     }
 
     fun close() {
+        stopTimers()
         if (closed.compareAndSet(false, true) && phase != Phase.DEAD) {
             runCatching {
                 sendFrame(Ppp.controlFrame(Ppp.PROTO_LCP, Ppp.CODE_TERM_REQ, id(), ByteArray(0)))
@@ -374,6 +434,7 @@ class PppSession(
     }
 
     private fun terminate(reason: String) {
+        stopTimers()
         phase = Phase.DEAD
         onLog("PPP: сессия завершена: $reason")
         onDown(reason)
@@ -387,5 +448,9 @@ class PppSession(
 
     companion object {
         const val AUTH_NONE = 0
+        private const val RESTART_MS = 3_000L      // Restart-таймер RFC 1661 (3 с)
+        private const val MAX_CONFIGURE = 10         // Max-Configure
+        private const val ECHO_IDLE_MS = 15_000L     // тишина в линии до Echo-Request
+        private const val MAX_ECHO_MISSES = 3
     }
 }

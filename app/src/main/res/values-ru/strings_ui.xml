@@ -238,4 +238,8 @@
     <string name="notif_action_servers">Серверы</string>
     <string name="notif_conn_dropped">Соединение разорвано</string>
     <string name="split_apply_live">Если VPN включён, он переподключится сам через секунду после изменений.</string>
+    <string name="btn_reconnecting">ПЕРЕПОДКЛЮЧЕНИЕ…</string>
+    <string name="notif_reconnecting">Переподключение…</string>
+    <string name="sec_reconnect">Переподключение после разрыва</string>
+    <string name="sec_reconnect_desc">Если туннель оборвался, Hydra сама пробует поднять его снова с растущими паузами (2 с → 30 с, до 10 попыток) и подхватывает сразу, как появится сеть. При включённом Kill Switch трафик всё это время заблокирован.</string>
 </resources>

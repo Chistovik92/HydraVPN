@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.6.16** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.6.17** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -124,7 +124,7 @@
     SSTP/L2TP в sing-box для той же цели — отдельная, гораздо более крупная
     задача (нужен собственный userspace TCP/IP-стек уровня gVisor netstack);
     заводить как отдельную инициативу, если/когда понадобится.
-11. **Наблюдаемость и переподключение туннеля** (Фаза 7a-7c в дорожной карте
+11. ✅ **(сделано в 0.6.17, не проверено на устройстве — см. CHANGELOG)** Наблюдаемость и переподключение туннеля (Фаза 7a-7c в дорожной карте
     выше) — главный найденный на аудите 19.09.2026 пробел: поднятое
     соединение никем не наблюдается, разрыв/смена сети не меняют
     `VpnState.state`, переподключения нет. 7a сделана в 0.6.14 для
@@ -133,7 +133,7 @@
     без него основной движок не покрыт. Дальше по порядку: 7b (бэкофф +
     `RECONNECTING` + Kill Switch на всё время) → 7c (`NetworkCallback` и
     `setUnderlyingNetworks()` в самом `HydraVpnService`).
-12. **Потоки и ресурсы userspace-ядер** (Фаза 7d): `TunBridge.stop()` не
+12. ✅ **(сделано в 0.6.17 — poll в TunBridge, атомики, Restart-таймер и LCP Echo; on-device не проверено)** Потоки и ресурсы userspace-ядер (Фаза 7d): `TunBridge.stop()` не
     разблокирует `tun-ppp-read` и не закрывает потоки ввода-вывода tun;
     счётчики трафика — не атомарные; в `PppSession` нет Restart-таймера
     ConfReq и своего LCP Echo-Request. Чинить вместе с TODO №2 (on-device

@@ -95,6 +95,8 @@ class XrayCore : VpnCore {
 
         val b = SingBoxCore()
         bridge = b
+        // Смерть sing-box-моста — смерть туннеля и для Xray (7a).
+        b.setDeathListener { reason -> deathListener?.invoke(reason) }
         b.runConfig(tun, bridgeConfig, onLog, onStats)
     }
 

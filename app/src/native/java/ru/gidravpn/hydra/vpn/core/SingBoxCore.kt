@@ -44,6 +44,11 @@ class SingBoxCore : VpnCore {
     override val name = "sing-box ${Libbox.version()}"
     private var service: BoxService? = null
 
+    /** Смерть сервиса sing-box у поднятого туннеля (Фаза 7a) — через postServiceClose() libbox. */
+    override fun setDeathListener(listener: (reason: String) -> Unit) {
+        SingBoxRuntime.onServiceClosed = listener
+    }
+
     override fun start(
         tun: ParcelFileDescriptor,
         profile: ServerProfile,
@@ -90,8 +95,9 @@ class SingBoxCore : VpnCore {
         SingBoxRuntime.startStatsPolling(onStats, onLog)
     }
 
-    override fun stop() {
+override fun stop() {
         SingBoxRuntime.shutdown()
+        SingBoxRuntime.onServiceClosed = null
         runCatching { service?.close() }
         service = null
     }
@@ -252,6 +258,10 @@ class HydraPlatformInterface(
             .build()
         runCatching { cm.registerNetworkCallback(request, cb, handler) }
             .onFailure { onLogLine("sing-box: monitor интерфейса: ошибка регистрации: ${it.message}") }
+        // №9: registerNetworkCallback сообщает о сети лишь асинхронно, и первые доли
+        // секунды sing-box работал без интерфейса ("no available network interface").
+        // Отдаём текущую физическую сеть сразу, не дожидаясь колбэка.
+        PhysicalNetwork.pick(cm)?.let { runCatching { notify(it, listener) } }
     }
 
     override fun closeDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {

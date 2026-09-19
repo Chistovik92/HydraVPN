@@ -77,6 +77,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     fun setKillSwitch(enabled: Boolean) = viewModelScope.launch { vpnSettingsRepo.setKillSwitch(enabled) }
 
+    val autoReconnect: StateFlow<Boolean> = vpnSettingsRepo.autoReconnect
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    fun setAutoReconnect(enabled: Boolean) = viewModelScope.launch { vpnSettingsRepo.setAutoReconnect(enabled) }
+
     val autoConnectOnAppStart: StateFlow<Boolean> = vpnSettingsRepo.autoConnectOnAppStart
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     fun setAutoConnectOnAppStart(enabled: Boolean) = viewModelScope.launch { vpnSettingsRepo.setAutoConnectOnAppStart(enabled) }
@@ -197,7 +201,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun select(id: Long) {
         _selectedId.value = id
         viewModelScope.launch { vpnSettingsRepo.setLastServerId(id) }
-        if (state.value == ConnectionState.CONNECTED || state.value == ConnectionState.CONNECTING) {
+        if (state.value == ConnectionState.CONNECTED || state.value == ConnectionState.CONNECTING || state.value == ConnectionState.RECONNECTING) {
             servers.value.firstOrNull { it.id == id }?.let { startTunnelWith(it) }
         }
     }
@@ -220,7 +224,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun toggle() = viewModelScope.launch {
-        if (state.value == ConnectionState.CONNECTED || state.value == ConnectionState.CONNECTING) {
+        if (state.value == ConnectionState.CONNECTED || state.value == ConnectionState.CONNECTING || state.value == ConnectionState.RECONNECTING) {
             disconnect()
         } else {
             _requestPermission.tryEmit(Unit)   // активити проверит prepare() и вызовет startTunnel()

@@ -100,7 +100,7 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
 @Composable
 private fun ConnectButton(state: ConnectionState, onClick: () -> Unit) {
     val connected = state == ConnectionState.CONNECTED
-    val connecting = state == ConnectionState.CONNECTING
+    val connecting = state == ConnectionState.CONNECTING || state == ConnectionState.RECONNECTING
     val error = state == ConnectionState.ERROR
     val active = connected || connecting
 
@@ -122,6 +122,7 @@ private fun ConnectButton(state: ConnectionState, onClick: () -> Unit) {
     val label = when {
         error -> stringResource(R.string.btn_error_retry)
         connected -> stringResource(R.string.btn_disconnect)
+        state == ConnectionState.RECONNECTING -> stringResource(R.string.btn_reconnecting)
         connecting -> stringResource(R.string.btn_connecting)
         else -> stringResource(R.string.btn_connect)
     }
@@ -211,6 +212,7 @@ private fun ConnectionInfo(
                 when (state) {
                     ConnectionState.CONNECTED -> stringResource(R.string.connected)
                     ConnectionState.ERROR -> stringResource(R.string.status_error)
+                    ConnectionState.RECONNECTING -> stringResource(R.string.notif_reconnecting)
                     else -> stringResource(R.string.disconnected)
                 },
                 when (state) {

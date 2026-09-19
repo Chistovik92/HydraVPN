@@ -28,8 +28,11 @@ class TunBridge(
     private val onLog: (String) -> Unit = {},
 ) {
     private val running = AtomicBoolean(false)
-    private var downBytes = 0L
-    private var upBytes = 0L
+    // Счётчики пишут два потока (tun→PPP и ридер транспорта), читает поток статистики: не Long, а атомик.
+    private val downBytes = java.util.concurrent.atomic.AtomicLong()
+    private val upBytes = java.util.concurrent.atomic.AtomicLong()
+    private var readThread: Thread? = null
+    private var statsThread: Thread? = null
     private var localIpInt = 0
     private var tunIpInt = 0
 
@@ -48,16 +51,32 @@ class TunBridge(
         val output = FileOutputStream(tun.fileDescriptor)
 
         // tun → PPP (исходящий трафик устройства)
-        thread(name = "tun-ppp-read") {
+        readThread = thread(name = "tun-ppp-read") {
             val buf = ByteArray(65536)
+            // Блокирующий read() на tun не разбудить ни close(), ни interrupt(): поток жил до
+            // следующего пакета и после stop(). Ждём данные через poll с таймаутом и каждый
+            // раз проверяем running.
+            val pollFd = android.system.StructPollfd().apply {
+                fd = tun.fileDescriptor
+                events = android.system.OsConstants.POLLIN.toShort()
+            }
             while (running.get()) {
+                val ready = try {
+                    android.system.Os.poll(arrayOf(pollFd), 500)
+                } catch (e: android.system.ErrnoException) {
+                    if (e.errno == android.system.OsConstants.EINTR) continue else break
+                }
+                if (ready <= 0) continue
+                val hup = pollFd.revents.toInt() and
+                    (android.system.OsConstants.POLLERR or android.system.OsConstants.POLLHUP or android.system.OsConstants.POLLNVAL)
+                if (hup != 0) break
                 val n = runCatching { input.read(buf) }.getOrNull() ?: break
                 if (n <= 0) continue
                 val packet = buf.copyOf(n)
                 if (!isIpv4(packet)) continue
                 val fixed = rewriteSrc(packet)
                 if (fixed != null) {
-                    upBytes += fixed.size
+                    upBytes.addAndGet(fixed.size.toLong())
                     session.sendIpPacket(fixed)
                 }
             }
@@ -70,16 +89,16 @@ class TunBridge(
                 val fixed = rewriteDst(packet)
                 if (fixed != null) {
                     runCatching { output.write(fixed) }
-                    downBytes += fixed.size
+                    downBytes.addAndGet(fixed.size.toLong())
                 }
             }
         }
 
         // статистика
-        thread(name = "tun-bridge-stats") {
+        statsThread = thread(name = "tun-bridge-stats") {
             while (running.get()) {
-                Thread.sleep(1000)
-                onStats(TrafficStats(downBytes, upBytes))
+                try { Thread.sleep(1000) } catch (_: InterruptedException) { break }
+                onStats(TrafficStats(downBytes.get(), upBytes.get()))
             }
         }
     }
@@ -94,6 +113,12 @@ class TunBridge(
     fun stop() {
         running.set(false)
         sessionToTun = null
+        statsThread?.interrupt()
+        // Поток чтения проснётся по таймауту poll (≤500 мс) — ждём его, чтобы после stop()
+        // никто уже не трогал fd, который сервис сейчас закроет.
+        readThread?.let { runCatching { it.join(1500) } }
+        readThread = null
+        statsThread = null
     }
 
     // ----- перезапись адресов + чек-суммы -----

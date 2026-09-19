@@ -14,6 +14,8 @@ import ru.gidravpn.hydra.R
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.vpn.core.ConnectionState
 import ru.gidravpn.hydra.vpn.core.CoreFactoryProvider
+import ru.gidravpn.hydra.vpn.core.PhysicalNetwork
+import kotlinx.coroutines.isActive
 import ru.gidravpn.hydra.vpn.core.VpnCore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -61,6 +63,18 @@ class HydraVpnService : VpnService() {
     @Volatile private var liveAttempt: Attempt? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    // ----- Фаза 7b/7c: переподключение и смена сети -----
+    // Цикл переподключения после разрыва (null — не идёт).
+    @Volatile private var reconnectJob: Job? = null
+    // true — пользователь сам отключил (или система отозвала VPN): переподключаться нельзя.
+    @Volatile private var userStopped = false
+    // Сервер последней попытки — его и поднимаем заново.
+    @Volatile private var lastServerId: Long = -1
+    // Сеть появилась/сменилась — будит цикл переподключения раньше бэкоффа.
+    private val networkSignal = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
+    private var netCallback: android.net.ConnectivityManager.NetworkCallback? = null
+    @Volatile private var lastUnderlying: android.net.Network? = null
+
     /**
      * Одна попытка подключения (Фаза 7a). Нужна, чтобы различить три случая,
      * которые иначе выглядят одинаково — «ядро сообщило, что умерло»:
@@ -84,14 +98,19 @@ class HydraVpnService : VpnService() {
     }
 
     override fun onCreate() {
-        super.onCreate()
+super.onCreate()
         SocketGuard.attach(this)
+        registerNetworkWatcher()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
+ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             else -> {
+                // Явное подключение пользователя отменяет идущий цикл переподключения.
+                userStopped = false
+                reconnectJob?.cancel()
+                reconnectJob = null
                 val serverId = intent?.getLongExtra(EXTRA_SERVER_ID, -1) ?: -1
                 // Фаза 7e: startForeground может отказать (на Android 12+ —
                 // ForegroundServiceStartNotAllowedException, если сервис
@@ -118,12 +137,17 @@ class HydraVpnService : VpnService() {
         connectJob = scope.launch { doConnect(serverId) }
     }
 
-    private suspend fun doConnect(serverId: Long) {
+    private suspend fun doConnect(serverId: Long, reconnecting: Boolean = false): Boolean {
         // Переключение на другой сервер при уже активном соединении вызывает
         // connect() повторно — без явного гашения предыдущих core/tun они
         // просто перезаписываются полями ниже и утекают активными в фоне
-        // (соединение остаётся поднятым, невидимым для UI/disconnect).
-        releaseTun()
+// (соединение остаётся поднятым, невидимым для UI/disconnect).
+        //
+        // Переподключение (7b) — исключение: прежний tun может быть «чёрной дырой»
+        // Kill Switch, и закрывать его до появления нового нельзя (окно утечки).
+        if (!reconnecting) releaseTun() else { runCatching { core?.stop() }; core = null }
+        val oldTun = if (reconnecting) tun else null
+        val oldTunFd = if (reconnecting) tunFd else -1
 
         // fd/ядро держим в локальных переменных, пока попытка не подтверждена
         // активной, — иначе гонка с параллельным stopTunnel()/новым connect()
@@ -137,7 +161,7 @@ class HydraVpnService : VpnService() {
         var newCore: VpnCore? = null
         val attempt = Attempt()
         try {
-            VpnState.state.value = ConnectionState.CONNECTING
+            VpnState.state.value = if (reconnecting) ConnectionState.RECONNECTING else ConnectionState.CONNECTING
             val settings = ru.gidravpn.hydra.data.repository.VpnSettingsRepository(applicationContext)
             // serverId < 0 — перезапуск системой по START_STICKY (intent == null):
             // поднимаем то же, что было, а не «Сервер #-1 не найден».
@@ -146,10 +170,18 @@ class HydraVpnService : VpnService() {
                 ?: throw IllegalStateException("Сервер #$id не найден")
 
             VpnState.activeServer.value = profile
-            VpnState.log("Подключение к ${profile.address}…")
+            lastServerId = profile.id
+            VpnState.log((if (reconnecting) "Переподключение к " else "Подключение к ") + "${profile.address}…")
 
             newTun = establishTun(profile)
             newTunFd = newTun.fd // снимаем ДО openTun()/detachFd() внутри vpnCore.start()
+            if (reconnecting && (oldTun != null || oldTunFd >= 0)) {
+                // Система уже заменила прежний интерфейс новым — прежний закрываем, а новый
+                // сразу держим как «чёрную дыру»: если ядро не взлетит, утечки не будет.
+                closeTun(oldTun, oldTunFd)
+                tun = newTun
+                tunFd = newTunFd
+            }
             val vpnCore = CoreFactoryProvider.factory.create(profile)
             newCore = vpnCore
             VpnState.log("Ядро: ${vpnCore.name}")
@@ -176,6 +208,11 @@ class HydraVpnService : VpnService() {
             core = newCore
             // С этого момента onCoreDied() принимает смерть этой попытки.
             liveAttempt = attempt
+            if (reconnecting) {
+                killSwitchBlocking = false
+                tunnelDropped = false
+            }
+            updateUnderlyingNetwork()
             VpnState.connectedSince.value = System.currentTimeMillis()
             VpnState.state.value = ConnectionState.CONNECTED
             VpnState.log("✓ Соединение установлено")
@@ -195,6 +232,7 @@ class HydraVpnService : VpnService() {
             // attempt`: тогда onCoreDied() отбросил событие как «эхо чужой
             // попытки», и без этой перепроверки туннель остался бы зомби.
             attempt.died?.let { handleCoreDeath(attempt, it) }
+            return true
         } catch (t: Throwable) {
             runCatching { newCore?.stop() }
 
@@ -225,6 +263,22 @@ class HydraVpnService : VpnService() {
             // в логе оставалось неразбираемое «Ошибка: null».
             VpnState.log("Ошибка: ${t.message ?: t.javaClass.simpleName}")
 
+// Переподключение (7b): неудачная попытка — не конец. Цикл сам решит, что
+            // дальше; здесь только сохраняем «чёрную дыру» (Kill Switch) или закрываем новый tun.
+            if (reconnecting) {
+                val ks = runCatching {
+                    ru.gidravpn.hydra.data.repository.VpnSettingsRepository(applicationContext)
+                        .killSwitch.firstOrNull()
+                }.getOrNull() == true
+                if (ks && newTun != null) {
+                    tun = newTun; tunFd = newTunFd; core = null; killSwitchBlocking = true
+                } else {
+                    closeTun(newTun, newTunFd)
+                    tun = null; tunFd = -1
+                }
+                return false
+            }
+
             // Kill Switch: только если tun реально поднялся (establishTun()
             // успел отработать) — иначе блокировать нечем, ведём себя как раньше.
             val killSwitch = newTun != null && runCatching {
@@ -243,6 +297,16 @@ class HydraVpnService : VpnService() {
                 VpnState.state.value = ConnectionState.ERROR
                 stopTunnel()
             }
+        }
+        return false
+    }
+
+    /** Закрывает tun так же, как везде выше: сначала PFD, если он ещё владеет fd, иначе сырой fd. */
+    private fun closeTun(t: ParcelFileDescriptor?, fd: Int) {
+        if (t?.fileDescriptor?.valid() == true) {
+            runCatching { t.close() }
+        } else if (fd >= 0) {
+            runCatching { ParcelFileDescriptor.adoptFd(fd).close() }
         }
     }
 
@@ -312,6 +376,24 @@ class HydraVpnService : VpnService() {
             ru.gidravpn.hydra.data.repository.VpnSettingsRepository(applicationContext)
                 .killSwitch.firstOrNull()
         }.getOrNull() == true
+
+        // Фаза 7b: автопереподключение — сохраняем «чёрную дыру» (Kill Switch) или
+        // закрываем мёртвый tun и запускаем цикл; состояние — RECONNECTING, не ERROR.
+        val autoReconnect = !userStopped && lastServerId >= 0 && runCatching {
+            ru.gidravpn.hydra.data.repository.VpnSettingsRepository(applicationContext)
+                .autoReconnect.firstOrNull()
+        }.getOrNull() != false
+        if (autoReconnect) {
+            if (killSwitch && deadTun != null) {
+                tun = deadTun; tunFd = deadTunFd; killSwitchBlocking = true
+                VpnState.log("Kill Switch: трафик заблокирован на время переподключения")
+            } else {
+                tun = null; tunFd = -1
+                closeTun(deadTun, deadTunFd)
+            }
+            startReconnectLoop()
+            return
+        }
 
         if (killSwitch && deadTun != null) {
             enterKillSwitch(deadTun, deadTunFd, "туннель разорван")
@@ -394,6 +476,9 @@ class HydraVpnService : VpnService() {
     }
 
     private fun stopTunnel() {
+        userStopped = true
+        reconnectJob?.cancel()
+        reconnectJob = null
         connectJob?.cancel()
         connectJob = null
         scope.launch {
@@ -408,7 +493,114 @@ class HydraVpnService : VpnService() {
     }
 
     override fun onRevoke() { stopTunnel() }
-    override fun onDestroy() { SocketGuard.detach(); scope.cancel(); super.onDestroy() }
+    override fun onDestroy() {
+        unregisterNetworkWatcher()
+        SocketGuard.detach()
+        scope.cancel()
+        super.onDestroy()
+    }
+
+    // ----- Фаза 7b: цикл переподключения -----
+
+    private fun startReconnectLoop() {
+        reconnectJob?.cancel()
+        reconnectJob = scope.launch {
+            VpnState.state.value = ConnectionState.RECONNECTING
+            VpnState.connectedSince.value = 0L
+            val name = VpnState.activeServer.value?.name ?: "…"
+            updateNotification(ConnectionState.RECONNECTING, name)
+            var n = 0
+            while (isActive && n < ReconnectPolicy.MAX_ATTEMPTS) {
+                val wait = ReconnectPolicy.backoffMs(n)
+                VpnState.log("Переподключение: попытка ${n + 1}/$ReconnectPolicy.MAX_ATTEMPTS через ${wait / 1000} с")
+                // Ждём бэкофф, но раньше, если система сообщила о появившейся сети.
+                kotlinx.coroutines.withTimeoutOrNull(wait) { networkSignal.receive() }
+                if (!hasPhysicalNetwork()) {
+                    VpnState.log("Переподключение: нет сети, жду её появления")
+                    kotlinx.coroutines.withTimeoutOrNull(60_000) { networkSignal.receive() }
+                    if (!hasPhysicalNetwork()) { n++; continue }
+                }
+                if (doConnect(lastServerId, reconnecting = true)) return@launch
+                n++
+            }
+            if (!isActive) return@launch
+            VpnState.log("Переподключение не удалось: попытки исчерпаны")
+            giveUpReconnect()
+        }
+    }
+
+    /** Попытки исчерпаны: Kill Switch (если он держит tun) остаётся, иначе честно отключаемся. */
+    private fun giveUpReconnect() {
+        val blackhole = tun != null && killSwitchBlocking
+        VpnState.state.value = ConnectionState.ERROR
+        if (blackhole) {
+            VpnState.activeServer.value = null
+            VpnState.log("Kill Switch: трафик заблокирован (переподключение не удалось)")
+            updateNotification(ConnectionState.ERROR, getString(R.string.tile_blocked))
+        } else {
+            releaseTun()
+            VpnState.activeServer.value = null
+            updateNotification(ConnectionState.ERROR, getString(R.string.notif_conn_dropped))
+            stopForeground(STOP_FOREGROUND_DETACH)
+            stopSelf()
+        }
+    }
+
+    private fun hasPhysicalNetwork(): Boolean =
+        getSystemService(android.net.ConnectivityManager::class.java)?.let { PhysicalNetwork.pick(it) } != null
+
+    // ----- Фаза 7c: смена сети -----
+
+    /**
+     * Следит за физическими сетями: сообщает системе, какая из них подложка VPN
+     * (`setUnderlyingNetworks`) — без этого Android продолжает считать подложкой
+     * ту сеть, что была при `establish()`, и после Wi-Fi → LTE показывает «нет
+     * интернета» и неверно считает трафик, — и будит цикл переподключения.
+     */
+    private fun registerNetworkWatcher() {
+        val cm = getSystemService(android.net.ConnectivityManager::class.java) ?: return
+        val cb = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                networkSignal.trySend(Unit)
+                updateUnderlyingNetwork()
+            }
+            override fun onLost(network: android.net.Network) = updateUnderlyingNetwork()
+            override fun onCapabilitiesChanged(network: android.net.Network, caps: android.net.NetworkCapabilities) =
+                updateUnderlyingNetwork()
+        }
+        netCallback = cb
+        val request = android.net.NetworkRequest.Builder()
+            .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            .build()
+        runCatching { cm.registerNetworkCallback(request, cb) }
+    }
+
+    private fun unregisterNetworkWatcher() {
+        val cb = netCallback ?: return
+        netCallback = null
+        runCatching { getSystemService(android.net.ConnectivityManager::class.java)?.unregisterNetworkCallback(cb) }
+    }
+
+    /** Подложка VPN = лучшая физическая сеть сейчас; зовётся из колбэка и после `establish()`. */
+    private fun updateUnderlyingNetwork() {
+        if (tun == null) return
+        val cm = getSystemService(android.net.ConnectivityManager::class.java) ?: return
+        val best = PhysicalNetwork.pick(cm)
+        runCatching { setUnderlyingNetworks(best?.let { arrayOf(it) }) }
+        if (best != lastUnderlying) {
+            lastUnderlying = best
+            val kind = best?.let { cm.getNetworkCapabilities(it) }?.let { c ->
+                when {
+                    c.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
+                    c.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "мобильная сеть"
+                    c.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
+                    else -> "другая сеть"
+                }
+            } ?: "нет сети"
+            VpnState.log("Сеть: $kind")
+        }
+    }
 
     // ----- notification -----
     private fun buildNotification(state: ConnectionState, server: String): Notification {
@@ -426,6 +618,7 @@ class HydraVpnService : VpnService() {
         val title = when {
             state == ConnectionState.CONNECTED -> getString(R.string.notif_encrypted)
             state == ConnectionState.CONNECTING -> getString(R.string.connecting)
+            state == ConnectionState.RECONNECTING -> getString(R.string.notif_reconnecting)
             state == ConnectionState.ERROR && killSwitchBlocking -> getString(R.string.notif_killswitch)
             state == ConnectionState.ERROR && tunnelDropped -> getString(R.string.notif_dropped)
             state == ConnectionState.ERROR -> getString(R.string.notif_error)
@@ -461,7 +654,8 @@ class HydraVpnService : VpnService() {
             )
             b.addAction(0, getString(R.string.notif_action_disconnect), disconnect)
             b.addAction(0, getString(R.string.notif_action_servers), servers)
-        } else if (state == ConnectionState.ERROR && killSwitchBlocking) {
+} else if ((state == ConnectionState.ERROR || state == ConnectionState.RECONNECTING) && killSwitchBlocking ||
+            state == ConnectionState.RECONNECTING) {
             b.setContentText(server)
             val disconnect = PendingIntent.getService(
                 this, 1,
