@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,11 +28,11 @@ import ru.gidravpn.hydra.ui.screens.*
 import ru.gidravpn.hydra.ui.theme.*
 
 // 4 вкладки нижней навигации: Главная/Серверы/Профиль/Настройки.
-enum class Tab(val label: String, val icon: ImageVector) {
-    MAIN("Главная", Icons.Filled.Home),
-    SERVERS("Серверы", Icons.Filled.Dns),
-    PROFILE("Профиль", Icons.Filled.Person),
-    SETTINGS("Настройки", Icons.Filled.Settings),
+enum class Tab(@androidx.annotation.StringRes val label: Int, val icon: ImageVector) {
+    MAIN(R.string.tab_main, Icons.Filled.Home),
+    SERVERS(R.string.tab_servers, Icons.Filled.Dns),
+    PROFILE(R.string.tab_profile, Icons.Filled.Person),
+    SETTINGS(R.string.tab_settings, Icons.Filled.Settings),
 }
 
 @Composable
@@ -97,10 +98,10 @@ private fun NavBar(current: Tab, onSelect: (Tab) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.clickableNoRipple { onSelect(t) }.padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
-                Icon(t.icon, contentDescription = t.label, tint = color, modifier = Modifier.size(22.dp))
+                Icon(t.icon, contentDescription = stringResource(t.label), tint = color, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = t.label,
+                    text = stringResource(t.label),
                     color = color,
                     fontSize = 10.sp,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,

@@ -1,5 +1,8 @@
 package ru.gidravpn.hydra.data.model
 
+import android.content.Context
+import ru.gidravpn.hydra.R
+
 /**
  * Раздельное туннелирование (split tunneling):
  *  - [OFF] — весь трафик через VPN (по умолчанию);
@@ -15,11 +18,11 @@ enum class SplitTunnelMode { OFF, INCLUDE, EXCLUDE }
  * Тип правила маршрутизации по IP/домену — соответствует ключам
  * route.rules в конфиге sing-box (см. SingBoxConfigBuilder).
  */
-enum class NetRuleType(val singBoxKey: String, val label: String) {
-    IP_CIDR("ip_cidr", "IP/CIDR"),
-    DOMAIN("domain", "Домен"),
-    DOMAIN_SUFFIX("domain_suffix", "Поддомены"),
-    DOMAIN_KEYWORD("domain_keyword", "Ключевое слово"),
+enum class NetRuleType(val singBoxKey: String, @androidx.annotation.StringRes val labelRes: Int) {
+    IP_CIDR("ip_cidr", R.string.rule_ip_cidr),
+    DOMAIN("domain", R.string.rule_domain),
+    DOMAIN_SUFFIX("domain_suffix", R.string.rule_domain_suffix),
+    DOMAIN_KEYWORD("domain_keyword", R.string.rule_domain_keyword),
 }
 
 data class NetworkRule(val type: NetRuleType, val value: String)
@@ -36,18 +39,16 @@ data class SplitTunnel(
     val netActive get() = netMode != SplitTunnelMode.OFF && netRules.isNotEmpty()
 
     /** Краткое описание для UI (раздел «По приложениям»). */
-    val summary: String
-        get() = when (mode) {
-            SplitTunnelMode.OFF -> "Весь трафик через VPN"
-            SplitTunnelMode.INCLUDE -> "Через VPN: ${packages.size} прил. (только выбранные)"
-            SplitTunnelMode.EXCLUDE -> "Мимо VPN: ${packages.size} прил."
-        }
+    fun summary(ctx: Context): String = when (mode) {
+        SplitTunnelMode.OFF -> ctx.getString(R.string.split_sum_off)
+        SplitTunnelMode.INCLUDE -> ctx.getString(R.string.split_sum_include, packages.size)
+        SplitTunnelMode.EXCLUDE -> ctx.getString(R.string.split_sum_exclude, packages.size)
+    }
 
     /** Краткое описание для UI (раздел «По IP/доменам»). */
-    val netSummary: String
-        get() = when (netMode) {
-            SplitTunnelMode.OFF -> "IP/домены маршрутизируются как обычно"
-            SplitTunnelMode.INCLUDE -> "Через VPN только: ${netRules.size} правил(о)"
-            SplitTunnelMode.EXCLUDE -> "Мимо VPN: ${netRules.size} правил(о)"
-        }
+    fun netSummary(ctx: Context): String = when (netMode) {
+        SplitTunnelMode.OFF -> ctx.getString(R.string.split_net_sum_off)
+        SplitTunnelMode.INCLUDE -> ctx.getString(R.string.split_net_sum_include, netRules.size)
+        SplitTunnelMode.EXCLUDE -> ctx.getString(R.string.split_net_sum_exclude, netRules.size)
+    }
 }

@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tabs -->
+    <string name="tab_main">Главная</string>
+    <string name="tab_servers">Серверы</string>
+    <string name="tab_profile">Профиль</string>
+    <string name="tab_settings">Настройки</string>
+
+    <!-- Common -->
+    <string name="action_delete">Удалить</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_save">Сохранить</string>
+    <string name="action_add">Добавить</string>
+    <string name="apply_next_connect">Применяется при следующем подключении.</string>
+    <string name="status_error">Ошибка</string>
+
+    <!-- Main screen -->
+    <string name="main_protocol">Протокол</string>
+    <string name="main_current_config">Текущая конфигурация</string>
+    <string name="main_change">Изменить →</string>
+    <string name="main_cfg">Сервер: %1$s\nПорт: %2$d\nТип: %3$s</string>
+    <string name="main_no_server">Сервер не выбран</string>
+    <string name="btn_error_retry">ОШИБКА — ПОВТОРИТЬ</string>
+    <string name="btn_disconnect">ОТКЛЮЧИТЬ</string>
+    <string name="btn_connecting">ПОДКЛЮЧЕНИЕ…</string>
+    <string name="btn_connect">ПОДКЛЮЧИТЬ</string>
+    <string name="info_status">Статус</string>
+    <string name="info_server">Сервер</string>
+    <string name="info_time">Время</string>
+    <string name="info_down">↓ Загружено</string>
+    <string name="info_up">↑ Отправлено</string>
+
+    <!-- Profile -->
+    <string name="profile_stats">Статистика</string>
+    <string name="profile_session">Сессия</string>
+    <string name="profile_virtual_ip">Виртуальный IP</string>
+    <string name="profile_hidden">[скрыт]</string>
+    <string name="profile_site">Сайт</string>
+    <string name="profile_repo">Репозиторий</string>
+    <string name="profile_open_site">Открыть сайт</string>
+    <string name="profile_open_github">Открыть на GitHub</string>
+
+    <!-- Logs -->
+    <string name="log_filter_all">Все</string>
+    <string name="log_filter_warn">Предупреждения</string>
+    <string name="log_filter_error">Ошибки</string>
+    <string name="log_title">Логи подключения</string>
+    <string name="log_clear">Очистить</string>
+    <string name="log_to_file">В файл</string>
+    <string name="log_storage_open">Хранение ▲</string>
+    <string name="log_storage_closed">Хранение ▼</string>
+    <string name="log_save_on_device">Сохранять на устройстве</string>
+    <string name="log_keep">Хранить:</string>
+    <string name="log_saved">Сохранено: %1$s</string>
+    <string name="log_delete_saved">Удалить сохранённые</string>
+    <string name="logmode_off">Не сохранять</string>
+    <string name="logmode_off_desc">Логи только в памяти, пропадают при закрытии приложения.</string>
+    <string name="logmode_errors">Только ошибки и предупреждения</string>
+    <string name="logmode_errors_desc">Без адресов сайтов — хватает, чтобы разобрать сбой подключения задним числом.</string>
+    <string name="logmode_all">Полный журнал</string>
+    <string name="logmode_all_desc">Включая адрес каждого соединения — это история посещённых сайтов на устройстве.</string>
+    <string name="retention_d1">1 день</string>
+    <string name="retention_d3">3 дня</string>
+    <string name="retention_d7">7 дней</string>
+
+    <!-- Servers -->
+    <string name="servers_refresh_ping">Обновить пинг</string>
+    <string name="servers_add">+ Добавить сервер</string>
+    <string name="servers_import">📥 Импорт</string>
+    <string name="servers_delete_title">Удалить сервер?</string>
+    <string name="servers_delete_msg">«%1$s» будет удалён без возможности восстановить.</string>
+    <string name="servers_measuring">измерение…</string>
+    <string name="servers_ping_ms">%1$d мс</string>
+    <string name="servers_measure">измерить</string>
+    <string name="default_server_name">Сервер</string>
+    <string name="servers_new_title">Новый сервер</string>
+    <string name="field_name">Название</string>
+    <string name="field_address">Адрес</string>
+    <string name="field_port">Порт</string>
+    <string name="servers_protocol">Протокол: %1$s</string>
+    <string name="default_subscription_name">Подписка</string>
+    <string name="import_title">Импорт</string>
+    <string name="import_hint">Вставьте ссылку (vless://, vmess://, trojan://, ss://, hysteria2://, tuic://, wireguard://, awg://, sstp://, l2tp://), .conf WireGuard/AmneziaWG или URL подписки.</string>
+    <string name="import_link_field">Ссылка / URL</string>
+    <string name="import_sub_name_field">Имя подписки (если URL)</string>
+    <string name="import_action">Импортировать</string>
+
+    <!-- Split tunneling -->
+    <string name="split_title">Раздельное туннелирование</string>
+    <string name="split_by_apps">По приложениям</string>
+    <string name="split_by_net">По IP/доменам</string>
+    <string name="split_apps_count">Приложений в списке: %1$d</string>
+    <string name="split_all_traffic">Весь трафик</string>
+    <string name="split_only_selected">Только выбранные</string>
+    <string name="split_except_selected">Кроме выбранных</string>
+    <string name="split_search">Поиск приложения</string>
+    <string name="split_system_apps">Системные приложения</string>
+    <string name="split_apps_off_hint">Весь трафик устройства идёт через VPN. Выберите режим, чтобы настроить исключения или белый список приложений.</string>
+    <string name="split_net_engine_note">Работает только при подключении через sing-box (VLESS/VMess/Trojan/SS/Hysteria2/TUIC/WireGuard).</string>
+    <string name="split_example_ip">например 10.0.0.0/8</string>
+    <string name="split_example_domain">например example.com</string>
+    <string name="split_net_off_hint">Все IP-адреса и домены маршрутизируются как обычно. Выберите режим, чтобы задать точечные исключения или белый список.</string>
+    <string name="split_system_tag">системное</string>
+    <string name="split_sum_off">Весь трафик через VPN</string>
+    <string name="split_sum_include">Через VPN: %1$d прил. (только выбранные)</string>
+    <string name="split_sum_exclude">Мимо VPN: %1$d прил.</string>
+    <string name="split_net_sum_off">IP/домены маршрутизируются как обычно</string>
+    <string name="split_net_sum_include">Через VPN только: %1$d правил(о)</string>
+    <string name="split_net_sum_exclude">Мимо VPN: %1$d правил(о)</string>
+    <string name="rule_ip_cidr">IP/CIDR</string>
+    <string name="rule_domain">Домен</string>
+    <string name="rule_domain_suffix">Поддомены</string>
+    <string name="rule_domain_keyword">Ключевое слово</string>
+
+    <!-- Routing enums -->
+    <string name="geo_off">Выключено</string>
+    <string name="geo_off_desc">Весь трафик идёт через прокси, как обычно.</string>
+    <string name="geo_direct">Выбранные страны напрямую, остальное — через прокси</string>
+    <string name="geo_direct_desc">Их IP и сайты идут мимо VPN — быстрее для локальных сервисов.</string>
+    <string name="geo_via_proxy">Выбранные страны через прокси, остальное — напрямую</string>
+    <string name="geo_via_proxy_desc">Только их IP и сайты идут через VPN — минимальная нагрузка на прокси.</string>
+    <string name="mtu_auto">Авто (9000)</string>
+    <string name="mtu_1500">1500 — Ethernet/Wi-Fi</string>
+    <string name="mtu_1400">1400 — мобильные сети</string>
+    <string name="mtu_1280">1280 — минимум для IPv6</string>
+    <string name="frag_off_desc">Рукопожатие отправляется как обычно.</string>
+    <string name="frag_record">По TLS-записям</string>
+    <string name="frag_record_desc">ClientHello делится на несколько TLS-записей. Почти без потерь скорости — пробовать первым.</string>
+    <string name="frag_tcp">По TCP-сегментам</string>
+    <string name="frag_tcp_desc">ClientHello режется на отдельные TCP-пакеты с паузой между ними. Медленнее подключается; если не помогли TLS-записи.</string>
+    <string name="dns_system">Системный резолвер</string>
+    <string name="dns_custom">Свой адрес</string>
+
+    <!-- Settings hub -->
+    <string name="set_back">← Настройки</string>
+    <string name="set_tunnel">Туннель</string>
+    <string name="set_tunnel_sub">Протоколы и движки</string>
+    <string name="set_security">Безопасность</string>
+    <string name="set_security_sub">Kill Switch, автоподключение</string>
+    <string name="set_routing">Маршрутизация</string>
+    <string name="set_routing_sub">DNS, GeoIP по странам, фрагментация, MTU</string>
+    <string name="set_split">Split-туннелинг</string>
+    <string name="set_split_sub">Приложения через VPN / мимо VPN</string>
+    <string name="set_logs">Логи</string>
+    <string name="set_logs_sub">Журнал подключения</string>
+    <string name="set_backup">Резервная копия</string>
+    <string name="set_backup_sub">Сохранить / восстановить всё, сброс настроек</string>
+    <string name="set_about">О приложении</string>
+    <string name="set_about_sub">Версия, лицензия</string>
+    <string name="set_language">Язык</string>
+    <string name="set_language_sub">Системный, Русский, English</string>
+
+    <!-- Tunnel info -->
+    <string name="tunnel_sstp_l2tp">Полностью на Kotlin, без нативных .aar: PPP-стек (LCP, MS-CHAPv2, IPCP), SSTP поверх TLS с crypto-binding, L2TP по UDP (без IPsec/ESP). Нужен тест на устройстве.</string>
+    <string name="tunnel_pptp">Недоступно: данные в GRE (IP-протокол 47) требуют raw-сокетов/root, стек удалён из Android 12/13. Альтернативы: SSTP, L2TP, WireGuard.</string>
+    <string name="tunnel_xray">Транспорт: XTLS Vision / WS / gRPC. Flow: xtls-rprx-vision. Движок: libXray.aar.</string>
+    <string name="tunnel_singbox">Протоколы: VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5. Движок: libbox.aar.</string>
+    <string name="tunnel_wg">Обычный WireGuard — через sing-box (libbox.aar). AmneziaWG 1.0/1.5/2.0 — отдельный движок amneziawg-go.aar: обфускация Jc/Jmin/Jmax/S1/S2/H1–H4 и маркеры I1–I5. Генерация .conf/uapi готова.</string>
+    <string name="tunnel_beta">Ознакомительные движки. WDTT — WireGuard через TURN-релей облака ВК (libclient.so + VK-авторизация). olcRTC — TCP поверх WebRTC DataChannel (olcrtc.aar + tun2socks). Отмечены плашкой BETA в интерфейсе.</string>
+    <string name="xray_toggle_title">Xray Core для VLESS/VMess/Trojan/SS</string>
+    <string name="xray_toggle_desc">Вместо sing-box — ради его реализации XTLS Vision (отдельный процесс, sing-box остаётся мостом к TUN). VLESS проверен на реальном устройстве; VMess/Trojan/SS и долгая стабильность — ещё нет.</string>
+    <string name="xray_toggle_missing">Нужен app/libs/libXray.aar — см. docs/BUILD.md, раздел 2.2.</string>
+
+    <!-- Security -->
+    <string name="sec_killswitch_desc">Если попытка подключения обрывается с ошибкой, туннель не откатывается на прямое соединение — трафик блокируется, пока вы не отключите VPN вручную. Не защищает от системного отзыва VPN (другое VPN-приложение, «Отключить» в системных настройках) — для полной гарантии на уровне ОС включите ниже «Блокировать соединения без VPN».</string>
+    <string name="sec_auto_app">Автоподключение при запуске приложения</string>
+    <string name="sec_auto_app_desc">Открыли Hydra — она сама поднимет туннель к последнему серверу, если системное согласие на VPN уже выдавалось раньше.</string>
+    <string name="sec_auto_boot">Автоподключение при загрузке устройства</string>
+    <string name="sec_auto_boot_desc">Туннель поднимется сразу после перезагрузки телефона, без открытия приложения. Тоже требует ранее выданного VPN-согласия — диалог из фона показать нельзя.</string>
+    <string name="sec_tile_title">Плитка в шторке уведомлений</string>
+    <string name="sec_tile_desc">Подключает/отключает последний использованный сервер прямо из панели быстрых настроек, без открытия приложения.</string>
+    <string name="sec_tile_add">Добавить плитку →</string>
+    <string name="sec_tile_manual">Как добавить вручную →</string>
+    <string name="sec_always_on_title">Системный Always-on VPN</string>
+    <string name="sec_always_on_desc">Единственный способ гарантированно заблокировать трафик и при крахе самого приложения/сервиса, не только при ошибке подключения. Настройки → Сеть → VPN → Hydra → шестерёнка → «Постоянная VPN-сеть» + «Блокировать соединения без VPN».</string>
+    <string name="sec_open_vpn_settings">Открыть настройки VPN →</string>
+
+    <!-- Routing screen -->
+    <string name="dns_label">DNS (внутри туннеля)</string>
+    <string name="dns_custom_hint">IP, хост или DoH/DoT-URL</string>
+    <string name="dns_system_hint">Резолвер устройства, без шифрования — запросы идут мимо туннеля</string>
+    <string name="dns_invalid">Не похоже на адрес DNS. Примеры: 94.140.14.14, dns.example.com, https://dns.example.com/dns-query/токен, tls://dns.example.com</string>
+    <string name="dns_supported">Поддерживаются IP, хост (→ DoH), https://… (DoH, можно с путём и токеном), tls://… (DoT), udp://…</string>
+    <string name="geo_label">GeoIP-маршрутизация по странам</string>
+    <string name="geo_desc">Базы IP ~250 стран встроены в приложение (sing-box rule-set из MetaCubeX/meta-rules-dat), работают без интернета. Работает и для sing-box, и для Xray Core — маршрутизацией в обоих случаях владеет sing-box.</string>
+    <string name="frag_label">Фрагментация TLS (обход DPI)</string>
+    <string name="frag_desc">Режет рукопожатие с прокси-сервером, чтобы DPI не увидел имя сайта в одном пакете. Только движок sing-box и только VLESS/VMess/Trojan с TLS — не действует на Hysteria2/TUIC (там QUIC) и при включённом Xray Core. Не проверено на реальных серверах.</string>
+    <string name="mtu_label">MTU туннеля</string>
+    <string name="mtu_desc">Меняйте, только если часть сайтов «висит» при загрузке, а мелкие запросы проходят — признак потери крупных пакетов. Для SSTP/L2TP действует не выше 1400.</string>
+    <string name="mtu_auto_sub">Как было до этой настройки</string>
+    <string name="mtu_bytes">%1$d байт</string>
+    <string name="geo_countries">Страны</string>
+    <string name="geo_none_selected">Не выбрано ни одной — правило не действует</string>
+    <string name="geo_domains_note">По доменам (не только по IP) — только %1$s: для остальных нет доменных баз. Сайты на зарубежных CDN у таких стран определятся как «не их».</string>
+    <string name="geo_search">Найти страну</string>
+    <string name="geo_domains_short">домены</string>
+    <string name="geo_not_found">Ничего не найдено</string>
+
+    <!-- Backup -->
+    <string name="backup_dismiss">Нажмите, чтобы скрыть</string>
+    <string name="backup_save_title">Сохранить копию</string>
+    <string name="backup_save_desc">Все серверы, подписки и настройки — в один JSON-файл. Внимание: в файле ключи и пароли серверов открытым текстом — храните его как пароль.</string>
+    <string name="backup_save_btn">Сохранить в файл →</string>
+    <string name="backup_restore_title">Восстановить из копии</string>
+    <string name="backup_restore_desc">Заменяет ВСЕ текущие серверы, подписки и настройки содержимым файла. VPN должен быть отключён.</string>
+    <string name="backup_restore_btn">Выбрать файл →</string>
+    <string name="backup_reset_title">Сброс настроек</string>
+    <string name="backup_reset_desc">Все настройки — к значениям по умолчанию (тема, DNS, маршрутизация, Kill Switch, split-туннелинг и т.д.). Серверы и подписки останутся.</string>
+    <string name="backup_reset_btn">Сбросить настройки →</string>
+    <string name="backup_restore_q">Восстановить из копии?</string>
+    <string name="backup_restore_q_desc">Текущие серверы, подписки и настройки будут заменены. Отменить это нельзя — при сомнениях сначала сохраните текущую копию.</string>
+    <string name="backup_replace">Заменить</string>
+    <string name="backup_reset_q">Сбросить все настройки?</string>
+    <string name="backup_reset_q_desc">Серверы и подписки останутся, всё остальное вернётся к значениям по умолчанию.</string>
+    <string name="backup_reset_confirm">Сбросить</string>
+    <string name="msg_backup_saved">Копия сохранена: %1$d серв., все настройки</string>
+    <string name="msg_backup_save_failed">Не удалось сохранить: %1$s</string>
+    <string name="msg_backup_disconnect_first">Отключите VPN перед восстановлением — иначе туннель останется со старыми настройками</string>
+    <string name="msg_backup_restored">Восстановлено: %1$d серверов, %2$d подписок, %3$d настроек</string>
+    <string name="msg_backup_restore_failed">Не удалось восстановить: %1$s</string>
+    <string name="msg_reset_done">Настройки сброшены. Серверы и подписки не тронуты.</string>
+
+    <!-- About -->
+    <string name="about_text">Hydra %1$s — мультипротокольный VPN-клиент. Лицензия GPL-3.0.</string>
+
+    <!-- Language -->
+    <string name="lang_title">Язык</string>
+    <string name="lang_system">Как в системе</string>
+    <string name="lang_hint">Язык интерфейса. Логи подключения остаются на русском.</string>
+
+    <!-- Notification / tile -->
+    <string name="tile_blocked">Заблокировано</string>
+    <string name="notif_encrypted">Туннель зашифрован</string>
+    <string name="notif_killswitch">Kill Switch: трафик заблокирован</string>
+    <string name="notif_dropped">Туннель разорван</string>
+    <string name="notif_error">Ошибка подключения</string>
+    <string name="notif_action_disconnect">Отключить</string>
+    <string name="notif_action_servers">Серверы</string>
+    <string name="notif_conn_dropped">Соединение разорвано</string>
+</resources>

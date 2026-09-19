@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English (default). Russian: values-ru/strings_ui.xml. Log lines stay in Russian by design. -->
+<resources>
+    <!-- Tabs -->
+    <string name="tab_main">Home</string>
+    <string name="tab_servers">Servers</string>
+    <string name="tab_profile">Profile</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- Common -->
+    <string name="action_delete">Delete</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_add">Add</string>
+    <string name="apply_next_connect">Applied on the next connection.</string>
+    <string name="status_error">Error</string>
+
+    <!-- Main screen -->
+    <string name="main_protocol">Protocol</string>
+    <string name="main_current_config">Current configuration</string>
+    <string name="main_change">Change →</string>
+    <string name="main_cfg">Server: %1$s\nPort: %2$d\nType: %3$s</string>
+    <string name="main_no_server">No server selected</string>
+    <string name="btn_error_retry">ERROR — RETRY</string>
+    <string name="btn_disconnect">DISCONNECT</string>
+    <string name="btn_connecting">CONNECTING…</string>
+    <string name="btn_connect">CONNECT</string>
+    <string name="info_status">Status</string>
+    <string name="info_server">Server</string>
+    <string name="info_time">Time</string>
+    <string name="info_down">↓ Downloaded</string>
+    <string name="info_up">↑ Uploaded</string>
+
+    <!-- Profile -->
+    <string name="profile_stats">Statistics</string>
+    <string name="profile_session">Session</string>
+    <string name="profile_virtual_ip">Virtual IP</string>
+    <string name="profile_hidden">[hidden]</string>
+    <string name="profile_site">Website</string>
+    <string name="profile_repo">Repository</string>
+    <string name="profile_open_site">Open website</string>
+    <string name="profile_open_github">Open on GitHub</string>
+
+    <!-- Logs -->
+    <string name="log_filter_all">All</string>
+    <string name="log_filter_warn">Warnings</string>
+    <string name="log_filter_error">Errors</string>
+    <string name="log_title">Connection log</string>
+    <string name="log_clear">Clear</string>
+    <string name="log_to_file">To file</string>
+    <string name="log_storage_open">Storage ▲</string>
+    <string name="log_storage_closed">Storage ▼</string>
+    <string name="log_save_on_device">Keep on device</string>
+    <string name="log_keep">Keep:</string>
+    <string name="log_saved">Saved: %1$s</string>
+    <string name="log_delete_saved">Delete saved</string>
+    <string name="logmode_off">Don\'t save</string>
+    <string name="logmode_off_desc">Logs stay in memory and disappear when the app closes.</string>
+    <string name="logmode_errors">Errors and warnings only</string>
+    <string name="logmode_errors_desc">No website addresses — enough to investigate a connection failure afterwards.</string>
+    <string name="logmode_all">Full log</string>
+    <string name="logmode_all_desc">Includes the address of every connection — that is your browsing history stored on the device.</string>
+    <string name="retention_d1">1 day</string>
+    <string name="retention_d3">3 days</string>
+    <string name="retention_d7">7 days</string>
+
+    <!-- Servers -->
+    <string name="servers_refresh_ping">Refresh ping</string>
+    <string name="servers_add">+ Add server</string>
+    <string name="servers_import">📥 Import</string>
+    <string name="servers_delete_title">Delete server?</string>
+    <string name="servers_delete_msg">\"%1$s\" will be deleted and cannot be restored.</string>
+    <string name="servers_measuring">measuring…</string>
+    <string name="servers_ping_ms">%1$d ms</string>
+    <string name="servers_measure">measure</string>
+    <string name="default_server_name">Server</string>
+    <string name="servers_new_title">New server</string>
+    <string name="field_name">Name</string>
+    <string name="field_address">Address</string>
+    <string name="field_port">Port</string>
+    <string name="servers_protocol">Protocol: %1$s</string>
+    <string name="default_subscription_name">Subscription</string>
+    <string name="import_title">Import</string>
+    <string name="import_hint">Paste a link (vless://, vmess://, trojan://, ss://, hysteria2://, tuic://, wireguard://, awg://, sstp://, l2tp://), a WireGuard/AmneziaWG .conf, or a subscription URL.</string>
+    <string name="import_link_field">Link / URL</string>
+    <string name="import_sub_name_field">Subscription name (for URLs)</string>
+    <string name="import_action">Import</string>
+
+    <!-- Split tunneling -->
+    <string name="split_title">Split tunneling</string>
+    <string name="split_by_apps">By apps</string>
+    <string name="split_by_net">By IP / domains</string>
+    <string name="split_apps_count">Apps in the list: %1$d</string>
+    <string name="split_all_traffic">All traffic</string>
+    <string name="split_only_selected">Selected only</string>
+    <string name="split_except_selected">All except selected</string>
+    <string name="split_search">Search apps</string>
+    <string name="split_system_apps">System apps</string>
+    <string name="split_apps_off_hint">All device traffic goes through the VPN. Pick a mode to set up exceptions or an app whitelist.</string>
+    <string name="split_net_engine_note">Works only when connected through sing-box (VLESS/VMess/Trojan/SS/Hysteria2/TUIC/WireGuard).</string>
+    <string name="split_example_ip">e.g. 10.0.0.0/8</string>
+    <string name="split_example_domain">e.g. example.com</string>
+    <string name="split_net_off_hint">All IPs and domains are routed as usual. Pick a mode to set point exceptions or a whitelist.</string>
+    <string name="split_system_tag">system</string>
+    <string name="split_sum_off">All traffic through the VPN</string>
+    <string name="split_sum_include">Through the VPN: %1$d app(s) (selected only)</string>
+    <string name="split_sum_exclude">Bypassing the VPN: %1$d app(s)</string>
+    <string name="split_net_sum_off">IPs/domains are routed as usual</string>
+    <string name="split_net_sum_include">Through the VPN only: %1$d rule(s)</string>
+    <string name="split_net_sum_exclude">Bypassing the VPN: %1$d rule(s)</string>
+    <string name="rule_ip_cidr">IP/CIDR</string>
+    <string name="rule_domain">Domain</string>
+    <string name="rule_domain_suffix">Subdomains</string>
+    <string name="rule_domain_keyword">Keyword</string>
+
+    <!-- Routing enums -->
+    <string name="geo_off">Off</string>
+    <string name="geo_off_desc">All traffic goes through the proxy, as usual.</string>
+    <string name="geo_direct">Selected countries directly, the rest through the proxy</string>
+    <string name="geo_direct_desc">Their IPs and sites bypass the VPN — faster for local services.</string>
+    <string name="geo_via_proxy">Selected countries through the proxy, the rest directly</string>
+    <string name="geo_via_proxy_desc">Only their IPs and sites use the VPN — minimal proxy load.</string>
+    <string name="mtu_auto">Auto (9000)</string>
+    <string name="mtu_1500">1500 — Ethernet/Wi-Fi</string>
+    <string name="mtu_1400">1400 — mobile networks</string>
+    <string name="mtu_1280">1280 — IPv6 minimum</string>
+    <string name="frag_off_desc">The handshake is sent as usual.</string>
+    <string name="frag_record">By TLS records</string>
+    <string name="frag_record_desc">ClientHello is split into several TLS records. Almost no speed loss — try this first.</string>
+    <string name="frag_tcp">By TCP segments</string>
+    <string name="frag_tcp_desc">ClientHello is cut into separate TCP packets with a pause between them. Connects slower; use if TLS records did not help.</string>
+    <string name="dns_system">System resolver</string>
+    <string name="dns_custom">Custom address</string>
+
+    <!-- Settings hub -->
+    <string name="set_back">← Settings</string>
+    <string name="set_tunnel">Tunnel</string>
+    <string name="set_tunnel_sub">Protocols and engines</string>
+    <string name="set_security">Security</string>
+    <string name="set_security_sub">Kill Switch, auto-connect</string>
+    <string name="set_routing">Routing</string>
+    <string name="set_routing_sub">DNS, GeoIP by country, fragmentation, MTU</string>
+    <string name="set_split">Split tunneling</string>
+    <string name="set_split_sub">Apps through the VPN / bypassing it</string>
+    <string name="set_logs">Logs</string>
+    <string name="set_logs_sub">Connection journal</string>
+    <string name="set_backup">Backup</string>
+    <string name="set_backup_sub">Save / restore everything, reset settings</string>
+    <string name="set_about">About</string>
+    <string name="set_about_sub">Version, license</string>
+    <string name="set_language">Language</string>
+    <string name="set_language_sub">System, Русский, English</string>
+
+    <!-- Tunnel info -->
+    <string name="tunnel_sstp_l2tp">Pure Kotlin, no native .aar: PPP stack (LCP, MS-CHAPv2, IPCP), SSTP over TLS with crypto-binding, L2TP over UDP (no IPsec/ESP). Needs on-device testing.</string>
+    <string name="tunnel_pptp">Unavailable: GRE (IP protocol 47) needs raw sockets/root, and the stack was removed from Android 12/13. Alternatives: SSTP, L2TP, WireGuard.</string>
+    <string name="tunnel_xray">Transport: XTLS Vision / WS / gRPC. Flow: xtls-rprx-vision. Engine: libXray.aar.</string>
+    <string name="tunnel_singbox">Protocols: VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5. Engine: libbox.aar.</string>
+    <string name="tunnel_wg">Plain WireGuard runs through sing-box (libbox.aar). AmneziaWG 1.0/1.5/2.0 uses its own engine, amneziawg-go.aar: Jc/Jmin/Jmax/S1/S2/H1–H4 obfuscation and I1–I5 markers. .conf/uapi generation is ready.</string>
+    <string name="tunnel_beta">Experimental engines. WDTT — WireGuard through a VK cloud TURN relay (libclient.so + VK sign-in). olcRTC — TCP over a WebRTC DataChannel (olcrtc.aar + tun2socks). Marked with a BETA badge in the interface.</string>
+    <string name="xray_toggle_title">Xray Core for VLESS/VMess/Trojan/SS</string>
+    <string name="xray_toggle_desc">Instead of sing-box — for its XTLS Vision implementation (separate process, sing-box stays as the bridge to the TUN). VLESS is verified on a real device; VMess/Trojan/SS and long-term stability are not yet.</string>
+    <string name="xray_toggle_missing">Requires app/libs/libXray.aar — see docs/BUILD.md, section 2.2.</string>
+
+    <!-- Security -->
+    <string name="sec_killswitch_desc">If a connection attempt fails, the tunnel does not fall back to a direct connection — traffic is blocked until you disconnect the VPN manually. It does not protect against the system revoking the VPN (another VPN app, \"Disconnect\" in system settings) — for a full guarantee at OS level enable \"Block connections without VPN\" below.</string>
+    <string name="sec_auto_app">Auto-connect on app start</string>
+    <string name="sec_auto_app_desc">Open Hydra and it brings the tunnel up to the last server, if VPN consent was granted earlier.</string>
+    <string name="sec_auto_boot">Auto-connect on device boot</string>
+    <string name="sec_auto_boot_desc">The tunnel comes up right after the phone reboots, without opening the app. Also needs previously granted VPN consent — a dialog cannot be shown from the background.</string>
+    <string name="sec_tile_title">Quick Settings tile</string>
+    <string name="sec_tile_desc">Connects/disconnects the last used server right from the quick settings panel, without opening the app.</string>
+    <string name="sec_tile_add">Add tile →</string>
+    <string name="sec_tile_manual">How to add manually →</string>
+    <string name="sec_always_on_title">System Always-on VPN</string>
+    <string name="sec_always_on_desc">The only way to guarantee traffic is blocked even if the app or service itself crashes, not just when a connection fails. Settings → Network → VPN → Hydra → gear → \"Always-on VPN\" + \"Block connections without VPN\".</string>
+    <string name="sec_open_vpn_settings">Open VPN settings →</string>
+
+    <!-- Routing screen -->
+    <string name="dns_label">DNS (inside the tunnel)</string>
+    <string name="dns_custom_hint">IP, host or DoH/DoT URL</string>
+    <string name="dns_system_hint">Device resolver, unencrypted — queries bypass the tunnel</string>
+    <string name="dns_invalid">Doesn\'t look like a DNS address. Examples: 94.140.14.14, dns.example.com, https://dns.example.com/dns-query/token, tls://dns.example.com</string>
+    <string name="dns_supported">Supported: IP, host (→ DoH), https://… (DoH, path and token allowed), tls://… (DoT), udp://…</string>
+    <string name="geo_label">GeoIP routing by country</string>
+    <string name="geo_desc">IP databases for ~250 countries are built into the app (sing-box rule-sets from MetaCubeX/meta-rules-dat) and work offline. Works for both sing-box and Xray Core — sing-box owns routing in both cases.</string>
+    <string name="frag_label">TLS fragmentation (DPI bypass)</string>
+    <string name="frag_desc">Splits the handshake with the proxy server so DPI can\'t see the site name in a single packet. sing-box only, and only VLESS/VMess/Trojan with TLS — has no effect on Hysteria2/TUIC (QUIC) or with Xray Core enabled. Not tested on real servers.</string>
+    <string name="mtu_label">Tunnel MTU</string>
+    <string name="mtu_desc">Change only if some sites hang while loading but small requests work — a sign of large packets being lost. For SSTP/L2TP it never exceeds 1400.</string>
+    <string name="mtu_auto_sub">As before this setting existed</string>
+    <string name="mtu_bytes">%1$d bytes</string>
+    <string name="geo_countries">Countries</string>
+    <string name="geo_none_selected">None selected — the rule has no effect</string>
+    <string name="geo_domains_note">Domain-based matching (not just IP) exists only for %1$s: the rest have no domain databases. Sites on foreign CDNs will be classified as \"not theirs\".</string>
+    <string name="geo_search">Find a country</string>
+    <string name="geo_domains_short">domains</string>
+    <string name="geo_not_found">Nothing found</string>
+
+    <!-- Backup -->
+    <string name="backup_dismiss">Tap to dismiss</string>
+    <string name="backup_save_title">Save a backup</string>
+    <string name="backup_save_desc">All servers, subscriptions and settings in a single JSON file. Note: keys and passwords are stored in plain text — keep the file like a password.</string>
+    <string name="backup_save_btn">Save to file →</string>
+    <string name="backup_restore_title">Restore from backup</string>
+    <string name="backup_restore_desc">Replaces ALL current servers, subscriptions and settings with the file contents. The VPN must be disconnected.</string>
+    <string name="backup_restore_btn">Choose file →</string>
+    <string name="backup_reset_title">Reset settings</string>
+    <string name="backup_reset_desc">All settings return to defaults (theme, DNS, routing, Kill Switch, split tunneling, etc.). Servers and subscriptions stay.</string>
+    <string name="backup_reset_btn">Reset settings →</string>
+    <string name="backup_restore_q">Restore from backup?</string>
+    <string name="backup_restore_q_desc">Current servers, subscriptions and settings will be replaced. This cannot be undone — save a current backup first if in doubt.</string>
+    <string name="backup_replace">Replace</string>
+    <string name="backup_reset_q">Reset all settings?</string>
+    <string name="backup_reset_q_desc">Servers and subscriptions stay, everything else returns to defaults.</string>
+    <string name="backup_reset_confirm">Reset</string>
+    <string name="msg_backup_saved">Backup saved: %1$d server(s), all settings</string>
+    <string name="msg_backup_save_failed">Could not save: %1$s</string>
+    <string name="msg_backup_disconnect_first">Disconnect the VPN before restoring — otherwise the tunnel keeps the old settings</string>
+    <string name="msg_backup_restored">Restored: %1$d servers, %2$d subscriptions, %3$d settings</string>
+    <string name="msg_backup_restore_failed">Could not restore: %1$s</string>
+    <string name="msg_reset_done">Settings reset. Servers and subscriptions were not touched.</string>
+
+    <!-- About -->
+    <string name="about_text">Hydra %1$s — multi-protocol VPN client. License: GPL-3.0.</string>
+
+    <!-- Language -->
+    <string name="lang_title">Language</string>
+    <string name="lang_system">System default</string>
+    <string name="lang_hint">The interface language. Connection logs stay in Russian.</string>
+
+    <!-- Notification / tile -->
+    <string name="tile_blocked">Blocked</string>
+    <string name="notif_encrypted">Tunnel encrypted</string>
+    <string name="notif_killswitch">Kill Switch: traffic blocked</string>
+    <string name="notif_dropped">Tunnel dropped</string>
+    <string name="notif_error">Connection error</string>
+    <string name="notif_action_disconnect">Disconnect</string>
+    <string name="notif_action_servers">Servers</string>
+    <string name="notif_conn_dropped">Connection dropped</string>
+</resources>

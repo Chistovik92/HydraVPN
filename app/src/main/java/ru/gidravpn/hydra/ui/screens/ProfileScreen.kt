@@ -1,5 +1,8 @@
 package ru.gidravpn.hydra.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import ru.gidravpn.hydra.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -71,7 +74,7 @@ fun ProfileScreen(vm: MainViewModel) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Профиль", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Text(stringResource(R.string.tab_profile), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
 
         Card(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -88,11 +91,11 @@ fun ProfileScreen(vm: MainViewModel) {
         }
 
         Card(Modifier.fillMaxWidth()) {
-            Label("Статистика")
+            Label(stringResource(R.string.profile_stats))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                StatCell("Статус", if (connected) "Подключено" else "Отключено", if (connected) Success else TextMuted)
-                StatCell("Сервер", server?.name ?: "—", TextPrimary)
-                StatCell("Сессия", elapsed, TextPrimary)
+                StatCell(stringResource(R.string.info_status), if (connected) stringResource(R.string.connected) else stringResource(R.string.disconnected), if (connected) Success else TextMuted)
+                StatCell(stringResource(R.string.info_server), server?.name ?: "—", TextPrimary)
+                StatCell(stringResource(R.string.profile_session), elapsed, TextPrimary)
             }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -106,8 +109,8 @@ fun ProfileScreen(vm: MainViewModel) {
         }
 
         Card(Modifier.fillMaxWidth()) {
-            Label("Виртуальный IP")
-            Text("[скрыт]", color = TextSecondary, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+            Label(stringResource(R.string.profile_virtual_ip))
+            Text(stringResource(R.string.profile_hidden), color = TextSecondary, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
         }
 
         WebsiteCard()
@@ -129,10 +132,10 @@ private fun WebsiteCard() {
     Card(Modifier.fillMaxWidth().clickableNoRipple { uriHandler.openUri(WEBSITE_URL) }) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
-                Text("Сайт", color = TextMuted, fontSize = 11.sp)
+                Text(stringResource(R.string.profile_site), color = TextMuted, fontSize = 11.sp)
                 Text(WEBSITE_URL.removePrefix("https://"), color = TextPrimary, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
             }
-            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Открыть сайт", tint = AccentCyan)
+            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = stringResource(R.string.profile_open_site), tint = AccentCyan)
         }
     }
 }
@@ -143,10 +146,10 @@ private fun GithubCard() {
     Card(Modifier.fillMaxWidth().clickableNoRipple { uriHandler.openUri("https://github.com/$GITHUB_REPO") }) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
-                Text("Репозиторий", color = TextMuted, fontSize = 11.sp)
+                Text(stringResource(R.string.profile_repo), color = TextMuted, fontSize = 11.sp)
                 Text(GITHUB_REPO, color = TextPrimary, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
             }
-            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Открыть на GitHub", tint = AccentCyan)
+            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = stringResource(R.string.profile_open_github), tint = AccentCyan)
         }
     }
 }

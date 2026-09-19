@@ -1,5 +1,8 @@
 package ru.gidravpn.hydra.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import ru.gidravpn.hydra.R
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -29,8 +32,8 @@ import ru.gidravpn.hydra.ui.components.clickableNoRipple
 import ru.gidravpn.hydra.ui.components.humanBytes
 import ru.gidravpn.hydra.ui.theme.*
 
-private enum class LogFilter(val label: String, val min: LogLevel) {
-    ALL("Все", LogLevel.DEBUG), WARN("Предупреждения", LogLevel.WARN), ERROR("Ошибки", LogLevel.ERROR)
+private enum class LogFilter(@androidx.annotation.StringRes val label: Int, val min: LogLevel) {
+    ALL(R.string.log_filter_all, LogLevel.DEBUG), WARN(R.string.log_filter_warn, LogLevel.WARN), ERROR(R.string.log_filter_error, LogLevel.ERROR)
 }
 
 @Composable
@@ -51,17 +54,17 @@ fun LogsScreen(vm: MainViewModel) {
     Column(Modifier.fillMaxSize().padding(20.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically) {
-            Text("Логи подключения", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
-            SmallButton("Очистить", Danger) { vm.clearLogs() }
+            Text(stringResource(R.string.log_title), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+            SmallButton(stringResource(R.string.log_clear), Danger) { vm.clearLogs() }
         }
         Spacer(Modifier.height(12.dp))
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            LogFilter.entries.forEach { f -> SmallButton(f.label, if (filter == f) AccentCyan else TextSecondary) { filter = f } }
-            SmallButton("В файл", AccentViolet) {
+            LogFilter.entries.forEach { f -> SmallButton(stringResource(f.label), if (filter == f) AccentCyan else TextSecondary) { filter = f } }
+            SmallButton(stringResource(R.string.log_to_file), AccentViolet) {
                 val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm", java.util.Locale.US).format(java.util.Date())
                 exportLauncher.launch("hydra-log-$stamp.txt")
             }
-            SmallButton(if (showStorage) "Хранение ▲" else "Хранение ▼", TextSecondary) {
+            SmallButton(stringResource(if (showStorage) R.string.log_storage_open else R.string.log_storage_closed), TextSecondary) {
                 showStorage = !showStorage
                 if (showStorage) vm.refreshStoredLogSize()
             }
@@ -97,27 +100,27 @@ private fun LogStorageSettings(vm: MainViewModel) {
             .border(1.dp, Border, RoundedCornerShape(12.dp)).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text("Сохранять на устройстве", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.log_save_on_device), color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         LogPersistMode.entries.forEach { m ->
             Column(Modifier.fillMaxWidth().clickableNoRipple { vm.setLogPersistMode(m) }) {
-                Text((if (m == mode) "● " else "○ ") + m.label,
+                Text((if (m == mode) "● " else "○ ") + stringResource(m.labelRes),
                     color = if (m == mode) AccentCyan else TextSecondary, fontSize = 12.sp)
-                Text(m.description, color = if (m == LogPersistMode.ALL) Danger.copy(alpha = 0.8f) else TextMuted,
+                Text(stringResource(m.descriptionRes), color = if (m == LogPersistMode.ALL) Danger.copy(alpha = 0.8f) else TextMuted,
                     fontSize = 10.sp, modifier = Modifier.padding(start = 14.dp))
             }
         }
         if (mode != LogPersistMode.OFF) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Хранить:", color = TextMuted, fontSize = 12.sp)
+                Text(stringResource(R.string.log_keep), color = TextMuted, fontSize = 12.sp)
                 LogRetention.entries.forEach { r ->
-                    SmallButton(r.label, if (r == retention) AccentCyan else TextSecondary) { vm.setLogRetention(r) }
+                    SmallButton(stringResource(r.labelRes), if (r == retention) AccentCyan else TextSecondary) { vm.setLogRetention(r) }
                 }
             }
         }
         Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()) {
-            Text("Сохранено: ${humanBytes(bytes)}", color = TextMuted, fontSize = 12.sp)
-            SmallButton("Удалить сохранённые", Danger) { vm.clearStoredLogs() }
+            Text(stringResource(R.string.log_saved, humanBytes(bytes)), color = TextMuted, fontSize = 12.sp)
+            SmallButton(stringResource(R.string.log_delete_saved), Danger) { vm.clearStoredLogs() }
         }
     }
 }

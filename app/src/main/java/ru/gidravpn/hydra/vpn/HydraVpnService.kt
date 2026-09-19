@@ -35,6 +35,9 @@ import kotlinx.coroutines.launch
  * выводятся из-под VPN-маршрутизации через [SocketGuard].
  */
 class HydraVpnService : VpnService() {
+    override fun attachBaseContext(base: android.content.Context) {
+        super.attachBaseContext(ru.gidravpn.hydra.LocaleHelper.wrap(base))
+    }
 
     // @Volatile: поля читаются и пишутся с разных потоков — корутины сервиса
     // живут на Dispatchers.IO (это пул, а не один поток), onStartCommand
@@ -269,7 +272,7 @@ class HydraVpnService : VpnService() {
         VpnState.activeServer.value = null
         VpnState.connectedSince.value = 0L
         VpnState.log("Kill Switch: трафик заблокирован ($reason)")
-        updateNotification(ConnectionState.ERROR, "Заблокировано")
+        updateNotification(ConnectionState.ERROR, getString(R.string.tile_blocked))
     }
 
     /**
@@ -325,7 +328,7 @@ class HydraVpnService : VpnService() {
             VpnState.state.value = ConnectionState.ERROR
             VpnState.activeServer.value = null
             VpnState.connectedSince.value = 0L
-            updateNotification(ConnectionState.ERROR, "Соединение разорвано")
+            updateNotification(ConnectionState.ERROR, getString(R.string.notif_conn_dropped))
             stopForeground(STOP_FOREGROUND_DETACH)
             stopSelf()
         }
@@ -421,12 +424,12 @@ class HydraVpnService : VpnService() {
             PendingIntent.FLAG_IMMUTABLE
         )
         val title = when {
-            state == ConnectionState.CONNECTED -> "Туннель зашифрован"
-            state == ConnectionState.CONNECTING -> "Подключение…"
-            state == ConnectionState.ERROR && killSwitchBlocking -> "Kill Switch: трафик заблокирован"
-            state == ConnectionState.ERROR && tunnelDropped -> "Туннель разорван"
-            state == ConnectionState.ERROR -> "Ошибка подключения"
-            else -> "Отключено"
+            state == ConnectionState.CONNECTED -> getString(R.string.notif_encrypted)
+            state == ConnectionState.CONNECTING -> getString(R.string.connecting)
+            state == ConnectionState.ERROR && killSwitchBlocking -> getString(R.string.notif_killswitch)
+            state == ConnectionState.ERROR && tunnelDropped -> getString(R.string.notif_dropped)
+            state == ConnectionState.ERROR -> getString(R.string.notif_error)
+            else -> getString(R.string.disconnected)
         }
         val b = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
@@ -456,8 +459,8 @@ class HydraVpnService : VpnService() {
                     .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
                 PendingIntent.FLAG_IMMUTABLE
             )
-            b.addAction(0, "Отключить", disconnect)
-            b.addAction(0, "Серверы", servers)
+            b.addAction(0, getString(R.string.notif_action_disconnect), disconnect)
+            b.addAction(0, getString(R.string.notif_action_servers), servers)
         } else if (state == ConnectionState.ERROR && killSwitchBlocking) {
             b.setContentText(server)
             val disconnect = PendingIntent.getService(
@@ -465,7 +468,7 @@ class HydraVpnService : VpnService() {
                 Intent(this, HydraVpnService::class.java).setAction(ACTION_DISCONNECT),
                 PendingIntent.FLAG_IMMUTABLE
             )
-            b.addAction(0, "Отключить", disconnect)
+            b.addAction(0, getString(R.string.notif_action_disconnect), disconnect)
         } else {
             b.setContentText(server)
         }
@@ -478,10 +481,5 @@ class HydraVpnService : VpnService() {
     }
 
     /** Байты в человекочитаемый вид: «0,0 MB» для килобайт выглядело как поломка. */
-    private fun humanBytes(bytes: Long): String = when {
-        bytes >= 1_000_000_000 -> "%.2f ГБ".format(bytes / 1_000_000_000.0)
-        bytes >= 1_000_000 -> "%.1f МБ".format(bytes / 1_000_000.0)
-        bytes >= 1_000 -> "%.0f КБ".format(bytes / 1_000.0)
-        else -> "$bytes Б"
-    }
+    private fun humanBytes(bytes: Long): String = ru.gidravpn.hydra.ui.components.humanBytes(bytes)
 }

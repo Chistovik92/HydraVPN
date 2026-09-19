@@ -28,6 +28,9 @@ import ru.gidravpn.hydra.vpn.core.ConnectionState
  * если согласие ещё не выдавалось, тап просто открывает MainActivity.
  */
 class HydraQsTileService : TileService() {
+    override fun attachBaseContext(base: android.content.Context) {
+        super.attachBaseContext(ru.gidravpn.hydra.LocaleHelper.wrap(base))
+    }
 
     // Main: qsTile/updateTile() — API TileService, трогаем с главного потока.
     // Room и DataStore main-safe, так что onClick тоже живёт здесь.
@@ -111,10 +114,10 @@ class HydraQsTileService : TileService() {
         t.label = "Hydra VPN"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             t.subtitle = when (state) {
-                ConnectionState.CONNECTED -> VpnState.activeServer.value?.name ?: "Подключено"
-                ConnectionState.CONNECTING -> "Подключение…"
-                ConnectionState.ERROR -> "Заблокировано"
-                ConnectionState.DISCONNECTED -> "Отключено"
+                ConnectionState.CONNECTED -> VpnState.activeServer.value?.name ?: getString(R.string.connected)
+                ConnectionState.CONNECTING -> getString(R.string.connecting)
+                ConnectionState.ERROR -> getString(R.string.tile_blocked)
+                ConnectionState.DISCONNECTED -> getString(R.string.disconnected)
             }
         }
         t.updateTile()

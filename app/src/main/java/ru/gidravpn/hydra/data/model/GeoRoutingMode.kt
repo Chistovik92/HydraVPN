@@ -8,15 +8,15 @@ import java.util.Locale
  * Действует одинаково для native sing-box и для Xray-моста — TUN и
  * маршрутизация в обоих случаях на стороне sing-box (см. buildXrayBridge).
  */
-enum class GeoRoutingMode(val label: String, val description: String) {
-    OFF("Выключено", "Весь трафик идёт через прокси, как обычно."),
+enum class GeoRoutingMode(@androidx.annotation.StringRes val labelRes: Int, @androidx.annotation.StringRes val descriptionRes: Int) {
+    OFF(ru.gidravpn.hydra.R.string.geo_off, ru.gidravpn.hydra.R.string.geo_off_desc),
     DIRECT(
-        "Выбранные страны напрямую, остальное — через прокси",
-        "Их IP и сайты идут мимо VPN — быстрее для локальных сервисов."
+        ru.gidravpn.hydra.R.string.geo_direct,
+        ru.gidravpn.hydra.R.string.geo_direct_desc
     ),
     VIA_PROXY(
-        "Выбранные страны через прокси, остальное — напрямую",
-        "Только их IP и сайты идут через VPN — минимальная нагрузка на прокси."
+        ru.gidravpn.hydra.R.string.geo_via_proxy,
+        ru.gidravpn.hydra.R.string.geo_via_proxy_desc
     );
 
     companion object {
@@ -29,6 +29,6 @@ enum class GeoRoutingMode(val label: String, val description: String) {
     }
 }
 
-/** ISO-код страны → название по-русски («ru» → «Россия»). */
+/** ISO-код страны → название на языке интерфейса («ru» → «Россия» / «Russia»). */
 fun countryName(code: String): String =
-    Locale("", code.uppercase()).getDisplayCountry(Locale("ru")).ifBlank { code.uppercase() }
+    Locale("", code.uppercase()).getDisplayCountry(Locale.getDefault()).ifBlank { code.uppercase() }

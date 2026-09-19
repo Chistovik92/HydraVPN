@@ -39,7 +39,7 @@ import ru.gidravpn.hydra.ui.theme.*
 import ru.gidravpn.hydra.vpn.HydraQsTileService
 
 /** Подэкраны Настроек — Split и Логи переехали сюда из верхнего уровня навигации. */
-private enum class SettingsSection { HUB, TUNNEL, SECURITY, ROUTING, SPLIT, HOTSPOT, LOGS, THEME, BACKUP, ABOUT }
+private enum class SettingsSection { HUB, TUNNEL, SECURITY, ROUTING, SPLIT, HOTSPOT, LOGS, THEME, LANGUAGE, BACKUP, ABOUT }
 
 @Composable
 fun SettingsScreen(vm: MainViewModel) {
@@ -52,6 +52,7 @@ fun SettingsScreen(vm: MainViewModel) {
         SettingsSection.ROUTING -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { RoutingContent(vm) }
         SettingsSection.SPLIT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { SplitTunnelScreen(vm) }
         SettingsSection.HOTSPOT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { HotspotContent(vm) }
+        SettingsSection.LANGUAGE -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { LanguageContent() }
         SettingsSection.LOGS -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { LogsScreen(vm) }
         SettingsSection.THEME -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { ThemeContent(vm) }
         SettingsSection.BACKUP -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { BackupContent(vm) }
@@ -65,17 +66,18 @@ private fun SettingsHub(onSelect: (SettingsSection) -> Unit) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Настройки", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Text(stringResource(R.string.tab_settings), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
 
-        HubRow("🌐", "Туннель", "Протоколы и движки", AccentViolet) { onSelect(SettingsSection.TUNNEL) }
-        HubRow("🛡️", "Безопасность", "Kill Switch, автоподключение", Danger) { onSelect(SettingsSection.SECURITY) }
-        HubRow("🧭", "Маршрутизация", "DNS, GeoIP по странам, фрагментация, MTU", AccentIndigo) { onSelect(SettingsSection.ROUTING) }
-        HubRow("🔀", "Split-туннелинг", "Приложения через VPN / мимо VPN", AccentCyan) { onSelect(SettingsSection.SPLIT) }
+        HubRow("🌐", stringResource(R.string.set_tunnel), stringResource(R.string.set_tunnel_sub), AccentViolet) { onSelect(SettingsSection.TUNNEL) }
+        HubRow("🛡️", stringResource(R.string.set_security), stringResource(R.string.set_security_sub), Danger) { onSelect(SettingsSection.SECURITY) }
+        HubRow("🧭", stringResource(R.string.set_routing), stringResource(R.string.set_routing_sub), AccentIndigo) { onSelect(SettingsSection.ROUTING) }
+        HubRow("🔀", stringResource(R.string.set_split), stringResource(R.string.set_split_sub), AccentCyan) { onSelect(SettingsSection.SPLIT) }
         HubRow("📡", stringResource(R.string.hotspot_hub_title), stringResource(R.string.hotspot_hub_subtitle), AccentIndigo) { onSelect(SettingsSection.HOTSPOT) }
-        HubRow("📋", "Логи", "Журнал подключения", TextSecondary) { onSelect(SettingsSection.LOGS) }
+        HubRow("📋", stringResource(R.string.set_logs), stringResource(R.string.set_logs_sub), TextSecondary) { onSelect(SettingsSection.LOGS) }
         HubRow("🎨", stringResource(R.string.theme_title), "Ambient · Stealth · AMOLED · Material You", AccentCyan) { onSelect(SettingsSection.THEME) }
-        HubRow("💾", "Резервная копия", "Сохранить / восстановить всё, сброс настроек", AccentViolet) { onSelect(SettingsSection.BACKUP) }
-        HubRow("ℹ️", "О приложении", "Версия, лицензия", TextSecondary) { onSelect(SettingsSection.ABOUT) }
+        HubRow("🌍", stringResource(R.string.set_language), stringResource(R.string.set_language_sub), AccentIndigo) { onSelect(SettingsSection.LANGUAGE) }
+        HubRow("💾", stringResource(R.string.set_backup), stringResource(R.string.set_backup_sub), AccentViolet) { onSelect(SettingsSection.BACKUP) }
+        HubRow("ℹ️", stringResource(R.string.set_about), stringResource(R.string.set_about_sub), TextSecondary) { onSelect(SettingsSection.ABOUT) }
     }
 }
 
@@ -108,7 +110,7 @@ private fun SettingsSubScreen(onBack: () -> Unit, content: @Composable () -> Uni
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "← Настройки", color = AccentCyan, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                stringResource(R.string.set_back), color = AccentCyan, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.clickableNoRipple(onBack).padding(8.dp)
             )
         }
@@ -120,32 +122,32 @@ private fun SettingsSubScreen(onBack: () -> Unit, content: @Composable () -> Uni
 private fun TunnelInfoContent(vm: MainViewModel) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Туннель", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Text(stringResource(R.string.set_tunnel), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
 
         XrayEngineToggle(vm)
 
         InfoGroup("SSTP / L2TP (userspace PPP)", AccentCyan) {
-            Text("Полностью на Kotlin, без нативных .aar: PPP-стек (LCP, MS-CHAPv2, IPCP), SSTP поверх TLS с crypto-binding, L2TP по UDP (без IPsec/ESP). Нужен тест на устройстве.",
+            Text(stringResource(R.string.tunnel_sstp_l2tp),
                 color = TextMuted, fontSize = 12.sp)
         }
         InfoGroup("PPTP", Danger) {
-            Text("Недоступно: данные в GRE (IP-протокол 47) требуют raw-сокетов/root, стек удалён из Android 12/13. Альтернативы: SSTP, L2TP, WireGuard.",
+            Text(stringResource(R.string.tunnel_pptp),
                 color = TextMuted, fontSize = 12.sp)
         }
         InfoGroup("Xray Core", AccentIndigo) {
-            Text("Транспорт: XTLS Vision / WS / gRPC. Flow: xtls-rprx-vision. Движок: libXray.aar.",
+            Text(stringResource(R.string.tunnel_xray),
                 color = TextMuted, fontSize = 12.sp)
         }
         InfoGroup("sing-box", AccentViolet) {
-            Text("Протоколы: VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5. Движок: libbox.aar.",
+            Text(stringResource(R.string.tunnel_singbox),
                 color = TextMuted, fontSize = 12.sp)
         }
         InfoGroup("WireGuard / AmneziaWG", Success) {
-            Text("Обычный WireGuard — через sing-box (libbox.aar). AmneziaWG 1.0/1.5/2.0 — отдельный движок amneziawg-go.aar: обфускация Jc/Jmin/Jmax/S1/S2/H1–H4 и маркеры I1–I5. Генерация .conf/uapi готова.",
+            Text(stringResource(R.string.tunnel_wg),
                 color = TextMuted, fontSize = 12.sp)
         }
-        InfoGroup("WDTT и olcRTC (BETA)", AccentViolet) {
-            Text("Ознакомительные движки. WDTT — WireGuard через TURN-релей облака ВК (libclient.so + VK-авторизация). olcRTC — TCP поверх WebRTC DataChannel (olcrtc.aar + tun2socks). Отмечены плашкой BETA в интерфейсе.",
+        InfoGroup("WDTT / olcRTC (BETA)", AccentViolet) {
+            Text(stringResource(R.string.tunnel_beta),
                 color = TextMuted, fontSize = 12.sp)
         }
     }
@@ -163,14 +165,14 @@ private fun XrayEngineToggle(vm: MainViewModel) {
         ) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Xray Core для VLESS/VMess/Trojan/SS", color = TextPrimary,
+                    Text(stringResource(R.string.xray_toggle_title), color = TextPrimary,
                         fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.width(6.dp))
                     ru.gidravpn.hydra.ui.components.BetaBadge()
                 }
                 Text(
-                    if (available) "Вместо sing-box — ради его реализации XTLS Vision (отдельный процесс, sing-box остаётся мостом к TUN). VLESS проверен на реальном устройстве; VMess/Trojan/SS и долгая стабильность — ещё нет."
-                    else "Нужен app/libs/libXray.aar — см. docs/BUILD.md, раздел 2.2.",
+                    if (available) stringResource(R.string.xray_toggle_desc)
+                    else stringResource(R.string.xray_toggle_missing),
                     color = TextMuted, fontSize = 11.sp
                 )
             }
@@ -196,46 +198,38 @@ private fun SecurityContent(vm: MainViewModel) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Безопасность", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Text(stringResource(R.string.set_security), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
 
         SecurityToggleCard(
             title = "Kill Switch",
-            description = "Если попытка подключения обрывается с ошибкой, туннель не " +
-                "откатывается на прямое соединение — трафик блокируется, пока вы не " +
-                "отключите VPN вручную. Не защищает от системного отзыва VPN (другое " +
-                "VPN-приложение, «Отключить» в системных настройках) — для полной " +
-                "гарантии на уровне ОС включите ниже «Блокировать соединения без VPN».",
+description = stringResource(R.string.sec_killswitch_desc),
             checked = killSwitch,
             onCheckedChange = { vm.setKillSwitch(it) }
         )
 
         SecurityToggleCard(
-            title = "Автоподключение при запуске приложения",
-            description = "Открыли Hydra — она сама поднимет туннель к последнему серверу, " +
-                "если системное согласие на VPN уже выдавалось раньше.",
+            title = stringResource(R.string.sec_auto_app),
+description = stringResource(R.string.sec_auto_app_desc),
             checked = autoApp,
             onCheckedChange = { vm.setAutoConnectOnAppStart(it) }
         )
 
         SecurityToggleCard(
-            title = "Автоподключение при загрузке устройства",
-            description = "Туннель поднимется сразу после перезагрузки телефона, без " +
-                "открытия приложения. Тоже требует ранее выданного VPN-согласия — " +
-                "диалог из фона показать нельзя.",
+            title = stringResource(R.string.sec_auto_boot),
+description = stringResource(R.string.sec_auto_boot_desc),
             checked = autoBoot,
             onCheckedChange = { vm.setAutoConnectOnBoot(it) }
         )
 
-        InfoGroup("Плитка в шторке уведомлений", AccentCyan) {
+        InfoGroup(stringResource(R.string.sec_tile_title), AccentCyan) {
             Text(
-                "Подключает/отключает последний использованный сервер прямо из панели " +
-                    "быстрых настроек, без открытия приложения.",
+stringResource(R.string.sec_tile_desc),
                 color = TextMuted, fontSize = 12.sp
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) "Добавить плитку →"
-                else "Как добавить вручную →",
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) stringResource(R.string.sec_tile_add)
+                else stringResource(R.string.sec_tile_manual),
                 color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.clickableNoRipple {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -255,17 +249,14 @@ private fun SecurityContent(vm: MainViewModel) {
             )
         }
 
-        InfoGroup("Системный Always-on VPN", TextSecondary) {
+        InfoGroup(stringResource(R.string.sec_always_on_title), TextSecondary) {
             Text(
-                "Единственный способ гарантированно заблокировать трафик и при крахе " +
-                    "самого приложения/сервиса, не только при ошибке подключения. " +
-                    "Настройки → Сеть → VPN → Hydra → шестерёнка → «Постоянная VPN-сеть» + " +
-                    "«Блокировать соединения без VPN».",
+stringResource(R.string.sec_always_on_desc),
                 color = TextMuted, fontSize = 12.sp
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                "Открыть настройки VPN →", color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                stringResource(R.string.sec_open_vpn_settings), color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.clickableNoRipple {
                     runCatching { context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS)) }
                 }
@@ -311,17 +302,17 @@ private fun RoutingContent(vm: MainViewModel) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Маршрутизация", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Text(stringResource(R.string.set_routing), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
 
-        Label("DNS (внутри туннеля)")
+        Label(stringResource(R.string.dns_label))
         ru.gidravpn.hydra.data.model.DnsProvider.entries.forEach { provider ->
             RoutingOptionCard(
-                title = provider.label,
+                title = provider.labelRes?.let { stringResource(it) } ?: provider.label,
                 subtitle = when {
                     provider.address != null -> "${provider.address} · DoH"
                     provider == ru.gidravpn.hydra.data.model.DnsProvider.CUSTOM ->
-                        if (dnsCustom.isNotBlank()) dnsCustom else "IP, хост или DoH/DoT-URL"
-                    else -> "Резолвер устройства, без шифрования — запросы идут мимо туннеля"
+                        if (dnsCustom.isNotBlank()) dnsCustom else stringResource(R.string.dns_custom_hint)
+                    else -> stringResource(R.string.dns_system_hint)
                 },
                 selected = dnsProvider == provider,
                 onClick = { vm.setDnsProvider(provider) }
@@ -349,30 +340,26 @@ private fun RoutingContent(vm: MainViewModel) {
                 }
             }
             Text(
-                if (invalid) "Не похоже на адрес DNS. Примеры: 94.140.14.14, dns.example.com, " +
-                    "https://dns.example.com/dns-query/токен, tls://dns.example.com"
-                else "Поддерживаются IP, хост (→ DoH), https://… (DoH, можно с путём и токеном), tls://… (DoT), udp://…",
+stringResource(if (invalid) R.string.dns_invalid else R.string.dns_supported),
                 color = if (invalid) Danger else TextMuted, fontSize = 11.sp
             )
         }
         Text(
-            "Применяется при следующем подключении.",
+stringResource(R.string.apply_next_connect),
             color = TextMuted, fontSize = 11.sp
         )
 
         Spacer(Modifier.height(8.dp))
-        Label("GeoIP-маршрутизация по странам")
+        Label(stringResource(R.string.geo_label))
         Text(
-            "Базы IP ~250 стран встроены в приложение (sing-box rule-set из MetaCubeX/meta-rules-dat), " +
-                "работают без интернета. Работает и для sing-box, и для Xray Core — маршрутизацией в " +
-                "обоих случаях владеет sing-box.",
+stringResource(R.string.geo_desc),
             color = TextMuted, fontSize = 11.sp
         )
         Spacer(Modifier.height(4.dp))
         ru.gidravpn.hydra.data.model.GeoRoutingMode.entries.forEach { mode ->
             RoutingOptionCard(
-                title = mode.label,
-                subtitle = mode.description,
+                title = stringResource(mode.labelRes),
+                subtitle = stringResource(mode.descriptionRes),
                 selected = geoMode == mode,
                 onClick = { vm.setGeoRoutingMode(mode) }
             )
@@ -380,43 +367,40 @@ private fun RoutingContent(vm: MainViewModel) {
         if (geoMode != ru.gidravpn.hydra.data.model.GeoRoutingMode.OFF) GeoCountryPicker(vm)
 
         Spacer(Modifier.height(8.dp))
-        Label("Фрагментация TLS (обход DPI)")
+        Label(stringResource(R.string.frag_label))
         Text(
-            "Режет рукопожатие с прокси-сервером, чтобы DPI не увидел имя сайта в одном пакете. " +
-                "Только движок sing-box и только VLESS/VMess/Trojan с TLS — не действует на " +
-                "Hysteria2/TUIC (там QUIC) и при включённом Xray Core. Не проверено на реальных серверах.",
+stringResource(R.string.frag_desc),
             color = TextMuted, fontSize = 11.sp
         )
         Spacer(Modifier.height(4.dp))
         val fragment by vm.tlsFragment.collectAsState()
         ru.gidravpn.hydra.data.model.TlsFragmentMode.entries.forEach { mode ->
             RoutingOptionCard(
-                title = mode.label,
-                subtitle = mode.description,
+                title = stringResource(mode.labelRes),
+                subtitle = stringResource(mode.descriptionRes),
                 selected = fragment == mode,
                 onClick = { vm.setTlsFragment(mode) }
             )
         }
 
         Spacer(Modifier.height(8.dp))
-        Label("MTU туннеля")
+        Label(stringResource(R.string.mtu_label))
         Text(
-            "Меняйте, только если часть сайтов «висит» при загрузке, а мелкие запросы проходят — " +
-                "признак потери крупных пакетов. Для SSTP/L2TP действует не выше 1400.",
+stringResource(R.string.mtu_desc),
             color = TextMuted, fontSize = 11.sp
         )
         Spacer(Modifier.height(4.dp))
         val mtu by vm.mtu.collectAsState()
         ru.gidravpn.hydra.data.model.MtuPreset.entries.forEach { preset ->
             RoutingOptionCard(
-                title = preset.label,
-                subtitle = if (preset == ru.gidravpn.hydra.data.model.MtuPreset.AUTO) "Как было до этой настройки"
-                    else "${preset.value} байт",
+                title = stringResource(preset.labelRes),
+                subtitle = if (preset == ru.gidravpn.hydra.data.model.MtuPreset.AUTO) stringResource(R.string.mtu_auto_sub)
+                    else stringResource(R.string.mtu_bytes, preset.value),
                 selected = mtu == preset,
                 onClick = { vm.setMtu(preset) }
             )
         }
-        Text("Применяется при следующем подключении.", color = TextMuted, fontSize = 11.sp)
+        Text(stringResource(R.string.apply_next_connect), color = TextMuted, fontSize = 11.sp)
     }
 }
 
@@ -428,23 +412,21 @@ private fun GeoCountryPicker(vm: MainViewModel) {
     var query by remember { mutableStateOf("") }
 
     Card(Modifier.fillMaxWidth()) {
-        Text("Страны", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.geo_countries), color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         Text(
-            if (selected.isEmpty()) "Не выбрано ни одной — правило не действует"
+            if (selected.isEmpty()) stringResource(R.string.geo_none_selected)
             else selected.sorted().joinToString(", ") { ru.gidravpn.hydra.data.model.countryName(it) },
             color = if (selected.isEmpty()) Danger else AccentCyan, fontSize = 12.sp
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "По доменам (не только по IP) — только ${vm.geoWithDomains.sorted().joinToString(", ") {
-                ru.gidravpn.hydra.data.model.countryName(it) }}: для остальных нет доменных баз. " +
-                "Сайты на зарубежных CDN у таких стран определятся как «не их».",
+stringResource(R.string.geo_domains_note, vm.geoWithDomains.sorted().joinToString(", ") { ru.gidravpn.hydra.data.model.countryName(it) }),
             color = TextMuted, fontSize = 11.sp
         )
         Spacer(Modifier.height(8.dp))
         androidx.compose.material3.OutlinedTextField(
             value = query, onValueChange = { query = it },
-            label = { Text("Найти страну", color = TextMuted, fontSize = 12.sp) },
+            label = { Text(stringResource(R.string.geo_search), color = TextMuted, fontSize = 12.sp) },
             singleLine = true,
             colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                 focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
@@ -468,12 +450,12 @@ private fun GeoCountryPicker(vm: MainViewModel) {
                 )
                 Text(name, color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
                 Text(
-                    code.uppercase() + if (code in vm.geoWithDomains) " · IP+домены" else " · IP",
+                    code.uppercase() + if (code in vm.geoWithDomains) " · IP+" + stringResource(R.string.geo_domains_short) else " · IP",
                     color = TextMuted, fontSize = 11.sp
                 )
             }
         }
-        if (q.isNotEmpty() && shown.isEmpty()) Text("Ничего не найдено", color = TextMuted, fontSize = 12.sp)
+        if (q.isNotEmpty() && shown.isEmpty()) Text(stringResource(R.string.geo_not_found), color = TextMuted, fontSize = 12.sp)
     }
 }
 
@@ -506,7 +488,7 @@ private fun RoutingSaveButton(onClick: () -> Unit) {
         Modifier.clip(RoundedCornerShape(12.dp)).background(CardBg)
             .border(1.dp, Border, RoundedCornerShape(12.dp))
             .clickableNoRipple(onClick).padding(horizontal = 16.dp, vertical = 14.dp)
-    ) { Text("Сохранить", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+    ) { Text(stringResource(R.string.action_save), color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
 }
 
 @Composable
@@ -695,6 +677,36 @@ private fun HotspotContent(vm: MainViewModel) {
 }
 
 @Composable
+private fun LanguageContent() {
+    val context = LocalContext.current
+    var lang by remember { mutableStateOf(ru.gidravpn.hydra.LocaleHelper.current(context)) }
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(stringResource(R.string.lang_title), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        listOf(
+            ru.gidravpn.hydra.LocaleHelper.SYSTEM to stringResource(R.string.lang_system),
+            ru.gidravpn.hydra.LocaleHelper.RU to "Русский",
+            ru.gidravpn.hydra.LocaleHelper.EN to "English",
+        ).forEach { (code, label) ->
+            RoutingOptionCard(title = label, subtitle = "", selected = lang == code, onClick = {
+                if (lang != code) {
+                    lang = code
+                    ru.gidravpn.hydra.LocaleHelper.applyToApp(context.applicationContext, code)
+                    var c: android.content.Context = context
+                    while (c is android.content.ContextWrapper) {
+                        if (c is android.app.Activity) { c.recreate(); break }
+                        c = c.baseContext
+                    }
+                }
+            })
+        }
+        Text(stringResource(R.string.lang_hint), color = TextMuted, fontSize = 11.sp)
+    }
+}
+
+@Composable
 private fun BackupContent(vm: MainViewModel) {
     val message by vm.backupMessage.collectAsState()
     var confirmImport by remember { mutableStateOf<android.net.Uri?>(null) }
@@ -711,78 +723,75 @@ private fun BackupContent(vm: MainViewModel) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Резервная копия", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Text(stringResource(R.string.set_backup), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
 
         message?.let {
             Card(Modifier.fillMaxWidth().clickableNoRipple { vm.dismissBackupMessage() }, borderColor = AccentCyan) {
                 Text(it, color = TextPrimary, fontSize = 13.sp)
-                Text("Нажмите, чтобы скрыть", color = TextMuted, fontSize = 10.sp)
+                Text(stringResource(R.string.backup_dismiss), color = TextMuted, fontSize = 10.sp)
             }
         }
 
-        InfoGroup("Сохранить копию", AccentCyan) {
+        InfoGroup(stringResource(R.string.backup_save_title), AccentCyan) {
             Text(
-                "Все серверы, подписки и настройки — в один JSON-файл. Внимание: в файле ключи и пароли " +
-                    "серверов открытым текстом — храните его как пароль.",
+stringResource(R.string.backup_save_desc),
                 color = TextMuted, fontSize = 12.sp
             )
             Spacer(Modifier.height(12.dp))
-            BackupActionButton("Сохранить в файл →", AccentCyan) {
+            BackupActionButton(stringResource(R.string.backup_save_btn), AccentCyan) {
                 val date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
                 exportLauncher.launch("hydra-backup-$date.json")
             }
         }
 
-        InfoGroup("Восстановить из копии", AccentViolet) {
+        InfoGroup(stringResource(R.string.backup_restore_title), AccentViolet) {
             Text(
-                "Заменяет ВСЕ текущие серверы, подписки и настройки содержимым файла. VPN должен быть отключён.",
+stringResource(R.string.backup_restore_desc),
                 color = TextMuted, fontSize = 12.sp
             )
             Spacer(Modifier.height(12.dp))
-            BackupActionButton("Выбрать файл →", AccentViolet) {
+            BackupActionButton(stringResource(R.string.backup_restore_btn), AccentViolet) {
                 importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
             }
         }
 
-        InfoGroup("Сброс настроек", Danger) {
+        InfoGroup(stringResource(R.string.backup_reset_title), Danger) {
             Text(
-                "Все настройки — к значениям по умолчанию (тема, DNS, маршрутизация, Kill Switch, " +
-                    "split-туннелинг и т.д.). Серверы и подписки останутся.",
+stringResource(R.string.backup_reset_desc),
                 color = TextMuted, fontSize = 12.sp
             )
             Spacer(Modifier.height(12.dp))
-            BackupActionButton("Сбросить настройки →", Danger) { confirmReset = true }
+            BackupActionButton(stringResource(R.string.backup_reset_btn), Danger) { confirmReset = true }
         }
     }
 
     confirmImport?.let { uri ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { confirmImport = null },
-            title = { Text("Восстановить из копии?") },
-            text = { Text("Текущие серверы, подписки и настройки будут заменены. Отменить это нельзя — " +
-                "при сомнениях сначала сохраните текущую копию.") },
+            title = { Text(stringResource(R.string.backup_restore_q)) },
+text = { Text(stringResource(R.string.backup_restore_q_desc)) },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { vm.importBackup(uri); confirmImport = null }) {
-                    Text("Заменить", color = Danger)
+                    Text(stringResource(R.string.backup_replace), color = Danger)
                 }
             },
             dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { confirmImport = null }) { Text("Отмена") }
+                androidx.compose.material3.TextButton(onClick = { confirmImport = null }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
     if (confirmReset) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { confirmReset = false },
-            title = { Text("Сбросить все настройки?") },
-            text = { Text("Серверы и подписки останутся, всё остальное вернётся к значениям по умолчанию.") },
+            title = { Text(stringResource(R.string.backup_reset_q)) },
+            text = { Text(stringResource(R.string.backup_reset_q_desc)) },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { vm.resetSettings(); confirmReset = false }) {
-                    Text("Сбросить", color = Danger)
+                    Text(stringResource(R.string.backup_reset_confirm), color = Danger)
                 }
             },
             dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { confirmReset = false }) { Text("Отмена") }
+                androidx.compose.material3.TextButton(onClick = { confirmReset = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -797,9 +806,9 @@ private fun BackupActionButton(text: String, color: Color, onClick: () -> Unit) 
 @Composable
 private fun AboutContent() {
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("О приложении", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Text(stringResource(R.string.set_about), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
         InfoGroup("Hydra", TextSecondary) {
-            Text("Hydra ${ru.gidravpn.hydra.BuildConfig.VERSION_NAME} — мультипротокольный VPN-клиент. Лицензия GPL-3.0.",
+            Text(stringResource(R.string.about_text, ru.gidravpn.hydra.BuildConfig.VERSION_NAME),
                 color = TextMuted, fontSize = 12.sp)
         }
     }

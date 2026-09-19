@@ -309,13 +309,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 app.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(text.toByteArray()) }
             }
-            "Копия сохранена: ${servers.value.size} серв., все настройки"
-        }.getOrElse { "Не удалось сохранить: ${it.message ?: it.javaClass.simpleName}" }
+            app.getString(ru.gidravpn.hydra.R.string.msg_backup_saved, servers.value.size)
+        }.getOrElse { app.getString(ru.gidravpn.hydra.R.string.msg_backup_save_failed, it.message ?: it.javaClass.simpleName) }
     }
 
     fun importBackup(uri: android.net.Uri) = viewModelScope.launch {
         if (state.value != ConnectionState.DISCONNECTED) {
-            _backupMessage.value = "Отключите VPN перед восстановлением — иначе туннель останется со старыми настройками"
+            _backupMessage.value = getApplication<Application>().getString(ru.gidravpn.hydra.R.string.msg_backup_disconnect_first)
             return@launch
         }
         val app = getApplication<Application>()
@@ -327,15 +327,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _selectedId.value = vpnSettingsRepo.lastServerId.firstOrNull()
             LauncherIcon.apply(getApplication(), themeRepo.launcherIcon.first(), themeRepo.mode.first())
             VpnState.log("Восстановлено из копии: ${s.servers} серв., ${s.subscriptions} подп., ${s.settings} настроек")
-            "Восстановлено: ${s.servers} серверов, ${s.subscriptions} подписок, ${s.settings} настроек"
-        }.getOrElse { "Не удалось восстановить: ${it.message ?: it.javaClass.simpleName}" }
+            app.getString(ru.gidravpn.hydra.R.string.msg_backup_restored, s.servers, s.subscriptions, s.settings)
+        }.getOrElse { app.getString(ru.gidravpn.hydra.R.string.msg_backup_restore_failed, it.message ?: it.javaClass.simpleName) }
     }
 
     fun resetSettings() = viewModelScope.launch {
         ru.gidravpn.hydra.data.backup.BackupManager.resetSettings(getApplication())
         LauncherIcon.apply(getApplication(), LauncherIconChoice.AMBIENT, ThemeMode.AMBIENT)
         VpnState.log("Настройки сброшены к значениям по умолчанию")
-        _backupMessage.value = "Настройки сброшены. Серверы и подписки не тронуты."
+        _backupMessage.value = getApplication<Application>().getString(ru.gidravpn.hydra.R.string.msg_reset_done)
     }
 
     private val _measuringIds = MutableStateFlow<Set<Long>>(emptySet())

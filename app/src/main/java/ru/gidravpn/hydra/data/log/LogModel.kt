@@ -25,15 +25,15 @@ enum class LogLevel {
  * sing-box уровня INFO содержат адрес каждого соединения, т.е. историю
  * посещённых сайтов, и хранить её в файле без явного согласия нельзя.
  */
-enum class LogPersistMode(val label: String, val description: String) {
-    OFF("Не сохранять", "Логи только в памяти, пропадают при закрытии приложения."),
+enum class LogPersistMode(@androidx.annotation.StringRes val labelRes: Int, @androidx.annotation.StringRes val descriptionRes: Int) {
+    OFF(ru.gidravpn.hydra.R.string.logmode_off, ru.gidravpn.hydra.R.string.logmode_off_desc),
     ERRORS(
-        "Только ошибки и предупреждения",
-        "Без адресов сайтов — хватает, чтобы разобрать сбой подключения задним числом."
+        ru.gidravpn.hydra.R.string.logmode_errors,
+        ru.gidravpn.hydra.R.string.logmode_errors_desc
     ),
     ALL(
-        "Полный журнал",
-        "Включая адрес каждого соединения — это история посещённых сайтов на устройстве."
+        ru.gidravpn.hydra.R.string.logmode_all,
+        ru.gidravpn.hydra.R.string.logmode_all_desc
     );
 
     companion object {
@@ -41,8 +41,8 @@ enum class LogPersistMode(val label: String, val description: String) {
     }
 }
 
-enum class LogRetention(val days: Int, val label: String) {
-    D1(1, "1 день"), D3(3, "3 дня"), D7(7, "7 дней");
+enum class LogRetention(val days: Int, @androidx.annotation.StringRes val labelRes: Int) {
+    D1(1, ru.gidravpn.hydra.R.string.retention_d1), D3(3, ru.gidravpn.hydra.R.string.retention_d3), D7(7, ru.gidravpn.hydra.R.string.retention_d7);
 
     companion object {
         fun fromId(id: String?) = entries.firstOrNull { it.name == id } ?: D3

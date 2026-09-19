@@ -7,11 +7,11 @@ package ru.gidravpn.hydra.data.model
  * значения — для сетей, где крупные пакеты теряются (часть мобильных
  * операторов, туннель поверх туннеля).
  */
-enum class MtuPreset(val value: Int, val label: String) {
-    AUTO(9000, "Авто (9000)"),
-    MTU_1500(1500, "1500 — Ethernet/Wi-Fi"),
-    MTU_1400(1400, "1400 — мобильные сети"),
-    MTU_1280(1280, "1280 — минимум для IPv6");
+enum class MtuPreset(val value: Int, @androidx.annotation.StringRes val labelRes: Int) {
+    AUTO(9000, ru.gidravpn.hydra.R.string.mtu_auto),
+    MTU_1500(1500, ru.gidravpn.hydra.R.string.mtu_1500),
+    MTU_1400(1400, ru.gidravpn.hydra.R.string.mtu_1400),
+    MTU_1280(1280, ru.gidravpn.hydra.R.string.mtu_1280);
 
     companion object {
         fun fromId(id: String?): MtuPreset = entries.firstOrNull { it.name == id } ?: AUTO
@@ -25,16 +25,15 @@ enum class MtuPreset(val value: Int, val label: String) {
  * (VLESS/VMess/Trojan): у Hysteria2/TUIC рукопожатие внутри QUIC, а в режиме
  * Xray Core рукопожатие делает сам Xray.
  */
-enum class TlsFragmentMode(val label: String, val description: String) {
-    OFF("Выключено", "Рукопожатие отправляется как обычно."),
+enum class TlsFragmentMode(@androidx.annotation.StringRes val labelRes: Int, @androidx.annotation.StringRes val descriptionRes: Int) {
+    OFF(ru.gidravpn.hydra.R.string.geo_off, ru.gidravpn.hydra.R.string.frag_off_desc),
     RECORD(
-        "По TLS-записям",
-        "ClientHello делится на несколько TLS-записей. Почти без потерь скорости — пробовать первым."
+        ru.gidravpn.hydra.R.string.frag_record,
+        ru.gidravpn.hydra.R.string.frag_record_desc
     ),
     TCP(
-        "По TCP-сегментам",
-        "ClientHello режется на отдельные TCP-пакеты с паузой между ними. Медленнее подключается; " +
-            "если не помогли TLS-записи."
+        ru.gidravpn.hydra.R.string.frag_tcp,
+        ru.gidravpn.hydra.R.string.frag_tcp_desc
     );
 
     companion object {

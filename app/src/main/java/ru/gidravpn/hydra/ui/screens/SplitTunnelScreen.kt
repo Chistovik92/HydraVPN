@@ -1,5 +1,8 @@
 package ru.gidravpn.hydra.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import ru.gidravpn.hydra.R
+
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import androidx.compose.foundation.background
@@ -44,13 +47,13 @@ fun SplitTunnelScreen(vm: MainViewModel) {
     var section by remember { mutableStateOf(SplitSection.APPS) }
 
     Column(Modifier.fillMaxSize().padding(20.dp)) {
-        Text("Раздельное туннелирование", fontSize = 20.sp,
+        Text(stringResource(R.string.split_title), fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold, color = TextPrimary)
         Spacer(Modifier.height(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ModeChip("По приложениям", section == SplitSection.APPS) { section = SplitSection.APPS }
-            ModeChip("По IP/доменам", section == SplitSection.NET) { section = SplitSection.NET }
+            ModeChip(stringResource(R.string.split_by_apps), section == SplitSection.APPS) { section = SplitSection.APPS }
+            ModeChip(stringResource(R.string.split_by_net), section == SplitSection.NET) { section = SplitSection.NET }
         }
         Spacer(Modifier.height(16.dp))
 
@@ -79,25 +82,25 @@ private fun AppsSection(vm: MainViewModel, split: SplitTunnel) {
         }
     }
 
-    Text(split.summary, color = TextMuted, fontSize = 12.sp)
+    Text(split.summary(context), color = TextMuted, fontSize = 12.sp)
     if (apps.isNotEmpty()) {
-        Text("Приложений в списке: ${apps.count { showSystem || !it.isSystem }}",
+        Text(stringResource(R.string.split_apps_count, apps.count { showSystem || !it.isSystem }),
             color = TextMuted, fontSize = 11.sp)
     }
     Spacer(Modifier.height(16.dp))
 
     // Режим
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ModeChip("Весь трафик", split.mode == SplitTunnelMode.OFF) { vm.setSplitMode(SplitTunnelMode.OFF) }
-        ModeChip("Только выбранные", split.mode == SplitTunnelMode.INCLUDE) { vm.setSplitMode(SplitTunnelMode.INCLUDE) }
-        ModeChip("Кроме выбранных", split.mode == SplitTunnelMode.EXCLUDE) { vm.setSplitMode(SplitTunnelMode.EXCLUDE) }
+        ModeChip(stringResource(R.string.split_all_traffic), split.mode == SplitTunnelMode.OFF) { vm.setSplitMode(SplitTunnelMode.OFF) }
+        ModeChip(stringResource(R.string.split_only_selected), split.mode == SplitTunnelMode.INCLUDE) { vm.setSplitMode(SplitTunnelMode.INCLUDE) }
+        ModeChip(stringResource(R.string.split_except_selected), split.mode == SplitTunnelMode.EXCLUDE) { vm.setSplitMode(SplitTunnelMode.EXCLUDE) }
     }
     Spacer(Modifier.height(16.dp))
 
     if (split.mode != SplitTunnelMode.OFF) {
         OutlinedTextField(
             value = search, onValueChange = { search = it },
-            label = { Text("Поиск приложения", color = TextMuted, fontSize = 12.sp) },
+            label = { Text(stringResource(R.string.split_search), color = TextMuted, fontSize = 12.sp) },
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
@@ -109,7 +112,7 @@ private fun AppsSection(vm: MainViewModel, split: SplitTunnel) {
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically) {
-            Text("Системные приложения", color = TextMuted, fontSize = 12.sp)
+            Text(stringResource(R.string.split_system_apps), color = TextMuted, fontSize = 12.sp)
             Switch(
                 checked = showSystem, onCheckedChange = { showSystem = it },
                 colors = SwitchDefaults.colors(checkedTrackColor = AccentCyan)
@@ -129,10 +132,10 @@ private fun AppsSection(vm: MainViewModel, split: SplitTunnel) {
         }
     } else {
         Card(Modifier.fillMaxWidth()) {
-            Text("Весь трафик устройства идёт через VPN. Выберите режим, чтобы настроить исключения или белый список приложений.",
+            Text(stringResource(R.string.split_apps_off_hint),
                 color = TextMuted, fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
-            Text("Применяется при следующем подключении.", color = TextMuted, fontSize = 11.sp)
+            Text(stringResource(R.string.apply_next_connect), color = TextMuted, fontSize = 11.sp)
         }
     }
 }
@@ -153,19 +156,19 @@ private fun NetRulesSection(vm: MainViewModel, split: SplitTunnel) {
     var type by remember { mutableStateOf(NetRuleType.DOMAIN) }
     var value by remember { mutableStateOf("") }
 
-    Text(split.netSummary, color = TextMuted, fontSize = 12.sp)
+    Text(split.netSummary(LocalContext.current), color = TextMuted, fontSize = 12.sp)
     Spacer(Modifier.height(16.dp))
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ModeChip("Весь трафик", split.netMode == SplitTunnelMode.OFF) { vm.setNetMode(SplitTunnelMode.OFF) }
-        ModeChip("Только выбранные", split.netMode == SplitTunnelMode.INCLUDE) { vm.setNetMode(SplitTunnelMode.INCLUDE) }
-        ModeChip("Кроме выбранных", split.netMode == SplitTunnelMode.EXCLUDE) { vm.setNetMode(SplitTunnelMode.EXCLUDE) }
+        ModeChip(stringResource(R.string.split_all_traffic), split.netMode == SplitTunnelMode.OFF) { vm.setNetMode(SplitTunnelMode.OFF) }
+        ModeChip(stringResource(R.string.split_only_selected), split.netMode == SplitTunnelMode.INCLUDE) { vm.setNetMode(SplitTunnelMode.INCLUDE) }
+        ModeChip(stringResource(R.string.split_except_selected), split.netMode == SplitTunnelMode.EXCLUDE) { vm.setNetMode(SplitTunnelMode.EXCLUDE) }
     }
     Spacer(Modifier.height(16.dp))
 
     if (split.netMode != SplitTunnelMode.OFF) {
         Text(
-            "Работает только при подключении через sing-box (VLESS/VMess/Trojan/SS/Hysteria2/TUIC/WireGuard).",
+            stringResource(R.string.split_net_engine_note),
             color = TextMuted, fontSize = 11.sp
         )
         Spacer(Modifier.height(12.dp))
@@ -174,14 +177,14 @@ private fun NetRulesSection(vm: MainViewModel, split: SplitTunnel) {
             Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            NetRuleType.entries.forEach { t -> ModeChip(t.label, type == t) { type = t } }
+            NetRuleType.entries.forEach { t -> ModeChip(stringResource(t.labelRes), type == t) { type = t } }
         }
         Spacer(Modifier.height(8.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = value, onValueChange = { value = it },
-                label = { Text(if (type == NetRuleType.IP_CIDR) "например 10.0.0.0/8" else "например example.com", color = TextMuted, fontSize = 12.sp) },
+                label = { Text(stringResource(if (type == NetRuleType.IP_CIDR) R.string.split_example_ip else R.string.split_example_domain), color = TextMuted, fontSize = 12.sp) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
@@ -190,7 +193,7 @@ private fun NetRulesSection(vm: MainViewModel, split: SplitTunnel) {
                 ),
                 modifier = Modifier.weight(1f)
             )
-            OutlinedActionButton("Добавить") {
+            OutlinedActionButton(stringResource(R.string.action_add)) {
                 normalizeNetRuleValue(type, value)?.let {
                     vm.addNetRule(NetworkRule(type, it))
                     value = ""
@@ -206,10 +209,10 @@ private fun NetRulesSection(vm: MainViewModel, split: SplitTunnel) {
         }
     } else {
         Card(Modifier.fillMaxWidth()) {
-            Text("Все IP-адреса и домены маршрутизируются как обычно. Выберите режим, чтобы задать точечные исключения или белый список.",
+            Text(stringResource(R.string.split_net_off_hint),
                 color = TextMuted, fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
-            Text("Применяется при следующем подключении.", color = TextMuted, fontSize = 11.sp)
+            Text(stringResource(R.string.apply_next_connect), color = TextMuted, fontSize = 11.sp)
         }
     }
 }
@@ -225,7 +228,7 @@ private fun NetRuleRow(rule: NetworkRule, onDelete: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column {
-            Text(rule.type.label, color = TextMuted, fontSize = 10.sp)
+            Text(stringResource(rule.type.labelRes), color = TextMuted, fontSize = 10.sp)
             Text(rule.value, color = TextPrimary, fontSize = 13.sp)
         }
         Text("✕", color = Danger, fontSize = 14.sp, fontWeight = FontWeight.Bold,
@@ -271,7 +274,7 @@ private fun AppRow(app: AppEntry, checked: Boolean, enabled: Boolean, onClick: (
         Column(Modifier.weight(1f)) {
             Text(app.label, color = TextPrimary, fontSize = 13.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(app.packageName + if (app.isSystem) " • системное" else "",
+            Text(app.packageName + if (app.isSystem) " • " + stringResource(R.string.split_system_tag) else "",
                 color = TextMuted, fontSize = 10.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }

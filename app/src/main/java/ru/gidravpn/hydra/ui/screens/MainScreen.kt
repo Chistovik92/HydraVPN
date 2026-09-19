@@ -1,5 +1,8 @@
 package ru.gidravpn.hydra.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import ru.gidravpn.hydra.R
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -53,7 +56,7 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
 
         // Выбор протокола (отражает протокол выбранного сервера)
         Card(Modifier.fillMaxWidth()) {
-            Label("Протокол")
+            Label(stringResource(R.string.main_protocol))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     server?.protocol?.displayName ?: "—",
@@ -78,14 +81,14 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
         // Превью конфигурации
         Card(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Текущая конфигурация", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                Text("Изменить →", color = AccentCyan, fontSize = 11.sp,
+                Text(stringResource(R.string.main_current_config), color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.main_change), color = AccentCyan, fontSize = 11.sp,
                     modifier = Modifier.clickableNoRipple(onGoServers))
             }
             Spacer(Modifier.height(8.dp))
             val cfg = server?.let {
-                "Сервер: ${it.address}\nПорт: ${it.port}\nТип: ${it.protocol?.displayName ?: it.protocolId}"
-            } ?: "Сервер не выбран"
+                stringResource(R.string.main_cfg, it.address, it.port, it.protocol?.displayName ?: it.protocolId)
+            } ?: stringResource(R.string.main_no_server)
             Text(cfg, color = TextSecondary, fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace, lineHeight = 18.sp,
                 modifier = Modifier.fillMaxWidth()
@@ -117,10 +120,10 @@ private fun ConnectButton(state: ConnectionState, onClick: () -> Unit) {
     }
     val iconColor = if (active || error) ringColor else TextSecondary
     val label = when {
-        error -> "ОШИБКА — ПОВТОРИТЬ"
-        connected -> "ОТКЛЮЧИТЬ"
-        connecting -> "ПОДКЛЮЧЕНИЕ…"
-        else -> "ПОДКЛЮЧИТЬ"
+        error -> stringResource(R.string.btn_error_retry)
+        connected -> stringResource(R.string.btn_disconnect)
+        connecting -> stringResource(R.string.btn_connecting)
+        else -> stringResource(R.string.btn_connect)
     }
 
     Box(Modifier.size(240.dp), contentAlignment = Alignment.Center) {
@@ -204,25 +207,25 @@ private fun ConnectionInfo(
 
     Card(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-            InfoCell("Статус",
+            InfoCell(stringResource(R.string.info_status),
                 when (state) {
-                    ConnectionState.CONNECTED -> "Подключено"
-                    ConnectionState.ERROR -> "Ошибка"
-                    else -> "Отключено"
+                    ConnectionState.CONNECTED -> stringResource(R.string.connected)
+                    ConnectionState.ERROR -> stringResource(R.string.status_error)
+                    else -> stringResource(R.string.disconnected)
                 },
                 when (state) {
                     ConnectionState.CONNECTED -> Success
                     ConnectionState.ERROR -> Danger
                     else -> TextMuted
                 })
-            InfoCell("Сервер", serverName ?: "—", TextPrimary)
-            InfoCell("Время", elapsed, TextPrimary)
+            InfoCell(stringResource(R.string.info_server), serverName ?: "—", TextPrimary)
+            InfoCell(stringResource(R.string.info_time), elapsed, TextPrimary)
         }
         if (connected) {
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                InfoCell("↓ Загружено", humanBytes(stats.downBytes), AccentCyan)
-                InfoCell("↑ Отправлено", humanBytes(stats.upBytes), AccentIndigo)
+                InfoCell(stringResource(R.string.info_down), humanBytes(stats.downBytes), AccentCyan)
+                InfoCell(stringResource(R.string.info_up), humanBytes(stats.upBytes), AccentIndigo)
             }
         }
     }

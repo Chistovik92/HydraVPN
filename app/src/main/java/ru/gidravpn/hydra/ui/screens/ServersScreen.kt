@@ -1,5 +1,8 @@
 package ru.gidravpn.hydra.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import ru.gidravpn.hydra.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -47,15 +50,15 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(20.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically) {
-            Text("Серверы", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
-            Text("Обновить пинг", color = AccentCyan, fontSize = 12.sp,
+            Text(stringResource(R.string.tab_servers), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+            Text(stringResource(R.string.servers_refresh_ping), color = AccentCyan, fontSize = 12.sp,
                 modifier = Modifier.clickableNoRipple { vm.measureAllPings() })
         }
         Spacer(Modifier.height(20.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            GradientButton("+ Добавить сервер", Modifier.weight(1f)) { showAdd = true }
-            OutlinedActionButton("📥 Импорт", Modifier.weight(1f)) { showImport = true }
+            GradientButton(stringResource(R.string.servers_add), Modifier.weight(1f)) { showAdd = true }
+            OutlinedActionButton(stringResource(R.string.servers_import), Modifier.weight(1f)) { showImport = true }
         }
         Spacer(Modifier.height(16.dp))
 
@@ -108,15 +111,15 @@ private fun ServerCard(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             containerColor = Surface,
-            title = { Text("Удалить сервер?", color = TextPrimary) },
-            text = { Text("«${s.name}» будет удалён без возможности восстановить.", color = TextMuted) },
+            title = { Text(stringResource(R.string.servers_delete_title), color = TextPrimary) },
+            text = { Text(stringResource(R.string.servers_delete_msg, s.name), color = TextMuted) },
             confirmButton = {
                 TextButton(onClick = { confirmDelete = false; onDelete() }) {
-                    Text("Удалить", color = PingSlow)
+                    Text(stringResource(R.string.action_delete), color = PingSlow)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("Отмена", color = TextMuted) }
+                TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel), color = TextMuted) }
             }
         )
     }
@@ -149,9 +152,9 @@ private fun ServerCard(
                 Text(" • ", color = TextMuted, fontSize = 12.sp)
                 Text(
                     when {
-                        measuring -> "измерение…"
-                        s.pingMs >= 0 -> "${s.pingMs}мс"
-                        else -> "измерить"
+                        measuring -> stringResource(R.string.servers_measuring)
+                        s.pingMs >= 0 -> stringResource(R.string.servers_ping_ms, s.pingMs)
+                        else -> stringResource(R.string.servers_measure)
                     },
                     color = if (measuring) TextMuted else pingColor(s.pingMs),
                     fontSize = 12.sp,
@@ -163,7 +166,7 @@ private fun ServerCard(
         s.protocol?.let { ProtocolChip(it.shortCode) }
         Spacer(Modifier.width(4.dp))
         IconButton(onClick = { confirmDelete = true }, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Filled.DeleteOutline, contentDescription = "Удалить сервер", tint = TextMuted)
+            Icon(Icons.Filled.DeleteOutline, contentDescription = stringResource(R.string.servers_delete_title), tint = TextMuted)
         }
     }
 }
@@ -216,18 +219,19 @@ private fun AddServerDialog(onDismiss: () -> Unit, onSave: (String, String, Int,
     var port by remember { mutableStateOf("443") }
     var proto by remember { mutableStateOf(Protocol.VLESS) }
     var expanded by remember { mutableStateOf(false) }
+    val defaultServerName = stringResource(R.string.default_server_name)
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Surface,
-        title = { Text("Новый сервер", color = TextPrimary) },
+        title = { Text(stringResource(R.string.servers_new_title), color = TextPrimary) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Field("Название", name) { name = it }
-                Field("Адрес", addr) { addr = it }
-                Field("Порт", port) { port = it.filter(Char::isDigit) }
+                Field(stringResource(R.string.field_name), name) { name = it }
+                Field(stringResource(R.string.field_address), addr) { addr = it }
+                Field(stringResource(R.string.field_port), port) { port = it.filter(Char::isDigit) }
                 Box {
-                    OutlinedActionButton("Протокол: ${proto.displayName}${if (proto.beta) " [BETA]" else ""}", Modifier.fillMaxWidth()) { expanded = true }
+                    OutlinedActionButton(stringResource(R.string.servers_protocol, proto.displayName) + if (proto.beta) " [BETA]" else "", Modifier.fillMaxWidth()) { expanded = true }
                     DropdownMenu(expanded, { expanded = false }) {
                         Protocol.entries.forEach { p ->
                             DropdownMenuItem(text = {
@@ -246,37 +250,38 @@ private fun AddServerDialog(onDismiss: () -> Unit, onSave: (String, String, Int,
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(name.ifBlank { "Сервер" }, addr, port.toIntOrNull() ?: 443, proto) }) {
-                Text("Сохранить", color = AccentCyan)
+            TextButton(onClick = { onSave(name.ifBlank { defaultServerName }, addr, port.toIntOrNull() ?: 443, proto) }) {
+                Text(stringResource(R.string.action_save), color = AccentCyan)
             }
         },
-        dismissButton = { TextButton(onDismiss) { Text("Отмена", color = TextMuted) } }
+        dismissButton = { TextButton(onDismiss) { Text(stringResource(R.string.action_cancel), color = TextMuted) } }
     )
 }
 
 @Composable
 private fun ImportDialog(onDismiss: () -> Unit, onLink: (String) -> Unit, onSubscription: (String, String) -> Unit) {
+    val defaultSubName = stringResource(R.string.default_subscription_name)
     var value by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("Подписка") }
+    var name by remember { mutableStateOf(defaultSubName) }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Surface,
-        title = { Text("Импорт", color = TextPrimary) },
+        title = { Text(stringResource(R.string.import_title), color = TextPrimary) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Вставьте ссылку (vless://, vmess://, trojan://, ss://, hysteria2://, tuic://, wireguard://, awg://, sstp://, l2tp://), .conf WireGuard/AmneziaWG или URL подписки.",
+                Text(stringResource(R.string.import_hint),
                     color = TextMuted, fontSize = 12.sp)
-                Field("Ссылка / URL", value) { value = it }
-                Field("Имя подписки (если URL)", name) { name = it }
+                Field(stringResource(R.string.import_link_field), value) { value = it }
+                Field(stringResource(R.string.import_sub_name_field), name) { name = it }
             }
         },
         confirmButton = {
             TextButton(onClick = {
                 val v = value.trim()
                 if (v.startsWith("http")) onSubscription(name, v) else onLink(v)
-            }) { Text("Импортировать", color = AccentCyan) }
+            }) { Text(stringResource(R.string.import_action), color = AccentCyan) }
         },
-        dismissButton = { TextButton(onDismiss) { Text("Отмена", color = TextMuted) } }
+        dismissButton = { TextButton(onDismiss) { Text(stringResource(R.string.action_cancel), color = TextMuted) } }
     )
 }
 

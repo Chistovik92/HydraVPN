@@ -71,12 +71,16 @@ fun BetaBadge() {
  * реальные килобайты трафика показывались как «0,0 MB» и выглядели поломкой.
  */
 fun humanBytes(bytes: Long): String = when {
-    bytes >= 1_000_000_000 -> "%.2f ГБ".format(bytes / 1_000_000_000.0)
-    bytes >= 1_000_000 -> "%.1f МБ".format(bytes / 1_000_000.0)
-    bytes >= 1_000 -> "%.0f КБ".format(bytes / 1_000.0)
-    else -> "$bytes Б"
+    bytes >= 1_000_000_000 -> "%.2f %s".format(bytes / 1_000_000_000.0, byteUnit(3))
+    bytes >= 1_000_000 -> "%.1f %s".format(bytes / 1_000_000.0, byteUnit(2))
+    bytes >= 1_000 -> "%.0f %s".format(bytes / 1_000.0, byteUnit(1))
+    else -> "$bytes ${byteUnit(0)}"
 }
 
+private fun byteUnit(i: Int): String {
+    val ru = java.util.Locale.getDefault().language == "ru"
+    return (if (ru) listOf("Б", "КБ", "МБ", "ГБ") else listOf("B", "KB", "MB", "GB"))[i]
+}
 /** Простой линейный график по последним замерам — для экрана Профиля. */
 @Composable
 fun Sparkline(samples: List<Float>, color: Color, modifier: Modifier = Modifier) {

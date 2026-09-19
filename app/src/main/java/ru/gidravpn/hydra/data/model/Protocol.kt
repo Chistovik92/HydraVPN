@@ -19,7 +19,7 @@ enum class Protocol(
 ) {
     SSTP      ("sstp",   "SSTP (TLS/PPP)",           Engine.USERSPACE),
     L2TP      ("l2tp",   "L2TP (PPP/UDP)",           Engine.USERSPACE),
-    PPTP      ("pptp",   "PPTP (недоступно)",        Engine.UNAVAILABLE),
+    PPTP      ("pptp",   "PPTP (N/A)",        Engine.UNAVAILABLE),
     VLESS     ("vless",  "VLESS (Xray/sing-box)",    Engine.SINGBOX, shortCode = "VL"),
     VMESS     ("vmess",  "VMess",                    Engine.SINGBOX, shortCode = "VM"),
     TROJAN    ("trojan", "Trojan",                   Engine.SINGBOX, shortCode = "TR"),
@@ -28,7 +28,7 @@ enum class Protocol(
     TUIC      ("tuic",   "TUIC v5",                  Engine.SINGBOX, shortCode = "TUIC"),
     WIREGUARD ("wireguard", "WireGuard",             Engine.SINGBOX, shortCode = "WG"),
     AMNEZIAWG ("awg",    "AmneziaWG",                Engine.AWG,     shortCode = "AWG"),
-    WDTT      ("wdtt",   "WDTT (WG over TURN ВК)",   Engine.WDTT,  beta = true),
+    WDTT      ("wdtt",   "WDTT (WG over TURN, VK)",   Engine.WDTT,  beta = true),
     OLCRTC    ("olcrtc", "olcRTC (TCP over WebRTC)", Engine.OLCRTC, beta = true);
 
     companion object {

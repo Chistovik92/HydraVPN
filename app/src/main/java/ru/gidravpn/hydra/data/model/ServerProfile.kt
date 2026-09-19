@@ -31,6 +31,6 @@ data class ServerProfile(
     val summary: String
         get() = buildString {
             append(protocol?.displayName ?: protocolId.uppercase())
-            if (pingMs >= 0) append(" • Пинг: ${pingMs}мс")
+            if (pingMs >= 0) append(" • ${pingMs} ms")
         }
 }
