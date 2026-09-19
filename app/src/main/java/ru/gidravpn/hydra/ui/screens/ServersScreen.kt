@@ -370,7 +370,7 @@ private fun SubscriptionCard(
         }
 
         // Трафик и срок — если панель их сообщила.
-        if (sub.totalBytes > 0 || sub.usedBytes > 0 || sub.expireAt > 0) {
+        if (sub.totalBytes > 0 || sub.usedBytes > 0 || sub.expireAt > 0 || sub.autoUpdate) {
             if (sub.totalBytes > 0) {
                 LinearProgressIndicator(
                     progress = { (sub.usedBytes.toFloat() / sub.totalBytes).coerceIn(0f, 1f) },
@@ -385,7 +385,10 @@ private fun SubscriptionCard(
                     sub.usedBytes > 0 -> humanBytes(sub.usedBytes)
                     else -> ""
                 }
-                Text(traffic, color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                val auto = if (sub.autoUpdate) stringResource(R.string.sub_auto_every, sub.autoUpdateHours) else ""
+                Text(listOf(traffic, auto).filter { it.isNotEmpty() }.joinToString(" · "),
+                    color = TextSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f))
                 if (sub.expireAt > 0) Text(stringResource(R.string.sub_until,
                     java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(sub.expireAt * 1000))),
                     color = TextSecondary, fontSize = 11.sp)
@@ -398,10 +401,10 @@ private fun SubscriptionCard(
                 enabled = !refreshing, onClick = onRefresh)
             Spacer(Modifier.width(6.dp))
             ActionChip(Icons.Filled.NetworkCheck, stringResource(R.string.sub_ping), onClick = onPing)
-            Spacer(Modifier.width(6.dp))
-            ActionChip(Icons.Filled.Share, stringResource(R.string.share_action), onClick = onShare)
             Spacer(Modifier.weight(1f))
-            if (sub.autoUpdate) Text(stringResource(R.string.sub_auto_every, sub.autoUpdateHours), color = TextMuted, fontSize = 10.sp)
+            IconButton(onClick = onShare, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Filled.Share, stringResource(R.string.share_action), tint = AccentCyan, modifier = Modifier.size(20.dp))
+            }
             Box {
                 IconButton(onClick = { menu = true }, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Filled.MoreVert, null, tint = TextMuted)

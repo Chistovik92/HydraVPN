@@ -31,8 +31,8 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 33
-        versionName = "0.6.22"
+        versionCode = 34
+        versionName = "0.6.22.1"
 
         // ABI, под которые собраны нативные ядра (libbox / libXray)
         ndk {

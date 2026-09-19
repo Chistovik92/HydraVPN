@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.6.22** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.6.22.1** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 

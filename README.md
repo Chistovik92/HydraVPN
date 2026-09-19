@@ -4,7 +4,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.6.22**
+- Статус: **0.6.22.1**
 
 ## Скриншоты
 
@@ -14,9 +14,9 @@
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/main.png" width="250"> | <img src="docs/screenshots/servers.png" width="250"> | <img src="docs/screenshots/settings.png" width="250"> |
 
-| Раздельное туннелирование | Хотспот-прокси |
-|:---:|:---:|
-| <img src="docs/screenshots/split.png" width="250"> | <img src="docs/screenshots/hotspot.png" width="250"> |
+| Меню «Добавить» | Ядра (Туннель) | Раздельное туннелирование |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/add.png" width="250"> | <img src="docs/screenshots/tunnel.png" width="250"> | <img src="docs/screenshots/split.png" width="250"> |
 
 ---
 
@@ -120,7 +120,7 @@ UI (Compose) → MainViewModel → ServerRepository (Room + подписки)
 - [docs/SECURITY.md](docs/SECURITY.md) — политика безопасности
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — как контрибьютить
 - [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md) — olcRTC / OpenFlux / snolc / AmneziaWG: апстримы, статус, клиенты
-- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.6.22
+- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.6.22.1
 
 ## Лицензия
 
