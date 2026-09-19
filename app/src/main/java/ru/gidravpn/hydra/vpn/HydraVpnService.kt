@@ -36,16 +36,41 @@ import kotlinx.coroutines.launch
  */
 class HydraVpnService : VpnService() {
 
-    private var tun: ParcelFileDescriptor? = null
-    private var core: VpnCore? = null
+    // @Volatile: поля читаются и пишутся с разных потоков — корутины сервиса
+    // живут на Dispatchers.IO (это пул, а не один поток), onStartCommand
+    // приходит с главного, а колбэк смерти ядра (Фаза 7a) — вообще с потока
+    // ядра (ридер SSTP/L2TP, JNI-поток sing-box, binder-поток :xray).
+    @Volatile private var tun: ParcelFileDescriptor? = null
+    @Volatile private var core: VpnCore? = null
     // Сырой fd tun-интерфейса, снятый ДО detachFd() (см. releaseTun()).
-    private var tunFd: Int = -1
+    @Volatile private var tunFd: Int = -1
     private var connectJob: Job? = null
     // Держит уведомление в актуальном состоянии по мере роста трафика.
     private var notifJob: Job? = null
-    // true — tun держится поднятым намеренно, как «чёрная дыра» (Kill Switch), см. doConnect().
-    private var killSwitchBlocking = false
+    // true — tun держится поднятым намеренно, как «чёрная дыра» (Kill Switch),
+    // см. enterKillSwitch().
+    @Volatile private var killSwitchBlocking = false
+    // true — ERROR получен разрывом уже поднятого туннеля, а не неудачным
+    // подключением: заголовок уведомления у этих случаев разный.
+    @Volatile private var tunnelDropped = false
+    // Попытка, чей туннель сейчас реально поднят; null — ничего не поднято.
+    // Смерть ядра принимается только от неё (см. onCoreDied()).
+    @Volatile private var liveAttempt: Attempt? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Одна попытка подключения (Фаза 7a). Нужна, чтобы различить три случая,
+     * которые иначе выглядят одинаково — «ядро сообщило, что умерло»:
+     *  - умерло у живого туннеля  → гасим/блокируем, меняем состояние;
+     *  - умерло прямо внутри `start()`, ещё до CONNECTED → это обычная ошибка
+     *    подключения, её обрабатывает существующий catch в doConnect();
+     *  - эхо уже проигравшей попытки (переключение сервера — это новый
+     *    doConnect поверх старого) → трогать текущий туннель нельзя.
+     */
+    private class Attempt {
+        @Volatile var died: String? = null
+        val handled = java.util.concurrent.atomic.AtomicBoolean(false)
+    }
 
     companion object {
         const val ACTION_CONNECT = "ru.gidravpn.hydra.CONNECT"
@@ -94,6 +119,7 @@ class HydraVpnService : VpnService() {
         var newTun: ParcelFileDescriptor? = null
         var newTunFd = -1
         var newCore: VpnCore? = null
+        val attempt = Attempt()
         try {
             VpnState.state.value = ConnectionState.CONNECTING
             val settings = ru.gidravpn.hydra.data.repository.VpnSettingsRepository(applicationContext)
@@ -112,6 +138,11 @@ class HydraVpnService : VpnService() {
             newCore = vpnCore
             VpnState.log("Ядро: ${vpnCore.name}")
 
+            // Фаза 7a: слушатель ставится ДО start() — ядро может развалиться
+            // уже внутри него (PPP не согласовался, :xray умер), и этот случай
+            // должен попасть в общий catch ниже, а не потеряться.
+            vpnCore.setDeathListener { reason -> onCoreDied(attempt, reason) }
+
             vpnCore.start(
                 tun = newTun,
                 profile = profile,
@@ -120,10 +151,15 @@ class HydraVpnService : VpnService() {
             )
 
             currentCoroutineContext().ensureActive()
+            // start() вернулся успешно, но ядро уже успело сообщить о смерти —
+            // «поднятым» такой туннель считать нельзя.
+            attempt.died?.let { throw IllegalStateException("ядро остановилось сразу после запуска: $it") }
 
             tun = newTun
             tunFd = newTunFd
             core = newCore
+            // С этого момента onCoreDied() принимает смерть этой попытки.
+            liveAttempt = attempt
             VpnState.connectedSince.value = System.currentTimeMillis()
             VpnState.state.value = ConnectionState.CONNECTED
             VpnState.log("✓ Соединение установлено")
@@ -138,6 +174,11 @@ class HydraVpnService : VpnService() {
             notifJob = scope.launch {
                 VpnState.stats.collect { updateNotification(ConnectionState.CONNECTED, profile.name) }
             }
+
+            // Ядро могло умереть в окне между проверкой выше и `liveAttempt =
+            // attempt`: тогда onCoreDied() отбросил событие как «эхо чужой
+            // попытки», и без этой перепроверки туннель остался бы зомби.
+            attempt.died?.let { handleCoreDeath(attempt, it) }
         } catch (t: Throwable) {
             runCatching { newCore?.stop() }
 
@@ -176,26 +217,7 @@ class HydraVpnService : VpnService() {
             }.getOrNull() == true
 
             if (killSwitch) {
-                // Держим tun поднятым как «чёрную дыру»: 0.0.0.0/0 по-прежнему
-                // маршрутизируется в этот fd (addRoute в establishTun), но core
-                // уже остановлен и больше ничего туда не пишет/не читает — трафик
-                // молча дропается вместо утечки в открытую сеть напрямую. Гасит
-                // это состояние только явный ACTION_DISCONNECT (releaseTun() ниже).
-                //
-                // Честная оговорка: если ядро успело detachFd() СЕБЕ и упало уже
-                // ПОСЛЕ этого (не до), сырой fd мог быть закрыт/переиспользован
-                // самим ядром при крахе — в этом редком случае tun фактически не
-                // защищает, потому что системе больше нечего держать поднятым.
-                // Не проверено на реальном устройстве — см. CHANGELOG.
-                tun = newTun
-                tunFd = newTunFd
-                core = null
-                killSwitchBlocking = true
-                VpnState.state.value = ConnectionState.ERROR
-                VpnState.activeServer.value = null
-                VpnState.connectedSince.value = 0L
-                VpnState.log("Kill Switch: трафик заблокирован (тоннель не поднялся)")
-                updateNotification(ConnectionState.ERROR, "Заблокировано")
+                enterKillSwitch(newTun, newTunFd, "тоннель не поднялся")
             } else {
                 if (newTun?.fileDescriptor?.valid() == true) {
                     runCatching { newTun.close() }
@@ -205,6 +227,94 @@ class HydraVpnService : VpnService() {
                 VpnState.state.value = ConnectionState.ERROR
                 stopTunnel()
             }
+        }
+    }
+
+    /**
+     * Kill Switch: держим tun поднятым как «чёрную дыру». 0.0.0.0/0 по-прежнему
+     * маршрутизируется в этот fd (addRoute в establishTun), но ядро уже
+     * остановлено и больше ничего туда не пишет/не читает — трафик молча
+     * дропается вместо утечки в открытую сеть напрямую. Гасит это состояние
+     * только явный ACTION_DISCONNECT (releaseTun()).
+     *
+     * Вызывается из двух мест: неудачное подключение (catch в doConnect) и,
+     * с Фазы 7a, смерть ядра у уже поднятого туннеля (handleCoreDeath) —
+     * до 7a разрыв живого соединения Kill Switch не защищал вообще.
+     *
+     * Честная оговорка: если ядро успело detachFd() СЕБЕ и упало уже ПОСЛЕ
+     * этого (не до), сырой fd мог быть закрыт/переиспользован самим ядром при
+     * крахе — в этом редком случае tun фактически не защищает, потому что
+     * системе больше нечего держать поднятым. Не проверено на реальном
+     * устройстве — см. CHANGELOG.
+     */
+    private fun enterKillSwitch(blockingTun: ParcelFileDescriptor?, blockingTunFd: Int, reason: String) {
+        tun = blockingTun
+        tunFd = blockingTunFd
+        core = null
+        killSwitchBlocking = true
+        VpnState.state.value = ConnectionState.ERROR
+        VpnState.activeServer.value = null
+        VpnState.connectedSince.value = 0L
+        VpnState.log("Kill Switch: трафик заблокирован ($reason)")
+        updateNotification(ConnectionState.ERROR, "Заблокировано")
+    }
+
+    /**
+     * Колбэк ядра «я умер» (Фаза 7a). Зовётся с потока ядра — ридера SSTP/L2TP,
+     * JNI-потока sing-box, binder-потока `:xray`, — поэтому здесь только
+     * отметка и передача работы в scope сервиса.
+     *
+     * Событие принимается только от попытки, чей туннель сейчас поднят:
+     * смерть внутри start() ещё до CONNECTED разбирает catch в doConnect
+     * (по [Attempt.died]), а эхо проигравшей попытки трогать живой туннель
+     * не должно.
+     */
+    private fun onCoreDied(attempt: Attempt, reason: String) {
+        attempt.died = reason
+        if (attempt !== liveAttempt) return
+        scope.launch { handleCoreDeath(attempt, reason) }
+    }
+
+    /** Разрыв уже поднятого туннеля: гасим ядро и либо блокируем трафик, либо честно отключаемся. */
+    private suspend fun handleCoreDeath(attempt: Attempt, reason: String) {
+        // Ядро вправе сообщить о смерти и несколько раз (упал ридер, следом
+        // закрылся PPP) — обрабатываем ровно один раз.
+        if (!attempt.handled.compareAndSet(false, true)) return
+        if (attempt !== liveAttempt) return
+        liveAttempt = null
+
+        VpnState.log("Туннель разорван: $reason")
+        tunnelDropped = true
+        notifJob?.cancel()
+        notifJob = null
+        val deadTun = tun
+        val deadTunFd = tunFd
+        runCatching { core?.stop() }
+        core = null
+
+        val killSwitch = runCatching {
+            ru.gidravpn.hydra.data.repository.VpnSettingsRepository(applicationContext)
+                .killSwitch.firstOrNull()
+        }.getOrNull() == true
+
+        if (killSwitch && deadTun != null) {
+            enterKillSwitch(deadTun, deadTunFd, "туннель разорван")
+        } else {
+            // Без Kill Switch держать tun незачем: ядра за ним больше нет,
+            // и «чёрная дыра» только маскировала бы разрыв.
+            tun = null
+            tunFd = -1
+            if (deadTun?.fileDescriptor?.valid() == true) {
+                runCatching { deadTun.close() }
+            } else if (deadTunFd >= 0) {
+                runCatching { ParcelFileDescriptor.adoptFd(deadTunFd).close() }
+            }
+            VpnState.state.value = ConnectionState.ERROR
+            VpnState.activeServer.value = null
+            VpnState.connectedSince.value = 0L
+            updateNotification(ConnectionState.ERROR, "Соединение разорвано")
+            stopForeground(STOP_FOREGROUND_DETACH)
+            stopSelf()
         }
     }
 
@@ -222,6 +332,10 @@ class HydraVpnService : VpnService() {
         notifJob?.cancel()
         notifJob = null
         killSwitchBlocking = false
+        tunnelDropped = false
+        // Штатная остановка — не смерть: колбэк уже снятого ядра не должен
+        // потом уронить состояние нового подключения.
+        liveAttempt = null
         runCatching { core?.stop() }
         core = null
         runCatching { tun?.close() }
@@ -297,6 +411,7 @@ class HydraVpnService : VpnService() {
             state == ConnectionState.CONNECTED -> "Туннель зашифрован"
             state == ConnectionState.CONNECTING -> "Подключение…"
             state == ConnectionState.ERROR && killSwitchBlocking -> "Kill Switch: трафик заблокирован"
+            state == ConnectionState.ERROR && tunnelDropped -> "Туннель разорван"
             state == ConnectionState.ERROR -> "Ошибка подключения"
             else -> "Отключено"
         }

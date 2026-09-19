@@ -46,7 +46,10 @@ class XrayCore : VpnCore {
     private var bridge: SingBoxCore? = null
     private var engine: IXrayEngine? = null
     private var connection: ServiceConnection? = null
-    private var xrayRunning = false
+    @Volatile private var xrayRunning = false
+    @Volatile private var deathListener: ((String) -> Unit)? = null
+
+    override fun setDeathListener(listener: (reason: String) -> Unit) { deathListener = listener }
 
     override fun start(
         tun: ParcelFileDescriptor,
@@ -123,8 +126,20 @@ class XrayCore : VpnCore {
                 engine = IXrayEngine.Stub.asInterface(binder)
                 latch.countDown()
             }
+            /**
+             * Процесс `:xray` умер (прошивка прибила его за фоновую активность
+             * или упало само ядро). Фаза 7a: для этого моста это однозначная
+             * смерть туннеля — трафик через socks5-inbound больше не пойдёт,
+             * хотя sing-box-мост и tun формально ещё живы. `xrayRunning`
+             * служит защёлкой: stop() снимает его до unbind, так что штатное
+             * отключение смертью не объявляется.
+             */
             override fun onServiceDisconnected(name: ComponentName?) {
                 engine = null
+                if (xrayRunning) {
+                    xrayRunning = false
+                    deathListener?.invoke("Xray: процесс :xray остановлен системой")
+                }
             }
         }
         connection = conn

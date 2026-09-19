@@ -26,6 +26,20 @@ class L2tpCore : VpnCore {
     private var session: PppSession? = null
     private var bridge: TunBridge? = null
     @Volatile private var running = false
+    @Volatile private var deathListener: ((String) -> Unit)? = null
+
+    override fun setDeathListener(listener: (reason: String) -> Unit) { deathListener = listener }
+
+    /**
+     * Туннель развалился сам (Фаза 7a). `running` — и признак «мы ещё живы»,
+     * и защёлкой от повторного сообщения: stop() ставит его в false первым,
+     * поэтому штатное отключение смертью не объявляется.
+     */
+    private fun died(reason: String) {
+        if (!running) return
+        running = false
+        deathListener?.invoke(reason)
+    }
 
     override fun start(
         tun: ParcelFileDescriptor,
@@ -47,7 +61,7 @@ class L2tpCore : VpnCore {
 
         t.onTunnelDown = { reason ->
             if (running) onLog("L2TP: сервер закрыл туннель: $reason")
-            running = false
+            died("L2TP: сервер закрыл туннель ($reason)")
         }
 
         // --- SCCRQ → SCCRP: контрольное соединение ---
@@ -111,7 +125,10 @@ class L2tpCore : VpnCore {
                 onLog("L2TP: PPP поднят, IP=$ip DNS=${dns1 ?: "-"}")
                 upLatch.countDown()
             },
-            onDown = { reason -> if (running) onLog("L2TP: PPP закрыт: $reason") },
+            onDown = { reason ->
+                if (running) onLog("L2TP: PPP закрыт: $reason")
+                died("L2TP: PPP закрыт ($reason)")
+            },
         )
         session = ppp
         t.onData = { frame -> ppp.onFrame(frame) }

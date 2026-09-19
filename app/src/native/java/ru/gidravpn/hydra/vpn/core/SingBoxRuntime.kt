@@ -98,7 +98,20 @@ object SingBoxRuntime {
             }
 
             override fun connected() {}
-            override fun disconnected(message: String?) {}
+
+            /**
+             * Канал статистики отвалился. Фаза 7a **не** считает это смертью
+             * ядра и не гасит туннель: `CommandClient` — наш собственный
+             * локальный сокет к `CommandServer`, он может отвалиться и при
+             * живом sing-box, а ложное срабатывание уронило бы рабочее
+             * соединение. Но раньше этот колбэк был пустым, и обрыв канала
+             * выглядел как «счётчики просто замерли» — теперь он хотя бы виден
+             * в логах. Настоящий признак смерти самого `BoxService` в libbox
+             * ещё предстоит найти — см. HANDOFF, Фаза 7a, открытый хвост.
+             */
+            override fun disconnected(message: String?) {
+                onLog("sing-box: канал статистики отключён (${message ?: "без сообщения"})")
+            }
             override fun clearLogs() {}
             override fun initializeClashMode(modes: StringIterator?, currentMode: String?) {}
             override fun updateClashMode(newMode: String?) {}
