@@ -260,4 +260,20 @@
     <string name="share_too_long">The link is too long for a QR code — share it as text.</string>
     <string name="share_no_link">This protocol has no shareable link format.</string>
     <string name="share_warning">The link contains the server keys or password. Send it only to people you trust.</string>
+    <string name="sub_refresh_all">Update subscriptions</string>
+    <string name="sub_refresh">⟳ Update</string>
+    <string name="sub_refreshing">Updating…</string>
+    <string name="sub_ping">Ping</string>
+    <string name="sub_standalone">Separate servers</string>
+    <string name="sub_servers_count">%1$d server(s)</string>
+    <string name="sub_until">until %1$s</string>
+    <string name="sub_updated">Updated %1$s</string>
+    <string name="sub_never">never</string>
+    <string name="sub_auto_every">auto every %1$d h</string>
+    <string name="sub_auto_update">Auto-update</string>
+    <string name="sub_delete_title">Delete subscription</string>
+    <string name="sub_delete_msg">Subscription \"%1$s\" and its %2$d server(s) will be deleted.</string>
+    <string name="sub_refreshed">\"%1$s\" updated: %2$d server(s), added %3$d, removed %4$d</string>
+    <string name="profile_hwid">Hardware ID (HWID)</string>
+    <string name="profile_hwid_hint">Sent to subscription panels as x-hwid, like Happ and INCY do. Panels with a device limit use it to count this phone.</string>
 </resources>

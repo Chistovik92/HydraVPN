@@ -37,6 +37,28 @@ interface ServerDao {
         upsertAll(servers)
     }
 
+    @Query("SELECT * FROM servers WHERE subscriptionId = :subId ORDER BY id")
+    suspend fun bySubscription(subId: Long): List<ServerProfile>
+
+    @Delete
+    suspend fun deleteAll(servers: List<ServerProfile>)
+
+    @Update
+    suspend fun updateAll(servers: List<ServerProfile>)
+
+    /**
+     * Синхронизация подписки (0.6.21) одной транзакцией: пропавшие серверы удаляются, новые
+     * добавляются, оставшиеся обновляются с сохранением id. См. SubscriptionSync.
+     */
+    @Transaction
+    suspend fun syncSubscription(subId: Long, incoming: List<ServerProfile>): ru.gidravpn.hydra.data.subscription.SubscriptionSync.Plan {
+        val plan = ru.gidravpn.hydra.data.subscription.SubscriptionSync.plan(subId, bySubscription(subId), incoming)
+        if (plan.toDelete.isNotEmpty()) deleteAll(plan.toDelete)
+        if (plan.toUpdate.isNotEmpty()) updateAll(plan.toUpdate)
+        if (plan.toInsert.isNotEmpty()) upsertAll(plan.toInsert)
+        return plan
+    }
+
     @Query("SELECT * FROM servers ORDER BY id")
     suspend fun getAll(): List<ServerProfile>
 
@@ -54,6 +76,12 @@ interface SubscriptionDao {
 
     @Delete
     suspend fun delete(sub: Subscription)
+
+    @Query("SELECT * FROM subscriptions WHERE id = :id")
+    suspend fun byId(id: Long): Subscription?
+
+    @Update
+    suspend fun update(sub: Subscription)
 
     @Query("SELECT * FROM subscriptions ORDER BY id")
     suspend fun getAll(): List<Subscription>

@@ -259,4 +259,20 @@
     <string name="share_too_long">Ссылка слишком длинная для QR-кода — поделитесь ею текстом.</string>
     <string name="share_no_link">Для этого протокола нет общепринятого формата ссылки.</string>
     <string name="share_warning">В ссылке — ключи или пароль сервера. Отправляйте её только тем, кому доверяете.</string>
+    <string name="sub_refresh_all">Обновить подписки</string>
+    <string name="sub_refresh">⟳ Обновить</string>
+    <string name="sub_refreshing">Обновление…</string>
+    <string name="sub_ping">Пинг</string>
+    <string name="sub_standalone">Отдельные серверы</string>
+    <string name="sub_servers_count">серверов: %1$d</string>
+    <string name="sub_until">до %1$s</string>
+    <string name="sub_updated">Обновлено %1$s</string>
+    <string name="sub_never">ни разу</string>
+    <string name="sub_auto_every">авто каждые %1$d ч</string>
+    <string name="sub_auto_update">Автообновление</string>
+    <string name="sub_delete_title">Удалить подписку</string>
+    <string name="sub_delete_msg">Подписка «%1$s» и её серверы (%2$d) будут удалены.</string>
+    <string name="sub_refreshed">«%1$s» обновлена: серверов %2$d, добавлено %3$d, удалено %4$d</string>
+    <string name="profile_hwid">Аппаратный ID (HWID)</string>
+    <string name="profile_hwid_hint">Передаётся панелям подписок заголовком x-hwid, как у Happ и INCY. Панели с лимитом устройств по нему учитывают этот телефон.</string>
 </resources>

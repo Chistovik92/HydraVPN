@@ -113,6 +113,20 @@ fun ProfileScreen(vm: MainViewModel) {
             Text(stringResource(R.string.profile_hidden), color = TextSecondary, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
         }
 
+        // 0.6.21: HWID, который уходит панелям подписок (x-hwid) — нажатие копирует.
+        val hwidCtx = androidx.compose.ui.platform.LocalContext.current
+        val copiedMsg = stringResource(R.string.hotspot_copied)
+        Card(Modifier.fillMaxWidth().clickableNoRipple {
+            hwidCtx.getSystemService(android.content.ClipboardManager::class.java)
+                ?.setPrimaryClip(android.content.ClipData.newPlainText("hwid", vm.hwid))
+            android.widget.Toast.makeText(hwidCtx, copiedMsg, android.widget.Toast.LENGTH_SHORT).show()
+        }) {
+            Label(stringResource(R.string.profile_hwid))
+            Text(vm.hwid, color = TextSecondary, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+            Spacer(Modifier.height(6.dp))
+            Text(stringResource(R.string.profile_hwid_hint), color = TextMuted, fontSize = 11.sp)
+        }
+
         WebsiteCard()
         GithubCard()
     }

@@ -31,8 +31,8 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 30
-        versionName = "0.6.20"
+        versionCode = 31
+        versionName = "0.6.21"
 
         // ABI, под которые собраны нативные ядра (libbox / libXray)
         ndk {
@@ -290,6 +290,9 @@ dependencies {
 
     // Сеть (загрузка подписок)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Автообновление подписок по расписанию (0.6.21)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // QR-импорт (0.6.18): сканер камеры + разбор QR на фото. Без Google Play Services —
     // ZXing работает офлайн и на устройствах без GMS.

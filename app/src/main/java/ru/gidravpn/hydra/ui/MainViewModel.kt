@@ -336,6 +336,50 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun delete(server: ServerProfile) = viewModelScope.launch { repo.delete(server) }
+
+    // ----- 0.6.21: подписки — обновление, пинг, автообновление, свёртка, удаление -----
+
+    private val _refreshingSubs = MutableStateFlow<Set<Long>>(emptySet())
+    val refreshingSubs: StateFlow<Set<Long>> = _refreshingSubs.asStateFlow()
+
+    /** Аппаратный ID, который клиент отдаёт панелям (`x-hwid`) — показывается в Профиле. */
+    val hwid: String by lazy { ru.gidravpn.hydra.data.repository.HydraDevice.hwid(getApplication()) }
+
+    fun refreshSubscription(sub: Subscription) = viewModelScope.launch {
+        if (sub.id in _refreshingSubs.value) return@launch
+        _refreshingSubs.update { it + sub.id }
+        val app = getApplication<Application>()
+        try {
+            runCatching { repo.refreshDetailed(sub.id) }.fold(
+                onSuccess = {
+                    VpnState.log("Подписка «${sub.displayName}» обновлена: ${it.total} серв. (+${it.added} / −${it.removed})")
+                    _importMessage.value = app.getString(ru.gidravpn.hydra.R.string.sub_refreshed, sub.displayName, it.total, it.added, it.removed)
+                },
+                onFailure = {
+                    val why = it.message ?: it.javaClass.simpleName
+                    VpnState.log("Ошибка: подписка «${sub.displayName}» не обновлена — $why")
+                    _importMessage.value = app.getString(ru.gidravpn.hydra.R.string.import_fail_sub, sub.displayName, why)
+                },
+            )
+        } finally {
+            _refreshingSubs.update { it - sub.id }
+        }
+    }
+
+    fun refreshAllSubscriptions() = subscriptions.value.forEach { refreshSubscription(it) }
+
+    fun pingSubscription(sub: Subscription) = servers.value.filter { it.subscriptionId == sub.id }.forEach { measurePing(it) }
+
+    fun setSubscriptionAutoUpdate(sub: Subscription, enabled: Boolean) =
+        viewModelScope.launch { repo.updateSubscription(sub.copy(autoUpdate = enabled)) }
+
+    fun toggleSubscriptionCollapsed(sub: Subscription) =
+        viewModelScope.launch { repo.updateSubscription(sub.copy(collapsed = !sub.collapsed)) }
+
+    fun deleteSubscription(sub: Subscription) = viewModelScope.launch {
+        repo.deleteSubscription(sub)
+        VpnState.log("Подписка «${sub.displayName}» удалена вместе с серверами")
+    }
     fun clearLogs() = VpnState.clearLogs()
 
     // ----- Фаза 6d: логи на устройстве -----

@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -63,20 +64,37 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
             androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 
-    val grouped = remember(servers, subscriptions) {
-        val bySub = servers.groupBy { it.subscriptionId }
-        val ordered = mutableListOf<Pair<Subscription?, List<ServerProfile>>>()
-        bySub[null]?.let { ordered.add(null to it) }
-        subscriptions.forEach { sub -> bySub[sub.id]?.let { ordered.add(sub to it) } }
-        ordered
+    val refreshingSubs by vm.refreshingSubs.collectAsState()
+    // Отдельные серверы — свои строки; серверы подписки — внутри карточки подписки.
+    val bySub = remember(servers) { servers.groupBy { it.subscriptionId } }
+    val standalone = bySub[null].orEmpty()
+    val effectiveSelected = selectedId ?: servers.firstOrNull()?.id
+    val shareServer: (ServerProfile) -> Unit = { s ->
+        val link = ru.gidravpn.hydra.data.subscription.LinkBuilder.toLink(s)
+        if (link != null) shareTarget = s.name to link
+        else android.widget.Toast.makeText(ctx, shareNoLink, android.widget.Toast.LENGTH_SHORT).show()
+    }
+    val serverCard: @Composable (ServerProfile) -> Unit = { s ->
+        ServerCard(s, selected = effectiveSelected == s.id,
+            measuring = s.id in measuringIds,
+            onClick = { vm.select(s.id); onSelected() },
+            onDelete = { vm.delete(s) },
+            onShare = { shareServer(s) },
+            onMeasure = { vm.measurePing(s) })
     }
 
     Column(Modifier.fillMaxSize().padding(20.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.tab_servers), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
-            Text(stringResource(R.string.servers_refresh_ping), color = AccentCyan, fontSize = 12.sp,
-                modifier = Modifier.clickableNoRipple { vm.measureAllPings() })
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (subscriptions.isNotEmpty()) {
+                    Text(stringResource(R.string.sub_refresh_all), color = AccentCyan, fontSize = 12.sp,
+                        modifier = Modifier.clickableNoRipple { vm.refreshAllSubscriptions() })
+                }
+                Text(stringResource(R.string.servers_refresh_ping), color = AccentCyan, fontSize = 12.sp,
+                    modifier = Modifier.clickableNoRipple { vm.measureAllPings() })
+            }
         }
         Spacer(Modifier.height(20.dp))
 
@@ -102,24 +120,32 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
         Spacer(Modifier.height(16.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            grouped.forEach { (sub, list) ->
-                if (sub != null) {
-                    item(key = "header_${sub.id}") {
-                        SubscriptionHeader(sub, list.size, onShare = { shareTarget = sub.name to sub.url })
+            subscriptions.forEach { sub ->
+                val list = bySub[sub.id].orEmpty()
+                item(key = "sub_${sub.id}") {
+                    SubscriptionCard(
+                        sub = sub, servers = list,
+                        refreshing = sub.id in refreshingSubs,
+                        onToggle = { vm.toggleSubscriptionCollapsed(sub) },
+                        onRefresh = { vm.refreshSubscription(sub) },
+                        onPing = { vm.pingSubscription(sub) },
+                        onShare = { shareTarget = sub.displayName to sub.url },
+                        onAutoUpdate = { vm.setSubscriptionAutoUpdate(sub, it) },
+                        onDelete = { vm.deleteSubscription(sub) },
+                        serverCard = serverCard,
+                    )
+                }
+            }
+            if (standalone.isNotEmpty()) {
+                item(key = "standalone_header") {
+                    Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(stringResource(R.string.sub_standalone).uppercase(), color = TextMuted, fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp)
+                        Text(stringResource(R.string.sub_ping), color = AccentCyan, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.clickableNoRipple { standalone.forEach { vm.measurePing(it) } })
                     }
                 }
-                items(list, key = { it.id }) { s ->
-                    ServerCard(s, selected = (selectedId ?: servers.firstOrNull()?.id) == s.id,
-                        measuring = s.id in measuringIds,
-                        onClick = { vm.select(s.id); onSelected() },
-                        onDelete = { vm.delete(s) },
-                        onShare = {
-                            val link = ru.gidravpn.hydra.data.subscription.LinkBuilder.toLink(s)
-                            if (link != null) shareTarget = s.name to link
-                            else android.widget.Toast.makeText(ctx, shareNoLink, android.widget.Toast.LENGTH_SHORT).show()
-                        },
-                        onMeasure = { vm.measurePing(s) })
-                }
+                items(standalone, key = { it.id }) { s -> serverCard(s) }
             }
         }
     }
@@ -139,19 +165,102 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
     )
 }
 
+/**
+ * Подписка одним блоком (0.6.21): название от панели, трафик и срок, действия (обновить, пинг,
+ * поделиться, автообновление, удалить) и её серверы, которые сворачиваются в «спойлер».
+ */
 @Composable
-private fun SubscriptionHeader(sub: Subscription, count: Int, onShare: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+private fun SubscriptionCard(
+    sub: Subscription,
+    servers: List<ServerProfile>,
+    refreshing: Boolean,
+    onToggle: () -> Unit,
+    onRefresh: () -> Unit,
+    onPing: () -> Unit,
+    onShare: () -> Unit,
+    onAutoUpdate: (Boolean) -> Unit,
+    onDelete: () -> Unit,
+    serverCard: @Composable (ServerProfile) -> Unit,
+) {
+    var menu by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            containerColor = Surface,
+            title = { Text(stringResource(R.string.sub_delete_title), color = TextPrimary) },
+            text = { Text(stringResource(R.string.sub_delete_msg, sub.displayName, servers.size), color = TextMuted) },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete = false; onDelete() }) {
+                    Text(stringResource(R.string.action_delete), color = PingSlow)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel), color = TextMuted) }
+            },
+        )
+    }
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(CardBg)
+            .border(1.dp, Border, RoundedCornerShape(18.dp)).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(sub.name.uppercase(), color = TextMuted, fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(R.string.share_action), color = AccentCyan, fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold, modifier = Modifier.clickableNoRipple(onShare))
-            Text("$count", color = TextMuted, fontSize = 11.sp)
+        Row(Modifier.fillMaxWidth().clickableNoRipple(onToggle), verticalAlignment = Alignment.CenterVertically) {
+            Text(if (sub.collapsed) "▸" else "▾", color = AccentCyan, fontSize = 16.sp)
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                Text(sub.displayName, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                val meta = buildList {
+                    add(stringResource(R.string.sub_servers_count, servers.size))
+                    if (sub.totalBytes > 0) add("${ru.gidravpn.hydra.ui.components.humanBytes(sub.usedBytes)} / ${ru.gidravpn.hydra.ui.components.humanBytes(sub.totalBytes)}")
+                    else if (sub.usedBytes > 0) add(ru.gidravpn.hydra.ui.components.humanBytes(sub.usedBytes))
+                    if (sub.expireAt > 0) add(stringResource(R.string.sub_until,
+                        java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(sub.expireAt * 1000))))
+                }
+                Text(meta.joinToString(" · "), color = TextMuted, fontSize = 11.sp)
+                val updated = if (sub.lastUpdated > 0) android.text.format.DateUtils.getRelativeTimeSpanString(
+                    sub.lastUpdated, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS).toString()
+                else stringResource(R.string.sub_never)
+                Text(
+                    stringResource(R.string.sub_updated, updated) +
+                        if (sub.autoUpdate) " · " + stringResource(R.string.sub_auto_every, sub.autoUpdateHours) else "",
+                    color = TextMuted, fontSize = 11.sp,
+                )
+                if (sub.lastError.isNotBlank()) Text(sub.lastError, color = Danger, fontSize = 11.sp)
+            }
+            Box {
+                IconButton(onClick = { menu = true }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = null, tint = TextMuted)
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.sub_auto_update)) },
+                        trailingIcon = { Checkbox(checked = sub.autoUpdate, onCheckedChange = null) },
+                        onClick = { menu = false; onAutoUpdate(!sub.autoUpdate) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.share_action)) },
+                        onClick = { menu = false; onShare() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.sub_delete_title), color = PingSlow) },
+                        onClick = { menu = false; confirmDelete = true },
+                    )
+                }
+            }
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(
+                stringResource(if (refreshing) R.string.sub_refreshing else R.string.sub_refresh),
+                color = if (refreshing) TextMuted else AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickableNoRipple { if (!refreshing) onRefresh() },
+            )
+            Text(stringResource(R.string.sub_ping), color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickableNoRipple(onPing))
+            Text(stringResource(R.string.share_action), color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickableNoRipple(onShare))
+        }
+        if (!sub.collapsed) servers.forEach { serverCard(it) }
     }
 }
 

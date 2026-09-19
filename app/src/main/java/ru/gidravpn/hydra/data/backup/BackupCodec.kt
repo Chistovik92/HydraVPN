@@ -136,6 +136,7 @@ object BackupCodec {
     private fun encodeSubscription(s: Subscription) = JSONObject().apply {
         put("id", s.id); put("name", s.name); put("url", s.url); put("userAgent", s.userAgent)
         put("lastUpdated", s.lastUpdated); put("autoUpdateHours", s.autoUpdateHours)
+        put("serverTitle", s.serverTitle); put("autoUpdate", s.autoUpdate); put("collapsed", s.collapsed)
     }
 
     private fun decodeSubscription(o: JSONObject): Subscription {
@@ -147,6 +148,9 @@ object BackupCodec {
             userAgent = o.optString("userAgent", d.userAgent),
             lastUpdated = o.optLong("lastUpdated", d.lastUpdated),
             autoUpdateHours = o.optInt("autoUpdateHours", d.autoUpdateHours),
+            serverTitle = o.optString("serverTitle", d.serverTitle),
+            autoUpdate = o.optBoolean("autoUpdate", d.autoUpdate),
+            collapsed = o.optBoolean("collapsed", d.collapsed),
         )
     }
 }
