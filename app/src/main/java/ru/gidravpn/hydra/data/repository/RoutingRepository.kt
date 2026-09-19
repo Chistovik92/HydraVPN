@@ -25,6 +25,7 @@ class RoutingRepository(private val context: Context) {
     private val KEY_DNS_PROVIDER = stringPreferencesKey("dns_provider")
     private val KEY_DNS_CUSTOM = stringPreferencesKey("dns_custom_address")
     private val KEY_GEO_MODE = stringPreferencesKey("geo_routing_mode")
+    private val KEY_GEO_COUNTRIES = stringPreferencesKey("geo_countries")
     private val KEY_MTU = stringPreferencesKey("tun_mtu")
     private val KEY_TLS_FRAGMENT = stringPreferencesKey("tls_fragment")
 
@@ -55,6 +56,14 @@ class RoutingRepository(private val context: Context) {
         .map { GeoRoutingMode.fromId(it[KEY_GEO_MODE]) }
     suspend fun setGeoRoutingMode(mode: GeoRoutingMode) {
         context.routingStore.edit { it[KEY_GEO_MODE] = mode.name }
+    }
+
+    /** Страны geo-режима (ISO-коды). По умолчанию — РФ, как было до выбора стран. */
+    val geoCountries: Flow<Set<String>> = context.routingStore.data.map { prefs ->
+        prefs[KEY_GEO_COUNTRIES]?.split(',')?.filter { it.isNotBlank() }?.toSet() ?: setOf("ru")
+    }
+    suspend fun setGeoCountries(countries: Set<String>) {
+        context.routingStore.edit { it[KEY_GEO_COUNTRIES] = countries.sorted().joinToString(",") }
     }
 
     /**

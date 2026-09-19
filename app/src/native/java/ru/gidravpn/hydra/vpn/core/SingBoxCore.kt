@@ -119,8 +119,7 @@ internal fun resolveRouting(ctx: android.content.Context?): RoutingOptions {
             dns = routing.resolveDns(),
             geoRouting = if (geoMode == GeoRoutingMode.OFF) null else SingBoxConfigBuilder.GeoRouting(
                 mode = geoMode,
-                geoipPath = GeoAssets.geoipRuPath(ctx),
-                geositePath = GeoAssets.geositeRuPath(ctx),
+                countries = GeoAssets.resolve(ctx, routing.geoCountries.firstOrNull() ?: setOf("ru")),
             ),
             mtu = (routing.mtu.firstOrNull() ?: MtuPreset.AUTO).value,
             tlsFragment = routing.tlsFragment.firstOrNull() ?: TlsFragmentMode.OFF,
