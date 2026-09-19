@@ -153,48 +153,53 @@ xrayVersion, getXrayState`. Для protect() сокетов — `LibXray.registe
 `XrayConfigBuilder.PRIVATE_IP_RANGES`) — см. docs/HANDOFF.md, «Честные
 оговорки», за полным разбором.
 
-### 2.3 amneziawg-go → `amneziawg-go.aar`
+### 2.3 AmneziaWG → `libwg-go.so`
+
+**Не gomobile.** Официальный `amnezia-vpn/amneziawg-android` собирает `amneziawg-go` как
+обычную C-shared библиотеку (`tunnel/tools/libwg-go`) с готовым JNI-слоем. Она не тащит
+свою копию `go.Seq` и потому не конфликтует с libbox/libXray (см. комментарий про
+«две gomobile-сборки» в `app/build.gradle.kts`).
 
 ```bash
-git clone https://github.com/amnezia-extensions/amneziawg-go
-cd amneziawg-go
-go install golang.org/x/mobile/cmd/gomobile@latest
-go install golang.org/x/mobile/cmd/gobind@latest
-export PATH="$PATH:$(go env GOPATH)/bin"
-gomobile init
-gomobile bind -v -androidapi 26 -target=android \
-  -o amneziawg-go.aar ./
-
-cp amneziawg-go.aar /path/to/Hydra/app/libs/
+scripts/build-awg.sh          # Go + NDK; результат — app/libs/awg/<abi>/libwg-go.so
 ```
 
-Интеграция: `AmneziaWgCore` уже генерирует `.conf`/uapi (`WireGuardConfigBuilder`);
-после сборки .aar подключите GoBackend/IpcUapi-вызовы в местах с
-`TODO(amneziawg-go.aar)`. Генерация конфигов не зависит от .aar.
+Скрипт клонирует апстрим (без submodule'ей — `wg`-утилиты нам не нужны) и собирает три
+ABI. Что важно знать:
 
-### 2.4 WDTT → `libclient.so` (beta)
+- Имя JNI-класса жёстко зашито в библиотеку: `org.amnezia.awg.GoBackend`
+  (`app/src/native/java/org/amnezia/awg/GoBackend.kt`) — не переименовывать.
+- В апстриме Go — патченый 1.24.2 (`goruntime-boottime-over-monotonic.diff`, время
+  на suspend); мы собираем обычным Go из PATH без патча — на устройстве это не проверялось.
+- Путь UAPI-сокета зашит флагом линковки под `ru.gidravpn.hydra`; при смене
+  applicationId пересоберите.
+- `HydraVpnService.establishTun` для AWG берёт адрес/DNS/MTU/маршруты из конфига (WireGuard
+  не делает NAT — заглушка 172.19.0.1 не годится).
 
-Нативная библиотека WG-over-TURN (см. docs/SERVICES.md, раздел WDTT).
-Соберите `libclient.so` под ABI из `abiFilters` и положите в
-`app/src/main/jniLibs/<abi>/`. Перед включением бинарника проверьте
-лицензию upstream-проекта. JNI-план — `WdttCore`.
+### 2.4 WDTT — не интегрирован
 
-### 2.5 olcRTC → `olcrtc.aar` + tun2socks (beta)
+Апстрим `amurcanov/proxy-turn-vk-android` (GPL-3.0) **заархивирован 11.09.2026**, автор
+отправляет к преемнику `amurcanov/csqtt`. Клиент работает через TURN-серверы VK и решает
+VK Smart Captcha автоматически (`captcha_v2*.go`). Автоматический обход капчи и
+использование чужой инфраструктуры в обход её защиты мы в проект не тащим — см. ROADMAP.
+`WdttCore` остаётся честной заглушкой.
 
-gomobile-биндинг компонента `cnc` (TCP over WebRTC → локальный SOCKS5):
+### 2.5 olcRTC → `libolcrtc.so` (beta)
+
+Апстрим `openlibrecommunity/olcrtc` (WTFPL). Клиент (`cmd/olcrtc`, режим `cnc`) — обычный
+Go-**исполняемый файл**, поднимающий локальный SOCKS5; приложение запускает его подпроцессом
+из `nativeLibraryDir` (поэтому файл называется `libolcrtc.so`) и подключает sing-box как
+мост к tun (`buildXrayBridge`) — тот же приём, что у Xray.
 
 ```bash
-git clone <olcrtc-upstream>
-gomobile bind -v -androidapi 26 -target=android -o olcrtc.aar ./
-cp olcrtc.aar /path/to/Hydra/app/libs/
+scripts/build-olcrtc.sh       # → app/libs/olcrtc/<abi>/libolcrtc.so
 ```
 
-Плюс tun2socks (`hev-socks5-tunnel`, тот, от которого отказались для Xray в
-2.2) — либо переиспользовать тот же приём «sing-box как мост», что и для
-`XrayCore`: `SingBoxConfigBuilder.buildXrayBridge()`/`SingBoxCore.runConfig()`
-уже общие, `olcrtc`-клиенту достаточно поднять свой локальный socks5-порт
-и передать его туда же. Мост описан в `OlcRtcCore` (не реализовано —
-см. HANDOFF.md).
+- Нужен флаг `-checklinkname=0` (зависимость `wlynxg/anet`), он есть в скрипте.
+- Файл ≈ 33 МБ на ABI — full-APK заметно вырос.
+- Сервер (`olcrtc srv`) и ключ (64 hex) — на стороне пользователя; ссылка формата
+  `olcrtc://<провайдер>?<транспорт>@<комната>#<ключ>$<комментарий>` (docs/uri.md апстрима)
+  импортируется как обычная (в т.ч. по QR).
 
 ### 2.6 Сборка приложения с ядрами (flavor `native`)
 

@@ -14,7 +14,7 @@ import java.util.Base64
  * Поля, которых у профиля нет (или они равны значению по умолчанию), в ссылку не
  * попадают — она остаётся короткой, а короткая ссылка помещается в QR.
  * Возвращает null для протоколов без общепринятого формата ссылки (PPTP недоступен,
- * WDTT/olcRTC — собственные форматы ещё не определены).
+ * WDTT — формата нет; olcRTC — compact URI из docs/uri.md).
  */
 object LinkBuilder {
 
@@ -31,6 +31,7 @@ object LinkBuilder {
             Protocol.SSTP, Protocol.L2TP -> userPass(p, extra, protocol.id)
             Protocol.WIREGUARD -> wireguard(p, "wireguard")
             Protocol.AMNEZIAWG -> wireguard(p, "awg")
+            Protocol.OLCRTC -> OlcRtcLink.build(p)
             else -> null
         }
     }

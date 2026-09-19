@@ -28,3 +28,5 @@ keystore.properties
 
 # AmneziaWG: libwg-go.so по ABI (scripts/build-awg.sh)
 /app/libs/awg/
+# olcRTC: libolcrtc.so по ABI (scripts/build-olcrtc.sh)
+/app/libs/olcrtc/

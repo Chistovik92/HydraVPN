@@ -80,7 +80,6 @@ class LinkBuilderTest {
     @Test fun unshareableProtocolsReturnNull() {
         assertNull(LinkBuilder.toLink(p("pptp")))
         assertNull(LinkBuilder.toLink(p("wdtt")))
-        assertNull(LinkBuilder.toLink(p("olcrtc")))
         assertNull(LinkBuilder.toLink(p("nonsense")))
         assertNotNull(LinkBuilder.toLink(p("vless")))
     }

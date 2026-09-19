@@ -31,8 +31,8 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 28
-        versionName = "0.6.18"
+        versionCode = 29
+        versionName = "0.6.19"
 
         // ABI, под которые собраны нативные ядра (libbox / libXray)
         ndk {
@@ -101,6 +101,8 @@ android {
             }
             // AmneziaWG: libwg-go.so по ABI лежит в app/libs/awg/<abi>/ (scripts/build-awg.sh).
             if (file("libs/awg").isDirectory) jniLibs.srcDir("libs/awg")
+            // olcRTC: исполняемый libolcrtc.so по ABI лежит в app/libs/olcrtc/<abi>/ (scripts/build-olcrtc.sh).
+            if (file("libs/olcrtc").isDirectory) jniLibs.srcDir("libs/olcrtc")
         }
     }
 

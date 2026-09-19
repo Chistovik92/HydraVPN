@@ -60,6 +60,7 @@
                 <data android:scheme="l2tp" />
                 <data android:scheme="pptp" />
                 <data android:scheme="sing-box" />
+                <data android:scheme="olcrtc" />
             </intent-filter>
             <!-- «Поделиться» ссылкой/текстом/картинкой с QR из другого приложения (0.6.18). -->
             <intent-filter>
