@@ -132,8 +132,14 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
                         onShare = { shareTarget = sub.displayName to sub.url },
                         onAutoUpdate = { vm.setSubscriptionAutoUpdate(sub, it) },
                         onDelete = { vm.deleteSubscription(sub) },
-                        serverCard = serverCard,
                     )
+                }
+                // Серверы подписки — отдельные ленивые элементы (36 серверов одним куском не листались
+                // и ломали вёрстку), с отступом, чтобы читались как вложенные в блок подписки.
+                if (!sub.collapsed) {
+                    items(list, key = { it.id }) { s ->
+                        Box(Modifier.padding(start = 12.dp)) { serverCard(s) }
+                    }
                 }
             }
             if (standalone.isNotEmpty()) {
@@ -180,7 +186,6 @@ private fun SubscriptionCard(
     onShare: () -> Unit,
     onAutoUpdate: (Boolean) -> Unit,
     onDelete: () -> Unit,
-    serverCard: @Composable (ServerProfile) -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -260,7 +265,6 @@ private fun SubscriptionCard(
             Text(stringResource(R.string.share_action), color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.clickableNoRipple(onShare))
         }
-        if (!sub.collapsed) servers.forEach { serverCard(it) }
     }
 }
 
@@ -311,7 +315,7 @@ private fun ServerCard(
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(s.protocol?.displayName ?: s.protocolId.uppercase(), color = TextMuted, fontSize = 12.sp)
+                Text(s.protocol?.displayName?.substringBefore(" (") ?: s.protocolId.uppercase(), color = TextMuted, fontSize = 12.sp, maxLines = 1)
                 Text(" • ", color = TextMuted, fontSize = 12.sp)
                 Text(
                     when {

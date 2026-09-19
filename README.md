@@ -4,7 +4,19 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.6.21**
+- Статус: **0.6.21.1**
+
+## Скриншоты
+
+Снято на реальном телефоне (OnePlus CPH2747, Android 16).
+
+| Главная (подключено) | Серверы и подписка | Настройки |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/main.png" width="250"> | <img src="docs/screenshots/servers.png" width="250"> | <img src="docs/screenshots/settings.png" width="250"> |
+
+| Раздельное туннелирование | Хотспот-прокси |
+|:---:|:---:|
+| <img src="docs/screenshots/split.png" width="250"> | <img src="docs/screenshots/hotspot.png" width="250"> |
 
 ---
 
@@ -16,7 +28,7 @@
   - **AmneziaWG 1.0/1.5/2.0** — обфусцированный WireGuard (amneziawg-go);
   - **SSTP** и **L2TP** — реализованы целиком на Kotlin (userspace-PPP),
     без нативных зависимостей и root;
-  - WDTT и olcRTC — ознакомительные движки, помечены плашкой **BETA**;
+  - olcRTC и OpenFlux — ознакомительные движки (BETA); WDTT не интегрирован (см. docs/ECOSYSTEM.md);
   - PPTP — честный отказ (GRE требует root, стек удалён из Android 12/13).
 - 📥 **Импорт**: подписки (base64/список) из панелей x-ui / 3x-ui / PasarGuard /
   Remnawave, одиночные ссылки (`vless:// vmess:// trojan:// ss:// hysteria2://
@@ -108,7 +120,7 @@ UI (Compose) → MainViewModel → ServerRepository (Room + подписки)
 - [docs/SECURITY.md](docs/SECURITY.md) — политика безопасности
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — как контрибьютить
 - [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md) — olcRTC / OpenFlux / snolc / AmneziaWG: апстримы, статус, клиенты
-- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.6.21
+- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.6.21.1
 
 ## Лицензия
 
