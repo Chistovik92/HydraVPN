@@ -83,8 +83,20 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleImportIntent(intent: Intent?) {
+        // «Поделиться» (0.6.18): текст со ссылкой/подпиской или картинка с QR.
+        if (intent?.action == Intent.ACTION_SEND) {
+            intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() }?.let {
+                vm.importAuto(listOf(it)); return
+            }
+            @Suppress("DEPRECATION")
+            val stream: android.net.Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                intent.getParcelableExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java)
+            else intent.getParcelableExtra(Intent.EXTRA_STREAM)
+            stream?.let { vm.importFromImage(it) }
+            return
+        }
         val data = intent?.data?.toString() ?: return
-        if ("://" in data) vm.importLink(data)
+        if ("://" in data) vm.importAuto(listOf(data))
     }
 
     private fun requestVpnPermission() {

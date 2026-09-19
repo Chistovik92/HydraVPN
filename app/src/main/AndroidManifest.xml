@@ -61,6 +61,13 @@
                 <data android:scheme="pptp" />
                 <data android:scheme="sing-box" />
             </intent-filter>
+            <!-- «Поделиться» ссылкой/текстом/картинкой с QR из другого приложения (0.6.18). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
         </activity>
 
         <!-- Ярлыки. Всегда включён ровно один: по умолчанию Cyber Emerald.

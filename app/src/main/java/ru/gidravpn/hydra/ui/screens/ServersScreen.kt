@@ -38,6 +38,25 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
     val measuringIds by vm.measuringIds.collectAsState()
     var showAdd by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
+    val importMessage by vm.importMessage.collectAsState()
+    val scanPrompt = stringResource(R.string.qr_scan_prompt)
+    val scanLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        com.journeyapps.barcodescanner.ScanContract()
+    ) { res -> res.contents?.let { vm.importAuto(listOf(it)) } }
+    val photoLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let { vm.importFromImage(it) } }
+    val startScan = {
+        scanLauncher.launch(
+            com.journeyapps.barcodescanner.ScanOptions()
+                .setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE)
+                .setPrompt(scanPrompt).setBeepEnabled(false).setOrientationLocked(false)
+        )
+    }
+    val startPhoto = {
+        photoLauncher.launch(androidx.activity.result.PickVisualMediaRequest(
+            androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
 
     val grouped = remember(servers, subscriptions) {
         val bySub = servers.groupBy { it.subscriptionId }
@@ -59,6 +78,21 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             GradientButton(stringResource(R.string.servers_add), Modifier.weight(1f)) { showAdd = true }
             OutlinedActionButton(stringResource(R.string.servers_import), Modifier.weight(1f)) { showImport = true }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedActionButton(stringResource(R.string.servers_scan_qr), Modifier.weight(1f)) { startScan() }
+            OutlinedActionButton(stringResource(R.string.servers_qr_photo), Modifier.weight(1f)) { startPhoto() }
+        }
+        importMessage?.let { msg ->
+            Spacer(Modifier.height(12.dp))
+            ru.gidravpn.hydra.ui.components.Card(
+                Modifier.fillMaxWidth().clickableNoRipple { vm.dismissImportMessage() },
+                borderColor = AccentCyan
+            ) {
+                Text(msg, color = TextPrimary, fontSize = 13.sp)
+                Text(stringResource(R.string.backup_dismiss), color = TextMuted, fontSize = 10.sp)
+            }
         }
         Spacer(Modifier.height(16.dp))
 
@@ -84,8 +118,9 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
     )
     if (showImport) ImportDialog(
         onDismiss = { showImport = false },
-        onLink = { vm.importLink(it); showImport = false },
-        onSubscription = { name, url -> vm.addSubscription(name, url); showImport = false }
+        onImport = { text, name -> vm.importAuto(listOf(text), name); showImport = false },
+        onScan = { showImport = false; startScan() },
+        onPhoto = { showImport = false; startPhoto() },
     )
 }
 
@@ -259,10 +294,15 @@ private fun AddServerDialog(onDismiss: () -> Unit, onSave: (String, String, Int,
 }
 
 @Composable
-private fun ImportDialog(onDismiss: () -> Unit, onLink: (String) -> Unit, onSubscription: (String, String) -> Unit) {
-    val defaultSubName = stringResource(R.string.default_subscription_name)
+private fun ImportDialog(
+    onDismiss: () -> Unit,
+    onImport: (text: String, subName: String?) -> Unit,
+    onScan: () -> Unit,
+    onPhoto: () -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var value by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf(defaultSubName) }
+    var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Surface,
@@ -272,13 +312,25 @@ private fun ImportDialog(onDismiss: () -> Unit, onLink: (String) -> Unit, onSubs
                 Text(stringResource(R.string.import_hint),
                     color = TextMuted, fontSize = 12.sp)
                 Field(stringResource(R.string.import_link_field), value) { value = it }
+                Text(stringResource(R.string.import_paste), color = AccentCyan, fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickableNoRipple {
+                        val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+                        cm?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+                            ?.let { value = it }
+                    })
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(stringResource(R.string.servers_scan_qr), color = AccentCyan, fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold, modifier = Modifier.clickableNoRipple(onScan))
+                    Text(stringResource(R.string.servers_qr_photo), color = AccentCyan, fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold, modifier = Modifier.clickableNoRipple(onPhoto))
+                }
                 Field(stringResource(R.string.import_sub_name_field), name) { name = it }
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                val v = value.trim()
-                if (v.startsWith("http")) onSubscription(name, v) else onLink(v)
+                onImport(value, name.takeIf { it.isNotBlank() })
             }) { Text(stringResource(R.string.import_action), color = AccentCyan) }
         },
         dismissButton = { TextButton(onDismiss) { Text(stringResource(R.string.action_cancel), color = TextMuted) } }

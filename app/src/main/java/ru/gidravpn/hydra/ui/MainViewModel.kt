@@ -268,6 +268,59 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             VpnState.log("Сервер \"$name\" добавлен")
         }
 
+    // ----- 0.6.18: умный импорт (ссылка / подписка / .conf / QR / фото) -----
+
+    private val _importMessage = MutableStateFlow<String?>(null)
+    val importMessage = _importMessage.asStateFlow()
+    fun dismissImportMessage() { _importMessage.value = null }
+
+    /**
+     * Принимает любой текст — клиент сам решает, серверы это или подписка. Несколько
+     * фрагментов (несколько QR на снимке) обрабатываются по очереди, итог — одним сообщением.
+     * [subName] — необязательное имя подписки от пользователя (иначе берётся из ссылки).
+     */
+    fun importAuto(texts: List<String>, subName: String? = null) = viewModelScope.launch {
+        val app = getApplication<Application>()
+        fun s(id: Int, vararg a: Any) = app.getString(id, *a)
+        if (texts.isEmpty()) { _importMessage.value = s(ru.gidravpn.hydra.R.string.import_no_qr); return@launch }
+        val lines = mutableListOf<String>()
+        for (text in texts) {
+            when (val r = ru.gidravpn.hydra.data.subscription.ImportDetector.classify(text)) {
+                is ru.gidravpn.hydra.data.subscription.ImportDetector.Result.SubscriptionUrl -> {
+                    val name = subName?.takeIf { it.isNotBlank() } ?: r.nameHint
+                    runCatching { repo.addSubscription(name, r.url) }.fold(
+                        onSuccess = {
+                            VpnState.log("Подписка \"$name\": импортировано $it серверов")
+                            lines += s(ru.gidravpn.hydra.R.string.import_done_sub, name, it)
+                        },
+                        onFailure = {
+                            val why = it.message ?: it.javaClass.simpleName
+                            VpnState.log("Ошибка: подписка \"$name\" не загружена — $why")
+                            lines += s(ru.gidravpn.hydra.R.string.import_fail_sub, name, why)
+                        },
+                    )
+                }
+                is ru.gidravpn.hydra.data.subscription.ImportDetector.Result.Servers -> {
+                    val n = runCatching { repo.importProfiles(r.profiles) }.getOrDefault(0)
+                    VpnState.log("Импортировано серверов: $n")
+                    lines += if (n == 1) s(ru.gidravpn.hydra.R.string.import_done_one, r.profiles.first().name)
+                    else s(ru.gidravpn.hydra.R.string.import_done_servers, n)
+                }
+                is ru.gidravpn.hydra.data.subscription.ImportDetector.Result.Unsupported ->
+                    lines += s(if (r.reason == ru.gidravpn.hydra.data.subscription.ImportDetector.Reason.JSON_CONFIG)
+                        ru.gidravpn.hydra.R.string.import_json_unsupported else ru.gidravpn.hydra.R.string.import_unknown)
+                ru.gidravpn.hydra.data.subscription.ImportDetector.Result.Empty -> Unit
+            }
+        }
+        _importMessage.value = lines.distinct().joinToString("\n").ifBlank { s(ru.gidravpn.hydra.R.string.import_unknown) }
+    }
+
+    /** Фото/скриншот из галереи: достаём все QR и отдаём умному импорту. */
+    fun importFromImage(uri: android.net.Uri) = viewModelScope.launch {
+        val codes = ru.gidravpn.hydra.data.subscription.QrImageDecoder.decode(getApplication(), uri)
+        importAuto(codes).join()
+    }
+
     fun importLink(link: String) = viewModelScope.launch {
         val p = runCatching { repo.importLink(link) }.getOrNull()
         VpnState.log(if (p != null) "Импортирован: ${p.name}" else "Не удалось разобрать ссылку")

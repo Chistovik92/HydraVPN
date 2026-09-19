@@ -242,4 +242,15 @@
     <string name="notif_reconnecting">Переподключение…</string>
     <string name="sec_reconnect">Переподключение после разрыва</string>
     <string name="sec_reconnect_desc">Если туннель оборвался, Hydra сама пробует поднять его снова с растущими паузами (2 с → 30 с, до 10 попыток) и подхватывает сразу, как появится сеть. При включённом Kill Switch трафик всё это время заблокирован.</string>
+    <string name="servers_scan_qr">📷 Сканировать QR</string>
+    <string name="servers_qr_photo">🖼 QR из фото</string>
+    <string name="qr_scan_prompt">Наведите камеру на QR-код со ссылкой, подпиской или конфигом</string>
+    <string name="import_paste">Вставить из буфера обмена</string>
+    <string name="import_no_qr">QR-код не найден. Попробуйте более чёткое фото покрупнее или отсканируйте камерой.</string>
+    <string name="import_done_sub">Подписка «%1$s»: импортировано серверов — %2$d</string>
+    <string name="import_fail_sub">Подписка «%1$s» не загружена: %2$s</string>
+    <string name="import_done_one">Сервер добавлен: %1$s</string>
+    <string name="import_done_servers">Добавлено серверов: %1$d</string>
+    <string name="import_json_unsupported">Это целый JSON-конфиг (sing-box/Xray). Пока не поддерживается — импортируйте ссылку или подписку.</string>
+    <string name="import_unknown">Не удалось распознать: это не ссылка на сервер, не подписка и не конфиг.</string>
 </resources>

@@ -284,6 +284,11 @@ dependencies {
 
     // Сеть (загрузка подписок)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // QR-импорт (0.6.18): сканер камеры + разбор QR на фото. Без Google Play Services —
+    // ZXing работает офлайн и на устройствах без GMS.
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("com.google.zxing:core:3.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
     // JVM unit-тесты. org.json из android.jar в unit-тестах — заглушки

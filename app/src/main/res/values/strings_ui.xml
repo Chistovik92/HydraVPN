@@ -243,4 +243,15 @@
     <string name="notif_reconnecting">Reconnecting…</string>
     <string name="sec_reconnect">Reconnect after a drop</string>
     <string name="sec_reconnect_desc">If the tunnel drops, Hydra retries automatically with growing pauses (2 s → 30 s, up to 10 attempts) and picks up as soon as a network returns. With Kill Switch on, traffic stays blocked meanwhile.</string>
+    <string name="servers_scan_qr">📷 Scan QR</string>
+    <string name="servers_qr_photo">🖼 QR from photo</string>
+    <string name="qr_scan_prompt">Point the camera at a QR code with a link, subscription or config</string>
+    <string name="import_paste">Paste from clipboard</string>
+    <string name="import_no_qr">No QR code found. Try a sharper, closer photo or scan with the camera.</string>
+    <string name="import_done_sub">Subscription \"%1$s\": %2$d server(s) imported</string>
+    <string name="import_fail_sub">Subscription \"%1$s\" was not loaded: %2$s</string>
+    <string name="import_done_one">Server added: %1$s</string>
+    <string name="import_done_servers">Servers added: %1$d</string>
+    <string name="import_json_unsupported">This is a full JSON config (sing-box/Xray). It is not supported yet — import a link or a subscription instead.</string>
+    <string name="import_unknown">Could not recognize this as a server link, subscription or config.</string>
 </resources>

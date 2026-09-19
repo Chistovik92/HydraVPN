@@ -25,6 +25,10 @@ class ServerRepository(context: Context) {
     suspend fun importLink(link: String): ServerProfile? =
         LinkParser.parseLine(link.trim())?.also { servers.upsert(it) }
 
+/** Пачка серверов из умного импорта (0.6.18): сколько реально сохранено. */
+    suspend fun importProfiles(profiles: List<ServerProfile>): Int =
+        profiles.count { runCatching { servers.upsert(it) }.isSuccess }
+
     /** Добавить подписку и подтянуть её содержимое. */
     suspend fun addSubscription(name: String, url: String): Int {
         val subId = subs.upsert(Subscription(name = name, url = url))
