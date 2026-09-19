@@ -291,4 +291,24 @@
     <string name="srv_engine_off">ядро выключено</string>
     <string name="profile_hwid_hint">Передаётся панелям подписок заголовком x-hwid. Панели с лимитом устройств по нему учитывают этот телефон.</string>
     <string name="set_tunnel_sub">Ядра: включить / выключить</string>
+    <string name="srv_summary">серверов: %1$d · подписок: %2$d</string>
+    <string name="srv_search">Поиск</string>
+    <string name="srv_search_hint">Название сервера или протокол</string>
+    <string name="srv_sort_ping">Сортировать по пингу</string>
+    <string name="srv_add">Добавить</string>
+    <string name="srv_add_paste">Из буфера обмена</string>
+    <string name="srv_add_paste_desc">Ссылка, подписка или конфиг — определится само</string>
+    <string name="srv_add_scan">Сканировать QR</string>
+    <string name="srv_add_scan_desc">Камерой</string>
+    <string name="srv_add_photo">QR из фото</string>
+    <string name="srv_add_photo_desc">Скриншот или картинка из галереи</string>
+    <string name="srv_add_link">Ввести ссылку</string>
+    <string name="srv_add_link_desc">Ссылка сервера, URL подписки или .conf</string>
+    <string name="srv_add_manual">Вручную</string>
+    <string name="srv_add_manual_desc">Адрес, порт и протокол</string>
+    <string name="srv_clipboard_empty">Буфер обмена пуст</string>
+    <string name="srv_empty_title">Серверов пока нет</string>
+    <string name="srv_empty_desc">Добавьте подписку или сервер: вставьте ссылку, отсканируйте QR или выберите фото.</string>
+    <string name="srv_more">Ещё…</string>
+    <string name="sub_refresh_short">Обновить</string>
 </resources>

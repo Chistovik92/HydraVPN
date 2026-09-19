@@ -292,4 +292,24 @@
     <string name="eng_openflux">OpenFlux</string>
     <string name="eng_openflux_desc">TCP tunnel through document and messenger services (Yandex, MAX, Mail.ru, Cups). Needs your own exit node.</string>
     <string name="srv_engine_off">core is off</string>
+    <string name="srv_summary">%1$d servers · %2$d subscriptions</string>
+    <string name="srv_search">Search</string>
+    <string name="srv_search_hint">Server name or protocol</string>
+    <string name="srv_sort_ping">Sort by ping</string>
+    <string name="srv_add">Add</string>
+    <string name="srv_add_paste">From clipboard</string>
+    <string name="srv_add_paste_desc">Link, subscription or config — detected automatically</string>
+    <string name="srv_add_scan">Scan QR</string>
+    <string name="srv_add_scan_desc">With the camera</string>
+    <string name="srv_add_photo">QR from photo</string>
+    <string name="srv_add_photo_desc">A screenshot or picture from the gallery</string>
+    <string name="srv_add_link">Enter a link</string>
+    <string name="srv_add_link_desc">Server link, subscription URL or .conf</string>
+    <string name="srv_add_manual">Manually</string>
+    <string name="srv_add_manual_desc">Address, port and protocol</string>
+    <string name="srv_clipboard_empty">Clipboard is empty</string>
+    <string name="srv_empty_title">No servers yet</string>
+    <string name="srv_empty_desc">Add a subscription or a server: paste a link, scan a QR code or pick a photo.</string>
+    <string name="srv_more">More…</string>
+    <string name="sub_refresh_short">Update</string>
 </resources>
