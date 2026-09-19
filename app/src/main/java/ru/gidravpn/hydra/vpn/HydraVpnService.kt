@@ -90,7 +90,20 @@ class HydraVpnService : VpnService() {
             ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             else -> {
                 val serverId = intent?.getLongExtra(EXTRA_SERVER_ID, -1) ?: -1
-                startForeground(NOTIF_ID, buildNotification(ConnectionState.CONNECTING, "…"))
+                // Фаза 7e: startForeground может отказать (на Android 12+ —
+                // ForegroundServiceStartNotAllowedException, если сервис
+                // подняли из фона без разрешённого повода). Голый вызов ронял
+                // процесс; лучше честно отказаться от подключения.
+                val foreground = runCatching {
+                    startForeground(NOTIF_ID, buildNotification(ConnectionState.CONNECTING, "…"))
+                }
+                if (foreground.isFailure) {
+                    VpnState.log("Ошибка: система не дала поднять сервис в foreground — " +
+                        "${foreground.exceptionOrNull()?.javaClass?.simpleName}")
+                    VpnState.state.value = ConnectionState.ERROR
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
                 connect(serverId)
             }
         }

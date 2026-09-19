@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.6.14** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.6.15** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -365,15 +365,26 @@
     (это же и есть недостающий keepalive для 7a). Один общий
     `OkHttpClient` на процесс; `AppDatabase.get()` — вторая проверка под
     `synchronized`.
-  - **7e. Дешёвая страховка.** `runCatching` вокруг всех трёх
-    `startForegroundService`/`startForeground`; глобальный
-    `UncaughtExceptionHandler`, дописывающий стек в `LogStore` перед
-    передачей управления системному (чтобы крэш после перезапуска можно
-    было прочитать на экране логов); `VpnState.log()` — на
-    `MutableStateFlow.update {}` с кольцевым буфером и отсечкой потока
-    (не чаще N строк/с); ограничение очереди в `LogStore.append()`;
-    `Semaphore(8)` в `measureAllPings()`; `@Transaction` на
-    `refreshSubscription()` + отказ применять пустой ответ подписки.
+  - ✅ **7e. Дешёвая страховка** (0.6.15, кроме ограничителя лога — только
+    компиляция stub в CI, живьём не проверено): `runCatching` вокруг всех
+    трёх стартов foreground-сервиса (`BootReceiver`, `HydraQsTileService`,
+    `HydraVpnService.onStartCommand` — последний при отказе честно гасит
+    сервис вместо падения); глобальный `UncaughtExceptionHandler` пишет
+    стек в `LogStore` и ждёт сброса на диск (`flushBlocking`) до передачи
+    системному обработчику; `VpnState.log()` переведён на атомарный
+    `update {}` и получил `LogThrottle` (40 строк/с, WARN/ERROR не режутся,
+    проглоченные считаются — вынесен отдельным классом с внешними часами
+    ради JVM-тестов, как `LogFiles` в 6d); очередь `LogStore` ограничена
+    2048 задачами с `DiscardPolicy`; `measureAllPings()` — `Semaphore(8)`;
+    `ServerDao.replaceSubscriptionServers()` под `@Transaction` + отказ
+    применять пустой ответ подписки (и причина отказа теперь видна в логе,
+    а не «импортировано 0 серверов»); вторая проверка под `synchronized` в
+    `AppDatabase.get()`.
+    **Порядок нарушен сознательно:** 7e сделана раньше 7b-7d, потому что
+    7b (переподключение) для основного движка упирается в открытый хвост
+    7a — без признака смерти sing-box переподключать нечего, — а вся 7e
+    лежит в `app/src/main` и потому проверяется компиляцией CI, тогда как
+    правки в native-флейворе здесь не компилирует никто.
 
   **Что осознанно НЕ входит в фазу 7**: миграции Room (пункт 14 — вместе
   с первым же изменением схемы, как и записано в 6d); переживание
@@ -464,15 +475,13 @@
     счётчики трафика — не атомарные; в `PppSession` нет Restart-таймера
     ConfReq и своего LCP Echo-Request. Чинить вместе с TODO №2 (on-device
     SSTP/L2TP) — без живого сервера половину этого не проверить.
-13. **Мелкая страховка от крэшей и деградации** (Фаза 7e), каждый пункт
-    независим: голые `startForegroundService`/`startForeground`
-    (`BootReceiver.kt:37`, `HydraQsTileService.kt:76`,
-    `HydraVpnService.onStartCommand`), отсутствие
+13. ~~**Мелкая страховка от крэшей и деградации** (Фаза 7e)~~ — **сделано в
+    0.6.15**: все семь пунктов (голые старты foreground-сервиса,
     `UncaughtExceptionHandler`, неатомарный `VpnState.log()` и
-    неограниченная очередь `LogStore.append()`, неограниченный
-    параллелизм `measureAllPings()`, `deleteBySubscription()` +
-    `upsertAll()` вне транзакции в `refreshSubscription()`, и
-    double-checked locking без второй проверки в `AppDatabase.get()`.
+    неограниченная очередь `LogStore`, параллелизм `measureAllPings()`,
+    транзакция при обновлении подписки, double-checked locking в
+    `AppDatabase.get()`). Живьём не проверено ничего, кроме ограничителя
+    лога (6 unit-тестов, прогнаны).
 
 ## Карта кода
 

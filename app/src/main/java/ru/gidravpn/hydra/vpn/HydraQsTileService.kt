@@ -55,7 +55,9 @@ class HydraQsTileService : TileService() {
         super.onClick()
         val current = VpnState.state.value
         if (current == ConnectionState.CONNECTED || current == ConnectionState.CONNECTING) {
-            startService(Intent(this, HydraVpnService::class.java).setAction(HydraVpnService.ACTION_DISCONNECT))
+            runCatching {
+                startService(Intent(this, HydraVpnService::class.java).setAction(HydraVpnService.ACTION_DISCONNECT))
+            }
             return
         }
         if (VpnService.prepare(this) != null) {
@@ -73,7 +75,13 @@ class HydraQsTileService : TileService() {
                     action = HydraVpnService.ACTION_CONNECT
                     putExtra(HydraVpnService.EXTRA_SERVER_ID, server.id)
                 }
-                ContextCompat.startForegroundService(ctx, intent)
+                // См. BootReceiver: старт foreground-сервиса может быть отклонён
+                // системой, и это не повод ронять процесс плитки.
+                runCatching { ContextCompat.startForegroundService(ctx, intent) }
+                    .onFailure {
+                        VpnState.log("Ошибка: подключение из плитки не стартовало — ${it.javaClass.simpleName}")
+                        openApp()
+                    }
             }
         }
     }

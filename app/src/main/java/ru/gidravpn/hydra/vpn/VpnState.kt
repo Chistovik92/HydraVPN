@@ -5,6 +5,7 @@ import ru.gidravpn.hydra.vpn.core.ConnectionState
 import ru.gidravpn.hydra.vpn.core.TrafficStats
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -40,12 +41,32 @@ object VpnState {
     )
     val logs = _logs.asStateFlow()
 
+    private const val MAX_LINES = 500
+    private val throttle = ru.gidravpn.hydra.data.log.LogThrottle()
+
+    /**
+     * Зовётся с любых потоков, в том числе с JNI-потоков sing-box на горячем
+     * пути.
+     *
+     * Фаза 7e, две правки:
+     *  - `update {}` вместо `_logs.value = _logs.value + …`: то был
+     *    read-modify-write без атомарности, и при параллельных вызовах строки
+     *    просто терялись (побеждал тот, кто записал последним);
+     *  - [LogThrottle]: всплеск лога ядра больше не превращается в сотни копий
+     *    списка на 500 элементов в секунду. WARN/ERROR не режутся никогда.
+     */
     fun log(msg: String) {
         val clean = stripAnsi(msg)
         android.util.Log.d("HydraCore", clean)
+        val level = ru.gidravpn.hydra.data.log.LogLevel.of(clean)
+        val decision = throttle.decide(level)
+        if (decision is ru.gidravpn.hydra.data.log.LogThrottle.Decision.Drop) return
+
+        val note = (decision as ru.gidravpn.hydra.data.log.LogThrottle.Decision.Pass).suppressedNote
         val stamped = line(clean)
-        _logs.value = (_logs.value + stamped).takeLast(500)
-        ru.gidravpn.hydra.data.log.LogStore.append(stamped, ru.gidravpn.hydra.data.log.LogLevel.of(clean))
+        val lines = if (note == null) listOf(stamped) else listOf(line(note), stamped)
+        _logs.update { (it + lines).takeLast(MAX_LINES) }
+        lines.forEach { ru.gidravpn.hydra.data.log.LogStore.append(it, level) }
     }
 
     fun clearLogs() { _logs.value = listOf(line("Логи очищены")) }
