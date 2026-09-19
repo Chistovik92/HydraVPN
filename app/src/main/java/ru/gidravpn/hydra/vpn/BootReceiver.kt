@@ -34,7 +34,12 @@ class BootReceiver : BroadcastReceiver() {
                     action = HydraVpnService.ACTION_CONNECT
                     putExtra(HydraVpnService.EXTRA_SERVER_ID, id)
                 }
-                ContextCompat.startForegroundService(context, svcIntent)
+                // Фаза 7e: на Android 12+ старт foreground-сервиса из фона
+                // может быть запрещён (ForegroundServiceStartNotAllowedException).
+                // Голый вызов ронял процесс в фоне, и пользователь видел это как
+                // «после перезагрузки VPN просто не поднялся», без следов.
+                runCatching { ContextCompat.startForegroundService(context, svcIntent) }
+                    .onFailure { VpnState.log("Ошибка: автоподключение при загрузке не стартовало — ${it.javaClass.simpleName}") }
             } finally {
                 pending.finish()
             }

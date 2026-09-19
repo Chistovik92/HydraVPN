@@ -27,6 +27,7 @@ import ru.gidravpn.hydra.vpn.VpnState
 import ru.gidravpn.hydra.vpn.core.ConnectionState
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withPermit
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ServerRepository(app)
@@ -240,8 +241,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun addSubscription(name: String, url: String) = viewModelScope.launch {
-        val n = runCatching { repo.addSubscription(name, url) }.getOrDefault(0)
-        VpnState.log("Подписка \"$name\": импортировано $n серверов")
+        // Причина отказа теперь видна: до 7e любая ошибка (нет сети, 404,
+        // пустой ответ) превращалась в «импортировано 0 серверов».
+        runCatching { repo.addSubscription(name, url) }.fold(
+            onSuccess = { VpnState.log("Подписка \"$name\": импортировано $it серверов") },
+            onFailure = { VpnState.log("Ошибка: подписка \"$name\" не загружена — ${it.message ?: it.javaClass.simpleName}") },
+        )
     }
 
     fun delete(server: ServerProfile) = viewModelScope.launch { repo.delete(server) }
@@ -326,11 +331,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _measuringIds = MutableStateFlow<Set<Long>>(emptySet())
     val measuringIds: StateFlow<Set<Long>> = _measuringIds.asStateFlow()
 
+    /**
+     * Не больше восьми одновременных замеров (Фаза 7e). «Обновить пинг» на
+     * подписке в сотни серверов раньше запускал по корутине на каждый сервер:
+     * сотни одновременных TCP-connect, столько же записей в Room и забитый
+     * Dispatchers.IO — на слабом устройстве это заметное подвисание.
+     */
+    private val pingLimit = kotlinx.coroutines.sync.Semaphore(8)
+
     fun measurePing(server: ServerProfile) = viewModelScope.launch {
         _measuringIds.update { it + server.id }
-        val ms = PingMeasurer.measure(server.address, server.port)
-        repo.save(server.copy(pingMs = ms))
-        _measuringIds.update { it - server.id }
+        try {
+            val ms = pingLimit.withPermit { PingMeasurer.measure(server.address, server.port) }
+            repo.save(server.copy(pingMs = ms))
+        } finally {
+            _measuringIds.update { it - server.id }
+        }
     }
 
     fun measureAllPings() {

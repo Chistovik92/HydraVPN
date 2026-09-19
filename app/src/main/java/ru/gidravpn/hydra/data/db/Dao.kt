@@ -25,6 +25,18 @@ interface ServerDao {
     @Query("DELETE FROM servers WHERE subscriptionId = :subId")
     suspend fun deleteBySubscription(subId: Long)
 
+    /**
+     * Замена содержимого подписки одним куском (Фаза 7e). Раньше репозиторий
+     * звал `deleteBySubscription()` и `upsertAll()` подряд, вне транзакции:
+     * падение или снятие процесса между ними оставляло подписку пустой —
+     * серверы стёрты, новые не записаны.
+     */
+    @Transaction
+    suspend fun replaceSubscriptionServers(subId: Long, servers: List<ServerProfile>) {
+        deleteBySubscription(subId)
+        upsertAll(servers)
+    }
+
     @Query("SELECT * FROM servers ORDER BY id")
     suspend fun getAll(): List<ServerProfile>
 

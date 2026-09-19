@@ -50,6 +50,21 @@ class SstpCore : VpnCore {
     private var bridge: TunBridge? = null
     private val outLock = Any()
     @Volatile private var running = false
+    @Volatile private var deathListener: ((String) -> Unit)? = null
+
+    override fun setDeathListener(listener: (reason: String) -> Unit) { deathListener = listener }
+
+    /**
+     * Туннель развалился сам (Фаза 7a). `running` служит и признаком
+     * «мы ещё живы», и защёлкой: stop() ставит его в false ПЕРЕД закрытием
+     * сокета, поэтому штатное отключение не будет объявлено смертью, а
+     * второе сообщение (упал ридер, следом закрылся PPP) не уйдёт повторно.
+     */
+    private fun died(reason: String) {
+        if (!running) return
+        running = false
+        deathListener?.invoke(reason)
+    }
 
     // SSTP control messages
     private object Msg {
@@ -143,6 +158,10 @@ class SstpCore : VpnCore {
             } catch (t: Throwable) {
                 if (running) onLog("SSTP: поток чтения завершён: ${t.message}")
             }
+            // Сюда попадаем и по EOF (n < 0), и по исключению. Если при этом
+            // мы всё ещё считаем себя живыми — TLS-канал оборвался, и туннеля
+            // больше нет: до 7a это оставалось строчкой в логе.
+            died("SSTP: TLS-канал закрыт сервером или сетью")
         }
 
         if (!ackLatch.await(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS))
@@ -165,7 +184,10 @@ class SstpCore : VpnCore {
                 sendCallConnected(output, cryptoBindingReq[0], onLog)
                 upLatch.countDown()
             },
-            onDown = { reason -> if (running) onLog("SSTP: PPP закрыт: $reason") },
+            onDown = { reason ->
+                if (running) onLog("SSTP: PPP закрыт: $reason")
+                died("SSTP: PPP закрыт ($reason)")
+            },
         )
         session = sstpSession
 
@@ -262,7 +284,7 @@ class SstpCore : VpnCore {
                 Msg.CALL_ABORT, Msg.CALL_DISCONNECT -> {
                     onLog("SSTP: сервер разорвал соединение (CALL_ABORT/DISCONNECT)")
                     runCatching { writeControl(output, Msg.CALL_DISCONNECT_ACK, emptyList()) }
-                    running = false
+                    died("SSTP: сервер прислал CALL_ABORT/CALL_DISCONNECT")
                 }
             }
         } else {

@@ -31,10 +31,20 @@ class ServerRepository(context: Context) {
         return refreshSubscription(subId, url)
     }
 
+    /**
+     * Перечитать подписку. Фаза 7e — две страховки от потери серверов:
+     *  - пустой разбор НЕ применяется: панель, отдавшая 200 с пустым телом
+     *    (или сменившая формат, который мы не разобрали), раньше молча стирала
+     *    все серверы подписки. Бросаем исключение — вызывающий покажет ошибку,
+     *    а старый список останется на месте;
+     *  - удаление и вставка — одной транзакцией, а не двумя вызовами подряд.
+     */
     suspend fun refreshSubscription(subId: Long, url: String): Int {
         val profiles = fetcher.fetch(url, "Hydra/0.5", subId)
-        servers.deleteBySubscription(subId)
-        servers.upsertAll(profiles)
+        if (profiles.isEmpty()) {
+            throw IllegalStateException("подписка не вернула ни одного сервера — прежний список сохранён")
+        }
+        servers.replaceSubscriptionServers(subId, profiles)
         return profiles.size
     }
 }

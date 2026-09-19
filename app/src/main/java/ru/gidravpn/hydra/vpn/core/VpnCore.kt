@@ -22,6 +22,23 @@ data class TrafficStats(val downBytes: Long = 0, val upBytes: Long = 0)
 interface VpnCore {
     val name: String
 
+    /**
+     * Канал «ядро умерло» (Фаза 7a). Ставится сервисом ДО [start] и зовётся
+     * ядром, когда туннель развалился уже ПОСЛЕ успешного запуска: закрылся
+     * PPP, сервер прислал CALL_ABORT/StopCCN, остановился sing-box, умер
+     * процесс `:xray`.
+     *
+     * До 7a такие события уходили только в лог (`onLog`), и состояние
+     * оставалось CONNECTED навсегда: в UI «Туннель зашифрован», трафика нет,
+     * Kill Switch не срабатывает — он жил только внутри `doConnect()`.
+     *
+     * Реализация по умолчанию — no-op: ядро, которое не умеет отличить смерть
+     * от штатной остановки (stub, AmneziaWG-заглушка, PptpCore), просто не
+     * переопределяет этот метод. Контракт: зовётся не более одного раза за
+     * запуск и НЕ зовётся из [stop] — штатное отключение смертью не считается.
+     */
+    fun setDeathListener(listener: (reason: String) -> Unit) {}
+
     fun start(
         tun: ParcelFileDescriptor,
         profile: ServerProfile,

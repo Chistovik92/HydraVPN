@@ -18,8 +18,13 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
+        // Фаза 7e: вторая проверка ВНУТРИ synchronized обязательна. Без неё два
+        // потока, одновременно увидевшие null, по очереди собирали по своему
+        // инстансу Room на один и тот же файл (второй затирал первый в
+        // INSTANCE) — а репозитории в проекте создаются на каждый чих, в том
+        // числе одновременно из UI и из VpnService.
         fun get(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
-            Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "hydra.db")
+            INSTANCE ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "hydra.db")
                 .fallbackToDestructiveMigration()
                 .build().also { INSTANCE = it }
         }
