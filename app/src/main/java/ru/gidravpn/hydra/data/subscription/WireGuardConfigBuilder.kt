@@ -13,7 +13,8 @@ import ru.gidravpn.hydra.data.model.ServerProfile
  */
 object WireGuardConfigBuilder {
 
-    private val AWG_V1_PARAMS = listOf("jc", "jmin", "jmax", "s1", "s2", "h1", "h2", "h3", "h4")
+    // s3/s4 — 2.0 (проверено по device/uapi.go amneziawg-go v3.1.x)
+    private val AWG_V1_PARAMS = listOf("jc", "jmin", "jmax", "s1", "s2", "s3", "s4", "h1", "h2", "h3", "h4")
     private val AWG_V2_PARAMS = listOf("i1", "i2", "i3", "i4", "i5")
 
     /** Полный .conf (для amneziawg-go tun-режима). */
@@ -51,6 +52,14 @@ object WireGuardConfigBuilder {
         return buildString {
             appendLine("private_key=${b64ToHex(p.uuidOrPassword)}")
             appendLine("listen_port=0")
+            // Параметры AmneziaWG — уровня интерфейса и обязаны идти ДО первого public_key,
+            // иначе amneziawg-go отвергает их как «unknown key». Раньше они уходили после пира с
+            // префиксом awg_ — такого ключа в uapi нет.
+            if (p.protocol == Protocol.AMNEZIAWG) {
+                (AWG_V1_PARAMS + AWG_V2_PARAMS).forEach { k ->
+                    extra.optString(k).takeIf { it.isNotBlank() }?.let { appendLine("$k=$it") }
+                }
+            }
             appendLine("replace_peers=true")
             appendLine("public_key=${b64ToHex(extra.optString("public_key"))}")
             extra.optString("preshared_key").takeIf { it.isNotBlank() }?.let {
@@ -65,19 +74,29 @@ object WireGuardConfigBuilder {
             extra.optString("keepalive").takeIf { it.isNotBlank() }?.let { appendLine("persistent_keepalive_interval=$it") }
             appendLine("replace_allowed_ips=true")
 
-            // AmneziaWG-параметры передаются через расширенный uapi amneziawg-go
-            if (p.protocol == Protocol.AMNEZIAWG) {
-                appendLine("protocol_version=1")
-                (AWG_V1_PARAMS + AWG_V2_PARAMS).forEach { k ->
-                    extra.optString(k).takeIf { it.isNotBlank() }?.let { appendLine("awg_$k=$it") }
-                }
-            }
+
         }
     }
 
     /** Локальный IP интерфейса (из AllowedIPs/Address либо дефолт туннеля). */
     fun localAddress(p: ServerProfile): String =
         extra(p).optString("local_address").ifBlank { "172.19.0.2/32" }
+
+    /** Адреса интерфейса из `Address` (IPv4/IPv6, через запятую) → пары (ip, префикс). */
+    fun localAddresses(p: ServerProfile): List<Pair<String, Int>> = cidrList(localAddress(p))
+
+    /** AllowedIPs пира — маршруты туннеля; по умолчанию всё. */
+    fun allowedIps(p: ServerProfile): List<Pair<String, Int>> =
+        cidrList(extra(p).optString("allowed_ips").ifBlank { "0.0.0.0/0, ::/0" })
+
+    /** MTU из конфига, иначе консервативные 1380 (обфускация добавляет заголовки). */
+    fun mtu(p: ServerProfile): Int = extra(p).optString("mtu").toIntOrNull()?.takeIf { it in 576..9000 } ?: 1380
+
+    private fun cidrList(s: String): List<Pair<String, Int>> = s.split(",").map { it.trim() }
+        .filter { it.isNotBlank() }.map {
+            val ip = it.substringBefore("/")
+            ip to (it.substringAfter("/", "").toIntOrNull() ?: if (":" in ip) 128 else 32)
+        }
 
     fun dnsServers(p: ServerProfile): List<String> =
         extra(p).optString("dns").split(",").map { it.trim() }.filter { it.isNotBlank() }
@@ -95,7 +114,7 @@ object WireGuardConfigBuilder {
     /** base64 (44 симв., .conf) → lowercase hex (64 симв., uapi). */
     internal fun b64ToHex(b64: String): String {
         if (b64.isBlank()) return ""
-        val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+        val bytes = java.util.Base64.getMimeDecoder().decode(b64.trim())
         return bytes.joinToString("") { "%02x".format(it) }
     }
 }

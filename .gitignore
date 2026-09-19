@@ -25,3 +25,6 @@ keystore.properties
 
 # Артефакты релиза (собираются scripts/release.sh, живут только на GitHub Releases)
 /Hydra-*.apk
+
+# AmneziaWG: libwg-go.so по ABI (scripts/build-awg.sh)
+/app/libs/awg/

@@ -88,7 +88,7 @@ object WireGuardParser {
         // --- Обфускация AmneziaWG ---
         var hasAwg = false
         val awgParams = listOf(
-            "jc", "jmin", "jmax", "s1", "s2", "h1", "h2", "h3", "h4",
+            "jc", "jmin", "jmax", "s1", "s2", "s3", "s4", "h1", "h2", "h3", "h4",
             "i1", "i2", "i3", "i4", "i5"
         )
         awgParams.forEach { k ->

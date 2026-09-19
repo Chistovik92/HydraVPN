@@ -99,6 +99,8 @@ android {
                 jniLibs.srcDir(layout.buildDirectory.dir("libXrayJni"))
                 assets.srcDir(layout.buildDirectory.dir("libXrayDexAsset"))
             }
+            // AmneziaWG: libwg-go.so по ABI лежит в app/libs/awg/<abi>/ (scripts/build-awg.sh).
+            if (file("libs/awg").isDirectory) jniLibs.srcDir("libs/awg")
         }
     }
 

@@ -450,13 +450,23 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
         // Должен совпадать с tun-инбаундом sing-box (тот же RoutingRepository.mtu).
         val mtu = (ru.gidravpn.hydra.data.repository.RoutingRepository(applicationContext).mtu.firstOrNull()
             ?: ru.gidravpn.hydra.data.model.MtuPreset.AUTO).value
-        val builder = Builder()
-            .setSession("Hydra")
-            .setMtu(if (userspace) minOf(1400, mtu) else mtu)
-            .addAddress("172.19.0.1", 28)
-            .addDnsServer("1.1.1.1")
-            .addRoute("0.0.0.0", 0)
-            .addRoute("::", 0)
+        val awg = profile.protocol == ru.gidravpn.hydra.data.model.Protocol.AMNEZIAWG
+        val builder = Builder().setSession("Hydra")
+        if (awg) {
+            // AmneziaWG: WireGuard не делает NAT — адрес tun обязан быть тем, что сервер знает как
+            // Address пира, а маршруты — AllowedIPs. Заглушка 172.19.0.1 тут не годится.
+            val cfg = ru.gidravpn.hydra.data.subscription.WireGuardConfigBuilder
+            builder.setMtu(cfg.mtu(profile))
+            cfg.localAddresses(profile).forEach { (ip, prefix) -> runCatching { builder.addAddress(ip, prefix) } }
+            cfg.dnsServers(profile).ifEmpty { listOf("1.1.1.1") }.forEach { runCatching { builder.addDnsServer(it) } }
+            cfg.allowedIps(profile).forEach { (ip, prefix) -> runCatching { builder.addRoute(ip, prefix) } }
+        } else {
+            builder.setMtu(if (userspace) minOf(1400, mtu) else mtu)
+                .addAddress("172.19.0.1", 28)
+                .addDnsServer("1.1.1.1")
+                .addRoute("0.0.0.0", 0)
+                .addRoute("::", 0)
+        }
 
         // Раздельное туннелирование (DataStore → правила VpnService.Builder)
         val split = ru.gidravpn.hydra.data.repository.SplitTunnelRepository(applicationContext)

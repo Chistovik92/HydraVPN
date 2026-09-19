@@ -17,3 +17,6 @@
 -keepclasseswithmembers class ru.gidravpn.hydra.data.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# AmneziaWG: JNI-символы libwg-go.so жёстко называют класс и методы — не трогать.
+-keep class org.amnezia.awg.GoBackend { *; }
