@@ -26,11 +26,23 @@ class SubscriptionFetcher(
             val req = Request.Builder().url(url).apply { headers.forEach { (k, v) -> header(k, v) } }.build()
             client.newCall(req).execute().use { resp ->
                 require(resp.isSuccessful) { "HTTP ${resp.code}" }
-                val body = resp.body?.string().orEmpty()
+                // body.string() читал ответ целиком без предела: сломанная или враждебная
+                // панель, отдающая поток вместо списка серверов, выедала память до OOM.
+                // Даже подписка на тысячи серверов укладывается в единицы мегабайт.
+                val src = resp.body?.source()
+                val body = if (src == null) "" else {
+                    require(!src.request(MAX_BODY_BYTES + 1)) { "ответ подписки больше $MAX_BODY_MB МБ" }
+                    src.readByteArray().toString(Charsets.UTF_8)
+                }
                 Result(
                     profiles = LinkParser.parseSubscription(body, subscriptionId),
                     info = SubscriptionHeaders.parse { resp.header(it) },
                 )
             }
         }
+
+    private companion object {
+        const val MAX_BODY_MB = 8L
+        const val MAX_BODY_BYTES = MAX_BODY_MB * 1024 * 1024
+    }
 }

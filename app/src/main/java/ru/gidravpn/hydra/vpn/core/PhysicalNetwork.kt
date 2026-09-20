@@ -11,7 +11,12 @@ import android.net.NetworkCapabilities
  */
 object PhysicalNetwork {
     fun pick(cm: ConnectivityManager): Network? {
-        val candidates = cm.allNetworks.filter { n ->
+        // allNetworks объявлен устаревшим и однажды перестанет отдавать полный
+        // список; activeNetwork сам по себе под VPN указывает на наш же туннель,
+        // поэтому список всё ещё нужен — берём его через @Suppress, а не наугад.
+        @Suppress("DEPRECATION")
+        val all = cm.allNetworks
+        val candidates = all.filter { n ->
             val c = cm.getNetworkCapabilities(n) ?: return@filter false
             c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
                 !c.hasTransport(NetworkCapabilities.TRANSPORT_VPN)

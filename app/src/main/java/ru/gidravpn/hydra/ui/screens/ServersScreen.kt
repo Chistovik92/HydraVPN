@@ -27,7 +27,7 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -142,7 +142,7 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
             HeaderIcon(Icons.Filled.Search, stringResource(R.string.srv_search), active = searchOpen) {
                 searchOpen = !searchOpen; if (!searchOpen) query = ""
             }
-            HeaderIcon(Icons.Filled.Sort, stringResource(R.string.srv_sort_ping), active = sortByPing) { sortByPing = !sortByPing }
+            HeaderIcon(Icons.AutoMirrored.Filled.Sort, stringResource(R.string.srv_sort_ping), active = sortByPing) { sortByPing = !sortByPing }
             HeaderIcon(Icons.Filled.NetworkCheck, stringResource(R.string.servers_refresh_ping)) { vm.measureAllPings() }
             if (subscriptions.isNotEmpty()) {
                 HeaderIcon(Icons.Filled.Refresh, stringResource(R.string.sub_refresh_all), active = refreshingSubs.isNotEmpty()) {

@@ -23,7 +23,13 @@ class SubscriptionUpdateWorker(ctx: Context, params: WorkerParameters) : Corouti
     override suspend fun doWork(): Result {
         val repo = ServerRepository(applicationContext)
         val now = System.currentTimeMillis()
-        repo.allSubscriptionsNow().filter { isDue(it, now) }.forEach { sub ->
+        // Чтение списка тоже может упасть (повреждённая база) — необработанное
+        // исключение из doWork() уводит работу в retry и ничего не пишет в журнал.
+        val due = runCatching { repo.allSubscriptionsNow() }
+            .onFailure { VpnState.log("Ошибка: автообновление подписок — ${it.message ?: it.javaClass.simpleName}") }
+            .getOrElse { emptyList() }
+            .filter { isDue(it, now) }
+        due.forEach { sub ->
             runCatching { repo.refreshDetailed(sub.id) }
                 .onSuccess { VpnState.log("Подписка «${sub.displayName}» обновлена автоматически: ${it.total} серв. (+${it.added} / −${it.removed})") }
                 .onFailure { VpnState.log("Ошибка: автообновление «${sub.displayName}» — ${it.message ?: it.javaClass.simpleName}") }

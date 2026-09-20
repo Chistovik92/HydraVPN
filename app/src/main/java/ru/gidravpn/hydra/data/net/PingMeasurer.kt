@@ -13,13 +13,15 @@ object PingMeasurer {
     /** Возвращает мс до сервера, либо -1 при таймауте/ошибке. */
     suspend fun measure(address: String, port: Int): Int = withContext(Dispatchers.IO) {
         runCatching {
-            val socket = Socket()
-            SocketGuard.protect(socket)
-            val start = System.nanoTime()
-            socket.connect(InetSocketAddress(address, port), TIMEOUT_MS)
-            val elapsed = (System.nanoTime() - start) / 1_000_000
-            socket.close()
-            elapsed.toInt()
+            // use{}: при таймауте (а это самый частый исход для мёртвого сервера)
+            // close() после connect() не выполнялся — дескриптор висел до GC.
+            // «Пинг всех» на списке в полсотни серверов копил их пачками.
+            Socket().use { socket ->
+                SocketGuard.protect(socket)
+                val start = System.nanoTime()
+                socket.connect(InetSocketAddress(address, port), TIMEOUT_MS)
+                ((System.nanoTime() - start) / 1_000_000).toInt()
+            }
         }.getOrDefault(-1)
     }
 }
