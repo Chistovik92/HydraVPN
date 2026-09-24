@@ -67,8 +67,17 @@ jobs:
         with:
           path: ios/Vendor/amneziawg-apple
           key: amneziawg-apple-${{ env.AWG_APPLE_COMMIT }}-ios-v1
+      # amneziawg-apple требует Go 1.26 (go.mod). Без явной установки go сам скачивает тулчейн
+      # в кэш модулей — только для чтения, и Makefile не может пропатчить скопированный рантайм.
+      - uses: actions/setup-go@v5
+        if: steps.awg.outputs.cache-hit != 'true'
+        with:
+          go-version: '1.26.x'
+          cache: false
       - name: Build libwg-go.a (amneziawg-go, iOS)
         if: steps.awg.outputs.cache-hit != 'true'
+        env:
+          GOTOOLCHAIN: local
         run: |
           set -euo pipefail
           git clone https://github.com/amnezia-vpn/amneziawg-apple ios/Vendor/amneziawg-apple
