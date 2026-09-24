@@ -337,11 +337,12 @@ struct LogsView: View {
         .refreshable { lines = model.store.readLog() }
     }
     var shown: [String] {
-        switch filter {
+        let filtered: [String] = switch filter {
         case 1: lines.filter { $0.contains("WARN") || $0.contains("Ошибка") || $0.contains("ERROR") }
         case 2: lines.filter { $0.contains("Ошибка") || $0.contains("ERROR") }
         default: lines
-        }.reversed()
+        }
+        return filtered.reversed()
     }
 }
 
