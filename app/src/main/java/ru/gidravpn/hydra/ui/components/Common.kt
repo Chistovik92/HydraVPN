@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -21,11 +24,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.gidravpn.hydra.ui.theme.*
 
-/** Клик без ripple — под минималистичный дизайн макета. */
+/**
+ * Клик без ripple — под минималистичный дизайн макета.
+ *
+ * Фаза 8: элемент в фокусе (пульт Android TV, клавиатура, переключатель доступа) обводится
+ * рамкой акцентного цвета — без неё на TV не видно, где курсор, а ripple тут выключен.
+ * Role.Button — TalkBack объявляет элемент кнопкой, а не просто текстом.
+ */
 @Composable
 fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier {
     val src = remember { MutableInteractionSource() }
-    return this.clickable(interactionSource = src, indication = null, onClick = onClick)
+    val focused by src.collectIsFocusedAsState()
+    return this
+        .then(if (focused) Modifier.border(2.dp, AccentCyan, RoundedCornerShape(12.dp)) else Modifier)
+        .clickable(interactionSource = src, indication = null, role = Role.Button, onClick = onClick)
 }
 
 /** Полупрозрачная карточка-контейнер, как в макете. */

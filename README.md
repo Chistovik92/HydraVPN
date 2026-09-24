@@ -4,7 +4,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.6.22.2**
+- Статус: **0.6.23**
 
 ## Скриншоты
 
@@ -25,7 +25,7 @@
 - 🎛 **Единый клиент** для нескольких семейств протоколов:
   - proxy (VLESS/VMess/Trojan/Shadowsocks/Hysteria2/TUIC/WireGuard) — sing-box;
   - Xray — альтернативное ядро (XTLS Vision, REALITY);
-  - **AmneziaWG 1.0/1.5/2.0** — обфусцированный WireGuard (amneziawg-go);
+  - **AmneziaWG 1.0 – 3.x** — обфусцированный WireGuard (amneziawg-go);
   - **SSTP** и **L2TP** — реализованы целиком на Kotlin (userspace-PPP),
     без нативных зависимостей и root;
   - olcRTC и OpenFlux — ознакомительные движки (BETA); WDTT не интегрирован (см. docs/ECOSYSTEM.md);
@@ -36,6 +36,13 @@
   deep-links.
 - ✂️ **Раздельное туннелирование**: весь трафик / только выбранные приложения /
   кроме выбранных (DataStore + `addAllowed/addDisallowedApplication`).
+- 🧭 **Маршрутизация**: DoH/DoT, GeoIP по ~250 странам офлайн, фрагментация TLS,
+  MTU, режим IPv6, **профили маршрутизации** («Дом», «Поездка») — с 0.6.23.
+- 🛡 **Безопасность**: Kill Switch, переподключение, блокировка приложения
+  отпечатком/PIN, скрытие ключей на экране, статус системного Always-on VPN.
+- 📱 **Вне приложения**: плитка в шторке с подключённой локацией (тап — открыть
+  Hydra), виджет на рабочем столе, ярлыки на иконке; Android TV и планшеты.
+- 🌍 Интерфейс: русский, английский, украинский, персидский, китайский.
 - 🌗 Тёмный интерфейс на Compose; экран логов, статистика трафика,
   foreground-уведомление.
 
@@ -46,7 +53,7 @@
 | VLESS (+REALITY/Vision), VMess, Trojan, Shadowsocks | sing-box / Xray | конфиг готов, нужен `.aar` |
 | Hysteria2, TUIC v5 | sing-box | конфиг готов, нужен `.aar` |
 | WireGuard | sing-box | конфиг готов, нужен `.aar` |
-| AmneziaWG 1.0/1.5/2.0 | amneziawg-go | `.conf`/uapi готовы, нужен `.aar` |
+| AmneziaWG 1.0 – 3.x | amneziawg-go | работает (`libwg-go.so`) |
 | **SSTP** (TLS/PPP, MS-CHAPv2, crypto-binding) | userspace (Kotlin) | **реализован**, нужен on-device тест |
 | **L2TP** (RFC 2661, без IPsec) | userspace (Kotlin) | **реализован**, нужен on-device тест |
 | Xray (альт. ядро) | libXray.aar + tun2socks | каркас, нужен `.aar` |
@@ -120,7 +127,7 @@ UI (Compose) → MainViewModel → ServerRepository (Room + подписки)
 - [docs/SECURITY.md](docs/SECURITY.md) — политика безопасности
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — как контрибьютить
 - [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md) — olcRTC / OpenFlux / snolc / AmneziaWG: апстримы, статус, клиенты
-- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.6.22.2
+- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.6.23
 
 ## Лицензия
 

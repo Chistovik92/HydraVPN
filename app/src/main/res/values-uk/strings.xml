@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Українська (Фаза 8). -->
+<resources>
+    <string name="app_name">Hydra</string>
+    <string name="tagline">Мультипротокольний VPN-клієнт</string>
+    <string name="vpn_notification_channel">Стан VPN</string>
+    <string name="connected">Підключено</string>
+    <string name="disconnected">Відключено</string>
+    <string name="connecting">Підключення…</string>
+
+    <!-- Themes -->
+    <string name="theme_ambient">Hydra Ambient</string>
+    <string name="theme_ambient_desc">Основна — смарагдовий неон на темному титані</string>
+    <string name="theme_stealth">Monochrome Stealth</string>
+    <string name="theme_stealth_desc">Монохром — стелс-контраст і багряне ядро</string>
+    <string name="theme_amoled">AMOLED Black</string>
+    <string name="theme_amoled_desc">Чисто чорний фон — економить заряд на OLED-екранах</string>
+    <string name="theme_material_you">Material You</string>
+    <string name="theme_material_you_desc">Кольори з ваших шпалер (Android 12+)</string>
+    <string name="theme_title">Тема</string>
+    <string name="theme_unsupported">Недоступно на цій версії Android</string>
+
+    <!-- Launcher icon -->
+    <string name="icon_title">Іконка застосунку</string>
+    <string name="icon_hint">Лаунчер перестворює ярлик під час зміни іконки: він може ненадовго зникнути, переміститися в кінець списку застосунків, а вручну розставлені ярлики можуть загубитися.</string>
+    <string name="icon_follow_theme">За темою</string>
+    <string name="icon_ambient">Смарагд</string>
+    <string name="icon_stealth">Багрянець</string>
+    <string name="icon_ocean">Океан</string>
+    <string name="icon_amber">Бурштин</string>
+
+    <!-- Hotspot proxy -->
+    <string name="hotspot_hub_title">Проксі для точки доступу</string>
+    <string name="hotspot_hub_subtitle">Роздати VPN іншим пристроям (SOCKS5 / HTTP)</string>
+    <string name="hotspot_title">Проксі для точки доступу</string>
+    <string name="hotspot_enable">Увімкнути проксі</string>
+    <string name="hotspot_enable_desc">Локальний SOCKS5/HTTP-сервер на всіх інтерфейсах. Інші пристрої в тій самій мережі (точка доступу телефона, Wi-Fi) підключаються до нього й отримують трафік через VPN. Логін і пароль обов\'язкові.</string>
+    <string name="hotspot_port">Порт</string>
+    <string name="hotspot_login">Логін</string>
+    <string name="hotspot_password">Пароль</string>
+    <string name="hotspot_save">Зберегти</string>
+    <string name="hotspot_regenerate">Новий пароль</string>
+    <string name="hotspot_copy">Копіювати</string>
+    <string name="hotspot_copied">Скопійовано</string>
+    <string name="hotspot_addresses">Підключення з іншого пристрою</string>
+    <string name="hotspot_no_address">Адресу в локальній мережі не знайдено. Увімкніть Wi-Fi або точку доступу.</string>
+    <string name="hotspot_invalid">Порт — 1024–65535, логін не порожній, пароль щонайменше 6 символів.</string>
+    <string name="hotspot_apply_note">Застосовується під час наступного підключення. Працює з протоколами sing-box і Xray Core; для SSTP, L2TP і AmneziaWG недоступно.</string>
+    <string name="hotspot_warning">Будь-хто, хто знає пароль, може користуватися вашим з\'єднанням. Не вмикайте в публічних мережах.</string>
+</resources>

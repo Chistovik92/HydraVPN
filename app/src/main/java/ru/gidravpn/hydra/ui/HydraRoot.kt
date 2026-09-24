@@ -50,17 +50,63 @@ fun HydraRoot(
     }
 
     Surface(color = Bg, modifier = Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            TopBrandBar(themeMode)
-            Box(Modifier.weight(1f)) {
-                when (tab) {
-                    Tab.MAIN -> MainScreen(vm, onGoServers = { tab = Tab.SERVERS })
-                    Tab.SERVERS -> ServersScreen(vm, onSelected = { tab = Tab.MAIN })
-                    Tab.PROFILE -> ProfileScreen(vm)
-                    Tab.SETTINGS -> SettingsScreen(vm)
+        // Фаза 8: планшеты и Android TV. От 600 dp навигация — колонкой слева (на TV пульт
+        // сразу попадает в неё), а контент не растягивается шире 720 dp — карточки,
+        // рассчитанные на телефон, на широком экране иначе превращались в полосы.
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val wide = maxWidth >= 600.dp
+            val content: @Composable () -> Unit = {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                    Box(Modifier.widthIn(max = 720.dp).fillMaxSize()) {
+                        when (tab) {
+                            Tab.MAIN -> MainScreen(vm, onGoServers = { tab = Tab.SERVERS })
+                            Tab.SERVERS -> ServersScreen(vm, onSelected = { tab = Tab.MAIN })
+                            Tab.PROFILE -> ProfileScreen(vm)
+                            Tab.SETTINGS -> SettingsScreen(vm)
+                        }
+                    }
                 }
             }
-            NavBar(tab) { tab = it }
+            if (wide) {
+                Row(Modifier.fillMaxSize()) {
+                    NavRail(tab) { tab = it }
+                    Column(Modifier.weight(1f)) {
+                        TopBrandBar(themeMode)
+                        Box(Modifier.weight(1f).navigationBarsPadding()) { content() }
+                    }
+                }
+            } else {
+                Column(Modifier.fillMaxSize()) {
+                    TopBrandBar(themeMode)
+                    Box(Modifier.weight(1f)) { content() }
+                    NavBar(tab) { tab = it }
+                }
+            }
+        }
+    }
+}
+
+/** Боковая навигация для широких экранов (планшет, TV). */
+@Composable
+private fun NavRail(current: Tab, onSelect: (Tab) -> Unit) {
+    Column(
+        Modifier.fillMaxHeight().background(SurfaceDim).statusBarsPadding().navigationBarsPadding()
+            .padding(horizontal = 8.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Tab.entries.forEach { t ->
+            val active = t == current
+            val color = if (active) AccentCyan else TextMuted
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clickableNoRipple { onSelect(t) }.padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                Icon(t.icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.height(4.dp))
+                Text(stringResource(t.label), color = color, fontSize = 11.sp,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
+            }
         }
     }
 }
@@ -98,7 +144,8 @@ private fun NavBar(current: Tab, onSelect: (Tab) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.clickableNoRipple { onSelect(t) }.padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
-                Icon(t.icon, contentDescription = stringResource(t.label), tint = color, modifier = Modifier.size(22.dp))
+                // Подпись ниже уже читается TalkBack — у иконки описание не дублируем.
+                Icon(t.icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = stringResource(t.label),

@@ -473,6 +473,13 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
                 .addDnsServer("1.1.1.1")
                 .addRoute("0.0.0.0", 0)
                 .addRoute("::", 0)
+            // IPv6 (Фаза 8): без адреса на tun маршрут ::/0 — «чёрная дыра», IPv6 не утекает
+            // мимо VPN (режим BLOCK, как было всегда). В режиме ENABLE tun получает ULA-адрес —
+            // тот же, что в tun-инбаунде sing-box. У PPP-моста (SSTP/L2TP) только IPv4.
+            val ipv6 = ru.gidravpn.hydra.data.repository.RoutingRepository(applicationContext).ipv6Mode.firstOrNull()
+            if (!userspace && ipv6 == ru.gidravpn.hydra.data.model.Ipv6Mode.ENABLE) {
+                builder.addAddress(ru.gidravpn.hydra.data.model.Ipv6Mode.TUN_ADDRESS, ru.gidravpn.hydra.data.model.Ipv6Mode.TUN_PREFIX)
+            }
         }
 
         // Раздельное туннелирование (DataStore → правила VpnService.Builder)
@@ -489,7 +496,11 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
                 runCatching { builder.addDisallowedApplication(packageName) } // не заворачиваем собственный трафик
         }
 
-        return builder.establish() ?: error("Не удалось поднять tun (нет разрешения VPN?)")
+        val pfd = builder.establish() ?: error("Не удалось поднять tun (нет разрешения VPN?)")
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            VpnState.alwaysOn.value = isAlwaysOn to isLockdownEnabled
+        }
+        return pfd
     }
 
     private fun stopTunnel() {

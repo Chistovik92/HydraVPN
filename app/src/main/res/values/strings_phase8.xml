@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Phase 8 (0.6.23): widget, shortcuts, IPv6, routing profiles, app lock, updates, a11y. -->
+<resources>
+    <!-- Home screen widget -->
+    <string name="widget_description">Location, status and a connect button</string>
+    <string name="widget_no_server">No server selected</string>
+    <string name="widget_connect">Connect</string>
+    <string name="widget_disconnect">Disconnect</string>
+
+    <!-- App shortcuts -->
+    <string name="shortcut_toggle_short">Connect</string>
+    <string name="shortcut_toggle_long">Connect / disconnect VPN</string>
+    <string name="shortcut_servers_short">Servers</string>
+    <string name="shortcut_servers_long">Open server list</string>
+
+    <!-- IPv6 -->
+    <string name="ipv6_desc">What to do with IPv6 traffic of other apps while the VPN is on.</string>
+    <string name="ipv6_block">Block</string>
+    <string name="ipv6_block_desc">IPv6 goes nowhere, apps fall back to IPv4. Nothing leaks past the VPN. Recommended.</string>
+    <string name="ipv6_enable">Through the tunnel</string>
+    <string name="ipv6_enable_desc">IPv6 is sent through the proxy. Needs a server with IPv6 access; sing-box and Xray only.</string>
+
+    <!-- App lock -->
+    <string name="sec_app_lock">App lock</string>
+    <string name="sec_app_lock_desc">Fingerprint, face or screen PIN when opening Hydra and after 30 s in the background. Screenshots of the app are blocked.</string>
+    <string name="lock_unavailable">Needs Android 9+ and a screen lock (PIN, pattern or fingerprint) set up on the device.</string>
+    <string name="lock_prompt_title">Unlock Hydra</string>
+    <string name="lock_prompt_subtitle">Confirm it\'s you</string>
+    <string name="lock_title">Hydra is locked</string>
+    <string name="lock_hint">The VPN keeps working. Unlock to see servers and settings.</string>
+    <string name="lock_unlock">Unlock</string>
+
+    <!-- Hide secrets -->
+    <string name="sec_hide_secrets">Hide keys</string>
+    <string name="sec_hide_secrets_desc">UUIDs, passwords, Reality keys and subscription tokens are shown as dots. Copy, QR and Share still use the full link.</string>
+    <string name="secret_show">Show</string>
+    <string name="secret_hide">Hide</string>
+
+    <!-- Always-on status -->
+    <string name="sec_always_on_status_lockdown">Now: Always-on VPN is on, connections without VPN are blocked ✓</string>
+    <string name="sec_always_on_status_on">Now: Always-on VPN is on, but connections without VPN are not blocked</string>
+    <string name="sec_always_on_status_off">Now: Always-on VPN is off for Hydra</string>
+
+    <!-- DNS leak test -->
+    <string name="leak_title">DNS and IPv6 leak test</string>
+    <string name="leak_desc">Opens a test site in your browser. The browser goes through the VPN like other apps; Hydra itself is excluded from the tunnel, so an in-app test would always show a “leak”. If the list shows your internet provider\'s DNS servers, DNS is leaking.</string>
+    <string name="leak_connect_first">Connect the VPN first, otherwise the test shows your real connection.</string>
+    <string name="leak_open">Open %1$s →</string>
+
+    <!-- Routing profiles -->
+    <string name="profiles_title">Routing profiles</string>
+    <string name="profiles_desc">Save the current DNS, geo routing, MTU, TLS fragmentation, IPv6 and split tunneling as a profile (“Home”, “Travel”) and switch in one tap.</string>
+    <string name="profiles_empty">No profiles yet.</string>
+    <string name="profiles_apply">Apply</string>
+    <string name="profiles_delete">Delete</string>
+    <string name="profiles_save_current">+ Save current settings as a profile</string>
+    <string name="profiles_name_title">Profile name</string>
+    <string name="profiles_name_hint">For example, Home</string>
+    <string name="profiles_delete_q">Delete profile “%1$s”?</string>
+
+    <!-- Updates -->
+    <string name="upd_title">Updates</string>
+    <string name="upd_desc">Hydra checks the latest release on GitHub. The app does not download or install anything by itself: it opens the release page.</string>
+    <string name="upd_checking">Checking…</string>
+    <string name="upd_latest">You have the latest version</string>
+    <string name="upd_failed">Could not check: %1$s</string>
+    <string name="upd_available">Version %1$s is available</string>
+    <string name="upd_open">Open release page →</string>
+    <string name="upd_check_now">Check now</string>
+    <string name="upd_auto">Check automatically</string>
+    <string name="upd_auto_desc">Once a day on app start. The request goes to api.github.com directly, not through the VPN.</string>
+    <string name="upd_banner">Hydra %1$s is available — tap to open</string>
+
+    <!-- Accessibility -->
+    <string name="a11y_dismiss">Dismiss</string>
+    <string name="a11y_more_actions">More actions</string>
+    <string name="a11y_selected">Selected</string>
+</resources>

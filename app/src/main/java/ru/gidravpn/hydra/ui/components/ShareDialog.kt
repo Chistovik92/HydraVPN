@@ -34,6 +34,8 @@ import androidx.core.content.FileProvider
 import ru.gidravpn.hydra.R
 import ru.gidravpn.hydra.data.subscription.QrEncoder
 import ru.gidravpn.hydra.ui.theme.AccentCyan
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import ru.gidravpn.hydra.ui.theme.Danger
 import ru.gidravpn.hydra.ui.theme.Surface
 import ru.gidravpn.hydra.ui.theme.TextMuted
@@ -47,8 +49,12 @@ import java.io.File
  * отсканировать, и просто нажать.
  */
 @Composable
-fun ShareDialog(title: String, link: String, onDismiss: () -> Unit) {
+fun ShareDialog(title: String, link: String, hideSecrets: Boolean = true, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    // «Скрывать ключи» (Фаза 8): на экране — ссылка без UUID/паролей/токенов, пока не нажать
+    // «Показать». QR, копирование и отправка — всегда полная ссылка.
+    var reveal by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(!hideSecrets) }
+    val shown = if (reveal) link else ru.gidravpn.hydra.data.model.SecretMask.mask(link)
     val qr = remember(link) { QrEncoder.encode(link) }
     val copiedMsg = stringResource(R.string.hotspot_copied)
 
@@ -69,11 +75,16 @@ fun ShareDialog(title: String, link: String, onDismiss: () -> Unit) {
                     Text(stringResource(R.string.share_too_long), color = Danger, fontSize = 12.sp)
                 }
                 Text(
-                    link.take(160) + if (link.length > 160) "…" else "",
+                    shown.take(160) + if (shown.length > 160) "…" else "",
                     color = TextSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace,
                     modifier = Modifier.fillMaxWidth().clickableNoRipple {
                         copy(context, link); Toast.makeText(context, copiedMsg, Toast.LENGTH_SHORT).show()
                     }
+                )
+                if (hideSecrets) Text(
+                    stringResource(if (reveal) R.string.secret_hide else R.string.secret_show),
+                    color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickableNoRipple { reveal = !reveal }.padding(vertical = 2.dp),
                 )
                 Text(stringResource(R.string.share_warning), color = TextMuted, fontSize = 11.sp)
             }

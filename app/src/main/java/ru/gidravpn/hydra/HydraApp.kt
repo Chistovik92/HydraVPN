@@ -30,6 +30,13 @@ class HydraApp : Application() {
         val logSettings = LogSettingsRepository(this)
         appScope.launch { logSettings.mode.collect { LogStore.mode = it } }
         appScope.launch { logSettings.retention.collect { LogStore.retention = it } }
+
+        // Виджет на рабочем столе (Фаза 8) перерисовывается при каждой смене состояния туннеля:
+        // его кнопка — прямой PendingIntent на сервис, и он должен соответствовать состоянию.
+        appScope.launch {
+            kotlinx.coroutines.flow.combine(ru.gidravpn.hydra.vpn.VpnState.state, ru.gidravpn.hydra.vpn.VpnState.activeServer) { s, srv -> s to srv }
+                .collect { (s, srv) -> runCatching { ru.gidravpn.hydra.vpn.HydraWidget.update(this@HydraApp, s, srv ?: ru.gidravpn.hydra.vpn.HydraWidget.lastServer(this@HydraApp)) } }
+        }
     }
 
     /**

@@ -31,8 +31,13 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 35
-        versionName = "0.6.22.2"
+        versionCode = 36
+        versionName = "0.6.23"
+
+        // Языки интерфейса (Фаза 8). Без фильтра библиотеки (AppCompat и др.) тащат строки ~90
+        // языков: APK толще, а на, скажем, немецком телефоне системные диалоги библиотек
+        // были бы по-немецки посреди английского интерфейса.
+        resourceConfigurations += listOf("en", "ru", "uk", "fa", "zh-rCN")
 
         // ABI, под которые собраны нативные ядра (libbox / libXray)
         ndk {
@@ -113,6 +118,16 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+
+    // Robolectric (0.6.23): тест миграций Room и прочие тесты, которым нужен настоящий
+    // Context, гоняются на JVM — без устройства и эмулятора, в том числе в CI.
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+    // Схемы Room (app/schemas) нужны MigrationTestHelper.
+    // Robolectric берёт ассеты из сборки приложения, а не из тестового source set, поэтому
+    // схемы лежат в ассетах debug-сборки (несколько КБ; в release не попадают).
+    sourceSets.getByName("debug").assets.srcDir("$projectDir/schemas")
 
     buildFeatures {
         compose = true
@@ -300,10 +315,20 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
+    // Блокировка приложения отпечатком/лицом/PIN (Фаза 8).
+    implementation("androidx.biometric:biometric:1.1.0")
+    // biometric 1.1.0 тянет androidx.fragment 1.2.x, а там registerForActivityResult во
+    // FragmentActivity не работает (запрос VPN-согласия, уведомлений) — lintVital это ловит.
+    implementation("androidx.fragment:fragment-ktx:1.8.3")
+
     // JVM unit-тесты. org.json из android.jar в unit-тестах — заглушки
     // ("Method ... not mocked"), поэтому настоящая реализация отдельно.
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core-ktx:1.6.1")
+    testImplementation("androidx.room:room-testing:2.6.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 
     // === Нативные ядра. Файлы .aar кладутся в app/libs вручную (см. docs/BUILD.md) ===
     // sing-box: github.com/SagerNet/sing-box (experimental/libbox), собран через gomobile.
@@ -316,4 +341,10 @@ dependencies {
     // extractLibXrayNativeLibs/libXrayToDex выше). .so и classes.dex для
     // изолированного рантайм-загрузчика (XrayEngineService) подключены
     // через jniLibs.srcDir/assets.srcDir в sourceSets["native"] выше.
+}
+
+// Схемы Room экспортируются в app/schemas (0.6.23): по ним MigrationTestHelper
+// проверяет каждую миграцию на реальной старой схеме, а не на воображаемой.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }

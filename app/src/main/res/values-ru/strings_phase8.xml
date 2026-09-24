@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Фаза 8 (0.6.23): виджет, ярлыки, IPv6, профили маршрутизации, блокировка, обновления, доступность. -->
+<resources>
+    <!-- Виджет -->
+    <string name="widget_description">Локация, статус и кнопка подключения</string>
+    <string name="widget_no_server">Сервер не выбран</string>
+    <string name="widget_connect">Подключить</string>
+    <string name="widget_disconnect">Отключить</string>
+
+    <!-- Ярлыки -->
+    <string name="shortcut_toggle_short">Подключить</string>
+    <string name="shortcut_toggle_long">Подключить / отключить VPN</string>
+    <string name="shortcut_servers_short">Серверы</string>
+    <string name="shortcut_servers_long">Открыть список серверов</string>
+
+    <!-- IPv6 -->
+    <string name="ipv6_desc">Что делать с IPv6-трафиком других приложений, пока VPN включён.</string>
+    <string name="ipv6_block">Блокировать</string>
+    <string name="ipv6_block_desc">IPv6 никуда не уходит, приложения переключаются на IPv4. Мимо VPN ничего не утекает. Рекомендуется.</string>
+    <string name="ipv6_enable">Через туннель</string>
+    <string name="ipv6_enable_desc">IPv6 идёт через прокси. Нужен сервер с выходом в IPv6; только sing-box и Xray.</string>
+
+    <!-- Блокировка приложения -->
+    <string name="sec_app_lock">Блокировка приложения</string>
+    <string name="sec_app_lock_desc">Отпечаток, лицо или PIN экрана при открытии Hydra и после 30 с в фоне. Скриншоты приложения запрещены.</string>
+    <string name="lock_unavailable">Нужен Android 9+ и блокировка экрана на устройстве (PIN, графический ключ или отпечаток).</string>
+    <string name="lock_prompt_title">Разблокировать Hydra</string>
+    <string name="lock_prompt_subtitle">Подтвердите, что это вы</string>
+    <string name="lock_title">Hydra заблокирована</string>
+    <string name="lock_hint">VPN продолжает работать. Разблокируйте, чтобы увидеть серверы и настройки.</string>
+    <string name="lock_unlock">Разблокировать</string>
+
+    <!-- Скрытие ключей -->
+    <string name="sec_hide_secrets">Скрывать ключи</string>
+    <string name="sec_hide_secrets_desc">UUID, пароли, ключи Reality и токены подписок показываются точками. Копирование, QR и «Поделиться» по-прежнему отдают полную ссылку.</string>
+    <string name="secret_show">Показать</string>
+    <string name="secret_hide">Скрыть</string>
+
+    <!-- Статус Always-on -->
+    <string name="sec_always_on_status_lockdown">Сейчас: постоянная VPN включена, соединения без VPN блокируются ✓</string>
+    <string name="sec_always_on_status_on">Сейчас: постоянная VPN включена, но соединения без VPN не блокируются</string>
+    <string name="sec_always_on_status_off">Сейчас: постоянная VPN для Hydra выключена</string>
+
+    <!-- Проверка утечек -->
+    <string name="leak_title">Проверка утечек DNS и IPv6</string>
+    <string name="leak_desc">Открывает тестовый сайт в браузере. Браузер ходит через VPN, как и остальные приложения; сама Hydra из туннеля исключена, поэтому проверка изнутри приложения всегда показывала бы «утечку». Если в списке DNS-серверы вашего провайдера — DNS утекает.</string>
+    <string name="leak_connect_first">Сначала подключите VPN, иначе тест покажет ваше настоящее соединение.</string>
+    <string name="leak_open">Открыть %1$s →</string>
+
+    <!-- Профили маршрутизации -->
+    <string name="profiles_title">Профили маршрутизации</string>
+    <string name="profiles_desc">Сохраните текущие DNS, geo-маршрутизацию, MTU, фрагментацию TLS, IPv6 и раздельное туннелирование как профиль («Дом», «Поездка») и переключайтесь одним нажатием.</string>
+    <string name="profiles_empty">Профилей пока нет.</string>
+    <string name="profiles_apply">Применить</string>
+    <string name="profiles_delete">Удалить</string>
+    <string name="profiles_save_current">+ Сохранить текущие настройки как профиль</string>
+    <string name="profiles_name_title">Название профиля</string>
+    <string name="profiles_name_hint">Например, Дом</string>
+    <string name="profiles_delete_q">Удалить профиль «%1$s»?</string>
+
+    <!-- Обновления -->
+    <string name="upd_title">Обновления</string>
+    <string name="upd_desc">Hydra проверяет последний релиз на GitHub. Приложение само ничего не скачивает и не устанавливает — открывает страницу релиза.</string>
+    <string name="upd_checking">Проверяю…</string>
+    <string name="upd_latest">У вас последняя версия</string>
+    <string name="upd_failed">Не удалось проверить: %1$s</string>
+    <string name="upd_available">Доступна версия %1$s</string>
+    <string name="upd_open">Открыть страницу релиза →</string>
+    <string name="upd_check_now">Проверить сейчас</string>
+    <string name="upd_auto">Проверять автоматически</string>
+    <string name="upd_auto_desc">Раз в сутки при запуске. Запрос идёт на api.github.com напрямую, не через VPN.</string>
+    <string name="upd_banner">Доступна Hydra %1$s — нажмите, чтобы открыть</string>
+
+    <!-- Доступность -->
+    <string name="a11y_dismiss">Закрыть</string>
+    <string name="a11y_more_actions">Другие действия</string>
+    <string name="a11y_selected">Выбран</string>
+</resources>

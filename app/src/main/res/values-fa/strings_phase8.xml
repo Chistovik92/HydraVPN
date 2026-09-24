@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- فاز ۸ (0.6.23)، فارسی. -->
+<resources>
+    <string name="widget_description">مکان، وضعیت و دکمه اتصال</string>
+    <string name="widget_no_server">سروری انتخاب نشده</string>
+    <string name="widget_connect">اتصال</string>
+    <string name="widget_disconnect">قطع</string>
+
+    <string name="shortcut_toggle_short">اتصال</string>
+    <string name="shortcut_toggle_long">اتصال / قطع VPN</string>
+    <string name="shortcut_servers_short">سرورها</string>
+    <string name="shortcut_servers_long">باز کردن فهرست سرورها</string>
+
+    <string name="ipv6_desc">وقتی VPN روشن است، با ترافیک IPv6 برنامه‌های دیگر چه شود.</string>
+    <string name="ipv6_block">مسدود</string>
+    <string name="ipv6_block_desc">IPv6 به جایی نمی‌رود و برنامه‌ها به IPv4 برمی‌گردند. چیزی خارج از VPN نشت نمی‌کند. پیشنهادی.</string>
+    <string name="ipv6_enable">از داخل تونل</string>
+    <string name="ipv6_enable_desc">IPv6 از پراکسی فرستاده می‌شود. به سروری با دسترسی IPv6 نیاز دارد؛ فقط sing-box و Xray.</string>
+
+    <string name="sec_app_lock">قفل برنامه</string>
+    <string name="sec_app_lock_desc">اثر انگشت، چهره یا PIN صفحه هنگام باز کردن Hydra و پس از ۳۰ ثانیه در پس‌زمینه. گرفتن اسکرین‌شات از برنامه مسدود است.</string>
+    <string name="lock_unavailable">به Android 9 یا بالاتر و قفل صفحه (PIN، الگو یا اثر انگشت) روی دستگاه نیاز است.</string>
+    <string name="lock_prompt_title">باز کردن قفل Hydra</string>
+    <string name="lock_prompt_subtitle">تأیید کنید که خودتان هستید</string>
+    <string name="lock_title">Hydra قفل است</string>
+    <string name="lock_hint">VPN همچنان کار می‌کند. برای دیدن سرورها و تنظیمات قفل را باز کنید.</string>
+    <string name="lock_unlock">باز کردن قفل</string>
+
+    <string name="sec_hide_secrets">پنهان کردن کلیدها</string>
+    <string name="sec_hide_secrets_desc">UUIDها، رمزها، کلیدهای Reality و توکن‌های اشتراک به‌صورت نقطه نمایش داده می‌شوند. کپی، QR و اشتراک‌گذاری همچنان پیوند کامل را می‌دهند.</string>
+    <string name="secret_show">نمایش</string>
+    <string name="secret_hide">پنهان</string>
+
+    <string name="sec_always_on_status_lockdown">اکنون: VPN همیشه‌روشن فعال است و اتصال‌های بدون VPN مسدودند ✓</string>
+    <string name="sec_always_on_status_on">اکنون: VPN همیشه‌روشن فعال است، اما اتصال‌های بدون VPN مسدود نیستند</string>
+    <string name="sec_always_on_status_off">اکنون: VPN همیشه‌روشن برای Hydra خاموش است</string>
+
+    <string name="leak_title">آزمون نشت DNS و IPv6</string>
+    <string name="leak_desc">یک سایت آزمون را در مرورگر باز می‌کند. مرورگر مانند برنامه‌های دیگر از VPN عبور می‌کند؛ خود Hydra از تونل مستثناست، پس آزمون از داخل برنامه همیشه «نشت» نشان می‌داد. اگر در فهرست سرورهای DNS ارائه‌دهنده اینترنت شما دیده شود، DNS نشت می‌کند.</string>
+    <string name="leak_connect_first">اول VPN را وصل کنید، وگرنه آزمون اتصال واقعی شما را نشان می‌دهد.</string>
+    <string name="leak_open">باز کردن %1$s ←</string>
+
+    <string name="profiles_title">نمایه‌های مسیریابی</string>
+    <string name="profiles_desc">DNS، مسیریابی جغرافیایی، MTU، تکه‌تکه‌سازی TLS، IPv6 و تونل‌زنی جداگانه فعلی را به‌عنوان یک نمایه («خانه»، «سفر») ذخیره کنید و با یک لمس جابه‌جا شوید.</string>
+    <string name="profiles_empty">هنوز نمایه‌ای نیست.</string>
+    <string name="profiles_apply">اعمال</string>
+    <string name="profiles_delete">حذف</string>
+    <string name="profiles_save_current">+ ذخیره تنظیمات فعلی به‌عنوان نمایه</string>
+    <string name="profiles_name_title">نام نمایه</string>
+    <string name="profiles_name_hint">مثلاً خانه</string>
+    <string name="profiles_delete_q">نمایه «%1$s» حذف شود؟</string>
+
+    <string name="upd_title">به‌روزرسانی‌ها</string>
+    <string name="upd_desc">Hydra آخرین انتشار را در GitHub بررسی می‌کند. برنامه خودش چیزی دانلود یا نصب نمی‌کند — صفحه انتشار را باز می‌کند.</string>
+    <string name="upd_checking">در حال بررسی…</string>
+    <string name="upd_latest">آخرین نسخه را دارید</string>
+    <string name="upd_failed">بررسی نشد: %1$s</string>
+    <string name="upd_available">نسخه %1$s در دسترس است</string>
+    <string name="upd_open">باز کردن صفحه انتشار ←</string>
+    <string name="upd_check_now">اکنون بررسی کن</string>
+    <string name="upd_auto">بررسی خودکار</string>
+    <string name="upd_auto_desc">روزی یک بار هنگام اجرا. درخواست مستقیم به api.github.com می‌رود، نه از طریق VPN.</string>
+    <string name="upd_banner">Hydra %1$s در دسترس است — برای باز کردن لمس کنید</string>
+
+    <string name="a11y_dismiss">بستن</string>
+    <string name="a11y_more_actions">کارهای بیشتر</string>
+    <string name="a11y_selected">انتخاب‌شده</string>
+</resources>

@@ -67,7 +67,7 @@ object BackupManager {
                 values.forEach { (k, v) -> p.putTyped(k, v) }
             }
             settings += values.size
-        }
+    }
         return Summary(backup.servers.size, backup.subscriptions.size, settings)
     }
 
@@ -76,16 +76,18 @@ object BackupManager {
         context.allStores().values.forEach { store -> store.edit { it.clear() } }
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun MutablePreferences.putTyped(key: String, value: Any) {
-        when (value) {
-            is Boolean -> this[booleanPreferencesKey(key)] = value
-            is Int -> this[intPreferencesKey(key)] = value
-            is Long -> this[longPreferencesKey(key)] = value
-            is Float -> this[floatPreferencesKey(key)] = value
-            is Double -> this[doublePreferencesKey(key)] = value
-            is String -> this[stringPreferencesKey(key)] = value
-            is Set<*> -> this[stringSetPreferencesKey(key)] = value as Set<String>
-        }
+}
+
+/** Записать значение с тем типом ключа, который оно несёт (бэкап, профили маршрутизации). */
+@Suppress("UNCHECKED_CAST")
+internal fun MutablePreferences.putTyped(key: String, value: Any) {
+    when (value) {
+        is Boolean -> this[booleanPreferencesKey(key)] = value
+        is Int -> this[intPreferencesKey(key)] = value
+        is Long -> this[longPreferencesKey(key)] = value
+        is Float -> this[floatPreferencesKey(key)] = value
+        is Double -> this[doublePreferencesKey(key)] = value
+        is String -> this[stringPreferencesKey(key)] = value
+        is Set<*> -> this[stringSetPreferencesKey(key)] = value as Set<String>
     }
 }

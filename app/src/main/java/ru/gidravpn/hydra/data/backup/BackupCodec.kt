@@ -76,7 +76,7 @@ object BackupCodec {
     private fun JSONArray?.objects(): List<JSONObject> =
         if (this == null) emptyList() else (0 until length()).map { getJSONObject(it) }
 
-    private fun encodeValue(v: Any): JSONObject = JSONObject().apply {
+    internal fun encodeValue(v: Any): JSONObject = JSONObject().apply {
         when (v) {
             is Boolean -> put("t", "b").put("v", v)
             is Int -> put("t", "i").put("v", v)
@@ -89,7 +89,7 @@ object BackupCodec {
         }
     }
 
-    private fun decodeValue(o: JSONObject): Any = when (val t = o.getString("t")) {
+    internal fun decodeValue(o: JSONObject): Any = when (val t = o.getString("t")) {
         "b" -> o.getBoolean("v")
         "i" -> o.getInt("v")
         "l" -> o.getLong("v")

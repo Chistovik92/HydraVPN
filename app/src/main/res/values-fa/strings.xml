@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- فارسی (فاز ۸). -->
+<resources>
+    <string name="app_name">Hydra</string>
+    <string name="tagline">کلاینت VPN چندپروتکلی</string>
+    <string name="vpn_notification_channel">وضعیت VPN</string>
+    <string name="connected">متصل</string>
+    <string name="disconnected">قطع</string>
+    <string name="connecting">در حال اتصال…</string>
+
+    <!-- Themes -->
+    <string name="theme_ambient">Hydra Ambient</string>
+    <string name="theme_ambient_desc">پیش‌فرض — نئون زمردی روی تیتانیوم تیره</string>
+    <string name="theme_stealth">Monochrome Stealth</string>
+    <string name="theme_stealth_desc">تک‌رنگ — کنتراست مخفی و هسته زرشکی</string>
+    <string name="theme_amoled">AMOLED Black</string>
+    <string name="theme_amoled_desc">پس‌زمینه کاملاً مشکی — صرفه‌جویی در باتری نمایشگرهای OLED</string>
+    <string name="theme_material_you">Material You</string>
+    <string name="theme_material_you_desc">رنگ‌ها از تصویر زمینه شما (Android 12 به بالا)</string>
+    <string name="theme_title">پوسته</string>
+    <string name="theme_unsupported">در این نسخه Android در دسترس نیست</string>
+
+    <!-- Launcher icon -->
+    <string name="icon_title">آیکون برنامه</string>
+    <string name="icon_hint">لانچر هنگام تغییر آیکون میانبر را از نو می‌سازد: ممکن است لحظه‌ای ناپدید شود، به انتهای فهرست برنامه‌ها برود و میانبرهایی که دستی چیده‌اید از بین بروند.</string>
+    <string name="icon_follow_theme">مطابق پوسته</string>
+    <string name="icon_ambient">زمرد</string>
+    <string name="icon_stealth">زرشکی</string>
+    <string name="icon_ocean">اقیانوس</string>
+    <string name="icon_amber">کهربا</string>
+
+    <!-- Hotspot proxy -->
+    <string name="hotspot_hub_title">پراکسی هات‌اسپات</string>
+    <string name="hotspot_hub_subtitle">اشتراک VPN با دستگاه‌های دیگر (SOCKS5 / HTTP)</string>
+    <string name="hotspot_title">پراکسی هات‌اسپات</string>
+    <string name="hotspot_enable">فعال‌سازی پراکسی</string>
+    <string name="hotspot_enable_desc">یک سرور محلی SOCKS5/HTTP روی همه رابط‌ها. دستگاه‌های دیگر در همان شبکه (هات‌اسپات گوشی، Wi-Fi) به آن وصل می‌شوند و ترافیکشان از VPN می‌گذرد. نام کاربری و رمز الزامی است.</string>
+    <string name="hotspot_port">پورت</string>
+    <string name="hotspot_login">نام کاربری</string>
+    <string name="hotspot_password">رمز عبور</string>
+    <string name="hotspot_save">ذخیره</string>
+    <string name="hotspot_regenerate">رمز جدید</string>
+    <string name="hotspot_copy">کپی</string>
+    <string name="hotspot_copied">کپی شد</string>
+    <string name="hotspot_addresses">اتصال از دستگاه دیگر</string>
+    <string name="hotspot_no_address">نشانی شبکه محلی پیدا نشد. Wi-Fi یا هات‌اسپات را روشن کنید.</string>
+    <string name="hotspot_invalid">پورت باید ۱۰۲۴ تا ۶۵۵۳۵ باشد، نام کاربری خالی نباشد و رمز دست‌کم ۶ نویسه.</string>
+    <string name="hotspot_apply_note">در اتصال بعدی اعمال می‌شود. با پروتکل‌های sing-box و Xray Core کار می‌کند؛ برای SSTP، L2TP و AmneziaWG در دسترس نیست.</string>
+    <string name="hotspot_warning">هر کس رمز را بداند می‌تواند از اتصال شما استفاده کند. در شبکه‌های عمومی فعال نکنید.</string>
+</resources>

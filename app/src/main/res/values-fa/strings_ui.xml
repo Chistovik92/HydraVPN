@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- فارسی (فاز ۸). خطوط گزارش اتصال عمداً روسی می‌مانند. -->
+<resources>
+    <!-- Tabs -->
+    <string name="tab_main">خانه</string>
+    <string name="tab_servers">سرورها</string>
+    <string name="tab_profile">نمایه</string>
+    <string name="tab_settings">تنظیمات</string>
+
+    <!-- Common -->
+    <string name="action_delete">حذف</string>
+    <string name="action_cancel">لغو</string>
+    <string name="action_save">ذخیره</string>
+    <string name="action_add">افزودن</string>
+    <string name="apply_next_connect">در اتصال بعدی اعمال می‌شود.</string>
+    <string name="status_error">خطا</string>
+
+    <!-- Main screen -->
+    <string name="main_protocol">پروتکل</string>
+    <string name="main_current_config">پیکربندی فعلی</string>
+    <string name="main_change">تغییر ←</string>
+    <string name="main_cfg">سرور: %1$s\nپورت: %2$d\nنوع: %3$s</string>
+    <string name="main_no_server">سروری انتخاب نشده</string>
+    <string name="btn_error_retry">خطا — تلاش دوباره</string>
+    <string name="btn_disconnect">قطع اتصال</string>
+    <string name="btn_connecting">در حال اتصال…</string>
+    <string name="btn_connect">اتصال</string>
+    <string name="info_status">وضعیت</string>
+    <string name="info_server">سرور</string>
+    <string name="info_time">زمان</string>
+    <string name="info_down">↓ دریافت</string>
+    <string name="info_up">↑ ارسال</string>
+
+    <!-- Profile -->
+    <string name="profile_stats">آمار</string>
+    <string name="profile_session">نشست</string>
+    <string name="profile_virtual_ip">IP مجازی</string>
+    <string name="profile_hidden">[پنهان]</string>
+    <string name="profile_site">وب‌سایت</string>
+    <string name="profile_repo">مخزن</string>
+    <string name="profile_open_site">باز کردن وب‌سایت</string>
+    <string name="profile_open_github">باز کردن در GitHub</string>
+
+    <!-- Logs -->
+    <string name="log_filter_all">همه</string>
+    <string name="log_filter_warn">هشدارها</string>
+    <string name="log_filter_error">خطاها</string>
+    <string name="log_title">گزارش اتصال</string>
+    <string name="log_clear">پاک کردن</string>
+    <string name="log_to_file">در فایل</string>
+    <string name="log_storage_open">ذخیره‌سازی ▲</string>
+    <string name="log_storage_closed">ذخیره‌سازی ▼</string>
+    <string name="log_save_on_device">نگهداری روی دستگاه</string>
+    <string name="log_keep">نگهداری:</string>
+    <string name="log_saved">ذخیره‌شده: %1$s</string>
+    <string name="log_delete_saved">حذف ذخیره‌شده‌ها</string>
+    <string name="logmode_off">ذخیره نشود</string>
+    <string name="logmode_off_desc">گزارش فقط در حافظه است و با بستن برنامه پاک می‌شود.</string>
+    <string name="logmode_errors">فقط خطاها و هشدارها</string>
+    <string name="logmode_errors_desc">بدون نشانی سایت‌ها — برای بررسی بعدی خرابی اتصال کافی است.</string>
+    <string name="logmode_all">گزارش کامل</string>
+    <string name="logmode_all_desc">نشانی هر اتصال را دارد — یعنی تاریخچه مرور شما روی دستگاه ذخیره می‌شود.</string>
+    <string name="retention_d1">۱ روز</string>
+    <string name="retention_d3">۳ روز</string>
+    <string name="retention_d7">۷ روز</string>
+
+    <!-- Servers -->
+    <string name="servers_refresh_ping">به‌روزرسانی پینگ</string>
+    <string name="servers_add">+ افزودن سرور</string>
+    <string name="servers_import">📥 درون‌ریزی</string>
+    <string name="servers_delete_title">سرور حذف شود؟</string>
+    <string name="servers_delete_msg">«%1$s» حذف می‌شود و قابل بازگشت نیست.</string>
+    <string name="servers_measuring">در حال سنجش…</string>
+    <string name="servers_ping_ms">%1$d میلی‌ثانیه</string>
+    <string name="servers_measure">سنجش</string>
+    <string name="default_server_name">سرور</string>
+    <string name="servers_new_title">سرور جدید</string>
+    <string name="field_name">نام</string>
+    <string name="field_address">نشانی</string>
+    <string name="field_port">پورت</string>
+    <string name="servers_protocol">پروتکل: %1$s</string>
+    <string name="default_subscription_name">اشتراک</string>
+    <string name="import_title">درون‌ریزی</string>
+    <string name="import_hint">یک پیوند (vless://، vmess://، trojan://، ss://، hysteria2://، tuic://، wireguard://، awg://، sstp://، l2tp://)، فایل ‎.conf‎ WireGuard/AmneziaWG یا نشانی اشتراک را جای‌گذاری کنید.</string>
+    <string name="import_link_field">پیوند / URL</string>
+    <string name="import_sub_name_field">نام اشتراک (برای URL)</string>
+    <string name="import_action">درون‌ریزی</string>
+
+    <!-- Split tunneling -->
+    <string name="split_title">تونل‌زنی جداگانه</string>
+    <string name="split_by_apps">بر اساس برنامه</string>
+    <string name="split_by_net">بر اساس IP / دامنه</string>
+    <string name="split_apps_count">برنامه‌های فهرست: %1$d</string>
+    <string name="split_all_traffic">همه ترافیک</string>
+    <string name="split_only_selected">فقط انتخاب‌شده‌ها</string>
+    <string name="split_except_selected">همه به‌جز انتخاب‌شده‌ها</string>
+    <string name="split_search">جست‌وجوی برنامه</string>
+    <string name="split_system_apps">برنامه‌های سیستمی</string>
+    <string name="split_apps_off_hint">همه ترافیک دستگاه از VPN می‌گذرد. برای تعیین استثنا یا فهرست مجاز، یک حالت انتخاب کنید.</string>
+    <string name="split_net_engine_note">فقط هنگام اتصال از طریق sing-box کار می‌کند (VLESS/VMess/Trojan/SS/Hysteria2/TUIC/WireGuard).</string>
+    <string name="split_example_ip">مثلاً 10.0.0.0/8</string>
+    <string name="split_example_domain">مثلاً example.com</string>
+    <string name="split_net_off_hint">همه IPها و دامنه‌ها مثل همیشه مسیریابی می‌شوند. برای استثنای موردی یا فهرست مجاز، یک حالت انتخاب کنید.</string>
+    <string name="split_system_tag">سیستمی</string>
+    <string name="split_sum_off">همه ترافیک از VPN</string>
+    <string name="split_sum_include">از VPN: %1$d برنامه (فقط انتخاب‌شده‌ها)</string>
+    <string name="split_sum_exclude">خارج از VPN: %1$d برنامه</string>
+    <string name="split_net_sum_off">IP/دامنه‌ها مثل همیشه مسیریابی می‌شوند</string>
+    <string name="split_net_sum_include">فقط از VPN: %1$d قانون</string>
+    <string name="split_net_sum_exclude">خارج از VPN: %1$d قانون</string>
+    <string name="rule_ip_cidr">IP/CIDR</string>
+    <string name="rule_domain">دامنه</string>
+    <string name="rule_domain_suffix">زیردامنه‌ها</string>
+    <string name="rule_domain_keyword">کلیدواژه</string>
+
+    <!-- Routing enums -->
+    <string name="geo_off">خاموش</string>
+    <string name="geo_off_desc">همه ترافیک مثل همیشه از پراکسی می‌گذرد.</string>
+    <string name="geo_direct">کشورهای انتخاب‌شده مستقیم، بقیه از پراکسی</string>
+    <string name="geo_direct_desc">IPها و سایت‌های آن‌ها خارج از VPN — سریع‌تر برای سرویس‌های محلی.</string>
+    <string name="geo_via_proxy">کشورهای انتخاب‌شده از پراکسی، بقیه مستقیم</string>
+    <string name="geo_via_proxy_desc">فقط IPها و سایت‌های آن‌ها از VPN — کمترین بار روی پراکسی.</string>
+    <string name="mtu_auto">خودکار (9000)</string>
+    <string name="mtu_1500">1500 — Ethernet/Wi-Fi</string>
+    <string name="mtu_1400">1400 — شبکه‌های همراه</string>
+    <string name="mtu_1280">1280 — حداقل IPv6</string>
+    <string name="frag_off_desc">دست‌دهی مثل همیشه فرستاده می‌شود.</string>
+    <string name="frag_record">با رکوردهای TLS</string>
+    <string name="frag_record_desc">ClientHello به چند رکورد TLS تقسیم می‌شود. تقریباً بدون افت سرعت — اول این را امتحان کنید.</string>
+    <string name="frag_tcp">با قطعه‌های TCP</string>
+    <string name="frag_tcp_desc">ClientHello به بسته‌های TCP جدا با مکث بینشان بریده می‌شود. اتصال کندتر است؛ اگر رکوردهای TLS کمک نکرد.</string>
+    <string name="dns_system">حل‌کننده سیستم</string>
+    <string name="dns_custom">نشانی دلخواه</string>
+
+    <!-- Settings hub -->
+    <string name="set_back">→ تنظیمات</string>
+    <string name="set_tunnel">تونل</string>
+    <string name="set_tunnel_sub">هسته‌ها: روشن / خاموش</string>
+    <string name="set_security">امنیت</string>
+    <string name="set_security_sub">Kill Switch، اتصال خودکار، قفل برنامه</string>
+    <string name="set_routing">مسیریابی</string>
+    <string name="set_routing_sub">DNS، GeoIP بر اساس کشور، تکه‌تکه‌سازی، MTU، IPv6، نمایه‌ها</string>
+    <string name="set_split">تونل‌زنی جداگانه</string>
+    <string name="set_split_sub">برنامه‌ها از VPN / خارج از آن</string>
+    <string name="set_logs">گزارش‌ها</string>
+    <string name="set_logs_sub">دفتر اتصال‌ها</string>
+    <string name="set_backup">پشتیبان</string>
+    <string name="set_backup_sub">ذخیره / بازیابی همه چیز، بازنشانی تنظیمات</string>
+    <string name="set_about">درباره</string>
+    <string name="set_about_sub">نسخه، به‌روزرسانی، مجوز</string>
+    <string name="set_language">زبان</string>
+    <string name="set_language_sub">سیستم، فارسی، English، Русский، Українська، 中文</string>
+
+    <!-- Tunnel info -->
+    <string name="tunnel_sstp_l2tp">Kotlin خالص، بدون ‎.aar‎ بومی: پشته PPP (LCP، MS-CHAPv2، IPCP)، SSTP روی TLS با crypto-binding، L2TP روی UDP (بدون IPsec/ESP). به آزمایش روی دستگاه نیاز دارد.</string>
+    <string name="tunnel_pptp">در دسترس نیست: GRE (پروتکل IP شماره ۴۷) به سوکت خام/روت نیاز دارد و این پشته از Android 12/13 حذف شده است. جایگزین‌ها: SSTP، L2TP، WireGuard.</string>
+    <string name="tunnel_xray">انتقال: XTLS Vision / WS / gRPC. Flow: xtls-rprx-vision. موتور: libXray.aar.</string>
+    <string name="tunnel_singbox">پروتکل‌ها: VLESS، VMess، Trojan، Shadowsocks، Hysteria2، TUIC v5. موتور: libbox.aar.</string>
+    <string name="tunnel_wg">WireGuard معمولی از طریق sing-box (libbox.aar) اجرا می‌شود. AmneziaWG 1.0/1.5/2.0 موتور خودش را دارد، amneziawg-go.aar: مبهم‌سازی Jc/Jmin/Jmax/S1/S2/H1–H4 و نشانگرهای I1–I5. تولید ‎.conf/uapi‎ آماده است.</string>
+    <string name="tunnel_beta">موتورهای آزمایشی. WDTT — WireGuard از طریق رله TURN ابر VK ‏(libclient.so + ورود VK). olcRTC — TCP روی WebRTC DataChannel ‏(olcrtc.aar + tun2socks). در رابط با نشان BETA مشخص شده‌اند.</string>
+    <string name="xray_toggle_title">Xray Core برای VLESS/VMess/Trojan/SS</string>
+    <string name="xray_toggle_desc">به‌جای sing-box — برای پیاده‌سازی XTLS Vision آن (فرایند جدا، sing-box پل TUN می‌ماند). VLESS روی دستگاه واقعی بررسی شده؛ VMess/Trojan/SS و پایداری طولانی هنوز نه.</string>
+    <string name="xray_toggle_missing">به app/libs/libXray.aar نیاز دارد — docs/BUILD.md، بخش ۲.۲ را ببینید.</string>
+
+    <!-- Security -->
+    <string name="sec_killswitch_desc">اگر تلاش اتصال ناموفق باشد، تونل به اتصال مستقیم برنمی‌گردد — ترافیک تا وقتی VPN را دستی قطع کنید مسدود می‌ماند. در برابر لغو VPN توسط سیستم (برنامه VPN دیگر، «قطع» در تنظیمات) محافظت نمی‌کند — برای تضمین کامل در سطح سیستم، «مسدود کردن اتصال‌های بدون VPN» را در پایین روشن کنید.</string>
+    <string name="sec_auto_app">اتصال خودکار هنگام اجرای برنامه</string>
+    <string name="sec_auto_app_desc">Hydra را باز می‌کنید و تونل به آخرین سرور برقرار می‌شود، اگر اجازه VPN قبلاً داده شده باشد.</string>
+    <string name="sec_auto_boot">اتصال خودکار هنگام روشن شدن دستگاه</string>
+    <string name="sec_auto_boot_desc">تونل بلافاصله پس از راه‌اندازی مجدد گوشی، بدون باز کردن برنامه برقرار می‌شود. این هم به اجازه VPN قبلی نیاز دارد — نمایش گفتگو از پس‌زمینه ممکن نیست.</string>
+    <string name="sec_tile_title">کاشی تنظیمات سریع</string>
+    <string name="sec_tile_desc">در پنل تنظیمات سریع نشان می‌دهد کدام مکان متصل است. لمس، برنامه را باز می‌کند.</string>
+    <string name="sec_tile_add">افزودن کاشی ←</string>
+    <string name="sec_tile_manual">افزودن دستی ←</string>
+    <string name="sec_always_on_title">VPN همیشه‌روشن سیستم</string>
+    <string name="sec_always_on_desc">تنها راه تضمین مسدود ماندن ترافیک حتی هنگام از کار افتادن خود برنامه یا سرویس، نه فقط در خطای اتصال. تنظیمات ← شبکه ← VPN ← Hydra ← چرخ‌دنده ← «VPN همیشه‌روشن» + «مسدود کردن اتصال‌های بدون VPN».</string>
+    <string name="sec_open_vpn_settings">باز کردن تنظیمات VPN ←</string>
+
+    <!-- Routing screen -->
+    <string name="dns_label">DNS (داخل تونل)</string>
+    <string name="dns_custom_hint">IP، میزبان یا URL ‏DoH/DoT</string>
+    <string name="dns_system_hint">حل‌کننده دستگاه، بدون رمزنگاری — پرس‌وجوها خارج از تونل می‌روند</string>
+    <string name="dns_invalid">شبیه نشانی DNS نیست. نمونه‌ها: 94.140.14.14، dns.example.com، https://dns.example.com/dns-query/token، tls://dns.example.com</string>
+    <string name="dns_supported">پشتیبانی می‌شود: IP، میزبان (← DoH)، https://… (DoH، با مسیر و توکن)، tls://… (DoT)، udp://…</string>
+    <string name="geo_label">مسیریابی GeoIP بر اساس کشور</string>
+    <string name="geo_desc">پایگاه‌های IP حدود ۲۵۰ کشور در برنامه تعبیه شده‌اند (rule-setهای sing-box از MetaCubeX/meta-rules-dat) و آفلاین کار می‌کنند. هم برای sing-box و هم برای Xray Core — در هر دو حالت مسیریابی با sing-box است.</string>
+    <string name="frag_label">تکه‌تکه‌سازی TLS (دور زدن DPI)</string>
+    <string name="frag_desc">دست‌دهی با سرور پراکسی را تکه می‌کند تا DPI نام سایت را در یک بسته نبیند. فقط sing-box و فقط VLESS/VMess/Trojan با TLS — روی Hysteria2/TUIC ‏(QUIC) یا با Xray Core اثری ندارد. روی سرورهای واقعی آزمایش نشده.</string>
+    <string name="mtu_label">MTU تونل</string>
+    <string name="mtu_desc">فقط وقتی تغییر دهید که برخی سایت‌ها هنگام بارگذاری گیر می‌کنند ولی درخواست‌های کوچک کار می‌کنند — نشانه گم شدن بسته‌های بزرگ. برای SSTP/L2TP هرگز بیش از 1400 نیست.</string>
+    <string name="mtu_auto_sub">مثل پیش از وجود این تنظیم</string>
+    <string name="mtu_bytes">%1$d بایت</string>
+    <string name="geo_countries">کشورها</string>
+    <string name="geo_none_selected">چیزی انتخاب نشده — قانون اثری ندارد</string>
+    <string name="geo_domains_note">تشخیص بر اساس دامنه (نه فقط IP) فقط برای %1$s وجود دارد: بقیه پایگاه دامنه ندارند. سایت‌های روی CDNهای خارجی «غیرخودی» شمرده می‌شوند.</string>
+    <string name="geo_search">یافتن کشور</string>
+    <string name="geo_domains_short">دامنه‌ها</string>
+    <string name="geo_not_found">چیزی پیدا نشد</string>
+
+    <!-- Backup -->
+    <string name="backup_dismiss">برای بستن لمس کنید</string>
+    <string name="backup_save_title">ذخیره پشتیبان</string>
+    <string name="backup_save_desc">همه سرورها، اشتراک‌ها و تنظیمات در یک فایل JSON. توجه: کلیدها و رمزها به‌صورت متن ساده ذخیره می‌شوند — فایل را مثل رمز عبور نگه دارید.</string>
+    <string name="backup_save_btn">ذخیره در فایل ←</string>
+    <string name="backup_restore_title">بازیابی از پشتیبان</string>
+    <string name="backup_restore_desc">همه سرورها، اشتراک‌ها و تنظیمات فعلی را با محتوای فایل جایگزین می‌کند. VPN باید قطع باشد.</string>
+    <string name="backup_restore_btn">انتخاب فایل ←</string>
+    <string name="backup_reset_title">بازنشانی تنظیمات</string>
+    <string name="backup_reset_desc">همه تنظیمات به پیش‌فرض برمی‌گردند (پوسته، DNS، مسیریابی، Kill Switch، تونل‌زنی جداگانه و…). سرورها و اشتراک‌ها می‌مانند.</string>
+    <string name="backup_reset_btn">بازنشانی تنظیمات ←</string>
+    <string name="backup_restore_q">از پشتیبان بازیابی شود؟</string>
+    <string name="backup_restore_q_desc">سرورها، اشتراک‌ها و تنظیمات فعلی جایگزین می‌شوند. قابل بازگشت نیست — اگر مطمئن نیستید اول پشتیبان فعلی را ذخیره کنید.</string>
+    <string name="backup_replace">جایگزینی</string>
+    <string name="backup_reset_q">همه تنظیمات بازنشانی شود؟</string>
+    <string name="backup_reset_q_desc">سرورها و اشتراک‌ها می‌مانند، بقیه به پیش‌فرض برمی‌گردد.</string>
+    <string name="backup_reset_confirm">بازنشانی</string>
+    <string name="msg_backup_saved">پشتیبان ذخیره شد: %1$d سرور، همه تنظیمات</string>
+    <string name="msg_backup_save_failed">ذخیره نشد: %1$s</string>
+    <string name="msg_backup_disconnect_first">پیش از بازیابی VPN را قطع کنید — وگرنه تونل با تنظیمات قبلی می‌ماند</string>
+    <string name="msg_backup_restored">بازیابی شد: %1$d سرور، %2$d اشتراک، %3$d تنظیم</string>
+    <string name="msg_backup_restore_failed">بازیابی نشد: %1$s</string>
+    <string name="msg_reset_done">تنظیمات بازنشانی شد. سرورها و اشتراک‌ها دست نخوردند.</string>
+
+    <!-- About -->
+    <string name="about_text">Hydra %1$s — کلاینت VPN چندپروتکلی. مجوز: GPL-3.0.</string>
+
+    <!-- Language -->
+    <string name="lang_title">زبان</string>
+    <string name="lang_system">پیش‌فرض سیستم</string>
+    <string name="lang_hint">زبان رابط کاربری. گزارش‌های اتصال روسی می‌مانند.</string>
+
+    <!-- Notification / tile -->
+    <string name="tile_blocked">مسدود</string>
+    <string name="notif_encrypted">تونل رمزنگاری شده</string>
+    <string name="notif_killswitch">Kill Switch: ترافیک مسدود است</string>
+    <string name="notif_dropped">تونل قطع شد</string>
+    <string name="notif_error">خطای اتصال</string>
+    <string name="notif_action_disconnect">قطع اتصال</string>
+    <string name="notif_action_servers">سرورها</string>
+    <string name="notif_conn_dropped">اتصال قطع شد</string>
+    <string name="split_apply_live">اگر VPN روشن باشد، لحظه‌ای پس از هر تغییر خودکار دوباره وصل می‌شود.</string>
+    <string name="btn_reconnecting">اتصال دوباره…</string>
+    <string name="notif_reconnecting">اتصال دوباره…</string>
+    <string name="sec_reconnect">اتصال دوباره پس از قطعی</string>
+    <string name="sec_reconnect_desc">اگر تونل قطع شود، Hydra خودکار با فاصله‌های رو به افزایش دوباره تلاش می‌کند (۲ ثانیه ← ۳۰ ثانیه، تا ۱۰ بار) و به‌محض برگشت شبکه ادامه می‌دهد. با Kill Switch روشن، ترافیک در این مدت مسدود است.</string>
+    <string name="servers_scan_qr">📷 اسکن QR</string>
+    <string name="servers_qr_photo">🖼 QR از عکس</string>
+    <string name="qr_scan_prompt">دوربین را به سمت QR کد حاوی پیوند، اشتراک یا پیکربندی بگیرید</string>
+    <string name="import_paste">چسباندن از کلیپ‌بورد</string>
+    <string name="import_no_qr">QR کدی پیدا نشد. عکسی واضح‌تر و نزدیک‌تر امتحان کنید یا با دوربین اسکن کنید.</string>
+    <string name="import_done_sub">اشتراک «%1$s»: %2$d سرور درون‌ریزی شد</string>
+    <string name="import_fail_sub">اشتراک «%1$s» بارگذاری نشد: %2$s</string>
+    <string name="import_done_one">سرور اضافه شد: %1$s</string>
+    <string name="import_done_servers">سرورهای اضافه‌شده: %1$d</string>
+    <string name="import_json_unsupported">این یک پیکربندی کامل JSON است (sing-box/Xray). هنوز پشتیبانی نمی‌شود — به‌جای آن پیوند یا اشتراک را درون‌ریزی کنید.</string>
+    <string name="import_unknown">به‌عنوان پیوند سرور، اشتراک یا پیکربندی شناخته نشد.</string>
+    <string name="share_action">اشتراک‌گذاری</string>
+    <string name="share_qr_desc">QR کد</string>
+    <string name="share_send">ارسال پیوند + QR</string>
+    <string name="share_too_long">پیوند برای QR کد بیش از حد بلند است — آن را به‌صورت متن بفرستید.</string>
+    <string name="share_no_link">این پروتکل قالب پیوند برای اشتراک ندارد.</string>
+    <string name="share_warning">پیوند شامل کلیدها یا رمز سرور است. فقط برای افراد مورد اعتماد بفرستید.</string>
+    <string name="sub_refresh_all">به‌روزرسانی اشتراک‌ها</string>
+    <string name="sub_refresh">⟳ به‌روزرسانی</string>
+    <string name="sub_refreshing">در حال به‌روزرسانی…</string>
+    <string name="sub_ping">پینگ</string>
+    <string name="sub_standalone">سرورهای جداگانه</string>
+    <string name="sub_servers_count">%1$d سرور</string>
+    <string name="sub_until">تا %1$s</string>
+    <string name="sub_updated">به‌روزشده %1$s</string>
+    <string name="sub_never">هرگز</string>
+    <string name="sub_auto_every">خودکار هر %1$d ساعت</string>
+    <string name="sub_auto_update">به‌روزرسانی خودکار</string>
+    <string name="sub_delete_title">حذف اشتراک</string>
+    <string name="sub_delete_msg">اشتراک «%1$s» و %2$d سرور آن حذف می‌شوند.</string>
+    <string name="sub_refreshed">«%1$s» به‌روز شد: %2$d سرور، %3$d افزوده، %4$d حذف</string>
+    <string name="profile_hwid">شناسه سخت‌افزار (HWID)</string>
+    <string name="profile_hwid_hint">به‌عنوان x-hwid برای پنل‌های اشتراک فرستاده می‌شود. پنل‌های دارای محدودیت دستگاه این گوشی را با آن می‌شمارند.</string>
+    <string name="eng_intro">همه هسته‌ها به‌طور پیش‌فرض روشن‌اند. هسته خاموش تونل را برقرار نمی‌کند و سرورهایش در فهرست سرورها علامت می‌خورند.</string>
+    <string name="eng_singbox">sing-box</string>
+    <string name="eng_singbox_desc">VLESS، VMess، Trojan، Shadowsocks، Hysteria2، TUIC v5، WireGuard. حتی خاموش، به‌عنوان پل TUN برای Xray، olcRTC و OpenFlux در داخل کار می‌کند.</string>
+    <string name="eng_xray">Xray Core</string>
+    <string name="eng_xray_desc">VLESS، VMess، Trojan، Shadowsocks با XTLS Vision / REALITY در فرایندی جدا. اگر پایین ترجیح داده شود یا sing-box خاموش باشد، این پروتکل‌ها را اجرا می‌کند.</string>
+    <string name="eng_prefer_xray">Xray به‌جای sing-box</string>
+    <string name="eng_prefer_xray_desc">برای VLESS / VMess / Trojan / SS.</string>
+    <string name="eng_awg">AmneziaWG 1.0 – 3.1</string>
+    <string name="eng_awg_desc">WireGuard مبهم‌شده، همه نسل‌های پروتکل: 1.0 (Jc/Jmin/Jmax، S1/S2، H1–H4)، 1.5 (I1–I5)، 2.0 (S3/S4، بازه‌های سرآیند) و 3.x (کلید حفاظت سرآیند، لایه‌گذاری محتوا، دنباله‌های تصادفی، زمان‌سنج‌ها). هسته: amneziawg-go 3.1.</string>
+    <string name="eng_ppp">SSTP / L2TP</string>
+    <string name="eng_ppp_desc">پشته PPP خودمان با Kotlin (LCP، MS-CHAPv2، IPCP): SSTP روی TLS با crypto-binding، L2TP روی UDP بدون IPsec.</string>
+    <string name="eng_olcrtc">olcRTC</string>
+    <string name="eng_olcrtc_desc">TCP روی WebRTC از طریق سرویس‌های تماس تصویری (Jitsi، Telemost، WB Stream). به سرور olcrtc خودتان نیاز دارد.</string>
+    <string name="eng_openflux">OpenFlux</string>
+    <string name="eng_openflux_desc">تونل TCP از طریق سرویس‌های سند و پیام‌رسان (Yandex، MAX، Mail.ru، Cups). به گره خروجی خودتان نیاز دارد.</string>
+    <string name="srv_engine_off">هسته خاموش است</string>
+    <string name="srv_summary">%1$d سرور · %2$d اشتراک</string>
+    <string name="srv_search">جست‌وجو</string>
+    <string name="srv_search_hint">نام سرور یا پروتکل</string>
+    <string name="srv_sort_ping">مرتب‌سازی بر اساس پینگ</string>
+    <string name="srv_add">افزودن</string>
+    <string name="srv_add_paste">از کلیپ‌بورد</string>
+    <string name="srv_add_paste_desc">پیوند، اشتراک یا پیکربندی — خودکار تشخیص داده می‌شود</string>
+    <string name="srv_add_scan">اسکن QR</string>
+    <string name="srv_add_scan_desc">با دوربین</string>
+    <string name="srv_add_photo">QR از عکس</string>
+    <string name="srv_add_photo_desc">اسکرین‌شات یا تصویر از گالری</string>
+    <string name="srv_add_link">وارد کردن پیوند</string>
+    <string name="srv_add_link_desc">پیوند سرور، نشانی اشتراک یا ‎.conf</string>
+    <string name="srv_add_manual">دستی</string>
+    <string name="srv_add_manual_desc">نشانی، پورت و پروتکل</string>
+    <string name="srv_clipboard_empty">کلیپ‌بورد خالی است</string>
+    <string name="srv_empty_title">هنوز سروری نیست</string>
+    <string name="srv_empty_desc">یک اشتراک یا سرور اضافه کنید: پیوند را جای‌گذاری کنید، QR کد را اسکن کنید یا عکسی انتخاب کنید.</string>
+    <string name="srv_more">بیشتر…</string>
+    <string name="sub_refresh_short">به‌روزرسانی</string>
+</resources>

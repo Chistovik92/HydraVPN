@@ -6,7 +6,8 @@ import android.content.res.Resources
 import java.util.Locale
 
 /**
- * Язык интерфейса (Фаза 6e): «как в системе» / русский / английский.
+ * Язык интерфейса (Фаза 6e): «как в системе» / русский / английский; с Фазы 8 ещё украинский,
+ * персидский и упрощённый китайский.
  *
  * Хранится в обычных SharedPreferences, а не в DataStore: язык нужен синхронно
  * в attachBaseContext() — раньше, чем можно что-либо прочитать асинхронно.
@@ -16,6 +17,10 @@ object LocaleHelper {
     const val SYSTEM = "system"
     const val RU = "ru"
     const val EN = "en"
+    // Фаза 8: украинский, персидский (RTL), упрощённый китайский.
+    const val UK = "uk"
+    const val FA = "fa"
+    const val ZH = "zh-CN"
 
     private const val PREFS = "hydra_ui"
     private const val KEY = "lang"
@@ -28,7 +33,7 @@ object LocaleHelper {
     }
 
     private fun localeFor(lang: String): Locale =
-        if (lang == SYSTEM) Resources.getSystem().configuration.locales[0] else Locale(lang)
+        if (lang == SYSTEM) Resources.getSystem().configuration.locales[0] else Locale.forLanguageTag(lang)
 
     /** Обёртка контекста для attachBaseContext() Activity/Service/Application. */
     fun wrap(base: Context): Context {

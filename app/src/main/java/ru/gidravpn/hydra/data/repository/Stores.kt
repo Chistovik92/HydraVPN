@@ -20,6 +20,7 @@ internal val Context.themeStore: DataStore<Preferences> by preferencesDataStore(
 internal val Context.engineStore: DataStore<Preferences> by preferencesDataStore(name = "engine_settings")
 internal val Context.vpnSettingsStore: DataStore<Preferences> by preferencesDataStore(name = "vpn_settings")
 internal val Context.routingStore: DataStore<Preferences> by preferencesDataStore(name = "routing_settings")
+internal val Context.profilesStore: DataStore<Preferences> by preferencesDataStore(name = "routing_profiles")
 
 /** Имя файла → хранилище; порядок стабилен (бэкап, сброс). */
 internal fun Context.allStores(): Map<String, DataStore<Preferences>> = linkedMapOf(
@@ -28,4 +29,5 @@ internal fun Context.allStores(): Map<String, DataStore<Preferences>> = linkedMa
     "engine_settings" to engineStore,
     "vpn_settings" to vpnSettingsStore,
     "routing_settings" to routingStore,
+    "routing_profiles" to profilesStore,
 )

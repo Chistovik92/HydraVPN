@@ -40,3 +40,24 @@ enum class TlsFragmentMode(@androidx.annotation.StringRes val labelRes: Int, @an
         fun fromId(id: String?): TlsFragmentMode = entries.firstOrNull { it.name == id } ?: OFF
     }
 }
+
+/**
+ * IPv6 внутри туннеля (Фаза 8). [BLOCK] — как было всегда: маршрут `::/0` уходит в tun, но
+ * IPv6-адреса у tun нет, поэтому приложения не могут отправить IPv6 и откатываются на IPv4 —
+ * IPv6 не утекает мимо VPN. [ENABLE] — tun получает ULA-адрес, и IPv6-трафик идёт через
+ * прокси (нужен сервер с IPv6-выходом; иначе такие соединения просто не установятся).
+ * SSTP/L2TP и AmneziaWG режим не затрагивает: у PPP-моста только IPv4, у AWG адреса задаёт
+ * сам конфиг.
+ */
+enum class Ipv6Mode(@androidx.annotation.StringRes val labelRes: Int, @androidx.annotation.StringRes val descriptionRes: Int) {
+    BLOCK(ru.gidravpn.hydra.R.string.ipv6_block, ru.gidravpn.hydra.R.string.ipv6_block_desc),
+    ENABLE(ru.gidravpn.hydra.R.string.ipv6_enable, ru.gidravpn.hydra.R.string.ipv6_enable_desc);
+
+    companion object {
+        /** ULA-адрес tun под IPv6 — общий для VpnService.Builder и tun-инбаунда sing-box. */
+        const val TUN_ADDRESS = "fdfe:dcba:9876::1"
+        const val TUN_PREFIX = 126
+
+        fun fromId(id: String?): Ipv6Mode = entries.firstOrNull { it.name == id } ?: BLOCK
+    }
+}

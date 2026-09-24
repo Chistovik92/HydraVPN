@@ -97,7 +97,7 @@ abstract class SocksBridgeCore : VpnCore {
         val opts = resolveRouting(ctx)
         val bridgeConfig = SingBoxConfigBuilder.buildXrayBridge(
             socksPort, split, dns = opts.dns, geoRouting = opts.geoRouting, mtu = opts.mtu,
-            hotspot = resolveHotspot(ctx),
+            hotspot = resolveHotspot(ctx), ipv6 = opts.ipv6,
         ).toString(2)
         val b = SingBoxCore()
         bridge = b

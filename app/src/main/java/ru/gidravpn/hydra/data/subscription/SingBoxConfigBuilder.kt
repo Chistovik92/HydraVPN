@@ -40,7 +40,8 @@ object SingBoxConfigBuilder {
         mtu: Int = MtuPreset.AUTO.value,
         tlsFragment: TlsFragmentMode = TlsFragmentMode.OFF,
         hotspot: HotspotSettings? = null,
-    ): JSONObject = baseConfig(outboundFor(profile, tlsFragment), splitTunnel, dns, geoRouting, mtu, hotspot)
+        ipv6: Boolean = false,
+    ): JSONObject = baseConfig(outboundFor(profile, tlsFragment), splitTunnel, dns, geoRouting, mtu, hotspot, ipv6)
 
     /**
      * Мост Xray → tun (см. `XrayCore` в native-flavor): Xray сам tun не
@@ -55,10 +56,11 @@ object SingBoxConfigBuilder {
         geoRouting: GeoRouting? = null,
         mtu: Int = MtuPreset.AUTO.value,
         hotspot: HotspotSettings? = null,
+        ipv6: Boolean = false,
     ): JSONObject {
         val outbound = JSONObject().put("type", "socks").put("tag", "proxy")
             .put("server", "127.0.0.1").put("server_port", socksPort)
-        return baseConfig(outbound, splitTunnel, dns, geoRouting, mtu, hotspot)
+        return baseConfig(outbound, splitTunnel, dns, geoRouting, mtu, hotspot, ipv6)
     }
 
     private fun baseConfig(
@@ -68,6 +70,7 @@ object SingBoxConfigBuilder {
         geoRouting: GeoRouting?,
         mtu: Int,
         hotspot: HotspotSettings?,
+        ipv6: Boolean = false,
     ): JSONObject {
         val root = JSONObject()
 
@@ -116,7 +119,10 @@ object SingBoxConfigBuilder {
                 put("tag", "tun-in")
                 put("interface_name", "hydra-tun")
                 put("mtu", mtu)
-                put("address", JSONArray().put("172.19.0.1/28"))
+                // IPv6-адрес — только в режиме Ipv6Mode.ENABLE; тот же, что у VpnService.Builder.
+                put("address", JSONArray().put("172.19.0.1/28").apply {
+                    if (ipv6) put("${ru.gidravpn.hydra.data.model.Ipv6Mode.TUN_ADDRESS}/${ru.gidravpn.hydra.data.model.Ipv6Mode.TUN_PREFIX}")
+                })
                 put("auto_route", false)
                 put("strict_route", false)
                 put("stack", "gvisor")

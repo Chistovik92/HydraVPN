@@ -14,6 +14,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -45,6 +47,11 @@ private enum class SettingsSection { HUB, TUNNEL, SECURITY, ROUTING, SPLIT, HOTS
 fun SettingsScreen(vm: MainViewModel) {
     var section by remember { mutableStateOf(SettingsSection.HUB) }
 
+    // Системная «Назад» (и кнопка Back пульта TV) из подэкрана возвращает в хаб, а не
+    // закрывает приложение (Фаза 8).
+    androidx.activity.compose.BackHandler(enabled = section != SettingsSection.HUB) { section = SettingsSection.HUB }
+
+
     when (section) {
         SettingsSection.HUB -> SettingsHub(onSelect = { section = it })
         SettingsSection.TUNNEL -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { TunnelInfoContent(vm) }
@@ -56,7 +63,7 @@ fun SettingsScreen(vm: MainViewModel) {
         SettingsSection.LOGS -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { LogsScreen(vm) }
         SettingsSection.THEME -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { ThemeContent(vm) }
         SettingsSection.BACKUP -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { BackupContent(vm) }
-        SettingsSection.ABOUT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { AboutContent() }
+        SettingsSection.ABOUT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { AboutContent(vm) }
     }
 }
 
@@ -173,7 +180,10 @@ private fun EngineCard(
     onChange: (Boolean) -> Unit,
 ) {
     Card(Modifier.fillMaxWidth(), borderColor = if (checked) accent.copy(alpha = 0.5f) else Border) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(title, color = if (checked) accent else TextSecondary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
@@ -186,7 +196,7 @@ private fun EngineCard(
                 Text(description, color = TextMuted, fontSize = 11.sp, lineHeight = 15.sp)
             }
             Spacer(Modifier.width(12.dp))
-            Switch(checked = checked, onCheckedChange = onChange, enabled = enabled,
+            Switch(checked = checked, onCheckedChange = null, enabled = enabled,
                 colors = SwitchDefaults.colors(checkedTrackColor = accent))
         }
     }
@@ -234,6 +244,27 @@ description = stringResource(R.string.sec_auto_boot_desc),
             onCheckedChange = { vm.setAutoConnectOnBoot(it) }
         )
 
+        val appLock by vm.appLock.collectAsState()
+        val hideSecrets by vm.hideSecrets.collectAsState()
+        val lockUnavailable = stringResource(R.string.lock_unavailable)
+        SecurityToggleCard(
+            title = stringResource(R.string.sec_app_lock),
+            description = stringResource(R.string.sec_app_lock_desc),
+            checked = appLock == true,
+            onCheckedChange = { on ->
+                if (on && !ru.gidravpn.hydra.MainActivity.canLock(context)) {
+                    android.widget.Toast.makeText(context, lockUnavailable, android.widget.Toast.LENGTH_LONG).show()
+                } else vm.setAppLock(on)
+            }
+        )
+
+        SecurityToggleCard(
+            title = stringResource(R.string.sec_hide_secrets),
+            description = stringResource(R.string.sec_hide_secrets_desc),
+            checked = hideSecrets,
+            onCheckedChange = { vm.setHideSecrets(it) }
+        )
+
         InfoGroup(stringResource(R.string.sec_tile_title), AccentCyan) {
             Text(
 stringResource(R.string.sec_tile_desc),
@@ -267,6 +298,21 @@ stringResource(R.string.sec_tile_desc),
 stringResource(R.string.sec_always_on_desc),
                 color = TextMuted, fontSize = 12.sp
             )
+            val alwaysOn by vm.alwaysOn.collectAsState()
+            alwaysOn?.let { (on, lockdown) ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(
+                        when {
+                            on && lockdown -> R.string.sec_always_on_status_lockdown
+                            on -> R.string.sec_always_on_status_on
+                            else -> R.string.sec_always_on_status_off
+                        }
+                    ),
+                    color = if (on && lockdown) Success else if (on) AccentCyan else TextSecondary,
+                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                )
+            }
             Spacer(Modifier.height(12.dp))
             Text(
                 stringResource(R.string.sec_open_vpn_settings), color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
@@ -286,8 +332,10 @@ private fun SecurityToggleCard(
     onCheckedChange: (Boolean) -> Unit
 ) {
     Card(Modifier.fillMaxWidth()) {
+        // Фаза 8 (TalkBack): вся карточка — один переключатель с названием и описанием,
+        // а не безымянный Switch рядом с текстом. Заодно тап по тексту тоже переключает.
         Row(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -298,7 +346,7 @@ private fun SecurityToggleCard(
             Spacer(Modifier.width(12.dp))
             Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange,
+                onCheckedChange = null,
                 colors = SwitchDefaults.colors(checkedTrackColor = AccentCyan)
             )
         }
@@ -316,6 +364,9 @@ private fun RoutingContent(vm: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(stringResource(R.string.set_routing), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+
+        RoutingProfilesCard(vm)
+
 
         Label(stringResource(R.string.dns_label))
         ru.gidravpn.hydra.data.model.DnsProvider.entries.forEach { provider ->
@@ -414,6 +465,117 @@ stringResource(R.string.mtu_desc),
             )
         }
         Text(stringResource(R.string.apply_next_connect), color = TextMuted, fontSize = 11.sp)
+
+        Spacer(Modifier.height(8.dp))
+        Label("IPv6")
+        Text(stringResource(R.string.ipv6_desc), color = TextMuted, fontSize = 11.sp)
+        Spacer(Modifier.height(4.dp))
+        val ipv6 by vm.ipv6Mode.collectAsState()
+        ru.gidravpn.hydra.data.model.Ipv6Mode.entries.forEach { mode ->
+            RoutingOptionCard(
+                title = stringResource(mode.labelRes),
+                subtitle = stringResource(mode.descriptionRes),
+                selected = ipv6 == mode,
+                onClick = { vm.setIpv6Mode(mode) }
+            )
+        }
+        Text(stringResource(R.string.apply_next_connect), color = TextMuted, fontSize = 11.sp)
+
+        Spacer(Modifier.height(8.dp))
+        DnsLeakCard(vm)
+    }
+}
+
+/**
+ * Проверка утечек DNS/IPv6/WebRTC (Фаза 8) — во внешнем браузере. Внутри приложения такая
+ * проверка ничего бы не показала: собственный трафик Hydra намеренно идёт мимо туннеля
+ * (establishTun → addDisallowedApplication), поэтому любой запрос отсюда «утечёт» по
+ * определению. Браузер же ходит через VPN, как и остальные приложения.
+ */
+@Composable
+private fun DnsLeakCard(vm: MainViewModel) {
+    val context = LocalContext.current
+    val state by vm.state.collectAsState()
+    InfoGroup(stringResource(R.string.leak_title), AccentCyan) {
+        Text(stringResource(R.string.leak_desc), color = TextMuted, fontSize = 12.sp)
+        if (state != ru.gidravpn.hydra.vpn.core.ConnectionState.CONNECTED) {
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(R.string.leak_connect_first), color = Danger, fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(12.dp))
+        listOf("ipleak.net" to "https://ipleak.net/", "browserleaks.com" to "https://browserleaks.com/dns").forEach { (label, url) ->
+            Text(
+                stringResource(R.string.leak_open, label), color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickableNoRipple {
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }
+                }.padding(vertical = 4.dp)
+            )
+        }
+    }
+}
+
+/** Профили маршрутизации (Фаза 8): сохранить текущие настройки под именем, применить, удалить. */
+@Composable
+private fun RoutingProfilesCard(vm: MainViewModel) {
+    val profiles by vm.routingProfiles.collectAsState()
+    var naming by remember { mutableStateOf(false) }
+    var toDelete by remember { mutableStateOf<String?>(null) }
+    InfoGroup(stringResource(R.string.profiles_title), AccentViolet) {
+        Text(stringResource(R.string.profiles_desc), color = TextMuted, fontSize = 12.sp)
+        Spacer(Modifier.height(8.dp))
+        if (profiles.isEmpty()) Text(stringResource(R.string.profiles_empty), color = TextSecondary, fontSize = 12.sp)
+        profiles.forEach { p ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(p.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.profiles_apply), color = AccentCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickableNoRipple { vm.applyRoutingProfile(p) }.padding(8.dp))
+                Text(stringResource(R.string.profiles_delete), color = Danger, fontSize = 12.sp,
+                    modifier = Modifier.clickableNoRipple { toDelete = p.name }.padding(8.dp))
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(stringResource(R.string.profiles_save_current), color = AccentViolet, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.clickableNoRipple { naming = true }.padding(vertical = 4.dp))
+    }
+
+    if (naming) {
+        var name by remember { mutableStateOf("") }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { naming = false },
+            title = { Text(stringResource(R.string.profiles_name_title)) },
+            text = {
+                androidx.compose.material3.OutlinedTextField(
+                    value = name, onValueChange = { name = it.take(40) }, singleLine = true,
+                    label = { Text(stringResource(R.string.profiles_name_hint)) },
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = { vm.saveRoutingProfile(name); naming = false },
+                    enabled = name.isNotBlank(),
+                ) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { naming = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+    toDelete?.let { n ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { toDelete = null },
+            title = { Text(stringResource(R.string.profiles_delete_q, n)) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { vm.deleteRoutingProfile(n); toDelete = null }) {
+                    Text(stringResource(R.string.profiles_delete), color = Danger)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { toDelete = null }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
     }
 }
 
@@ -596,6 +758,8 @@ private fun HotspotContent(vm: MainViewModel) {
     var portText by remember(hs.port) { mutableStateOf(hs.port.toString()) }
     var userText by remember(hs.username) { mutableStateOf(hs.username) }
     var passText by remember(hs.password) { mutableStateOf(hs.password) }
+    val hideSecrets by vm.hideSecrets.collectAsState()
+    var showPass by remember { mutableStateOf(false) }
     var invalid by remember { mutableStateOf(false) }
     val addresses = remember(hs.enabled) { localAddresses() }
 
@@ -633,7 +797,14 @@ private fun HotspotContent(vm: MainViewModel) {
             androidx.compose.material3.OutlinedTextField(
                 value = passText, onValueChange = { passText = it; invalid = false },
                 label = { Text(stringResource(R.string.hotspot_password), color = TextMuted, fontSize = 12.sp) },
-                singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth()
+                singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth(),
+                // «Скрывать ключи» (Фаза 8): пароль точками, пока не нажать «Показать».
+                visualTransformation = if (hideSecrets && !showPass)
+                    androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+                trailingIcon = if (hideSecrets) { {
+                    Text(stringResource(if (showPass) R.string.secret_hide else R.string.secret_show), color = AccentCyan,
+                        fontSize = 12.sp, modifier = Modifier.clickableNoRipple { showPass = !showPass }.padding(8.dp))
+                } } else null,
             )
             if (invalid) Text(stringResource(R.string.hotspot_invalid), color = Danger, fontSize = 11.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -702,6 +873,9 @@ private fun LanguageContent() {
             ru.gidravpn.hydra.LocaleHelper.SYSTEM to stringResource(R.string.lang_system),
             ru.gidravpn.hydra.LocaleHelper.RU to "Русский",
             ru.gidravpn.hydra.LocaleHelper.EN to "English",
+            ru.gidravpn.hydra.LocaleHelper.UK to "Українська",
+            ru.gidravpn.hydra.LocaleHelper.FA to "فارسی",
+            ru.gidravpn.hydra.LocaleHelper.ZH to "简体中文",
         ).forEach { (code, label) ->
             RoutingOptionCard(title = label, subtitle = "", selected = lang == code, onClick = {
                 if (lang != code) {
@@ -817,13 +991,56 @@ private fun BackupActionButton(text: String, color: Color, onClick: () -> Unit) 
 }
 
 @Composable
-private fun AboutContent() {
-    Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+private fun AboutContent(vm: MainViewModel) {
+    val context = LocalContext.current
+    val update by vm.update.collectAsState()
+    val autoCheck by vm.updateCheckEnabled.collectAsState()
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
         Text(stringResource(R.string.set_about), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
         InfoGroup("Hydra", TextSecondary) {
             Text(stringResource(R.string.about_text, ru.gidravpn.hydra.BuildConfig.VERSION_NAME),
                 color = TextMuted, fontSize = 12.sp)
         }
+
+        InfoGroup(stringResource(R.string.upd_title), AccentCyan) {
+            Text(stringResource(R.string.upd_desc), color = TextMuted, fontSize = 12.sp)
+            Spacer(Modifier.height(10.dp))
+            when (val u = update) {
+                is MainViewModel.UpdateUi.Checking ->
+                    Text(stringResource(R.string.upd_checking), color = TextSecondary, fontSize = 13.sp)
+                is MainViewModel.UpdateUi.UpToDate ->
+                    Text(stringResource(R.string.upd_latest), color = Success, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                is MainViewModel.UpdateUi.Failed ->
+                    Text(stringResource(R.string.upd_failed, u.reason), color = Danger, fontSize = 13.sp)
+                is MainViewModel.UpdateUi.Available -> {
+                    Text(stringResource(R.string.upd_available, u.release.version), color = AccentCyan,
+                        fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        stringResource(R.string.upd_open), color = AccentCyan, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickableNoRipple {
+                            runCatching {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(u.release.pageUrl))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                            }
+                        }.padding(vertical = 6.dp)
+                    )
+                }
+                MainViewModel.UpdateUi.Idle -> {}
+            }
+            Text(
+                stringResource(R.string.upd_check_now), color = AccentCyan, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickableNoRipple { vm.checkForUpdates(manual = true) }.padding(vertical = 6.dp)
+            )
+        }
+        SecurityToggleCard(
+            title = stringResource(R.string.upd_auto),
+            description = stringResource(R.string.upd_auto_desc),
+            checked = autoCheck,
+            onCheckedChange = { vm.setUpdateCheck(it) }
+        )
     }
 }
 

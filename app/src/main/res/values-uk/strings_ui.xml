@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Українська (Фаза 8). Рядки журналу підключення навмисно лишаються російською. -->
+<resources>
+    <!-- Tabs -->
+    <string name="tab_main">Головна</string>
+    <string name="tab_servers">Сервери</string>
+    <string name="tab_profile">Профіль</string>
+    <string name="tab_settings">Налаштування</string>
+
+    <!-- Common -->
+    <string name="action_delete">Видалити</string>
+    <string name="action_cancel">Скасувати</string>
+    <string name="action_save">Зберегти</string>
+    <string name="action_add">Додати</string>
+    <string name="apply_next_connect">Застосовується під час наступного підключення.</string>
+    <string name="status_error">Помилка</string>
+
+    <!-- Main screen -->
+    <string name="main_protocol">Протокол</string>
+    <string name="main_current_config">Поточна конфігурація</string>
+    <string name="main_change">Змінити →</string>
+    <string name="main_cfg">Сервер: %1$s\nПорт: %2$d\nТип: %3$s</string>
+    <string name="main_no_server">Сервер не вибрано</string>
+    <string name="btn_error_retry">ПОМИЛКА — ПОВТОРИТИ</string>
+    <string name="btn_disconnect">ВІДКЛЮЧИТИ</string>
+    <string name="btn_connecting">ПІДКЛЮЧЕННЯ…</string>
+    <string name="btn_connect">ПІДКЛЮЧИТИ</string>
+    <string name="info_status">Стан</string>
+    <string name="info_server">Сервер</string>
+    <string name="info_time">Час</string>
+    <string name="info_down">↓ Завантажено</string>
+    <string name="info_up">↑ Відправлено</string>
+
+    <!-- Profile -->
+    <string name="profile_stats">Статистика</string>
+    <string name="profile_session">Сеанс</string>
+    <string name="profile_virtual_ip">Віртуальна IP</string>
+    <string name="profile_hidden">[приховано]</string>
+    <string name="profile_site">Сайт</string>
+    <string name="profile_repo">Репозиторій</string>
+    <string name="profile_open_site">Відкрити сайт</string>
+    <string name="profile_open_github">Відкрити на GitHub</string>
+
+    <!-- Logs -->
+    <string name="log_filter_all">Усі</string>
+    <string name="log_filter_warn">Попередження</string>
+    <string name="log_filter_error">Помилки</string>
+    <string name="log_title">Журнал підключення</string>
+    <string name="log_clear">Очистити</string>
+    <string name="log_to_file">У файл</string>
+    <string name="log_storage_open">Зберігання ▲</string>
+    <string name="log_storage_closed">Зберігання ▼</string>
+    <string name="log_save_on_device">Зберігати на пристрої</string>
+    <string name="log_keep">Зберігати:</string>
+    <string name="log_saved">Збережено: %1$s</string>
+    <string name="log_delete_saved">Видалити збережене</string>
+    <string name="logmode_off">Не зберігати</string>
+    <string name="logmode_off_desc">Журнал лише в пам\'яті й зникає після закриття застосунку.</string>
+    <string name="logmode_errors">Лише помилки й попередження</string>
+    <string name="logmode_errors_desc">Без адрес сайтів — достатньо, щоб потім розібратися зі збоєм підключення.</string>
+    <string name="logmode_all">Повний журнал</string>
+    <string name="logmode_all_desc">Містить адресу кожного з\'єднання — це ваша історія відвідувань на пристрої.</string>
+    <string name="retention_d1">1 день</string>
+    <string name="retention_d3">3 дні</string>
+    <string name="retention_d7">7 днів</string>
+
+    <!-- Servers -->
+    <string name="servers_refresh_ping">Оновити пінг</string>
+    <string name="servers_add">+ Додати сервер</string>
+    <string name="servers_import">📥 Імпорт</string>
+    <string name="servers_delete_title">Видалити сервер?</string>
+    <string name="servers_delete_msg">«%1$s» буде видалено без можливості відновлення.</string>
+    <string name="servers_measuring">вимірювання…</string>
+    <string name="servers_ping_ms">%1$d мс</string>
+    <string name="servers_measure">виміряти</string>
+    <string name="default_server_name">Сервер</string>
+    <string name="servers_new_title">Новий сервер</string>
+    <string name="field_name">Назва</string>
+    <string name="field_address">Адреса</string>
+    <string name="field_port">Порт</string>
+    <string name="servers_protocol">Протокол: %1$s</string>
+    <string name="default_subscription_name">Підписка</string>
+    <string name="import_title">Імпорт</string>
+    <string name="import_hint">Вставте посилання (vless://, vmess://, trojan://, ss://, hysteria2://, tuic://, wireguard://, awg://, sstp://, l2tp://), .conf WireGuard/AmneziaWG або URL підписки.</string>
+    <string name="import_link_field">Посилання / URL</string>
+    <string name="import_sub_name_field">Назва підписки (для URL)</string>
+    <string name="import_action">Імпортувати</string>
+
+    <!-- Split tunneling -->
+    <string name="split_title">Роздільне тунелювання</string>
+    <string name="split_by_apps">За застосунками</string>
+    <string name="split_by_net">За IP / доменами</string>
+    <string name="split_apps_count">Застосунків у списку: %1$d</string>
+    <string name="split_all_traffic">Весь трафік</string>
+    <string name="split_only_selected">Лише вибрані</string>
+    <string name="split_except_selected">Усі, крім вибраних</string>
+    <string name="split_search">Пошук застосунків</string>
+    <string name="split_system_apps">Системні застосунки</string>
+    <string name="split_apps_off_hint">Весь трафік пристрою йде через VPN. Виберіть режим, щоб задати винятки або білий список застосунків.</string>
+    <string name="split_net_engine_note">Працює лише під час підключення через sing-box (VLESS/VMess/Trojan/SS/Hysteria2/TUIC/WireGuard).</string>
+    <string name="split_example_ip">напр. 10.0.0.0/8</string>
+    <string name="split_example_domain">напр. example.com</string>
+    <string name="split_net_off_hint">Усі IP і домени маршрутизуються як завжди. Виберіть режим, щоб задати точкові винятки або білий список.</string>
+    <string name="split_system_tag">системний</string>
+    <string name="split_sum_off">Весь трафік через VPN</string>
+    <string name="split_sum_include">Через VPN: %1$d заст. (лише вибрані)</string>
+    <string name="split_sum_exclude">Повз VPN: %1$d заст.</string>
+    <string name="split_net_sum_off">IP/домени маршрутизуються як завжди</string>
+    <string name="split_net_sum_include">Лише через VPN: %1$d правил</string>
+    <string name="split_net_sum_exclude">Повз VPN: %1$d правил</string>
+    <string name="rule_ip_cidr">IP/CIDR</string>
+    <string name="rule_domain">Домен</string>
+    <string name="rule_domain_suffix">Піддомени</string>
+    <string name="rule_domain_keyword">Ключове слово</string>
+
+    <!-- Routing enums -->
+    <string name="geo_off">Вимкнено</string>
+    <string name="geo_off_desc">Весь трафік іде через проксі, як завжди.</string>
+    <string name="geo_direct">Вибрані країни напряму, решта через проксі</string>
+    <string name="geo_direct_desc">Їхні IP і сайти йдуть повз VPN — швидше для місцевих сервісів.</string>
+    <string name="geo_via_proxy">Вибрані країни через проксі, решта напряму</string>
+    <string name="geo_via_proxy_desc">Лише їхні IP і сайти йдуть через VPN — мінімальне навантаження на проксі.</string>
+    <string name="mtu_auto">Авто (9000)</string>
+    <string name="mtu_1500">1500 — Ethernet/Wi-Fi</string>
+    <string name="mtu_1400">1400 — мобільні мережі</string>
+    <string name="mtu_1280">1280 — мінімум IPv6</string>
+    <string name="frag_off_desc">Рукостискання надсилається як завжди.</string>
+    <string name="frag_record">За TLS-записами</string>
+    <string name="frag_record_desc">ClientHello ділиться на кілька TLS-записів. Майже без втрати швидкості — спробуйте спершу цей режим.</string>
+    <string name="frag_tcp">За TCP-сегментами</string>
+    <string name="frag_tcp_desc">ClientHello ріжеться на окремі TCP-пакети з паузою між ними. Підключення повільніше; якщо TLS-записи не допомогли.</string>
+    <string name="dns_system">Системний резолвер</string>
+    <string name="dns_custom">Своя адреса</string>
+
+    <!-- Settings hub -->
+    <string name="set_back">← Налаштування</string>
+    <string name="set_tunnel">Тунель</string>
+    <string name="set_tunnel_sub">Ядра: увімкнути / вимкнути</string>
+    <string name="set_security">Безпека</string>
+    <string name="set_security_sub">Kill Switch, автопідключення, блокування</string>
+    <string name="set_routing">Маршрутизація</string>
+    <string name="set_routing_sub">DNS, GeoIP за країнами, фрагментація, MTU, IPv6, профілі</string>
+    <string name="set_split">Роздільне тунелювання</string>
+    <string name="set_split_sub">Застосунки через VPN / повз нього</string>
+    <string name="set_logs">Журнал</string>
+    <string name="set_logs_sub">Журнал підключень</string>
+    <string name="set_backup">Резервна копія</string>
+    <string name="set_backup_sub">Зберегти / відновити все, скинути налаштування</string>
+    <string name="set_about">Про застосунок</string>
+    <string name="set_about_sub">Версія, оновлення, ліцензія</string>
+    <string name="set_language">Мова</string>
+    <string name="set_language_sub">Системна, Українська, Русский, English, فارسی, 中文</string>
+
+    <!-- Tunnel info -->
+    <string name="tunnel_sstp_l2tp">Чистий Kotlin, без нативних .aar: PPP-стек (LCP, MS-CHAPv2, IPCP), SSTP поверх TLS із crypto-binding, L2TP поверх UDP (без IPsec/ESP). Потребує перевірки на пристрої.</string>
+    <string name="tunnel_pptp">Недоступно: GRE (IP-протокол 47) потребує raw-сокетів/root, а стек прибрали з Android 12/13. Альтернативи: SSTP, L2TP, WireGuard.</string>
+    <string name="tunnel_xray">Транспорт: XTLS Vision / WS / gRPC. Flow: xtls-rprx-vision. Рушій: libXray.aar.</string>
+    <string name="tunnel_singbox">Протоколи: VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5. Рушій: libbox.aar.</string>
+    <string name="tunnel_wg">Звичайний WireGuard працює через sing-box (libbox.aar). AmneziaWG 1.0/1.5/2.0 — власний рушій amneziawg-go.aar: обфускація Jc/Jmin/Jmax/S1/S2/H1–H4 і маркери I1–I5. Генерація .conf/uapi готова.</string>
+    <string name="tunnel_beta">Експериментальні рушії. WDTT — WireGuard через TURN-ретранслятор хмари VK (libclient.so + вхід VK). olcRTC — TCP поверх WebRTC DataChannel (olcrtc.aar + tun2socks). В інтерфейсі позначені бейджем BETA.</string>
+    <string name="xray_toggle_title">Xray Core для VLESS/VMess/Trojan/SS</string>
+    <string name="xray_toggle_desc">Замість sing-box — заради його реалізації XTLS Vision (окремий процес, sing-box лишається мостом до TUN). VLESS перевірено на реальному пристрої; VMess/Trojan/SS і тривала стабільність — ще ні.</string>
+    <string name="xray_toggle_missing">Потрібен app/libs/libXray.aar — див. docs/BUILD.md, розділ 2.2.</string>
+
+    <!-- Security -->
+    <string name="sec_killswitch_desc">Якщо спроба підключення не вдалася, тунель не відкочується на пряме з\'єднання — трафік блокується, доки ви не вимкнете VPN вручну. Не захищає від відкликання VPN системою (інший VPN-застосунок, «Відключити» в налаштуваннях) — для повної гарантії на рівні ОС увімкніть «Блокувати з\'єднання без VPN» нижче.</string>
+    <string name="sec_auto_app">Автопідключення під час запуску</string>
+    <string name="sec_auto_app_desc">Відкриваєте Hydra — вона піднімає тунель до останнього сервера, якщо згоду на VPN уже було надано.</string>
+    <string name="sec_auto_boot">Автопідключення після завантаження</string>
+    <string name="sec_auto_boot_desc">Тунель піднімається одразу після перезавантаження телефона, без відкриття застосунку. Також потрібна раніше надана згода на VPN — показати діалог із фону неможливо.</string>
+    <string name="sec_tile_title">Плитка в шторці</string>
+    <string name="sec_tile_desc">Показує в шторці, яка локація підключена. Дотик відкриває застосунок.</string>
+    <string name="sec_tile_add">Додати плитку →</string>
+    <string name="sec_tile_manual">Як додати вручну →</string>
+    <string name="sec_always_on_title">Системний Always-on VPN</string>
+    <string name="sec_always_on_desc">Єдиний спосіб гарантовано заблокувати трафік навіть у разі збою самого застосунку чи сервісу, а не лише помилки підключення. Налаштування → Мережа → VPN → Hydra → шестірня → «Постійна VPN» + «Блокувати з\'єднання без VPN».</string>
+    <string name="sec_open_vpn_settings">Відкрити налаштування VPN →</string>
+
+    <!-- Routing screen -->
+    <string name="dns_label">DNS (усередині тунелю)</string>
+    <string name="dns_custom_hint">IP, хост або URL DoH/DoT</string>
+    <string name="dns_system_hint">Резолвер пристрою, без шифрування — запити йдуть повз тунель</string>
+    <string name="dns_invalid">Не схоже на адресу DNS. Приклади: 94.140.14.14, dns.example.com, https://dns.example.com/dns-query/token, tls://dns.example.com</string>
+    <string name="dns_supported">Підтримуються: IP, хост (→ DoH), https://… (DoH, можна зі шляхом і токеном), tls://… (DoT), udp://…</string>
+    <string name="geo_label">GeoIP-маршрутизація за країнами</string>
+    <string name="geo_desc">IP-бази ~250 країн вбудовані в застосунок (rule-set sing-box з MetaCubeX/meta-rules-dat) і працюють офлайн. Працює і для sing-box, і для Xray Core — маршрутизацією в обох випадках керує sing-box.</string>
+    <string name="frag_label">Фрагментація TLS (обхід DPI)</string>
+    <string name="frag_desc">Розбиває рукостискання з проксі-сервером, щоб DPI не бачив назву сайту в одному пакеті. Лише sing-box і лише VLESS/VMess/Trojan з TLS — на Hysteria2/TUIC (QUIC) та з увімкненим Xray Core не діє. На реальних серверах не перевірялося.</string>
+    <string name="mtu_label">MTU тунелю</string>
+    <string name="mtu_desc">Змінюйте, лише якщо частина сайтів зависає під час завантаження, а дрібні запити проходять — ознака втрати великих пакетів. Для SSTP/L2TP не більше 1400.</string>
+    <string name="mtu_auto_sub">Як було до появи налаштування</string>
+    <string name="mtu_bytes">%1$d байт</string>
+    <string name="geo_countries">Країни</string>
+    <string name="geo_none_selected">Нічого не вибрано — правило не діє</string>
+    <string name="geo_domains_note">Розпізнавання за доменами (а не лише IP) є тільки для %1$s: для решти доменних баз немає. Сайти на закордонних CDN вважатимуться «не своїми».</string>
+    <string name="geo_search">Знайти країну</string>
+    <string name="geo_domains_short">домени</string>
+    <string name="geo_not_found">Нічого не знайдено</string>
+
+    <!-- Backup -->
+    <string name="backup_dismiss">Торкніться, щоб закрити</string>
+    <string name="backup_save_title">Зберегти резервну копію</string>
+    <string name="backup_save_desc">Усі сервери, підписки й налаштування в одному JSON-файлі. Увага: ключі та паролі зберігаються відкритим текстом — бережіть файл як пароль.</string>
+    <string name="backup_save_btn">Зберегти у файл →</string>
+    <string name="backup_restore_title">Відновити з копії</string>
+    <string name="backup_restore_desc">Замінює ВСІ поточні сервери, підписки й налаштування вмістом файлу. VPN має бути вимкнено.</string>
+    <string name="backup_restore_btn">Вибрати файл →</string>
+    <string name="backup_reset_title">Скинути налаштування</string>
+    <string name="backup_reset_desc">Усі налаштування повертаються до типових (тема, DNS, маршрутизація, Kill Switch, роздільне тунелювання тощо). Сервери й підписки лишаються.</string>
+    <string name="backup_reset_btn">Скинути налаштування →</string>
+    <string name="backup_restore_q">Відновити з копії?</string>
+    <string name="backup_restore_q_desc">Поточні сервери, підписки й налаштування буде замінено. Скасувати не можна — якщо сумніваєтеся, спершу збережіть поточну копію.</string>
+    <string name="backup_replace">Замінити</string>
+    <string name="backup_reset_q">Скинути всі налаштування?</string>
+    <string name="backup_reset_q_desc">Сервери й підписки лишаються, решта повертається до типових значень.</string>
+    <string name="backup_reset_confirm">Скинути</string>
+    <string name="msg_backup_saved">Копію збережено: серверів %1$d, усі налаштування</string>
+    <string name="msg_backup_save_failed">Не вдалося зберегти: %1$s</string>
+    <string name="msg_backup_disconnect_first">Вимкніть VPN перед відновленням — інакше тунель лишиться зі старими налаштуваннями</string>
+    <string name="msg_backup_restored">Відновлено: серверів %1$d, підписок %2$d, налаштувань %3$d</string>
+    <string name="msg_backup_restore_failed">Не вдалося відновити: %1$s</string>
+    <string name="msg_reset_done">Налаштування скинуто. Сервери й підписки не змінено.</string>
+
+    <!-- About -->
+    <string name="about_text">Hydra %1$s — мультипротокольний VPN-клієнт. Ліцензія: GPL-3.0.</string>
+
+    <!-- Language -->
+    <string name="lang_title">Мова</string>
+    <string name="lang_system">Як у системі</string>
+    <string name="lang_hint">Мова інтерфейсу. Журнал підключення лишається російською.</string>
+
+    <!-- Notification / tile -->
+    <string name="tile_blocked">Заблоковано</string>
+    <string name="notif_encrypted">Тунель зашифровано</string>
+    <string name="notif_killswitch">Kill Switch: трафік заблоковано</string>
+    <string name="notif_dropped">Тунель обірвався</string>
+    <string name="notif_error">Помилка підключення</string>
+    <string name="notif_action_disconnect">Відключити</string>
+    <string name="notif_action_servers">Сервери</string>
+    <string name="notif_conn_dropped">З\'єднання обірвалося</string>
+    <string name="split_apply_live">Якщо VPN увімкнено, він перепідключиться автоматично за мить після кожної зміни.</string>
+    <string name="btn_reconnecting">ПЕРЕПІДКЛЮЧЕННЯ…</string>
+    <string name="notif_reconnecting">Перепідключення…</string>
+    <string name="sec_reconnect">Перепідключення після обриву</string>
+    <string name="sec_reconnect_desc">Якщо тунель обірвався, Hydra повторює спроби автоматично зі зростаючими паузами (2 с → 30 с, до 10 спроб) і підхоплює, щойно повертається мережа. З увімкненим Kill Switch трафік тим часом заблоковано.</string>
+    <string name="servers_scan_qr">📷 Сканувати QR</string>
+    <string name="servers_qr_photo">🖼 QR із фото</string>
+    <string name="qr_scan_prompt">Наведіть камеру на QR-код із посиланням, підпискою чи конфігом</string>
+    <string name="import_paste">Вставити з буфера</string>
+    <string name="import_no_qr">QR-код не знайдено. Спробуйте чіткіше й ближче фото або скануйте камерою.</string>
+    <string name="import_done_sub">Підписка «%1$s»: імпортовано серверів %2$d</string>
+    <string name="import_fail_sub">Підписку «%1$s» не завантажено: %2$s</string>
+    <string name="import_done_one">Сервер додано: %1$s</string>
+    <string name="import_done_servers">Додано серверів: %1$d</string>
+    <string name="import_json_unsupported">Це повний JSON-конфіг (sing-box/Xray). Поки не підтримується — імпортуйте посилання або підписку.</string>
+    <string name="import_unknown">Не вдалося розпізнати як посилання на сервер, підписку чи конфіг.</string>
+    <string name="share_action">Поділитися</string>
+    <string name="share_qr_desc">QR-код</string>
+    <string name="share_send">Надіслати посилання + QR</string>
+    <string name="share_too_long">Посилання задовге для QR-коду — надішліть його текстом.</string>
+    <string name="share_no_link">Для цього протоколу немає формату посилання.</string>
+    <string name="share_warning">Посилання містить ключі чи пароль сервера. Надсилайте лише тим, кому довіряєте.</string>
+    <string name="sub_refresh_all">Оновити підписки</string>
+    <string name="sub_refresh">⟳ Оновити</string>
+    <string name="sub_refreshing">Оновлення…</string>
+    <string name="sub_ping">Пінг</string>
+    <string name="sub_standalone">Окремі сервери</string>
+    <string name="sub_servers_count">серверів: %1$d</string>
+    <string name="sub_until">до %1$s</string>
+    <string name="sub_updated">Оновлено %1$s</string>
+    <string name="sub_never">ніколи</string>
+    <string name="sub_auto_every">авто кожні %1$d год</string>
+    <string name="sub_auto_update">Автооновлення</string>
+    <string name="sub_delete_title">Видалити підписку</string>
+    <string name="sub_delete_msg">Підписку «%1$s» і її сервери (%2$d) буде видалено.</string>
+    <string name="sub_refreshed">«%1$s» оновлено: серверів %2$d, додано %3$d, видалено %4$d</string>
+    <string name="profile_hwid">Ідентифікатор пристрою (HWID)</string>
+    <string name="profile_hwid_hint">Надсилається панелям підписок як x-hwid. Панелі з лімітом пристроїв рахують за ним цей телефон.</string>
+    <string name="eng_intro">Усі ядра типово ввімкнено. Вимкнене ядро не піднімає тунель, а його сервери позначені в списку «Сервери».</string>
+    <string name="eng_singbox">sing-box</string>
+    <string name="eng_singbox_desc">VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5, WireGuard. Навіть вимкнений, працює всередині як міст TUN для Xray, olcRTC і OpenFlux.</string>
+    <string name="eng_xray">Xray Core</string>
+    <string name="eng_xray_desc">VLESS, VMess, Trojan, Shadowsocks з XTLS Vision / REALITY в окремому процесі. Обслуговує ці протоколи, якщо вибрано нижче або якщо sing-box вимкнено.</string>
+    <string name="eng_prefer_xray">Xray замість sing-box</string>
+    <string name="eng_prefer_xray_desc">Для VLESS / VMess / Trojan / SS.</string>
+    <string name="eng_awg">AmneziaWG 1.0 – 3.1</string>
+    <string name="eng_awg_desc">Обфускований WireGuard, усі покоління протоколу: 1.0 (Jc/Jmin/Jmax, S1/S2, H1–H4), 1.5 (I1–I5), 2.0 (S3/S4, діапазони заголовків) і 3.x (ключ захисту заголовків, доповнення вмісту, випадкові хвости, таймери). Ядро: amneziawg-go 3.1.</string>
+    <string name="eng_ppp">SSTP / L2TP</string>
+    <string name="eng_ppp_desc">Власний PPP-стек на Kotlin (LCP, MS-CHAPv2, IPCP): SSTP поверх TLS із crypto-binding, L2TP поверх UDP без IPsec.</string>
+    <string name="eng_olcrtc">olcRTC</string>
+    <string name="eng_olcrtc_desc">TCP поверх WebRTC через сервіси відеодзвінків (Jitsi, Телемост, WB Stream). Потрібен власний сервер olcrtc.</string>
+    <string name="eng_openflux">OpenFlux</string>
+    <string name="eng_openflux_desc">TCP-тунель через сервіси документів і месенджери (Яндекс, MAX, Mail.ru, Cups). Потрібен власний вихідний вузол.</string>
+    <string name="srv_engine_off">ядро вимкнено</string>
+    <string name="srv_summary">Серверів: %1$d · підписок: %2$d</string>
+    <string name="srv_search">Пошук</string>
+    <string name="srv_search_hint">Назва сервера або протокол</string>
+    <string name="srv_sort_ping">Сортувати за пінгом</string>
+    <string name="srv_add">Додати</string>
+    <string name="srv_add_paste">З буфера обміну</string>
+    <string name="srv_add_paste_desc">Посилання, підписка чи конфіг — визначається автоматично</string>
+    <string name="srv_add_scan">Сканувати QR</string>
+    <string name="srv_add_scan_desc">Камерою</string>
+    <string name="srv_add_photo">QR із фото</string>
+    <string name="srv_add_photo_desc">Скріншот або зображення з галереї</string>
+    <string name="srv_add_link">Ввести посилання</string>
+    <string name="srv_add_link_desc">Посилання на сервер, URL підписки або .conf</string>
+    <string name="srv_add_manual">Вручну</string>
+    <string name="srv_add_manual_desc">Адреса, порт і протокол</string>
+    <string name="srv_clipboard_empty">Буфер обміну порожній</string>
+    <string name="srv_empty_title">Серверів поки немає</string>
+    <string name="srv_empty_desc">Додайте підписку чи сервер: вставте посилання, відскануйте QR-код або виберіть фото.</string>
+    <string name="srv_more">Ще…</string>
+    <string name="sub_refresh_short">Оновити</string>
+</resources>

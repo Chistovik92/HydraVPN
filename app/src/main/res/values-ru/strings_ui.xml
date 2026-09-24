@@ -135,9 +135,9 @@
     <string name="set_back">← Настройки</string>
     <string name="set_tunnel">Туннель</string>
     <string name="set_security">Безопасность</string>
-    <string name="set_security_sub">Kill Switch, автоподключение</string>
+    <string name="set_security_sub">Kill Switch, автоподключение, блокировка</string>
     <string name="set_routing">Маршрутизация</string>
-    <string name="set_routing_sub">DNS, GeoIP по странам, фрагментация, MTU</string>
+    <string name="set_routing_sub">DNS, GeoIP по странам, фрагментация, MTU, IPv6, профили</string>
     <string name="set_split">Split-туннелинг</string>
     <string name="set_split_sub">Приложения через VPN / мимо VPN</string>
     <string name="set_logs">Логи</string>
@@ -145,9 +145,9 @@
     <string name="set_backup">Резервная копия</string>
     <string name="set_backup_sub">Сохранить / восстановить всё, сброс настроек</string>
     <string name="set_about">О приложении</string>
-    <string name="set_about_sub">Версия, лицензия</string>
+    <string name="set_about_sub">Версия, обновления, лицензия</string>
     <string name="set_language">Язык</string>
-    <string name="set_language_sub">Системный, Русский, English</string>
+    <string name="set_language_sub">Системный, Русский, English, Українська, فارسی, 中文</string>
 
     <!-- Tunnel info -->
     <string name="tunnel_sstp_l2tp">Полностью на Kotlin, без нативных .aar: PPP-стек (LCP, MS-CHAPv2, IPCP), SSTP поверх TLS с crypto-binding, L2TP по UDP (без IPsec/ESP). Нужен тест на устройстве.</string>
@@ -167,7 +167,7 @@
     <string name="sec_auto_boot">Автоподключение при загрузке устройства</string>
     <string name="sec_auto_boot_desc">Туннель поднимется сразу после перезагрузки телефона, без открытия приложения. Тоже требует ранее выданного VPN-согласия — диалог из фона показать нельзя.</string>
     <string name="sec_tile_title">Плитка в шторке уведомлений</string>
-    <string name="sec_tile_desc">Подключает/отключает последний использованный сервер прямо из панели быстрых настроек, без открытия приложения.</string>
+    <string name="sec_tile_desc">Показывает в шторке, какая локация подключена. Тап открывает приложение.</string>
     <string name="sec_tile_add">Добавить плитку →</string>
     <string name="sec_tile_manual">Как добавить вручную →</string>
     <string name="sec_always_on_title">Системный Always-on VPN</string>

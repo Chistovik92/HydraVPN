@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 简体中文（第 8 阶段）。 -->
+<resources>
+    <string name="app_name">Hydra</string>
+    <string name="tagline">多协议 VPN 客户端</string>
+    <string name="vpn_notification_channel">VPN 状态</string>
+    <string name="connected">已连接</string>
+    <string name="disconnected">已断开</string>
+    <string name="connecting">正在连接…</string>
+
+    <!-- Themes -->
+    <string name="theme_ambient">Hydra Ambient</string>
+    <string name="theme_ambient_desc">默认 — 深色钛金上的翡翠霓虹</string>
+    <string name="theme_stealth">Monochrome Stealth</string>
+    <string name="theme_stealth_desc">单色 — 隐身对比度与深红核心</string>
+    <string name="theme_amoled">AMOLED Black</string>
+    <string name="theme_amoled_desc">纯黑背景 — 在 OLED 屏幕上更省电</string>
+    <string name="theme_material_you">Material You</string>
+    <string name="theme_material_you_desc">取自壁纸的颜色（Android 12+）</string>
+    <string name="theme_title">主题</string>
+    <string name="theme_unsupported">此 Android 版本不可用</string>
+
+    <!-- Launcher icon -->
+    <string name="icon_title">应用图标</string>
+    <string name="icon_hint">更换图标时启动器会重建快捷方式：它可能短暂消失、移到应用列表末尾，手动摆放的快捷方式也可能丢失。</string>
+    <string name="icon_follow_theme">跟随主题</string>
+    <string name="icon_ambient">翡翠</string>
+    <string name="icon_stealth">深红</string>
+    <string name="icon_ocean">海洋</string>
+    <string name="icon_amber">琥珀</string>
+
+    <!-- Hotspot proxy -->
+    <string name="hotspot_hub_title">热点代理</string>
+    <string name="hotspot_hub_subtitle">将 VPN 共享给其他设备（SOCKS5 / HTTP）</string>
+    <string name="hotspot_title">热点代理</string>
+    <string name="hotspot_enable">启用代理</string>
+    <string name="hotspot_enable_desc">在所有接口上运行本地 SOCKS5/HTTP 服务器。同一网络中的其他设备（手机热点、Wi-Fi）连接到它即可通过 VPN 上网。必须设置用户名和密码。</string>
+    <string name="hotspot_port">端口</string>
+    <string name="hotspot_login">用户名</string>
+    <string name="hotspot_password">密码</string>
+    <string name="hotspot_save">保存</string>
+    <string name="hotspot_regenerate">新密码</string>
+    <string name="hotspot_copy">复制</string>
+    <string name="hotspot_copied">已复制</string>
+    <string name="hotspot_addresses">从其他设备连接</string>
+    <string name="hotspot_no_address">未找到局域网地址。请打开 Wi-Fi 或热点。</string>
+    <string name="hotspot_invalid">端口须为 1024–65535，用户名不能为空，密码至少 6 个字符。</string>
+    <string name="hotspot_apply_note">下次连接时生效。适用于 sing-box 和 Xray Core 协议；SSTP、L2TP 和 AmneziaWG 不可用。</string>
+    <string name="hotspot_warning">任何知道密码的人都能使用你的连接。请勿在公共网络中启用。</string>
+</resources>

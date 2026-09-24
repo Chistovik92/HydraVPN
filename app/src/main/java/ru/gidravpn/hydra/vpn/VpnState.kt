@@ -20,6 +20,13 @@ object VpnState {
     val stats = MutableStateFlow(TrafficStats())
     val connectedSince = MutableStateFlow(0L)
 
+    /**
+     * Системный Always-on VPN (Фаза 8): (включён, «Блокировать соединения без VPN»). Узнать это
+     * можно только изнутри поднятого VpnService (API 29+), поэтому сервис публикует значения
+     * при каждом establish(); null — ещё не подключались в этом процессе или Android < 10.
+     */
+    val alwaysOn = MutableStateFlow<Pair<Boolean, Boolean>?>(null)
+
     private val fmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
     private fun line(msg: String) = "[${fmt.format(Date())}] $msg"
 

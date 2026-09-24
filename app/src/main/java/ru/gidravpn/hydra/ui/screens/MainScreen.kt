@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,6 +55,32 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(12.dp))
+
+        // Фаза 8: новая версия на GitHub — плашка, по тапу страница релиза; «×» прячет до перезапуска.
+        val update by vm.update.collectAsState()
+        val dismissLabel = stringResource(R.string.a11y_dismiss)
+        (update as? MainViewModel.UpdateUi.Available)?.let { u ->
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            Card(Modifier.fillMaxWidth(), borderColor = AccentCyan) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.upd_banner, u.release.version), color = AccentCyan, fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f).clickableNoRipple {
+                            runCatching {
+                                ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse(u.release.pageUrl)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                            }
+                        }
+                    )
+                    Text("×", color = TextMuted, fontSize = 18.sp,
+                        modifier = Modifier.clickableNoRipple { vm.dismissUpdate() }.padding(horizontal = 8.dp)
+                            .semantics { contentDescription = dismissLabel })
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
 
         // Выбор протокола (отражает протокол выбранного сервера)
         Card(Modifier.fillMaxWidth()) {

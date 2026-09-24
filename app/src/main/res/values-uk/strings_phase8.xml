@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Фаза 8 (0.6.23), українська. -->
+<resources>
+    <string name="widget_description">Локація, стан і кнопка підключення</string>
+    <string name="widget_no_server">Сервер не вибрано</string>
+    <string name="widget_connect">Підключити</string>
+    <string name="widget_disconnect">Відключити</string>
+
+    <string name="shortcut_toggle_short">Підключити</string>
+    <string name="shortcut_toggle_long">Підключити / відключити VPN</string>
+    <string name="shortcut_servers_short">Сервери</string>
+    <string name="shortcut_servers_long">Відкрити список серверів</string>
+
+    <string name="ipv6_desc">Що робити з IPv6-трафіком інших застосунків, поки VPN увімкнено.</string>
+    <string name="ipv6_block">Блокувати</string>
+    <string name="ipv6_block_desc">IPv6 нікуди не йде, застосунки переходять на IPv4. Повз VPN нічого не витікає. Рекомендовано.</string>
+    <string name="ipv6_enable">Через тунель</string>
+    <string name="ipv6_enable_desc">IPv6 іде через проксі. Потрібен сервер із виходом в IPv6; лише sing-box і Xray.</string>
+
+    <string name="sec_app_lock">Блокування застосунку</string>
+    <string name="sec_app_lock_desc">Відбиток, обличчя або PIN екрана під час відкриття Hydra і після 30 с у фоні. Скріншоти застосунку заборонено.</string>
+    <string name="lock_unavailable">Потрібен Android 9+ і блокування екрана на пристрої (PIN, графічний ключ або відбиток).</string>
+    <string name="lock_prompt_title">Розблокувати Hydra</string>
+    <string name="lock_prompt_subtitle">Підтвердьте, що це ви</string>
+    <string name="lock_title">Hydra заблоковано</string>
+    <string name="lock_hint">VPN продовжує працювати. Розблокуйте, щоб побачити сервери й налаштування.</string>
+    <string name="lock_unlock">Розблокувати</string>
+
+    <string name="sec_hide_secrets">Приховувати ключі</string>
+    <string name="sec_hide_secrets_desc">UUID, паролі, ключі Reality і токени підписок показуються крапками. Копіювання, QR і «Поділитися» так само віддають повне посилання.</string>
+    <string name="secret_show">Показати</string>
+    <string name="secret_hide">Приховати</string>
+
+    <string name="sec_always_on_status_lockdown">Зараз: постійну VPN увімкнено, з\'єднання без VPN блокуються ✓</string>
+    <string name="sec_always_on_status_on">Зараз: постійну VPN увімкнено, але з\'єднання без VPN не блокуються</string>
+    <string name="sec_always_on_status_off">Зараз: постійну VPN для Hydra вимкнено</string>
+
+    <string name="leak_title">Перевірка витоків DNS та IPv6</string>
+    <string name="leak_desc">Відкриває тестовий сайт у браузері. Браузер ходить через VPN, як і інші застосунки; сама Hydra виключена з тунелю, тож перевірка зсередини застосунку завжди показувала б «витік». Якщо в списку DNS-сервери вашого провайдера — DNS витікає.</string>
+    <string name="leak_connect_first">Спершу підключіть VPN, інакше тест покаже ваше справжнє з\'єднання.</string>
+    <string name="leak_open">Відкрити %1$s →</string>
+
+    <string name="profiles_title">Профілі маршрутизації</string>
+    <string name="profiles_desc">Збережіть поточні DNS, geo-маршрутизацію, MTU, фрагментацію TLS, IPv6 і роздільне тунелювання як профіль («Дім», «Поїздка») і перемикайтеся одним дотиком.</string>
+    <string name="profiles_empty">Профілів поки немає.</string>
+    <string name="profiles_apply">Застосувати</string>
+    <string name="profiles_delete">Видалити</string>
+    <string name="profiles_save_current">+ Зберегти поточні налаштування як профіль</string>
+    <string name="profiles_name_title">Назва профілю</string>
+    <string name="profiles_name_hint">Наприклад, Дім</string>
+    <string name="profiles_delete_q">Видалити профіль «%1$s»?</string>
+
+    <string name="upd_title">Оновлення</string>
+    <string name="upd_desc">Hydra перевіряє останній реліз на GitHub. Застосунок сам нічого не завантажує й не встановлює — відкриває сторінку релізу.</string>
+    <string name="upd_checking">Перевіряю…</string>
+    <string name="upd_latest">У вас остання версія</string>
+    <string name="upd_failed">Не вдалося перевірити: %1$s</string>
+    <string name="upd_available">Доступна версія %1$s</string>
+    <string name="upd_open">Відкрити сторінку релізу →</string>
+    <string name="upd_check_now">Перевірити зараз</string>
+    <string name="upd_auto">Перевіряти автоматично</string>
+    <string name="upd_auto_desc">Раз на добу під час запуску. Запит іде на api.github.com напряму, не через VPN.</string>
+    <string name="upd_banner">Доступна Hydra %1$s — торкніться, щоб відкрити</string>
+
+    <string name="a11y_dismiss">Закрити</string>
+    <string name="a11y_more_actions">Інші дії</string>
+    <string name="a11y_selected">Вибрано</string>
+</resources>

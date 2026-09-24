@@ -235,4 +235,13 @@ class SingBoxConfigBuilderTest {
     @Test fun domainResolverForProxyServerIsLocal() {
         assertEquals("local", SingBoxConfigBuilder.build(profile).getJSONObject("route").getString("default_domain_resolver"))
     }
+
+    // Фаза 8: IPv6 через туннель — второй адрес tun (тот же, что у VpnService.Builder).
+    @Test fun ipv6AddsTunAddressOnlyWhenEnabled() {
+        fun addresses(cfg: JSONObject) = cfg.getJSONArray("inbounds").getJSONObject(0).getJSONArray("address")
+        assertEquals(1, addresses(SingBoxConfigBuilder.build(profile)).length())
+        val v6 = addresses(dump("ipv6", SingBoxConfigBuilder.build(profile, ipv6 = true)))
+        assertEquals(listOf("172.19.0.1/28", "fdfe:dcba:9876::1/126"), (0 until v6.length()).map { v6.getString(it) })
+        assertEquals(2, addresses(SingBoxConfigBuilder.buildXrayBridge(10808, ipv6 = true)).length())
+    }
 }

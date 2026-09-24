@@ -9,6 +9,14 @@
     <!-- Автозапуск после перезагрузки (опционально) -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Android TV и устройства без сенсорного экрана/камеры (Фаза 8): ни одна из этих
+         возможностей не обязательна — иначе магазины прячут приложение на TV, а камера
+         (QR-сканер ZXing тянет разрешение CAMERA) по умолчанию считалась бы обязательной. -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
     <!-- Видимость пакетов (Android 11+): без этого queryIntentActivities в экране
          раздельного туннелирования возвращает лишь горстку приложений, и выбрать
          в списке почти нечего. Запрос по launcher-интенту не требует
@@ -28,6 +36,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Hydra"
         android:usesCleartextTraffic="false"
+        android:banner="@drawable/tv_banner"
+        android:localeConfig="@xml/locales_config"
         android:extractNativeLibs="true">
         <!-- extractNativeLibs="true": без этого AGP не распаковывает .so на
              диск (грузит их прямо из APK служебным механизмом системного
@@ -64,6 +74,12 @@
                 <data android:scheme="openflux" />
                 <data android:scheme="olcbox" />
             </intent-filter>
+            <!-- Android TV (Фаза 8): в лаунчер TV попадает сама активность — ярлыки-alias
+                 ниже переключаются вместе с иконкой и на TV пропадали бы. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
             <!-- «Поделиться» ссылкой/текстом/картинкой с QR из другого приложения (0.6.18). -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
@@ -86,6 +102,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity-alias>
 
         <activity-alias
@@ -99,6 +116,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity-alias>
 
         <activity-alias
@@ -112,6 +130,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity-alias>
 
         <activity-alias
@@ -125,6 +144,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity-alias>
 
         <!-- Отдаёт картинку QR другим приложениям при «Поделиться» (0.6.18+). -->
@@ -162,6 +182,19 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
+        </receiver>
+
+        <!-- Виджет на рабочем столе (Фаза 8): локация, статус, кнопка подключения. -->
+        <receiver
+            android:name=".vpn.HydraWidget"
+            android:exported="false"
+            android:label="Hydra VPN">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_vpn_info" />
         </receiver>
 
         <!-- Плитка «Hydra VPN» в шторке быстрых настроек (Фаза 6b). -->

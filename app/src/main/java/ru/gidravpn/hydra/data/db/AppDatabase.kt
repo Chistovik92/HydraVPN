@@ -10,7 +10,7 @@ import ru.gidravpn.hydra.data.model.Subscription
 @Database(
     entities = [ServerProfile::class, Subscription::class],
     version = 2,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun serverDao(): ServerDao

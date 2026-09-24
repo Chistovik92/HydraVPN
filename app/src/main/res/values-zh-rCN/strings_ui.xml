@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 简体中文（第 8 阶段）。连接日志有意保留俄语。 -->
+<resources>
+    <!-- Tabs -->
+    <string name="tab_main">首页</string>
+    <string name="tab_servers">服务器</string>
+    <string name="tab_profile">个人</string>
+    <string name="tab_settings">设置</string>
+
+    <!-- Common -->
+    <string name="action_delete">删除</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_save">保存</string>
+    <string name="action_add">添加</string>
+    <string name="apply_next_connect">下次连接时生效。</string>
+    <string name="status_error">错误</string>
+
+    <!-- Main screen -->
+    <string name="main_protocol">协议</string>
+    <string name="main_current_config">当前配置</string>
+    <string name="main_change">更改 →</string>
+    <string name="main_cfg">服务器：%1$s\n端口：%2$d\n类型：%3$s</string>
+    <string name="main_no_server">未选择服务器</string>
+    <string name="btn_error_retry">错误 — 重试</string>
+    <string name="btn_disconnect">断开</string>
+    <string name="btn_connecting">正在连接…</string>
+    <string name="btn_connect">连接</string>
+    <string name="info_status">状态</string>
+    <string name="info_server">服务器</string>
+    <string name="info_time">时长</string>
+    <string name="info_down">↓ 已下载</string>
+    <string name="info_up">↑ 已上传</string>
+
+    <!-- Profile -->
+    <string name="profile_stats">统计</string>
+    <string name="profile_session">会话</string>
+    <string name="profile_virtual_ip">虚拟 IP</string>
+    <string name="profile_hidden">[已隐藏]</string>
+    <string name="profile_site">网站</string>
+    <string name="profile_repo">代码仓库</string>
+    <string name="profile_open_site">打开网站</string>
+    <string name="profile_open_github">在 GitHub 上打开</string>
+
+    <!-- Logs -->
+    <string name="log_filter_all">全部</string>
+    <string name="log_filter_warn">警告</string>
+    <string name="log_filter_error">错误</string>
+    <string name="log_title">连接日志</string>
+    <string name="log_clear">清空</string>
+    <string name="log_to_file">导出到文件</string>
+    <string name="log_storage_open">存储 ▲</string>
+    <string name="log_storage_closed">存储 ▼</string>
+    <string name="log_save_on_device">保存在设备上</string>
+    <string name="log_keep">保留：</string>
+    <string name="log_saved">已保存：%1$s</string>
+    <string name="log_delete_saved">删除已保存</string>
+    <string name="logmode_off">不保存</string>
+    <string name="logmode_off_desc">日志仅在内存中，关闭应用后消失。</string>
+    <string name="logmode_errors">仅错误和警告</string>
+    <string name="logmode_errors_desc">不含网站地址 — 足以事后排查连接故障。</string>
+    <string name="logmode_all">完整日志</string>
+    <string name="logmode_all_desc">包含每个连接的地址 — 即保存在设备上的浏览记录。</string>
+    <string name="retention_d1">1 天</string>
+    <string name="retention_d3">3 天</string>
+    <string name="retention_d7">7 天</string>
+
+    <!-- Servers -->
+    <string name="servers_refresh_ping">刷新延迟</string>
+    <string name="servers_add">+ 添加服务器</string>
+    <string name="servers_import">📥 导入</string>
+    <string name="servers_delete_title">删除服务器？</string>
+    <string name="servers_delete_msg">“%1$s”将被删除且无法恢复。</string>
+    <string name="servers_measuring">测量中…</string>
+    <string name="servers_ping_ms">%1$d 毫秒</string>
+    <string name="servers_measure">测量</string>
+    <string name="default_server_name">服务器</string>
+    <string name="servers_new_title">新服务器</string>
+    <string name="field_name">名称</string>
+    <string name="field_address">地址</string>
+    <string name="field_port">端口</string>
+    <string name="servers_protocol">协议：%1$s</string>
+    <string name="default_subscription_name">订阅</string>
+    <string name="import_title">导入</string>
+    <string name="import_hint">粘贴链接（vless://、vmess://、trojan://、ss://、hysteria2://、tuic://、wireguard://、awg://、sstp://、l2tp://）、WireGuard/AmneziaWG 的 .conf 或订阅地址。</string>
+    <string name="import_link_field">链接 / URL</string>
+    <string name="import_sub_name_field">订阅名称（用于 URL）</string>
+    <string name="import_action">导入</string>
+
+    <!-- Split tunneling -->
+    <string name="split_title">分流</string>
+    <string name="split_by_apps">按应用</string>
+    <string name="split_by_net">按 IP / 域名</string>
+    <string name="split_apps_count">列表中的应用：%1$d</string>
+    <string name="split_all_traffic">全部流量</string>
+    <string name="split_only_selected">仅所选</string>
+    <string name="split_except_selected">除所选外全部</string>
+    <string name="split_search">搜索应用</string>
+    <string name="split_system_apps">系统应用</string>
+    <string name="split_apps_off_hint">设备的全部流量都经过 VPN。选择一种模式来设置例外或应用白名单。</string>
+    <string name="split_net_engine_note">仅在通过 sing-box 连接时有效（VLESS/VMess/Trojan/SS/Hysteria2/TUIC/WireGuard）。</string>
+    <string name="split_example_ip">例如 10.0.0.0/8</string>
+    <string name="split_example_domain">例如 example.com</string>
+    <string name="split_net_off_hint">所有 IP 和域名照常路由。选择一种模式来设置单独例外或白名单。</string>
+    <string name="split_system_tag">系统</string>
+    <string name="split_sum_off">全部流量经过 VPN</string>
+    <string name="split_sum_include">经过 VPN：%1$d 个应用（仅所选）</string>
+    <string name="split_sum_exclude">绕过 VPN：%1$d 个应用</string>
+    <string name="split_net_sum_off">IP/域名照常路由</string>
+    <string name="split_net_sum_include">仅经过 VPN：%1$d 条规则</string>
+    <string name="split_net_sum_exclude">绕过 VPN：%1$d 条规则</string>
+    <string name="rule_ip_cidr">IP/CIDR</string>
+    <string name="rule_domain">域名</string>
+    <string name="rule_domain_suffix">子域名</string>
+    <string name="rule_domain_keyword">关键词</string>
+
+    <!-- Routing enums -->
+    <string name="geo_off">关闭</string>
+    <string name="geo_off_desc">全部流量照常经过代理。</string>
+    <string name="geo_direct">所选国家直连，其余走代理</string>
+    <string name="geo_direct_desc">这些国家的 IP 和网站绕过 VPN — 访问本地服务更快。</string>
+    <string name="geo_via_proxy">所选国家走代理，其余直连</string>
+    <string name="geo_via_proxy_desc">只有这些国家的 IP 和网站使用 VPN — 代理负载最小。</string>
+    <string name="mtu_auto">自动（9000）</string>
+    <string name="mtu_1500">1500 — 以太网/Wi-Fi</string>
+    <string name="mtu_1400">1400 — 移动网络</string>
+    <string name="mtu_1280">1280 — IPv6 最小值</string>
+    <string name="frag_off_desc">握手照常发送。</string>
+    <string name="frag_record">按 TLS 记录</string>
+    <string name="frag_record_desc">ClientHello 被拆分为多个 TLS 记录。几乎不影响速度 — 建议先试这个。</string>
+    <string name="frag_tcp">按 TCP 分段</string>
+    <string name="frag_tcp_desc">ClientHello 被切成多个 TCP 包，中间有停顿。连接较慢；在 TLS 记录无效时使用。</string>
+    <string name="dns_system">系统解析器</string>
+    <string name="dns_custom">自定义地址</string>
+
+    <!-- Settings hub -->
+    <string name="set_back">← 设置</string>
+    <string name="set_tunnel">隧道</string>
+    <string name="set_tunnel_sub">内核：开启 / 关闭</string>
+    <string name="set_security">安全</string>
+    <string name="set_security_sub">Kill Switch、自动连接、应用锁</string>
+    <string name="set_routing">路由</string>
+    <string name="set_routing_sub">DNS、按国家 GeoIP、分片、MTU、IPv6、配置方案</string>
+    <string name="set_split">分流</string>
+    <string name="set_split_sub">应用走 VPN / 绕过 VPN</string>
+    <string name="set_logs">日志</string>
+    <string name="set_logs_sub">连接记录</string>
+    <string name="set_backup">备份</string>
+    <string name="set_backup_sub">保存 / 恢复全部，重置设置</string>
+    <string name="set_about">关于</string>
+    <string name="set_about_sub">版本、更新、许可证</string>
+    <string name="set_language">语言</string>
+    <string name="set_language_sub">跟随系统、中文、English、Русский、Українська、فارسی</string>
+
+    <!-- Tunnel info -->
+    <string name="tunnel_sstp_l2tp">纯 Kotlin，无原生 .aar：PPP 协议栈（LCP、MS-CHAPv2、IPCP），基于 TLS 的 SSTP（带 crypto-binding），基于 UDP 的 L2TP（无 IPsec/ESP）。需要在设备上测试。</string>
+    <string name="tunnel_pptp">不可用：GRE（IP 协议 47）需要原始套接字/root，且该协议栈已从 Android 12/13 移除。替代方案：SSTP、L2TP、WireGuard。</string>
+    <string name="tunnel_xray">传输：XTLS Vision / WS / gRPC。Flow：xtls-rprx-vision。引擎：libXray.aar。</string>
+    <string name="tunnel_singbox">协议：VLESS、VMess、Trojan、Shadowsocks、Hysteria2、TUIC v5。引擎：libbox.aar。</string>
+    <string name="tunnel_wg">普通 WireGuard 通过 sing-box（libbox.aar）运行。AmneziaWG 1.0/1.5/2.0 使用自己的引擎 amneziawg-go.aar：Jc/Jmin/Jmax/S1/S2/H1–H4 混淆和 I1–I5 标记。.conf/uapi 生成已就绪。</string>
+    <string name="tunnel_beta">实验性引擎。WDTT — 经由 VK 云 TURN 中继的 WireGuard（libclient.so + VK 登录）。olcRTC — 基于 WebRTC DataChannel 的 TCP（olcrtc.aar + tun2socks）。界面中带有 BETA 标记。</string>
+    <string name="xray_toggle_title">Xray Core 用于 VLESS/VMess/Trojan/SS</string>
+    <string name="xray_toggle_desc">代替 sing-box — 为了使用其 XTLS Vision 实现（独立进程，sing-box 仍作为 TUN 桥接）。VLESS 已在真机验证；VMess/Trojan/SS 及长期稳定性尚未验证。</string>
+    <string name="xray_toggle_missing">需要 app/libs/libXray.aar — 见 docs/BUILD.md 第 2.2 节。</string>
+
+    <!-- Security -->
+    <string name="sec_killswitch_desc">连接尝试失败时，隧道不会退回直连 — 流量会被阻断，直到你手动断开 VPN。它无法防止系统撤销 VPN（其他 VPN 应用、系统设置中的“断开”）— 如需系统级完全保障，请在下方开启“阻止未使用 VPN 的连接”。</string>
+    <string name="sec_auto_app">启动应用时自动连接</string>
+    <string name="sec_auto_app_desc">打开 Hydra 即连接到上次使用的服务器（前提是之前已授予 VPN 权限）。</string>
+    <string name="sec_auto_boot">开机时自动连接</string>
+    <string name="sec_auto_boot_desc">手机重启后无需打开应用即建立隧道。同样需要之前已授予的 VPN 权限 — 无法从后台显示对话框。</string>
+    <string name="sec_tile_title">快速设置磁贴</string>
+    <string name="sec_tile_desc">在快速设置面板中显示当前连接的位置。点按打开应用。</string>
+    <string name="sec_tile_add">添加磁贴 →</string>
+    <string name="sec_tile_manual">如何手动添加 →</string>
+    <string name="sec_always_on_title">系统始终开启的 VPN</string>
+    <string name="sec_always_on_desc">唯一能保证在应用或服务本身崩溃时（而不仅是连接失败时）也阻断流量的方式。设置 → 网络 → VPN → Hydra → 齿轮 → “始终开启的 VPN” + “阻止未使用 VPN 的连接”。</string>
+    <string name="sec_open_vpn_settings">打开 VPN 设置 →</string>
+
+    <!-- Routing screen -->
+    <string name="dns_label">DNS（隧道内）</string>
+    <string name="dns_custom_hint">IP、主机名或 DoH/DoT 地址</string>
+    <string name="dns_system_hint">设备解析器，未加密 — 查询绕过隧道</string>
+    <string name="dns_invalid">不像是 DNS 地址。示例：94.140.14.14、dns.example.com、https://dns.example.com/dns-query/token、tls://dns.example.com</string>
+    <string name="dns_supported">支持：IP、主机名（→ DoH）、https://…（DoH，可带路径和令牌）、tls://…（DoT）、udp://…</string>
+    <string name="geo_label">按国家的 GeoIP 路由</string>
+    <string name="geo_desc">约 250 个国家的 IP 数据库内置于应用中（来自 MetaCubeX/meta-rules-dat 的 sing-box 规则集），离线可用。对 sing-box 和 Xray Core 均有效 — 两种情况下都由 sing-box 负责路由。</string>
+    <string name="frag_label">TLS 分片（绕过 DPI）</string>
+    <string name="frag_desc">拆分与代理服务器的握手，使 DPI 无法在单个包中看到网站名称。仅 sing-box，且仅限带 TLS 的 VLESS/VMess/Trojan — 对 Hysteria2/TUIC（QUIC）或启用 Xray Core 时无效。未在真实服务器上测试。</string>
+    <string name="mtu_label">隧道 MTU</string>
+    <string name="mtu_desc">仅当部分网站加载卡住而小请求正常时才更改 — 这是大包丢失的迹象。SSTP/L2TP 不会超过 1400。</string>
+    <string name="mtu_auto_sub">与此设置出现之前相同</string>
+    <string name="mtu_bytes">%1$d 字节</string>
+    <string name="geo_countries">国家</string>
+    <string name="geo_none_selected">未选择 — 规则不生效</string>
+    <string name="geo_domains_note">仅 %1$s 支持按域名（而非仅 IP）匹配：其余国家没有域名数据库。托管在境外 CDN 上的网站会被判定为“非本国”。</string>
+    <string name="geo_search">查找国家</string>
+    <string name="geo_domains_short">域名</string>
+    <string name="geo_not_found">未找到</string>
+
+    <!-- Backup -->
+    <string name="backup_dismiss">点按关闭</string>
+    <string name="backup_save_title">保存备份</string>
+    <string name="backup_save_desc">所有服务器、订阅和设置保存在一个 JSON 文件中。注意：密钥和密码以明文保存 — 请像保管密码一样保管该文件。</string>
+    <string name="backup_save_btn">保存到文件 →</string>
+    <string name="backup_restore_title">从备份恢复</string>
+    <string name="backup_restore_desc">用文件内容替换当前全部服务器、订阅和设置。必须先断开 VPN。</string>
+    <string name="backup_restore_btn">选择文件 →</string>
+    <string name="backup_reset_title">重置设置</string>
+    <string name="backup_reset_desc">所有设置恢复默认（主题、DNS、路由、Kill Switch、分流等）。服务器和订阅保留。</string>
+    <string name="backup_reset_btn">重置设置 →</string>
+    <string name="backup_restore_q">从备份恢复？</string>
+    <string name="backup_restore_q_desc">当前服务器、订阅和设置将被替换，且无法撤销 — 如有疑虑，请先保存当前备份。</string>
+    <string name="backup_replace">替换</string>
+    <string name="backup_reset_q">重置所有设置？</string>
+    <string name="backup_reset_q_desc">服务器和订阅保留，其他恢复默认。</string>
+    <string name="backup_reset_confirm">重置</string>
+    <string name="msg_backup_saved">备份已保存：%1$d 个服务器及全部设置</string>
+    <string name="msg_backup_save_failed">保存失败：%1$s</string>
+    <string name="msg_backup_disconnect_first">恢复前请先断开 VPN — 否则隧道仍使用旧设置</string>
+    <string name="msg_backup_restored">已恢复：%1$d 个服务器、%2$d 个订阅、%3$d 项设置</string>
+    <string name="msg_backup_restore_failed">恢复失败：%1$s</string>
+    <string name="msg_reset_done">设置已重置。服务器和订阅未改动。</string>
+
+    <!-- About -->
+    <string name="about_text">Hydra %1$s — 多协议 VPN 客户端。许可证：GPL-3.0。</string>
+
+    <!-- Language -->
+    <string name="lang_title">语言</string>
+    <string name="lang_system">跟随系统</string>
+    <string name="lang_hint">界面语言。连接日志保留俄语。</string>
+
+    <!-- Notification / tile -->
+    <string name="tile_blocked">已阻断</string>
+    <string name="notif_encrypted">隧道已加密</string>
+    <string name="notif_killswitch">Kill Switch：流量已阻断</string>
+    <string name="notif_dropped">隧道已中断</string>
+    <string name="notif_error">连接错误</string>
+    <string name="notif_action_disconnect">断开</string>
+    <string name="notif_action_servers">服务器</string>
+    <string name="notif_conn_dropped">连接已中断</string>
+    <string name="split_apply_live">如果 VPN 已开启，每次更改后片刻会自动重新连接。</string>
+    <string name="btn_reconnecting">正在重新连接…</string>
+    <string name="notif_reconnecting">正在重新连接…</string>
+    <string name="sec_reconnect">断线后重新连接</string>
+    <string name="sec_reconnect_desc">隧道中断时，Hydra 会以逐渐增加的间隔自动重试（2 秒 → 30 秒，最多 10 次），网络恢复后立即接上。开启 Kill Switch 时，其间流量保持阻断。</string>
+    <string name="servers_scan_qr">📷 扫描二维码</string>
+    <string name="servers_qr_photo">🖼 从图片识别二维码</string>
+    <string name="qr_scan_prompt">将相机对准包含链接、订阅或配置的二维码</string>
+    <string name="import_paste">从剪贴板粘贴</string>
+    <string name="import_no_qr">未找到二维码。请尝试更清晰、更近的照片，或用相机扫描。</string>
+    <string name="import_done_sub">订阅“%1$s”：已导入 %2$d 个服务器</string>
+    <string name="import_fail_sub">订阅“%1$s”加载失败：%2$s</string>
+    <string name="import_done_one">已添加服务器：%1$s</string>
+    <string name="import_done_servers">已添加服务器：%1$d</string>
+    <string name="import_json_unsupported">这是完整的 JSON 配置（sing-box/Xray），暂不支持 — 请改为导入链接或订阅。</string>
+    <string name="import_unknown">无法识别为服务器链接、订阅或配置。</string>
+    <string name="share_action">分享</string>
+    <string name="share_qr_desc">二维码</string>
+    <string name="share_send">分享链接 + 二维码</string>
+    <string name="share_too_long">链接太长，无法生成二维码 — 请以文本分享。</string>
+    <string name="share_no_link">此协议没有可分享的链接格式。</string>
+    <string name="share_warning">链接包含服务器密钥或密码。只发送给你信任的人。</string>
+    <string name="sub_refresh_all">更新订阅</string>
+    <string name="sub_refresh">⟳ 更新</string>
+    <string name="sub_refreshing">正在更新…</string>
+    <string name="sub_ping">延迟</string>
+    <string name="sub_standalone">单独的服务器</string>
+    <string name="sub_servers_count">%1$d 个服务器</string>
+    <string name="sub_until">至 %1$s</string>
+    <string name="sub_updated">更新于 %1$s</string>
+    <string name="sub_never">从未</string>
+    <string name="sub_auto_every">每 %1$d 小时自动</string>
+    <string name="sub_auto_update">自动更新</string>
+    <string name="sub_delete_title">删除订阅</string>
+    <string name="sub_delete_msg">订阅“%1$s”及其 %2$d 个服务器将被删除。</string>
+    <string name="sub_refreshed">“%1$s”已更新：%2$d 个服务器，新增 %3$d，移除 %4$d</string>
+    <string name="profile_hwid">硬件 ID（HWID）</string>
+    <string name="profile_hwid_hint">以 x-hwid 发送给订阅面板。有设备数量限制的面板用它来统计这部手机。</string>
+    <string name="eng_intro">所有内核默认开启。关闭的内核不会建立隧道，其服务器会在“服务器”列表中标出。</string>
+    <string name="eng_singbox">sing-box</string>
+    <string name="eng_singbox_desc">VLESS、VMess、Trojan、Shadowsocks、Hysteria2、TUIC v5、WireGuard。即使关闭，也会在内部作为 Xray、olcRTC 和 OpenFlux 的 TUN 桥接运行。</string>
+    <string name="eng_xray">Xray Core</string>
+    <string name="eng_xray_desc">在独立进程中运行带 XTLS Vision / REALITY 的 VLESS、VMess、Trojan、Shadowsocks。在下方选择优先或 sing-box 关闭时用于这些协议。</string>
+    <string name="eng_prefer_xray">用 Xray 代替 sing-box</string>
+    <string name="eng_prefer_xray_desc">用于 VLESS / VMess / Trojan / SS。</string>
+    <string name="eng_awg">AmneziaWG 1.0 – 3.1</string>
+    <string name="eng_awg_desc">混淆版 WireGuard，支持所有协议世代：1.0（Jc/Jmin/Jmax、S1/S2、H1–H4）、1.5（I1–I5）、2.0（S3/S4、头部范围）和 3.x（头部保护密钥、内容填充、随机尾部、计时器）。内核：amneziawg-go 3.1。</string>
+    <string name="eng_ppp">SSTP / L2TP</string>
+    <string name="eng_ppp_desc">我们自己用 Kotlin 实现的 PPP 协议栈（LCP、MS-CHAPv2、IPCP）：基于 TLS 的 SSTP（带 crypto-binding），基于 UDP、无 IPsec 的 L2TP。</string>
+    <string name="eng_olcrtc">olcRTC</string>
+    <string name="eng_olcrtc_desc">通过视频通话服务（Jitsi、Telemost、WB Stream）以 WebRTC 承载 TCP。需要自己的 olcrtc 服务器。</string>
+    <string name="eng_openflux">OpenFlux</string>
+    <string name="eng_openflux_desc">通过文档和即时通讯服务（Yandex、MAX、Mail.ru、Cups）建立 TCP 隧道。需要自己的出口节点。</string>
+    <string name="srv_engine_off">内核已关闭</string>
+    <string name="srv_summary">%1$d 个服务器 · %2$d 个订阅</string>
+    <string name="srv_search">搜索</string>
+    <string name="srv_search_hint">服务器名称或协议</string>
+    <string name="srv_sort_ping">按延迟排序</string>
+    <string name="srv_add">添加</string>
+    <string name="srv_add_paste">从剪贴板</string>
+    <string name="srv_add_paste_desc">链接、订阅或配置 — 自动识别</string>
+    <string name="srv_add_scan">扫描二维码</string>
+    <string name="srv_add_scan_desc">使用相机</string>
+    <string name="srv_add_photo">从图片识别二维码</string>
+    <string name="srv_add_photo_desc">截图或相册中的图片</string>
+    <string name="srv_add_link">输入链接</string>
+    <string name="srv_add_link_desc">服务器链接、订阅地址或 .conf</string>
+    <string name="srv_add_manual">手动</string>
+    <string name="srv_add_manual_desc">地址、端口和协议</string>
+    <string name="srv_clipboard_empty">剪贴板为空</string>
+    <string name="srv_empty_title">还没有服务器</string>
+    <string name="srv_empty_desc">添加订阅或服务器：粘贴链接、扫描二维码或选择图片。</string>
+    <string name="srv_more">更多…</string>
+    <string name="sub_refresh_short">更新</string>
+</resources>

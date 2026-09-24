@@ -5,6 +5,28 @@ on:
   pull_request: { branches: [ master, main ] }
 
 jobs:
+  # Исходники и ресурсы в UTF-8 без «кракозябр» (Фаза 8). 0.6.22.2 ушёл с дважды
+  # перекодированным MainViewModel.kt: компилятор и тесты такое не ловят, строки просто
+  # становятся мусором в журнале. Ищем типичные следы: UTF-8, прочитанный как Latin-1.
+  encoding:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No double-encoded UTF-8 in sources
+        run: |
+          export LC_ALL=C   # grep -P в байтовом режиме: шаблоны ниже — байты UTF-8, а не кодовые точки
+          if grep -rlP '\xc3\x90[\xc2\xc3]|\xc3\x91[\xc2\xc3]|\xc3\xa2\xc2[\x80-\x9f]|\xef\xbf\xbd' \
+               --exclude-dir=build --exclude-dir=.gradle --include='*.kt' --include='*.xml' --include='*.kts' --include='*.md' --include='*.swift' .; then
+            echo "::error::Найдены дважды перекодированные строки (UTF-8 → Latin-1 → UTF-8) или символ замены U+FFFD"
+            exit 1
+          fi
+      - name: No raw NUL bytes in sources
+        run: |
+          export LC_ALL=C
+          if grep -rlP '\x00' --exclude-dir=build --include='*.kt' --include='*.swift' .; then
+            echo "::error::В исходниках нулевой байт — git и grep сочтут файл бинарным"; exit 1
+          fi
+
   build-stub:
     runs-on: ubuntu-latest
     steps:
@@ -17,6 +39,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
       - name: Generate wrapper
         run: gradle wrapper --gradle-version 8.9
+      - name: Unit tests (JVM + Robolectric, incl. Room migrations)
+        run: ./gradlew :app:testStubDebugUnitTest --stacktrace
       - name: Assemble stub (no native .aar required)
         run: ./gradlew :app:assembleStubDebug --stacktrace
       - name: Upload APK artifact
@@ -24,5 +48,70 @@ jobs:
         with:
           name: hydra-stub-debug
           path: app/build/outputs/apk/stub/debug/*.apk
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: app/build/reports/tests/
       - name: Lint
         run: ./gradlew :app:lintStubDebug || true
+
+  # Full-сборка с настоящим ядром (Фаза 8). libbox.aar в git не лежит, поэтому собирается
+  # здесь из исходников sing-box той же версии и с теми же тегами, что в docs/BUILD.md 2.1,
+  # и кэшируется. Остальные ядра (Xray, AmneziaWG, olcRTC, OpenFlux) необязательны —
+  # сборка без них проходит, соответствующие протоколы честно отказывают при подключении.
+  build-native:
+    runs-on: ubuntu-latest
+    env:
+      SING_BOX_VERSION: "1.12.9"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+      - name: Cache libbox.aar
+        id: libbox-cache
+        uses: actions/cache@v4
+        with:
+          path: app/libs/libbox.aar
+          key: libbox-${{ env.SING_BOX_VERSION }}-v1
+      - uses: actions/setup-go@v5
+        if: steps.libbox-cache.outputs.cache-hit != 'true'
+        with:
+          go-version: '1.25.x'
+      - name: Build libbox.aar from sing-box sources
+        if: steps.libbox-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch "v${SING_BOX_VERSION}" https://github.com/SagerNet/sing-box /tmp/sing-box
+          go install github.com/sagernet/gomobile/cmd/gomobile@latest
+          go install github.com/sagernet/gomobile/cmd/gobind@latest
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          gomobile init
+          cd /tmp/sing-box
+          TAGS="with_gvisor,with_quic,with_utls,with_clash_api,with_wireguard,with_conntrack"
+          gomobile bind -v -androidapi 21 -javapkg=io.nekohasekai -libname=box \
+            -tags "$TAGS" -trimpath -buildvcs=false \
+            -ldflags="-X github.com/sagernet/sing-box/constant.Version=${SING_BOX_VERSION} -s -w -buildid= -checklinkname=0" \
+            -o libbox.aar ./experimental/libbox
+          mkdir -p "$GITHUB_WORKSPACE/app/libs"
+          cp libbox.aar "$GITHUB_WORKSPACE/app/libs/"
+      - name: Generate wrapper
+        run: gradle wrapper --gradle-version 8.9
+      - name: Assemble native (full) debug
+        run: ./gradlew :app:assembleNativeDebug --stacktrace
+      - name: Core is inside the APK
+        run: |
+          apk=$(ls app/build/outputs/apk/native/debug/*.apk | head -1)
+          unzip -l "$apk" | awk '{print $NF}' | grep -E '^lib/[^/]+/libbox\.so$' \
+            || { echo "::error::В full-APK нет lib/*/libbox.so"; exit 1; }
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hydra-full-debug
+          path: app/build/outputs/apk/native/debug/*.apk

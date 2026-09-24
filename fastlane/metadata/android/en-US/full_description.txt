@@ -1,0 +1,27 @@
+Hydra is an open-source (GPL-3.0) VPN client for Android that speaks many protocols through several engines, so one app covers the servers you already have.
+
+<b>Protocols</b>
+<ul>
+<li>sing-box: VLESS (incl. REALITY), VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5, WireGuard</li>
+<li>Xray Core (optional, separate process): VLESS/VMess/Trojan/SS with XTLS Vision</li>
+<li>AmneziaWG 1.0 – 3.x (obfuscated WireGuard)</li>
+<li>SSTP and L2TP on a built-in PPP stack</li>
+<li>Experimental: olcRTC and OpenFlux</li>
+</ul>
+
+<b>Features</b>
+<ul>
+<li>Subscriptions with HWID, traffic and expiry from the panel, auto-update and sync</li>
+<li>Import from a link, clipboard, QR code (camera or photo) or a .conf file</li>
+<li>Split tunneling by apps and by IP / domain, GeoIP routing for ~250 countries (offline)</li>
+<li>DNS over HTTPS / TLS, TLS fragmentation against DPI, MTU and IPv6 modes</li>
+<li>Routing profiles such as “Home” and “Travel”</li>
+<li>Kill Switch, automatic reconnect, auto-connect on start and boot</li>
+<li>Quick Settings tile with the connected location, home screen widget, app shortcuts</li>
+<li>App lock with fingerprint, face or PIN; keys hidden on screen</li>
+<li>Hotspot proxy (SOCKS5 / HTTP) to share the VPN with other devices</li>
+<li>Backup and restore of all servers and settings</li>
+<li>Android TV and tablets; English, Russian, Ukrainian, Persian, Chinese</li>
+</ul>
+
+Hydra does not provide servers: bring your own or use a subscription from your provider. The app has no ads, no analytics and no trackers. Its only own network request besides your servers is an optional daily update check against GitHub.

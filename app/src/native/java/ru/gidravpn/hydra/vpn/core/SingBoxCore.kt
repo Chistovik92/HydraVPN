@@ -60,7 +60,7 @@ class SingBoxCore : VpnCore {
         val opts = resolveRouting(ctx)
         val config = SingBoxConfigBuilder.build(
             profile, splitTunnel = split, dns = opts.dns, geoRouting = opts.geoRouting,
-            mtu = opts.mtu, tlsFragment = opts.tlsFragment, hotspot = resolveHotspot(ctx),
+            mtu = opts.mtu, tlsFragment = opts.tlsFragment, hotspot = resolveHotspot(ctx), ipv6 = opts.ipv6,
         ).toString(2)
         onLog("sing-box: конфиг сгенерирован (${config.length} байт)")
         runConfig(tun, config, onLog, onStats)
@@ -114,6 +114,8 @@ internal data class RoutingOptions(
     val geoRouting: SingBoxConfigBuilder.GeoRouting?,
     val mtu: Int,
     val tlsFragment: TlsFragmentMode,
+    /** IPv6 в туннеле (Ipv6Mode.ENABLE) — адрес tun в конфиге sing-box. */
+    val ipv6: Boolean = false,
 )
 
 /** Хотспот-прокси (6f): null, если выключен или нет контекста. */
@@ -135,6 +137,7 @@ internal fun resolveRouting(ctx: android.content.Context?): RoutingOptions {
             ),
             mtu = (routing.mtu.firstOrNull() ?: MtuPreset.AUTO).value,
             tlsFragment = routing.tlsFragment.firstOrNull() ?: TlsFragmentMode.OFF,
+            ipv6 = routing.ipv6Mode.firstOrNull() == ru.gidravpn.hydra.data.model.Ipv6Mode.ENABLE,
         )
     }
 }

@@ -257,7 +257,8 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
         }
     }
     shareTarget?.let { (title, link) ->
-        ru.gidravpn.hydra.ui.components.ShareDialog(title, link) { shareTarget = null }
+        val hideSecrets by vm.hideSecrets.collectAsState()
+        ru.gidravpn.hydra.ui.components.ShareDialog(title, link, hideSecrets) { shareTarget = null }
     }
     if (showManual) AddServerDialog(
         onDismiss = { showManual = false },
@@ -407,7 +408,7 @@ private fun SubscriptionCard(
             }
             Box {
                 IconButton(onClick = { menu = true }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Filled.MoreVert, null, tint = TextMuted)
+                    Icon(Icons.Filled.MoreVert, stringResource(R.string.a11y_more_actions), tint = TextMuted)
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(
@@ -502,10 +503,10 @@ private fun ServerRow(
                 }
             }
         }
-        if (selected) Icon(Icons.Filled.Check, null, tint = AccentCyan, modifier = Modifier.size(20.dp))
+        if (selected) Icon(Icons.Filled.Check, stringResource(R.string.a11y_selected), tint = AccentCyan, modifier = Modifier.size(20.dp))
         Box {
             IconButton(onClick = { menu = true }, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Filled.MoreVert, null, tint = TextMuted)
+                Icon(Icons.Filled.MoreVert, stringResource(R.string.a11y_more_actions), tint = TextMuted)
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(text = { Text(stringResource(R.string.sub_ping)) },

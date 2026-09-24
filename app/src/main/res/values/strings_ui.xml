@@ -137,9 +137,9 @@
     <string name="set_tunnel">Tunnel</string>
     <string name="set_tunnel_sub">Cores: turn on / off</string>
     <string name="set_security">Security</string>
-    <string name="set_security_sub">Kill Switch, auto-connect</string>
+    <string name="set_security_sub">Kill Switch, auto-connect, app lock</string>
     <string name="set_routing">Routing</string>
-    <string name="set_routing_sub">DNS, GeoIP by country, fragmentation, MTU</string>
+    <string name="set_routing_sub">DNS, GeoIP by country, fragmentation, MTU, IPv6, profiles</string>
     <string name="set_split">Split tunneling</string>
     <string name="set_split_sub">Apps through the VPN / bypassing it</string>
     <string name="set_logs">Logs</string>
@@ -147,9 +147,9 @@
     <string name="set_backup">Backup</string>
     <string name="set_backup_sub">Save / restore everything, reset settings</string>
     <string name="set_about">About</string>
-    <string name="set_about_sub">Version, license</string>
+    <string name="set_about_sub">Version, updates, license</string>
     <string name="set_language">Language</string>
-    <string name="set_language_sub">System, Русский, English</string>
+    <string name="set_language_sub">System, English, Русский, Українська, فارسی, 中文</string>
 
     <!-- Tunnel info -->
     <string name="tunnel_sstp_l2tp">Pure Kotlin, no native .aar: PPP stack (LCP, MS-CHAPv2, IPCP), SSTP over TLS with crypto-binding, L2TP over UDP (no IPsec/ESP). Needs on-device testing.</string>
@@ -169,7 +169,7 @@
     <string name="sec_auto_boot">Auto-connect on device boot</string>
     <string name="sec_auto_boot_desc">The tunnel comes up right after the phone reboots, without opening the app. Also needs previously granted VPN consent — a dialog cannot be shown from the background.</string>
     <string name="sec_tile_title">Quick Settings tile</string>
-    <string name="sec_tile_desc">Connects/disconnects the last used server right from the quick settings panel, without opening the app.</string>
+    <string name="sec_tile_desc">Shows which location is connected right in the quick settings panel. Tap opens the app.</string>
     <string name="sec_tile_add">Add tile →</string>
     <string name="sec_tile_manual">How to add manually →</string>
     <string name="sec_always_on_title">System Always-on VPN</string>
@@ -283,8 +283,8 @@
     <string name="eng_xray_desc">VLESS, VMess, Trojan, Shadowsocks with XTLS Vision / REALITY, in a separate process. Used for these protocols when preferred below or when sing-box is off.</string>
     <string name="eng_prefer_xray">Use Xray instead of sing-box</string>
     <string name="eng_prefer_xray_desc">For VLESS / VMess / Trojan / SS.</string>
-    <string name="eng_awg">AmneziaWG 1.0 â 3.1</string>
-    <string name="eng_awg_desc">Obfuscated WireGuard, all protocol generations: 1.0 (Jc/Jmin/Jmax, S1/S2, H1âH4), 1.5 (I1âI5), 2.0 (S3/S4, header ranges) and 3.x (header protection key, content padding, random trailers, timers). Core: amneziawg-go 3.1.</string>
+    <string name="eng_awg">AmneziaWG 1.0 – 3.1</string>
+    <string name="eng_awg_desc">Obfuscated WireGuard, all protocol generations: 1.0 (Jc/Jmin/Jmax, S1/S2, H1–H4), 1.5 (I1–I5), 2.0 (S3/S4, header ranges) and 3.x (header protection key, content padding, random trailers, timers). Core: amneziawg-go 3.1.</string>
     <string name="eng_ppp">SSTP / L2TP</string>
     <string name="eng_ppp_desc">Our own PPP stack in Kotlin (LCP, MS-CHAPv2, IPCP): SSTP over TLS with crypto-binding, L2TP over UDP without IPsec.</string>
     <string name="eng_olcrtc">olcRTC</string>

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.map
 import ru.gidravpn.hydra.data.model.DnsEndpoint
 import ru.gidravpn.hydra.data.model.DnsProvider
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
+import ru.gidravpn.hydra.data.model.Ipv6Mode
 import ru.gidravpn.hydra.data.model.MtuPreset
 import ru.gidravpn.hydra.data.model.TlsFragmentMode
 
@@ -22,6 +23,12 @@ class RoutingRepository(private val context: Context) {
     private val KEY_GEO_COUNTRIES = stringPreferencesKey("geo_countries")
     private val KEY_MTU = stringPreferencesKey("tun_mtu")
     private val KEY_TLS_FRAGMENT = stringPreferencesKey("tls_fragment")
+    private val KEY_IPV6 = stringPreferencesKey("ipv6_mode")
+
+    val ipv6Mode: Flow<Ipv6Mode> = context.routingStore.data.map { Ipv6Mode.fromId(it[KEY_IPV6]) }
+    suspend fun setIpv6Mode(mode: Ipv6Mode) {
+        context.routingStore.edit { it[KEY_IPV6] = mode.name }
+    }
 
     val mtu: Flow<MtuPreset> = context.routingStore.data.map { MtuPreset.fromId(it[KEY_MTU]) }
     suspend fun setMtu(preset: MtuPreset) {
