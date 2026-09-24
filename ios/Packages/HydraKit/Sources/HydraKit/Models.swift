@@ -64,7 +64,7 @@ public enum ServerProtocol: String, Codable, CaseIterable, Sendable {
         case .vless, .vmess, .trojan, .shadowsocks, .hysteria2, .tuic, .wireguard: .singBox
         case .amneziaWG: .amneziaWG
         // SSTP/L2TP: PPP-стек перенесён (HydraKit/PPP), транспорт MS-SSTP ждёт исправления и проверки на
-        // живом сервере — Android-реализация расходится со спецификацией (см. docs/ROADMAP.md, 0.6.24).
+        // живом сервере — Android-реализация расходится со спецификацией (см. docs/ROADMAP.md, 0.6.25).
         case .sstp, .l2tp: .notYetOnIOS
         case .pptp, .wdtt, .olcrtc, .openflux: .unavailable
         }

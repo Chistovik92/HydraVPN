@@ -11,6 +11,7 @@
 | `Packages/HydraKit` | Переносимая логика (только Foundation): модели, парсер ссылок и подписок, WireGuard/AmneziaWG `.conf`, конфиг sing-box, синхронизация подписок, резервная копия **в формате Android**, маска ключей, локация. Тесты — `swift test`. |
 | `HydraTunnel` | Network Extension (`NEPacketTunnelProvider`): собирает конфиг из общего состояния в App Group и поднимает Libbox. geo-базы `.srs` — те же файлы, что в Android-ассетах. |
 | `Hydra` | Приложение: Главная, Серверы, Профиль, Настройки; блокировка Face ID / кодом; фоновое автообновление подписок. |
+| `HydraAWG` | Network Extension для AmneziaWG: WireGuardKit и amneziawg-go из `Vendor/amneziawg-apple` (свой Go-рантайм — отдельный процесс). |
 | `HydraWidgets` | Виджет (экран «Домой» и экран блокировки: локация, статус, кнопка), кнопка Пункта управления (iOS 18). |
 | `Shared` | Общий код приложения и виджета, локализации. |
 
@@ -36,8 +37,8 @@
 | Раздельное туннелирование по приложениям | ❌ iOS разрешает только через MDM |
 | Xray Core | ❌ второй Go-рантайм в процессе расширения несовместим с Libbox; VLESS/REALITY/Vision работает через sing-box |
 | olcRTC, OpenFlux | ❌ iOS запрещает подпроцессы |
-| AmneziaWG | ⏳ отдельное расширение на amneziawg-go — следующий шаг |
-| SSTP / L2TP | ⏳ порт PPP-стека с Kotlin — следующий шаг |
+| AmneziaWG 1.0 – 3.x | ✅ отдельное расширение на WireGuardKit из amneziawg-apple |
+| SSTP / L2TP | ⏳ PPP-стек перенесён и покрыт RFC-тестами; транспорт MS-SSTP ждёт исправления и проверки на сервере (на Android он расходится со спецификацией) |
 | Проверка обновлений | — на iOS обновления приходят через TestFlight/App Store |
 
 ## Сборка
@@ -51,7 +52,11 @@ go install github.com/sagernet/gomobile/cmd/gomobile@latest github.com/sagernet/
 gomobile init && go run ./cmd/internal/build_libbox -target apple -platform ios
 mv Libbox.xcframework ../Hydra/ios/Frameworks/
 
-# 2. Локализации и проект
+# 2. amneziawg-apple (коммит — AWG_APPLE_COMMIT в .github/workflows/ios.yml), нужен Go 1.26
+git clone https://github.com/amnezia-vpn/amneziawg-apple ios/Vendor/amneziawg-apple
+make -C ios/Vendor/amneziawg-apple/Sources/WireGuardKitGo PLATFORM_NAME=iphoneos ARCHS=arm64
+
+# 3. Локализации и проект
 bash scripts/android-strings-to-ios.sh
 brew install xcodegen && cd ios && xcodegen generate && open Hydra.xcodeproj
 ```
@@ -61,8 +66,8 @@ brew install xcodegen && cd ios && xcodegen generate && open Hydra.xcodeproj
 Network Extension работает только с подписью разработчика, у которой есть entitlement
 **Packet Tunnel** — это требует платного **Apple Developer Program** ($99 в год). Бесплатный
 аккаунт Xcode такой entitlement не выдаёт. Дальше: указать свой Team ID в `project.yml`
-(`DEVELOPMENT_TEAM`), зарегистрировать App Group `group.ru.gidravpn.hydra` и три bundle id
-(`ru.gidravpn.hydra`, `.tunnel`, `.widgets`), собрать на устройство или выложить в TestFlight.
+(`DEVELOPMENT_TEAM`), зарегистрировать App Group `group.ru.gidravpn.hydra` и четыре bundle id
+(`ru.gidravpn.hydra`, `.tunnel`, `.awg`, `.widgets`), собрать на устройство или выложить в TestFlight.
 
 Неподписанный `.ipa` из CI (артефакт `hydra-ios-unsigned`) можно переподписать своим профилем.
 
