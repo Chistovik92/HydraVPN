@@ -73,7 +73,10 @@ jobs:
           set -euo pipefail
           git clone https://github.com/amnezia-vpn/amneziawg-apple ios/Vendor/amneziawg-apple
           git -C ios/Vendor/amneziawg-apple checkout "$AWG_APPLE_COMMIT"
-          make -C ios/Vendor/amneziawg-apple/Sources/WireGuardKitGo PLATFORM_NAME=iphoneos ARCHS=arm64 \n            SDKROOT="$(xcrun --sdk iphoneos --show-sdk-path)" \n            DEPLOYMENT_TARGET_CLANG_FLAG_NAME=miphoneos-version-min \n            DEPLOYMENT_TARGET_CLANG_ENV_NAME=IPHONEOS_DEPLOYMENT_TARGET IPHONEOS_DEPLOYMENT_TARGET=17.0
+          make -C ios/Vendor/amneziawg-apple/Sources/WireGuardKitGo PLATFORM_NAME=iphoneos ARCHS=arm64 \
+            SDKROOT="$(xcrun --sdk iphoneos --show-sdk-path)" \
+            DEPLOYMENT_TARGET_CLANG_FLAG_NAME=miphoneos-version-min \
+            DEPLOYMENT_TARGET_CLANG_ENV_NAME=IPHONEOS_DEPLOYMENT_TARGET IPHONEOS_DEPLOYMENT_TARGET=17.0
           ls -la ios/Vendor/amneziawg-apple/Sources/WireGuardKitGo/out
       - name: Save amneziawg-apple
         if: steps.awg.outputs.cache-hit != 'true'
