@@ -1,0 +1,76 @@
+name: iOS CI
+
+# iOS-клиент (Фаза 12). Локально у разработчика нет Mac — компилятор и тесты живут здесь.
+on:
+  push:
+    paths: [ 'ios/**', '.github/workflows/ios.yml', 'app/src/main/res/values*/strings*.xml', 'scripts/android-strings-to-ios.sh' ]
+  pull_request:
+    paths: [ 'ios/**', '.github/workflows/ios.yml' ]
+  workflow_dispatch:
+
+env:
+  SING_BOX_VERSION: "1.12.9"
+
+jobs:
+  # Переносимая логика: парсеры, конфиг sing-box, резервная копия, маска ключей.
+  hydrakit:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: swift test
+        run: swift test --package-path ios/Packages/HydraKit
+
+  # Приложение + Network Extension + виджеты. Сборка без подписи: без аккаунта Apple Developer
+  # приложение на iPhone не поставить, но компиляция всех трёх таргетов проверяется.
+  app:
+    runs-on: macos-15
+    needs: hydrakit
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Libbox.xcframework
+        id: libbox
+        uses: actions/cache@v4
+        with:
+          path: ios/Frameworks/Libbox.xcframework
+          key: libbox-ios-${{ env.SING_BOX_VERSION }}-v1
+      - uses: actions/setup-go@v5
+        if: steps.libbox.outputs.cache-hit != 'true'
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - name: Build Libbox.xcframework (sing-box, iOS)
+        if: steps.libbox.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch "v${SING_BOX_VERSION}" https://github.com/SagerNet/sing-box /tmp/sing-box
+          go install github.com/sagernet/gomobile/cmd/gomobile@latest
+          go install github.com/sagernet/gomobile/cmd/gobind@latest
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          gomobile init
+          cd /tmp/sing-box
+          go run ./cmd/internal/build_libbox -target apple -platform ios
+          mkdir -p "$GITHUB_WORKSPACE/ios/Frameworks"
+          rm -rf "$GITHUB_WORKSPACE/ios/Frameworks/Libbox.xcframework"
+          mv Libbox.xcframework "$GITHUB_WORKSPACE/ios/Frameworks/"
+      - name: Localizations from Android strings
+        run: bash scripts/android-strings-to-ios.sh
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          cd ios && xcodegen generate
+      - name: Build (unsigned, generic iOS device)
+        run: |
+          set -o pipefail
+          cd ios
+          xcodebuild -project Hydra.xcodeproj -scheme Hydra -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -200
+      - name: Unsigned .ipa (для sideload после переподписи)
+        run: |
+          cd ios/build/Build/Products/Release-iphoneos
+          mkdir -p Payload && cp -R Hydra.app Payload/
+          zip -qr "$GITHUB_WORKSPACE/Hydra-ios-unsigned.ipa" Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hydra-ios-unsigned
+          path: Hydra-ios-unsigned.ipa
