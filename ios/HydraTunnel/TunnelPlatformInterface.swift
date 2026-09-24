@@ -1,4 +1,5 @@
 import Foundation
+import HydraKit
 import Libbox
 import Network
 import NetworkExtension
@@ -187,11 +188,7 @@ final class TunnelPlatformInterface: NSObject, LibboxPlatformInterfaceProtocol, 
 
 /// Чтение настроек из App Group для синхронных колбэков libbox.
 enum HydraKitBridge {
-    static var killSwitch: Bool { HydraStoreAccess.state().app.killSwitch }
-}
-
-enum HydraStoreAccess {
-    static func state() -> HydraKit.HydraState { HydraKit.HydraStore.shared().load() }
+    static var killSwitch: Bool { HydraStore.shared().load().app.killSwitch }
 }
 
 /// async → sync для колбэков libbox, которые вызываются из Go синхронно.

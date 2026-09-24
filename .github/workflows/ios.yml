@@ -68,11 +68,16 @@ jobs:
           cd ios && xcodegen generate
       - name: Build (unsigned, generic iOS device)
         run: |
-          set -o pipefail
           cd ios
+          set +e
           xcodebuild -project Hydra.xcodeproj -scheme Hydra -configuration Release \
             -destination 'generic/platform=iOS' -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -200
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build > build.log 2>&1
+          code=$?
+          # Все ошибки компилятора целиком (а не хвост лога), затем хвост для контекста.
+          grep -E "(error|fatal error):" build.log | sort -u | head -150
+          tail -40 build.log
+          exit $code
       - name: Unsigned .ipa (для sideload после переподписи)
         run: |
           cd ios/build/Build/Products/Release-iphoneos
