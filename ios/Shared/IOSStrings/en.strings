@@ -1,0 +1,11 @@
+"ios_protocol_not_on_ios" = "%1$@ is not available on iOS yet. sing-box protocols work: VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard.";
+"ios_killswitch_desc" = "The system does not let any traffic past the tunnel while the VPN is on (includeAllNetworks). Local network devices stay reachable.";
+"ios_ondemand" = "Connect automatically";
+"ios_ondemand_desc" = "iOS brings the tunnel up whenever there is a network — also after a reboot and after a drop. Disconnecting by hand turns it off until the next Connect.";
+"ios_widgets_title" = "Widget and Control Center";
+"ios_widgets_desc" = "Add the Hydra widget to the Home or Lock Screen to see the connected location and connect in one tap; on iOS 18 add the Hydra control to Control Center. Shortcuts: “Connect Hydra”, “Disconnect Hydra”.";
+"ios_limits_title" = "Not on iOS";
+"ios_limits_desc" = "Split tunneling by app (iOS allows it only via device management), Xray Core, olcRTC and OpenFlux (separate processes are forbidden). SSTP/L2TP and AmneziaWG are planned.";
+"ios_lang_hint" = "The interface language follows the language set for Hydra in iOS Settings.";
+"ios_open_settings" = "Open Hydra settings →";
+"ios_import_file" = "Import from file";

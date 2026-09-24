@@ -27,9 +27,9 @@ jobs:
     needs: hydrakit
     steps:
       - uses: actions/checkout@v4
-      - name: Cache Libbox.xcframework
+      - name: Restore Libbox.xcframework
         id: libbox
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ios/Frameworks/Libbox.xcframework
           key: libbox-ios-${{ env.SING_BOX_VERSION }}-v1
@@ -52,6 +52,14 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/ios/Frameworks"
           rm -rf "$GITHUB_WORKSPACE/ios/Frameworks/Libbox.xcframework"
           mv Libbox.xcframework "$GITHUB_WORKSPACE/ios/Frameworks/"
+      # Сохраняем сразу после сборки (≈10 мин), а не в пост-шаге: иначе упавшая дальше
+      # сборка приложения выбрасывала бы готовую xcframework.
+      - name: Save Libbox.xcframework
+        if: steps.libbox.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ios/Frameworks/Libbox.xcframework
+          key: libbox-ios-${{ env.SING_BOX_VERSION }}-v1
       - name: Localizations from Android strings
         run: bash scripts/android-strings-to-ios.sh
       - name: Generate Xcode project

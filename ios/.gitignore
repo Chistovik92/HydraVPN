@@ -1,0 +1,6 @@
+# Генерируется: xcodegen / сборка / Libbox из исходников sing-box (см. README.md)
+Hydra.xcodeproj/
+Frameworks/
+build/
+DerivedData/
+*.ipa

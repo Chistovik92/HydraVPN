@@ -132,3 +132,32 @@ final class SubscriptionTests: XCTestCase {
         XCTAssertNil(DnsEndpoint.parse("bad host!"))
     }
 }
+
+final class LinkBuilderTests: XCTestCase {
+    /// ссылка → профиль → ссылка → профиль: ключевые поля не теряются (как LinkBuilderTest на Android).
+    func testRoundTrip() throws {
+        let links = [
+            "vless://b831381d-6324-4d53-ad4f-8cda48b30811@de.example:443?type=grpc&security=reality&pbk=PB&sid=ab&sni=w.example&fp=chrome&serviceName=svc#%F0%9F%87%A9%F0%9F%87%AA%20Франкфурт",
+            "trojan://p%40ss@t.example:443?security=tls&sni=t.example&type=ws&path=%2Fws#T",
+            "hysteria2://pw@h.example:8443?sni=h.example&obfs=salamander&obfs-password=o#H",
+            "tuic://uuid:pw@[2001:db8::1]:443?sni=t.example&congestion_control=bbr#T6",
+        ]
+        for l in links {
+            let a = try XCTUnwrap(LinkParser.parseLine(l), l)
+            let b = try XCTUnwrap(LinkParser.parseLine(try XCTUnwrap(LinkBuilder.link(a))), l)
+            XCTAssertEqual(SubscriptionSync.key(a), SubscriptionSync.key(b), l)
+            XCTAssertEqual(a.name, b.name, l)
+            XCTAssertEqual(a.transportPath, b.transportPath, l)
+            XCTAssertEqual(a.extraObject as NSDictionary, b.extraObject as NSDictionary, l)
+        }
+    }
+
+    func testWireGuardRoundTrip() throws {
+        let conf = "[Interface]\nPrivateKey = PRIV=\nAddress = 10.0.0.2/32\nJc = 3\n[Peer]\nPublicKey = PUB=\nEndpoint = 1.2.3.4:51820\n"
+        let a = try XCTUnwrap(LinkParser.parseLine(conf))
+        let b = try XCTUnwrap(LinkParser.parseLine(try XCTUnwrap(LinkBuilder.link(a))))
+        XCTAssertEqual(b.protocolId, "awg")
+        XCTAssertEqual(b.extraObject["jc"] as? String, "3")
+        XCTAssertEqual(b.extraObject["public_key"] as? String, "PUB=")
+    }
+}

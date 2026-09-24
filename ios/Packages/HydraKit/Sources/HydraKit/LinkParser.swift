@@ -57,7 +57,7 @@ public enum LinkParser {
         if let v = u.query["sid"] { extra["reality_sid"] = v }
         return ServerProfile(
             name: u.fragment ?? "VLESS \(u.host)", protocolId: ServerProtocol.vless.rawValue,
-            address: u.host, port: u.port ?? 443, uuidOrPassword: u.userInfo,
+            address: u.host, port: u.port ?? 443, uuidOrPassword: urlDecode(u.userInfo),
             flow: u.query["flow"] ?? "", sni: u.query["sni"] ?? u.query["host"] ?? "",
             transport: u.query["type"] ?? "tcp", transportPath: u.query["path"] ?? u.query["serviceName"] ?? "",
             security: u.query["security"] ?? "none", alpn: u.query["alpn"] ?? "",
@@ -69,7 +69,7 @@ public enum LinkParser {
         guard let u = URLParts(link) else { return nil }
         return ServerProfile(
             name: u.fragment ?? "Trojan \(u.host)", protocolId: ServerProtocol.trojan.rawValue,
-            address: u.host, port: u.port ?? 443, uuidOrPassword: u.userInfo,
+            address: u.host, port: u.port ?? 443, uuidOrPassword: urlDecode(u.userInfo),
             sni: u.query["sni"] ?? u.query["peer"] ?? "", transport: u.query["type"] ?? "tcp",
             transportPath: u.query["path"] ?? u.query["serviceName"] ?? "",
             security: u.query["security"] ?? "tls", alpn: u.query["alpn"] ?? "")
@@ -135,7 +135,7 @@ public enum LinkParser {
         if let v = u.query["obfs-password"] { extra["obfs_password"] = v }
         return ServerProfile(
             name: u.fragment ?? "Hysteria2 \(u.host)", protocolId: ServerProtocol.hysteria2.rawValue,
-            address: u.host, port: u.port ?? 443, uuidOrPassword: u.userInfo,
+            address: u.host, port: u.port ?? 443, uuidOrPassword: urlDecode(u.userInfo),
             sni: u.query["sni"] ?? "", security: "tls", extra: json(extra))
     }
 

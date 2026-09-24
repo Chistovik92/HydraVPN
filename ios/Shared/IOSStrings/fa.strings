@@ -1,0 +1,11 @@
+"ios_protocol_not_on_ios" = "%1$@ هنوز در iOS در دسترس نیست. پروتکل‌های sing-box کار می‌کنند: VLESS، VMess، Trojan، Shadowsocks، Hysteria2، TUIC، WireGuard.";
+"ios_killswitch_desc" = "تا وقتی VPN روشن است، سیستم هیچ ترافیکی را خارج از تونل عبور نمی‌دهد (includeAllNetworks). دستگاه‌های شبکه محلی در دسترس می‌مانند.";
+"ios_ondemand" = "اتصال خودکار";
+"ios_ondemand_desc" = "iOS هر وقت شبکه باشد تونل را برقرار می‌کند — پس از راه‌اندازی مجدد و پس از قطعی. قطع دستی آن را تا «اتصال» بعدی خاموش می‌کند.";
+"ios_widgets_title" = "ابزارک و مرکز کنترل";
+"ios_widgets_desc" = "ابزارک Hydra را به صفحه اصلی یا صفحه قفل اضافه کنید تا مکان متصل را ببینید و با یک لمس وصل شوید؛ در iOS 18 کنترل Hydra را به مرکز کنترل اضافه کنید. میانبرها: «اتصال Hydra»، «قطع Hydra».";
+"ios_limits_title" = "در iOS نیست";
+"ios_limits_desc" = "تونل‌زنی جداگانه بر اساس برنامه (iOS فقط از طریق مدیریت دستگاه اجازه می‌دهد)، Xray Core، olcRTC و OpenFlux (فرایندهای جدا ممنوع‌اند). SSTP/L2TP و AmneziaWG در برنامه‌اند.";
+"ios_lang_hint" = "زبان رابط همان زبانی است که برای Hydra در تنظیمات iOS انتخاب شده.";
+"ios_open_settings" = "باز کردن تنظیمات Hydra ←";
+"ios_import_file" = "درون‌ریزی از فایل";
