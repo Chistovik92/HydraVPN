@@ -1,0 +1,122 @@
+name: iOS CI
+
+# iOS-клиент (Фаза 12). Локально у разработчика нет Mac — компилятор и тесты живут здесь.
+on:
+  push:
+    paths: [ 'ios/**', '.github/workflows/ios.yml', 'app/src/main/res/values*/strings*.xml', 'scripts/android-strings-to-ios.sh' ]
+  pull_request:
+    paths: [ 'ios/**', '.github/workflows/ios.yml' ]
+  workflow_dispatch:
+
+env:
+  SING_BOX_VERSION: "1.12.9"
+  AWG_APPLE_COMMIT: "9d5ee60"
+
+jobs:
+  # Переносимая логика: парсеры, конфиг sing-box, резервная копия, маска ключей.
+  hydrakit:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: swift test
+        run: swift test --package-path ios/Packages/HydraKit
+
+  # Приложение + Network Extension + виджеты. Сборка без подписи: без аккаунта Apple Developer
+  # приложение на iPhone не поставить, но компиляция всех трёх таргетов проверяется.
+  app:
+    runs-on: macos-15
+    needs: hydrakit
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore Libbox.xcframework
+        id: libbox
+        uses: actions/cache/restore@v4
+        with:
+          path: ios/Frameworks/Libbox.xcframework
+          key: libbox-ios-${{ env.SING_BOX_VERSION }}-v1
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - name: Build Libbox.xcframework (sing-box, iOS)
+        if: steps.libbox.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch "v${SING_BOX_VERSION}" https://github.com/SagerNet/sing-box /tmp/sing-box
+          go install github.com/sagernet/gomobile/cmd/gomobile@latest
+          go install github.com/sagernet/gomobile/cmd/gobind@latest
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          gomobile init
+          cd /tmp/sing-box
+          go run ./cmd/internal/build_libbox -target apple -platform ios
+          mkdir -p "$GITHUB_WORKSPACE/ios/Frameworks"
+          rm -rf "$GITHUB_WORKSPACE/ios/Frameworks/Libbox.xcframework"
+          mv Libbox.xcframework "$GITHUB_WORKSPACE/ios/Frameworks/"
+      # Сохраняем сразу после сборки (≈10 мин), а не в пост-шаге: иначе упавшая дальше
+      # сборка приложения выбрасывала бы готовую xcframework.
+      - name: Save Libbox.xcframework
+        if: steps.libbox.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ios/Frameworks/Libbox.xcframework
+          key: libbox-ios-${{ env.SING_BOX_VERSION }}-v1
+      # AmneziaWG: WireGuardKit из amneziawg-apple на зафиксированном коммите + libwg-go.a (amneziawg-go).
+      - name: Restore amneziawg-apple
+        id: awg
+        uses: actions/cache/restore@v4
+        with:
+          path: ios/Vendor/amneziawg-apple
+          key: amneziawg-apple-${{ env.AWG_APPLE_COMMIT }}-ios-v1
+      # amneziawg-apple требует Go 1.26 (go.mod). Без явной установки go сам скачивает тулчейн
+      # в кэш модулей — только для чтения, и Makefile не может пропатчить скопированный рантайм.
+      - uses: actions/setup-go@v5
+        if: steps.awg.outputs.cache-hit != 'true'
+        with:
+          go-version: '1.26.x'
+          cache: false
+      - name: Build libwg-go.a (amneziawg-go, iOS)
+        if: steps.awg.outputs.cache-hit != 'true'
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          set -euo pipefail
+          git clone https://github.com/amnezia-vpn/amneziawg-apple ios/Vendor/amneziawg-apple
+          git -C ios/Vendor/amneziawg-apple checkout "$AWG_APPLE_COMMIT"
+          make -C ios/Vendor/amneziawg-apple/Sources/WireGuardKitGo PLATFORM_NAME=iphoneos ARCHS=arm64 \
+            SDKROOT="$(xcrun --sdk iphoneos --show-sdk-path)" \
+            DEPLOYMENT_TARGET_CLANG_FLAG_NAME=miphoneos-version-min \
+            DEPLOYMENT_TARGET_CLANG_ENV_NAME=IPHONEOS_DEPLOYMENT_TARGET IPHONEOS_DEPLOYMENT_TARGET=17.0
+          ls -la ios/Vendor/amneziawg-apple/Sources/WireGuardKitGo/out
+      - name: Save amneziawg-apple
+        if: steps.awg.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ios/Vendor/amneziawg-apple
+          key: amneziawg-apple-${{ env.AWG_APPLE_COMMIT }}-ios-v1
+      - name: Localizations from Android strings
+        run: bash scripts/android-strings-to-ios.sh
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          cd ios && xcodegen generate
+      - name: Build (unsigned, generic iOS device)
+        run: |
+          cd ios
+          set +e
+          xcodebuild -project Hydra.xcodeproj -scheme Hydra -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build > build.log 2>&1
+          code=$?
+          # Все ошибки компилятора целиком (а не хвост лога), затем хвост для контекста.
+          grep -E "(error|fatal error):" build.log | sort -u | head -150
+          tail -40 build.log
+          exit $code
+      - name: Unsigned .ipa (для sideload после переподписи)
+        run: |
+          cd ios/build/Build/Products/Release-iphoneos
+          mkdir -p Payload && cp -R Hydra.app Payload/
+          zip -qr "$GITHUB_WORKSPACE/Hydra-ios-unsigned.ipa" Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hydra-ios-unsigned
+          path: Hydra-ios-unsigned.ipa

@@ -1,0 +1,11 @@
+"ios_protocol_not_on_ios" = "%1$@ 暂不支持 iOS。可用的 sing-box 协议：VLESS、VMess、Trojan、Shadowsocks、Hysteria2、TUIC、WireGuard。";
+"ios_killswitch_desc" = "VPN 开启期间，系统不允许任何流量绕过隧道（includeAllNetworks）。局域网设备仍可访问。";
+"ios_ondemand" = "自动连接";
+"ios_ondemand_desc" = "只要有网络，iOS 就会建立隧道 — 包括重启后和断线后。手动断开会关闭此功能，直到下次“连接”。";
+"ios_widgets_title" = "小组件和控制中心";
+"ios_widgets_desc" = "将 Hydra 小组件添加到主屏幕或锁定屏幕，即可查看已连接的位置并一键连接；在 iOS 18 上可将 Hydra 控件添加到控制中心。快捷指令：“连接 Hydra”“断开 Hydra”。";
+"ios_limits_title" = "iOS 上没有的功能";
+"ios_limits_desc" = "按应用分流（iOS 仅允许通过设备管理实现）、Xray Core、olcRTC 和 OpenFlux（禁止独立进程）。SSTP/L2TP 和 AmneziaWG 在计划中。";
+"ios_lang_hint" = "界面语言跟随 iOS 设置中为 Hydra 选择的语言。";
+"ios_open_settings" = "打开 Hydra 设置 →";
+"ios_import_file" = "从文件导入";
