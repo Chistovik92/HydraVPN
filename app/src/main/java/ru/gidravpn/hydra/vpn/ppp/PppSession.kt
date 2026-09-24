@@ -146,9 +146,10 @@ class PppSession(
     private fun sendLcpConfigRequest() {
         lastLcpTxMs = System.currentTimeMillis()
         val opts = mutableListOf(
-            Ppp.optInt(Ppp.LCP_OPT_MRU, ourMru),
-            Ppp.optInt(Ppp.LCP_OPT_MAGIC, (ourMagic and 0xFFFFFFFFL).toInt()),
+            // MRU — 2 байта (RFC 1661 §6.1). До 0.6.24 уходило 4 (optInt) — неверная длина опции.
+            Ppp.optShort(Ppp.LCP_OPT_MRU, ourMru),
         )
+        if (ourMagic != 0L) opts += Ppp.optInt(Ppp.LCP_OPT_MAGIC, (ourMagic and 0xFFFFFFFFL).toInt())
         sendFrame(Ppp.controlFrame(Ppp.PROTO_LCP, Ppp.CODE_CONF_REQ, id(), Ppp.encodeOptions(opts)))
     }
 
@@ -192,7 +193,8 @@ class PppSession(
             }
             Ppp.CODE_TERM_ACK -> terminate("LCP Terminate-Ack")
             Ppp.CODE_ECHO_REQ -> {
-                val data = Ppp.int32(0) + Ppp.int32((ourMagic and 0xFFFFFFFFL).toInt())
+                // Echo-Reply: сначала наш Magic-Number (RFC 1661 §5.8), а не ноль.
+                val data = Ppp.int32((ourMagic and 0xFFFFFFFFL).toInt())
                 sendFrame(Ppp.controlFrame(Ppp.PROTO_LCP, Ppp.CODE_ECHO_REP, pkt.id, data))
             }
             Ppp.CODE_ECHO_REP -> Unit
@@ -212,10 +214,11 @@ class PppSession(
                     if (auth != AUTH_NONE) {
                         when (auth) {
                             Ppp.AUTH_CHAP_MS2 -> {
-                                if (o.value.size < 5 || (o.value[4].toInt() and 0xFF) != Ppp.CHAP_ALG_MSCHAPV2) {
-                                    // CHAP, но не MS-CHAPv2 — Nak с MS-CHAPv2
+                                // Значение опции CHAP — 3 байта: C223 + алгоритм (RFC 1994 §3). До 0.6.24 читался
+                                // value[4] — его нет, и на правильный MS-CHAPv2 всегда уходил Nak (петля).
+                                if (o.value.size < 3 || (o.value[2].toInt() and 0xFF) != Ppp.CHAP_ALG_MSCHAPV2) {
                                     naks += Ppp.optBytes(Ppp.LCP_OPT_AUTH,
-                                        byteArrayOf(0xC2.toByte(), 0x23.toByte(), 0, Ppp.CHAP_ALG_MSCHAPV2.toByte()))
+                                        byteArrayOf(0xC2.toByte(), 0x23.toByte(), Ppp.CHAP_ALG_MSCHAPV2.toByte()))
                                 } else {
                                     negotiatedAuth = Ppp.AUTH_CHAP_MS2
                                 }
@@ -234,7 +237,8 @@ class PppSession(
                 else -> Unit // неизвестные опции игнорируем (упрощение: ack)
             }
         }
-        return if (naks.isEmpty()) Ppp.CODE_CONF_ACK to ByteArray(0)
+        // Configure-Ack обязан повторить опции дословно (RFC 1661 §5.2); до 0.6.24 уходил пустым.
+        return if (naks.isEmpty()) Ppp.CODE_CONF_ACK to data
         else Ppp.CODE_CONF_NAK to Ppp.encodeOptions(naks)
     }
 
@@ -281,8 +285,10 @@ class PppSession(
                 }
                 lastAuth = auth
 
-                // Response: PeerChallenge(16) + Reserved(8, нули) + NTResponse(24) + Flags(1)
-                val resp = peerChallenge + ByteArray(8) + auth.ntResponse + byteArrayOf(0)
+                // RFC 2759 §4: Value-Size (49) + [PeerChallenge(16) + Reserved(8) + NT-Response(24) +
+                // Flags(1)] + Name. До 0.6.24 не было ни Value-Size, ни имени — сервер отбросил бы пакет.
+                val value = peerChallenge + ByteArray(8) + auth.ntResponse + byteArrayOf(0)
+                val resp = byteArrayOf(value.size.toByte()) + value + userName.toByteArray(Charsets.UTF_8)
                 sendFrame(Ppp.controlFrame(Ppp.PROTO_CHAP, Ppp.CHAP_CODE_RESPONSE, pkt.id, resp))
                 onLog("PPP CHAP: MS-CHAPv2 Response отправлен (id=${pkt.id})")
             }

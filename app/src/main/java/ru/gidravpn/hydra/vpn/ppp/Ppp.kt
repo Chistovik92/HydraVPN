@@ -154,6 +154,9 @@ object Ppp {
         ((value ushr 8) and 0xFF).toByte(), (value and 0xFF).toByte(),
     ))
 
+    /** 2-байтовое значение (MRU). */
+    fun optShort(type: Int, value: Int): Option = Option(type, byteArrayOf(((value ushr 8) and 0xFF).toByte(), (value and 0xFF).toByte()))
+
     fun optBytes(type: Int, value: ByteArray): Option = Option(type, value)
 
     fun optIp(type: Int, ip: String): Option {
