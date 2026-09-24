@@ -4,3 +4,4 @@ Frameworks/
 build/
 DerivedData/
 *.ipa
+Vendor/

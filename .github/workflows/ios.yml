@@ -10,6 +10,7 @@ on:
 
 env:
   SING_BOX_VERSION: "1.12.9"
+  AWG_APPLE_COMMIT: "9d5ee60"
 
 jobs:
   # Переносимая логика: парсеры, конфиг sing-box, резервная копия, маска ключей.
@@ -34,7 +35,6 @@ jobs:
           path: ios/Frameworks/Libbox.xcframework
           key: libbox-ios-${{ env.SING_BOX_VERSION }}-v1
       - uses: actions/setup-go@v5
-        if: steps.libbox.outputs.cache-hit != 'true'
         with:
           go-version: '1.25.x'
           cache: false
@@ -60,6 +60,27 @@ jobs:
         with:
           path: ios/Frameworks/Libbox.xcframework
           key: libbox-ios-${{ env.SING_BOX_VERSION }}-v1
+      # AmneziaWG: WireGuardKit из amneziawg-apple на зафиксированном коммите + libwg-go.a (amneziawg-go).
+      - name: Restore amneziawg-apple
+        id: awg
+        uses: actions/cache/restore@v4
+        with:
+          path: ios/Vendor/amneziawg-apple
+          key: amneziawg-apple-${{ env.AWG_APPLE_COMMIT }}-ios-v1
+      - name: Build libwg-go.a (amneziawg-go, iOS)
+        if: steps.awg.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          git clone https://github.com/amnezia-vpn/amneziawg-apple ios/Vendor/amneziawg-apple
+          git -C ios/Vendor/amneziawg-apple checkout "$AWG_APPLE_COMMIT"
+          make -C ios/Vendor/amneziawg-apple/Sources/WireGuardKitGo PLATFORM_NAME=iphoneos ARCHS=arm64 \n            SDKROOT="$(xcrun --sdk iphoneos --show-sdk-path)" \n            DEPLOYMENT_TARGET_CLANG_FLAG_NAME=miphoneos-version-min \n            DEPLOYMENT_TARGET_CLANG_ENV_NAME=IPHONEOS_DEPLOYMENT_TARGET IPHONEOS_DEPLOYMENT_TARGET=17.0
+          ls -la ios/Vendor/amneziawg-apple/Sources/WireGuardKitGo/out
+      - name: Save amneziawg-apple
+        if: steps.awg.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ios/Vendor/amneziawg-apple
+          key: amneziawg-apple-${{ env.AWG_APPLE_COMMIT }}-ios-v1
       - name: Localizations from Android strings
         run: bash scripts/android-strings-to-ios.sh
       - name: Generate Xcode project

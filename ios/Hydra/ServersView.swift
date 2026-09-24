@@ -116,7 +116,7 @@ struct ServersView: View {
 
     @ViewBuilder private func row(_ p: ServerProfile) -> some View {
         let selected = p.id == model.selected?.id
-        let supported = p.serverProtocol?.engine == .singBox
+        let supported = p.serverProtocol?.supportedOnIOS == true
         Button {
             model.select(p.id)
             onSelected()

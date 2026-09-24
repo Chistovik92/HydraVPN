@@ -58,7 +58,7 @@ final class AppModel: ObservableObject {
 
     func connect() {
         guard let server = selected else { message = L("main_no_server"); return }
-        if server.serverProtocol?.engine != .singBox {
+        if server.serverProtocol?.supportedOnIOS != true {
             message = L("ios_protocol_not_on_ios", server.serverProtocol?.displayName ?? server.protocolId)
             return
         }

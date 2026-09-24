@@ -19,6 +19,9 @@ settings:
 packages:
   HydraKit:
     path: Packages/HydraKit
+  # amneziawg-apple (WireGuardKit + amneziawg-go). Клонируется и собирается в CI / по ios/README.md.
+  AmneziaWG:
+    path: Vendor/amneziawg-apple
 
 targets:
   Hydra:
@@ -36,6 +39,7 @@ targets:
       - sdk: libresolv.tbd
       - target: HydraTunnel
       - target: HydraWidgets
+      - target: HydraAWG
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ru.gidravpn.hydra
@@ -83,3 +87,21 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: ru.gidravpn.hydra.widgets
         INFOPLIST_FILE: HydraWidgets/Info.plist
         CODE_SIGN_ENTITLEMENTS: HydraWidgets/HydraWidgets.entitlements
+
+  # AmneziaWG — отдельное расширение: amneziawg-go несёт свой Go-рантайм, с Libbox в одном
+  # процессе он не уживается. libwg-go.a собирает Makefile из Vendor/amneziawg-apple.
+  HydraAWG:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: HydraAWG
+    dependencies:
+      - package: HydraKit
+      - package: AmneziaWG
+        product: WireGuardKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ru.gidravpn.hydra.awg
+        INFOPLIST_FILE: HydraAWG/Info.plist
+        CODE_SIGN_ENTITLEMENTS: HydraAWG/HydraAWG.entitlements
+        LIBRARY_SEARCH_PATHS: ["$(inherited)", "$(SRCROOT)/Vendor/amneziawg-apple/Sources/WireGuardKitGo/out"]

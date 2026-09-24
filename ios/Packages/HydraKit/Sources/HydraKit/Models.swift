@@ -5,6 +5,8 @@ import Foundation
 /// в том же процессе не уживается, а подпроцессы (olcRTC, OpenFlux) iOS запрещает.
 public enum Engine: String, Codable, Sendable {
     case singBox
+    /// AmneziaWG — отдельное расширение на amneziawg-go (второй Go-рантайм с Libbox не уживается).
+    case amneziaWG
     /// Есть на Android, на iOS пока нет — показываем честно, с причиной.
     case notYetOnIOS
     /// Невозможно на iOS в принципе (подпроцессы, GRE и т. п.).
@@ -54,11 +56,16 @@ public enum ServerProtocol: String, Codable, CaseIterable, Sendable {
         }
     }
 
+    /// Протокол можно поднять на iOS (sing-box или AmneziaWG).
+    public var supportedOnIOS: Bool { engine == .singBox || engine == .amneziaWG }
+
     public var engine: Engine {
         switch self {
         case .vless, .vmess, .trojan, .shadowsocks, .hysteria2, .tuic, .wireguard: .singBox
-        // Своя реализация PPP (SSTP/L2TP) и отдельное расширение под amneziawg-go — следующие шаги.
-        case .sstp, .l2tp, .amneziaWG: .notYetOnIOS
+        case .amneziaWG: .amneziaWG
+        // SSTP/L2TP: PPP-стек перенесён (HydraKit/PPP), транспорт MS-SSTP ждёт исправления и проверки на
+        // живом сервере — Android-реализация расходится со спецификацией (см. docs/ROADMAP.md, 0.6.24).
+        case .sstp, .l2tp: .notYetOnIOS
         case .pptp, .wdtt, .olcrtc, .openflux: .unavailable
         }
     }
