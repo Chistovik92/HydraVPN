@@ -36,7 +36,22 @@ esac
 step "Сборка ($TARGET, версия $VERSION)"
 case "$TARGET" in
   windows-*) "$GRADLE" :desktop:createDistributable :desktop:packageMsi :desktop:packageExe --stacktrace ;;
-  linux-*)   "$GRADLE" :desktop:createDistributable :desktop:packageDeb :desktop:packageRpm --stacktrace ;;
+  linux-*)
+    # DEB/RPM — jpackage из ГОТОВОГО образа (--app-image): packageDeb/packageRpm Compose
+    # пересобирают образ сами и теряют бит исполнения у ядра.
+    "$GRADLE" :desktop:createDistributable --stacktrace
+    JPACKAGE="${JAVA_HOME:+$JAVA_HOME/bin/}jpackage"
+    for type in deb rpm; do
+      mkdir -p "$BIN/$type"
+      "$JPACKAGE" --type "$type" --app-image "$APP_DIR" --dest "$BIN/$type" \
+        --name Hydra --app-version "$VERSION" --vendor "Hydra VPN" \
+        --description "Hydra VPN client" --license-file LICENSE \
+        --icon desktop/build/icons/hydra.png \
+        --linux-package-name hydra-vpn --linux-deb-maintainer "Hydra VPN <dev@shadowlink.local>" \
+        --linux-menu-group Network --linux-app-category Network --linux-shortcut \
+        --linux-rpm-license-type "GPL-3.0-or-later"
+    done
+    ;;
   macos-*)   "$GRADLE" :desktop:createDistributable --stacktrace ;;
 esac
 
@@ -76,9 +91,11 @@ case "$TARGET" in
     ;;
   linux-*)
     cp "$BIN"/deb/*.deb "$DIST/$NAME.deb"
-    # Без бита исполнения Hydra всё равно запустит ядро (копия в ~/.config/hydra/bin),
-    # но в норме он должен быть уже в пакете.
     dpkg-deb -c "$DIST/$NAME.deb" | grep 'resources/sing-box' | sed 's/^/    deb: /'
+    dpkg-deb -c "$DIST/$NAME.deb" | grep 'resources/sing-box$' | grep -q '^-rwx' \
+      || err "в DEB ядро без бита исполнения"
+    rpm -qplv "$DIST/$NAME.rpm" | grep 'resources/sing-box$' | grep -q '^-rwx' \
+      || err "в RPM ядро без бита исполнения"
     cp "$BIN"/rpm/*.rpm "$DIST/$NAME.rpm"
     tar -C "$BIN/app" -czf "$DIST/$NAME.tar.gz" Hydra
 
