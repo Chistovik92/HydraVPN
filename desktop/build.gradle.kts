@@ -263,3 +263,11 @@ tasks.matching { it.name == "prepareAppResources" }.configureEach {
 }
 tasks.matching { it.name.startsWith("package") || it.name.startsWith("createDistributable") || it.name.startsWith("createReleaseDistributable") }
     .configureEach { dependsOn(generateIcons) }
+
+// jpackage кладёт ресурсы в образ приложения без бита исполнения. Ставим его в готовом
+// образе: из него же собираются DEB/RPM (--app-image) и DMG в scripts/package-desktop.sh.
+tasks.matching { it.name == "createDistributable" || it.name == "createReleaseDistributable" }.configureEach {
+    doLast {
+        outputs.files.asFileTree.matching { include("**/resources/sing-box") }.forEach { it.setExecutable(true, false) }
+    }
+}

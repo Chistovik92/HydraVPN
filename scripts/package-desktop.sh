@@ -76,6 +76,9 @@ case "$TARGET" in
     ;;
   linux-*)
     cp "$BIN"/deb/*.deb "$DIST/$NAME.deb"
+    # Без бита исполнения Hydra всё равно запустит ядро (копия в ~/.config/hydra/bin),
+    # но в норме он должен быть уже в пакете.
+    dpkg-deb -c "$DIST/$NAME.deb" | grep 'resources/sing-box' | sed 's/^/    deb: /'
     cp "$BIN"/rpm/*.rpm "$DIST/$NAME.rpm"
     tar -C "$BIN/app" -czf "$DIST/$NAME.tar.gz" Hydra
 
