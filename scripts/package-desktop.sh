@@ -94,9 +94,9 @@ case "$TARGET" in
     dpkg-deb -c "$DIST/$NAME.deb" | grep 'resources/sing-box' | sed 's/^/    deb: /'
     dpkg-deb -c "$DIST/$NAME.deb" | grep 'resources/sing-box$' | grep -q '^-rwx' \
       || err "в DEB ядро без бита исполнения"
+    cp "$BIN"/rpm/*.rpm "$DIST/$NAME.rpm"
     rpm -qplv "$DIST/$NAME.rpm" | grep 'resources/sing-box$' | grep -q '^-rwx' \
       || err "в RPM ядро без бита исполнения"
-    cp "$BIN"/rpm/*.rpm "$DIST/$NAME.rpm"
     tar -C "$BIN/app" -czf "$DIST/$NAME.tar.gz" Hydra
 
     arch="x86_64"; [[ "$TARGET" == "linux-arm64" ]] && arch="aarch64"
