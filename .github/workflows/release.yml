@@ -88,8 +88,11 @@ jobs:
           [ $missing -eq 0 ] || exit 1
 
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "Hydra-full-$VERSION.apk" --dir /tmp/apk
-          unzip -l "/tmp/apk/Hydra-full-$VERSION.apk" | awk '{print $NF}' | grep -qE '^lib/[^/]+/libbox\.so$' \
-            || { echo "::error::в full-APK нет lib/*/libbox.so"; exit 1; }
+          # Список — в переменную: `unzip | grep -q` под pipefail падает от SIGPIPE,
+          # когда grep выходит на первом совпадении (так сорвалась публикация 0.6.25).
+          so="$(unzip -Z1 "/tmp/apk/Hydra-full-$VERSION.apk" | grep -E '^lib/[^/]+/libbox\.so$' || true)"
+          [ -n "$so" ] || { echo "::error::в full-APK нет lib/*/libbox.so"; exit 1; }
+          echo "$so" | sed 's/^/  ядро: /'
           echo "Все платформы на месте, ядро в full-APK есть."
 
       - name: Опубликовать
