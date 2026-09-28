@@ -50,6 +50,7 @@ class DesktopConfigTest {
                     assertEquals("tun", inbound.getString("type"))
                     assertTrue(inbound.getBoolean("auto_route"))
                     assertEquals(os != Os.MACOS, inbound.has("interface_name"), "macOS: имя utun выбирает система")
+                    assertEquals("ipv4_only", cfg.getJSONObject("dns").getString("strategy"))
                 } else {
                     assertEquals("mixed", inbound.getString("type"))
                     assertEquals("127.0.0.1", inbound.getString("listen"))

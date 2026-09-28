@@ -254,6 +254,12 @@ compose.desktop {
 }
 
 // Ресурсы (ядро + geo) и иконки нужны и `run`, и всем задачам упаковки.
-tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(hydraAppResources) }
+tasks.matching { it.name == "prepareAppResources" }.configureEach {
+    dependsOn(hydraAppResources)
+    // Compose копирует ресурсы без бита исполнения — ядро в пакете было бы «Permission denied».
+    (this as? AbstractCopyTask)?.eachFile {
+        if (name == "sing-box") permissions { unix("rwxr-xr-x") }
+    }
+}
 tasks.matching { it.name.startsWith("package") || it.name.startsWith("createDistributable") || it.name.startsWith("createReleaseDistributable") }
     .configureEach { dependsOn(generateIcons) }

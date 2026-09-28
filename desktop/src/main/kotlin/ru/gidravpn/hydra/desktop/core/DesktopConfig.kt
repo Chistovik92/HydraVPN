@@ -67,6 +67,15 @@ object DesktopConfig {
             }
         ))
 
+        if (settings.mode == ConnectionMode.TUN) {
+            // IPv6-адрес у tun нужен, чтобы IPv6 не утекал мимо туннеля, но тогда ОС
+            // предпочитает AAAA — а у большинства серверов IPv6 наружу нет: стек tun
+            // принимает соединение и тут же рвёт его, и приложение не откатывается на IPv4
+            // (поймано e2e на Windows). Как в Android по умолчанию (Ipv6Mode выключен):
+            // имена резолвятся только в IPv4.
+            root.getJSONObject("dns").put("strategy", "ipv4_only")
+        }
+
         convertWireGuard(root)
         return root
     }
