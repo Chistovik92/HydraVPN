@@ -56,7 +56,7 @@ object LinkParser {
         val uri = UriParser.parse(link)
         val q = uri.queryMap()
         val userInfo = uri.userInfo.orEmpty()
-        val user = decode(userInfo.substringBefore(":"))
+        val user = userInfo.substringBefore(":")   // userInfo уже декодирован UriParser
         val pass = userInfo.substringAfter(":", "")
         return ServerProfile(
             name = tag(uri) ?: "${protocol.displayName} ${uri.host}",
@@ -196,7 +196,10 @@ object LinkParser {
 
     @OptIn(ExperimentalEncodingApi::class)
     private fun b64(s: String): ByteArray =
-        Base64.decode(s.replace('-', '+').replace('_', '/').padBase64())
+        // Android Base64.DEFAULT пропускает переводы строк/пробелы, kotlin.io.encoding — нет:
+        // подписки часто отдают base64, порезанный по 76 символов.
+        Base64.decode(s.filterNot { it.isWhitespace() }.trimEnd('=')
+            .replace('-', '+').replace('_', '/').padBase64())
 
     private fun String.padBase64(): String {
         val m = length % 4

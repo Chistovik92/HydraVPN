@@ -1,10 +1,10 @@
 # Hydra
 
-**Мультипротокольный VPN-клиент для Android** на Jetpack Compose.
+**Мультипротокольный VPN-клиент** для Android, Windows, Linux и macOS (iOS — сборка без подписи). См. [docs/MULTIPLATFORM.md](docs/MULTIPLATFORM.md).
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.6.24**
+- Статус: **0.6.25**
 
 ## Скриншоты
 
@@ -127,7 +127,7 @@ UI (Compose) → MainViewModel → ServerRepository (Room + подписки)
 - [docs/SECURITY.md](docs/SECURITY.md) — политика безопасности
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — как контрибьютить
 - [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md) — olcRTC / OpenFlux / snolc / AmneziaWG: апстримы, статус, клиенты
-- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.6.24
+- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.6.25
 
 ## Лицензия
 

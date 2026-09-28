@@ -34,6 +34,19 @@ jobs:
           fi
           echo "FULL_APK=$full" >> "$GITHUB_ENV"
 
+          # С 0.6.25 релиз — все платформы (см. release.yml). Старые теги не трогаем.
+          v="${TAG#v}"
+          if [ "$(printf '%s\n0.6.25\n' "$v" | sort -V | head -1)" = "0.6.25" ]; then
+            for p in "windows-x64.msi" "windows-x64.exe" "windows-x64-portable.zip" \
+                     "linux-x64.deb" "linux-x64.rpm" "linux-x64.AppImage" "linux-x64.tar.gz" \
+                     "linux-arm64.deb" "linux-arm64.rpm" "linux-arm64.AppImage" "linux-arm64.tar.gz" \
+                     "macos-arm64.dmg" "macos-x64.dmg"; do
+              echo "$assets" | grep -qxF "Hydra-desktop-$v-$p" \
+                || { echo "::error::В релизе $TAG нет Hydra-desktop-$v-$p. Релиз публикует release.yml после сборки всех платформ."; exit 1; }
+            done
+            echo "$assets" | grep -qxF "Hydra-ios-$v-unsigned.ipa" || { echo "::error::нет Hydra-ios-$v-unsigned.ipa"; exit 1; }
+          fi
+
       - name: Проверить, что внутри full-APK есть ядро sing-box
         env:
           GH_TOKEN: ${{ github.token }}

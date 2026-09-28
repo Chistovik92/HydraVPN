@@ -1,103 +1,90 @@
 name: Desktop CI
 
+# Hydra Desktop (Windows / Linux / macOS). На каждом раннере:
+#   1) юнит-тесты + рендер всех экранов (:desktop:test);
+#   2) `sing-box check` каждого сгенерированного конфига;
+#   3) сквозная проверка реального трафика (scripts/desktop-e2e.sh): режим PROXY и
+#      режим TUN (на раннерах есть sudo / администратор);
+#   4) при package=true — пакеты (scripts/package-desktop.sh) + дымовой запуск,
+#      выкладываются артефактом. Так вызывает release.yml.
+
 on:
   push:
     branches: [ master, main ]
-    paths:
-      - 'desktop/**'
-      - 'shared/**'
-      - '.github/workflows/desktop.yml'
+    paths: [ 'desktop/**', 'shared/**', 'scripts/desktop-e2e.sh', 'scripts/package-desktop.sh', '.github/workflows/desktop.yml', 'settings.gradle.kts', 'build.gradle.kts' ]
   pull_request:
-    branches: [ master, main ]
-    paths:
-      - 'desktop/**'
-      - 'shared/**'
-      - '.github/workflows/desktop.yml'
+    paths: [ 'desktop/**', 'shared/**', 'scripts/desktop-e2e.sh', 'scripts/package-desktop.sh', '.github/workflows/desktop.yml' ]
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Собрать пакеты"
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      package:
+        type: boolean
+        default: true
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  desktop:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: windows-x64, runner: windows-latest,   os: windows }
+          - { target: linux-x64,   runner: ubuntu-24.04,     os: linux }
+          - { target: linux-arm64, runner: ubuntu-24.04-arm, os: linux }
+          - { target: macos-arm64, runner: macos-15,         os: macos }
+          - { target: macos-x64,   runner: macos-15-intel,   os: macos }
+    defaults:
+      run:
+        shell: bash
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-    
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
-    
-    - name: Build shared module
-      run: ./gradlew :shared:build --no-daemon
-    
-    - name: Build desktop module
-      run: ./gradlew :desktop:build --no-daemon
-    
-    - name: Run desktop tests
-      run: ./gradlew :desktop:test --no-daemon
-    
-    - name: Upload desktop JAR
-      uses: actions/upload-artifact@v4
-      with:
-        name: hydravpn-desktop-windows
-        path: desktop/build/libs/*.jar
+      - uses: actions/checkout@v4
 
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-    
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
-    
-    - name: Build shared module
-      run: ./gradlew :shared:build --no-daemon
-    
-    - name: Build desktop module
-      run: ./gradlew :desktop:build --no-daemon
-    
-    - name: Run desktop tests
-      run: ./gradlew :desktop:test --no-daemon
-    
-    - name: Upload desktop JAR
-      uses: actions/upload-artifact@v4
-      with:
-        name: hydravpn-desktop-linux
-        path: desktop/build/libs/*.jar
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-  build-macos:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-    
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
-    
-    - name: Build shared module
-      run: ./gradlew :shared:build --no-daemon
-    
-    - name: Build desktop module
-      run: ./gradlew :desktop:build --no-daemon
-    
-    - name: Run desktop tests
-      run: ./gradlew :desktop:test --no-daemon
-    
-    - name: Upload desktop JAR
-      uses: actions/upload-artifact@v4
-      with:
-        name: hydravpn-desktop-macos
-        path: desktop/build/libs/*.jar
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.9'
+
+      - name: Linux-пакеты для сборки и дымового теста
+        if: matrix.os == 'linux'
+        run: sudo apt-get update -q && sudo apt-get install -y -q fakeroot rpm xvfb libfuse2t64 || sudo apt-get install -y -q fakeroot rpm xvfb
+
+      - name: Тесты (конфиги, парсеры, хранилище, рендер UI)
+        run: gradle :desktop:test :desktop:downloadSingBox --stacktrace
+
+      - name: sing-box check каждого конфига
+        run: |
+          set -euo pipefail
+          core="$(ls desktop/build/hydra-app-resources/${{ matrix.target }}/sing-box* | head -1)"
+          "$core" version | head -1
+          n=0
+          for c in desktop/build/singbox-configs/*.json; do
+            "$core" check -c "$c" || { echo "::error::sing-box check: $c"; exit 1; }
+            n=$((n+1))
+          done
+          echo "проверено конфигов: $n"
+
+      - name: Сквозная проверка трафика (PROXY + TUN)
+        run: |
+          core="$(ls desktop/build/hydra-app-resources/${{ matrix.target }}/sing-box* | head -1)"
+          bash scripts/desktop-e2e.sh "$core" desktop/build/singbox-configs ${{ matrix.os }} all
+
+      - name: Пакеты + дымовой запуск
+        if: inputs.package
+        run: bash scripts/package-desktop.sh ${{ matrix.target }} gradle
+
+      - uses: actions/upload-artifact@v4
+        if: inputs.package
+        with:
+          name: hydra-desktop-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error

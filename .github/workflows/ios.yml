@@ -7,6 +7,7 @@ on:
   pull_request:
     paths: [ 'ios/**', '.github/workflows/ios.yml' ]
   workflow_dispatch:
+  workflow_call:   # release.yml: неподписанный .ipa в релиз
 
 env:
   SING_BOX_VERSION: "1.12.9"

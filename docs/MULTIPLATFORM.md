@@ -1,140 +1,86 @@
-# Мультиплатформенность — дорожная карта
+# Мультиплатформенность
 
-Статус: **в реализации**. Фаза M0 (shared data layer) завершена, Фаза M1 (Desktop core) в работе. Compose UI заблокирован недоступностью JetBrains Maven repository.
+Статус на 0.6.25: **Android, Windows, Linux, macOS — рабочие клиенты; iOS — собирается в CI
+без подписи.** Каждый релиз публикуется только со всеми платформами (`.github/workflows/release.yml`).
 
-## Зачем
-
-Hydra сейчас — Android-only. Запрос на iOS/desktop-клиенты и на единый формат
-ссылок для обмена конфигами между платформами возникает регулярно. Тащить это
-бездумно (общий UI-фреймворк, общий VPN-core) дорого и рискованно — история
-проекта (`docs/HANDOFF.md`, «Честные оговорки») показывает, что именно нативный
-слой tun/VPN-core давал больше всего живых багов (утечки fd, JNI-крэши, гонки
-при переключении сервера). Поэтому план разделяет код на то, что переносится
-дёшево, и то, что переписывается заново на каждой платформе осознанно.
+| Платформа | Клиент | Ядро | Сборка / проверка |
+|---|---|---|---|
+| Android | `app/` (Jetpack Compose) | libbox (sing-box 1.12.9), Xray, AWG, olcRTC, OpenFlux, SSTP/L2TP | локально `scripts/release.sh` (подпись) + `android.yml` |
+| Windows 10/11 x64 | `desktop/` (Compose Desktop) | sing-box 1.12.9 процессом | `desktop.yml` на `windows-latest`: MSI, EXE, portable ZIP |
+| Linux x64 / arm64 | `desktop/` | sing-box 1.12.9 процессом | `ubuntu-24.04`, `ubuntu-24.04-arm`: DEB, RPM, AppImage, tar.gz |
+| macOS 12+ arm64 / x64 | `desktop/` | sing-box 1.12.9 процессом | `macos-15`, `macos-15-intel`: DMG (ad-hoc подпись) |
+| iOS | `ios/` (SwiftUI + Network Extension) | Libbox.xcframework, WireGuardKit (AWG) | `ios.yml`: неподписанный `.ipa` |
 
 ## Архитектура
 
 ```
 HydraVPN/
-├── app/              # Android-приложение (зависит от :shared)
-├── shared/           # KMP модуль — общий data-слой
-│   ├── commonMain/   # Модели, парсеры, билдеры конфигов, PPP-протокол
-│   ├── androidMain/  # Room-сущности, DataStore
-│   └── desktopMain/  # JVM-специфичные зависимости
-├── desktop/          # Desktop-приложение (Windows/Linux)
-│   ├── commonMain/   # Общий код Desktop
-│   └── desktopMain/  # WinTun (Windows), /dev/net/tun (Linux), JNA
-└── scripts/          # Скрипты сборки и упаковки
+├── app/        Android. Свои копии data-классов (см. ниже «Android и :shared»)
+├── shared/     KMP: commonMain — модели, LinkParser/UriParser, SingBoxConfigBuilder,
+│               PPP-протокол; androidMain — Room-сущности (пока не используются)
+├── desktop/    Compose Desktop: src/main/kotlin (UI, AppController, core/*),
+│               src/test/kotlin (конфиги, парсеры, хранилище, рендер экранов)
+└── ios/        SwiftUI-приложение, HydraTunnel (Libbox), HydraAWG, виджеты
 ```
 
-## Что переносимо, а что нет
+### Desktop изнутри
 
-| Пакет | Связь с Android | Перенос |
-|---|---|---|
-| `vpn/ppp/` (Md4, MsChapV2, Ppp, PppSession) | нет | ✅ перенесено в `commonMain` |
-| `vpn/ppp/TunBridge.kt` | `ParcelFileDescriptor` | протокольная часть (NAT/чек-суммы) — ✅, обёртка fd — platform-specific |
-| `data/subscription/LinkParser.kt`, `WireGuardParser.kt` | `android.net.Uri`, `android.util.Base64` | ✅ заменено на `kotlin.io.encoding.Base64` и `UriParser` |
-| `data/model/ServerProfile.kt`, `Subscription.kt` | Room-аннотации | ✅ разделено: domain-модель в `commonMain`, Room-сущность в `androidMain` |
-| `data/subscription/SingBoxConfigBuilder.kt`, `WireGuardConfigBuilder.kt` | нет | ✅ перенесено в `commonMain` |
-| `vpn/core/*Core.kt` | JNI/gomobile, `VpnService.Builder` | **не переносится** — свой tun-механизм на каждой платформе |
-| `ui/**` | Jetpack Compose | не переносится — Compose Multiplatform для Desktop, SwiftUI для iOS |
+- **Ядро** — официальный бинарник sing-box той же версии, что libbox в Android/iOS.
+  Gradle-задача `downloadSingBox` берёт архив с GitHub SagerNet, **сверяет SHA-256**
+  (закреплены в `desktop/build.gradle.kts`) и кладёт в ресурсы пакета своей ОС/архитектуры.
+- **Конфиг** — `DesktopConfig` поверх общего `SingBoxConfigBuilder`: outbound, DNS,
+  sniff/hijack-dns, geo-правила — те же, что в Android; платформенная часть заменяется:
+  tun с `auto_route`+`strict_route` (маршруты ставит sing-box) или mixed-inbound
+  127.0.0.1; WireGuard — endpoint (схема 1.12); clash_api на 127.0.0.1 с секретом.
+- **Режимы.** «Системный прокси» (по умолчанию) — без прав администратора; прокси ОС
+  ставит/возвращает Hydra сама (`SystemProxy`: реестр+WinINet, networksetup, gsettings/KDE),
+  с резервной копией на диске — после сбоя восстанавливается при следующем запуске.
+  «TUN» — весь трафик: Windows — перезапуск Hydra от администратора (UAC);
+  Linux — копия ядра с `cap_net_admin` (однократно `pkexec setcap`); macOS — ядро от root
+  через системный запрос пароля.
+- **Проверка соединения** — после старта HTTP-запрос через outbound proxy (clash_api
+  `/proxies/proxy/delay`). «Подключено» показывается только если он прошёл.
+- **Данные** — один JSON: `%APPDATA%\Hydra`, `~/Library/Application Support/Hydra`,
+  `~/.config/hydra`.
 
-## Стратегия
+### Что проверяется в CI на каждой ОС (`desktop.yml`)
 
-**KMP только для `data`-слоя.** Не для VPN-core, не для UI целиком.
+1. `:desktop:test` — конфиги для 9 протоколов × 3 ОС × 2 режима, разбор ссылок (IPv6,
+   `+` в паролях, base64 с переносами), хранилище, рендер всех экранов в PNG.
+2. `sing-box check` каждого сгенерированного конфига настоящим ядром.
+3. `scripts/desktop-e2e.sh` — **реальный трафик**: локальный сервер Shadowsocks 2022 +
+   клиент из конфига Hydra; PROXY (HTTP, SOCKS5, clash_api delay) и TUN (curl без прокси
+   должен пройти через tun-in → proxy).
+4. `scripts/package-desktop.sh` — пакеты, проверка, что ядро и geo-базы внутри,
+   дымовой запуск собранного приложения (20 с).
 
-- `commonMain`: `data/model`, `data/subscription` (парсеры ссылок, билдеры конфигов), PPP-протокол
-- Каждая платформа: свой VPN-core (нативный tun-механизм) и свой UI
-- **Не** пытаемся написать общий VPN-core через abstraction layer поверх разных tun API
+## Android и `:shared`
 
-## Фазы
+В `app/` лежат свои копии классов с теми же именами, что в `:shared`
+(`ru.gidravpn.hydra.data.model.*`, `data.subscription.*`, `vpn.ppp.*`), но с другой
+реализацией (android.net.Uri, Room-аннотации, IPv6-поддержка в SingBoxConfigBuilder).
+В 1936f1d `app` подключал `:shared` — в APK попадала одна копия из двух, какая —
+решал порядок слияния dex. В 0.6.25 зависимость снята. Перевод Android на `:shared` —
+отдельная задача: удалить дубли из `app`, догнать `:shared` до версий `app`
+(ipv6 в SingBoxConfigBuilder и т.п.), прогнать `app`-тесты.
 
-### Фаза M0 — подготовка `commonMain` ✅ ЗАВЕРШЕНО
-- ✅ Заменён `android.util.Base64` → `kotlin.io.encoding.Base64`
-- ✅ Заменён `android.net.Uri` → `UriParser` (свой лёгкий парсер)
-- ✅ Разделены `ServerProfile`/`Subscription` на domain-модель и Room-сущность
-- ✅ Вынесена протокольная часть `TunBridge` (NAT/чек-суммы)
-- ✅ Создан модуль `:shared` с `commonMain`/`androidMain`/`desktopMain`
-- ✅ Android-приложение переведено на зависимость от `:shared`
-- ✅ Проверено: Android собирается и работает идентично
+## Ограничения (честно)
 
-### Фаза M1 — Desktop (Windows/Linux) 🔄 В РАБОТЕ
-- ✅ Создан модуль `:desktop` с JVM target
-- ✅ Windows: WinTun JNA wrapper, route management, DNS, kill switch (Windows Firewall)
-- ✅ Linux: /dev/net/tun, route management (iproute2), DNS (systemd-resolved), kill switch (nftables)
-- ✅ Тесты для desktop модуля (8 тестов, все проходят)
-- ✅ CI workflow для desktop (Windows/Linux/macOS)
-- ✅ Скрипты упаковки: MSI (Windows), deb/AppImage (Linux)
-- ⚠️ Compose Multiplatform UI — заблокирован (JetBrains Maven repo 503)
-- ⏳ Упаковка MSI/AppImage/deb/rpm — требует Compose Desktop plugin
+- На ПК только протоколы ядра sing-box: VLESS/REALITY, VMess, Trojan, Shadowsocks,
+  Hysteria2, TUIC, WireGuard. AmneziaWG, SSTP, L2TP, olcRTC, OpenFlux, WDTT — только Android.
+- Нет kill switch и раздельного туннелирования по приложениям на ПК.
+- Пакеты не подписаны сертификатами издателя (Windows — SmartScreen, macOS — не
+  нотаризовано, нужно «Всё равно открыть»).
+- Интерфейс ПК — только русский.
+- iOS не запускался на iPhone: для Network Extension нужен платный Apple Developer Program.
+- Каталоги `desktop/src/commonMain|desktopMain|desktopTest` и скрипты
+  `scripts/build-desktop.sh`, `package-*-{msi,deb,appimage}.sh` — нерабочая заготовка
+  1936f1d, не компилируются и не используются; к удалению.
 
-### Фаза M2 — macOS 🔄 В РАБОТЕ
-- ✅ Создан macOS VPN manager (utun, route management, DNS, pfctl kill switch)
-- ✅ Интеграция в desktop модуль (desktopMain)
-- ⚠️ Compose Multiplatform UI — заблокирован (JetBrains Maven repo 503)
-- ⏳ Упаковка — требует Xcode и Apple Developer Program
-
-### Фаза M3 — iOS 🔄 В РАБОТЕ
-- ✅ Создана структура iOS проекта (SwiftUI + Network Extension)
-- ✅ PacketTunnelProvider с базовой конфигурацией
-- ✅ Info.plist для основного приложения и extension
-- ⚠️ Требуется Xcode для сборки и тестирования
-- ⏳ sing-box integration через Libbox.xcframework
-- ⏳ App Store review — проверка политики Apple по VPN-приложениям
-
-### Фаза M4 — свой формат ссылок (план)
-- `hydra://crypt1/<AES-256-GCM payload>` — обфускация от автоматики
-- Реализация в `commonMain`, когда он уже есть
-
-## Что осознанно не делаем сейчас
-
-- **Не** переписываем VPN-core через общий абстрактный слой поверх разных tun API
-- **Не** начинаем сразу с iOS — Desktop даёт первую реальную проверку
-- **Не** переводим сразу весь UI на Compose Multiplatform ради iOS
-
-## Сборка
+## Сборка локально
 
 ```bash
-# Android
-./gradlew :app:assembleStubDebug
-./gradlew :app:assembleNativeDebug
-
-# Desktop (JVM)
-./gradlew :desktop:compileKotlinDesktop
-./gradlew :desktop:test
-
-# Все платформы
-./gradlew build
+gradle :desktop:test                     # тесты + конфиги в desktop/build/singbox-configs
+gradle :desktop:run                      # запустить клиент
+scripts/package-desktop.sh windows-x64   # пакеты своей ОС в dist/
 ```
-
-## Тестирование
-
-```bash
-# Android тесты
-./gradlew :app:test
-
-# Desktop тесты
-./gradlew :desktop:test
-
-# Все тесты
-./gradlew test
-```
-
-## Упаковка
-
-```bash
-# Windows (требует WiX Toolset)
-./scripts/package-windows-msi.sh
-
-# Linux deb (требует dpkg-deb)
-./scripts/package-linux-deb.sh
-
-# Linux AppImage (требует appimagetool)
-./scripts/package-linux-appimage.sh
-```
-
-## Открытые вопросы
-
-- Монorepo vs отдельные репозитории? Монорепо проще синхронизировать
-- Единый бренд/appId на iOS/Desktop? `ru.gidravpn.hydra` — Android
-- GPL-3.0 — для Desktop/iOS сборок тоже становится определяющей лицензией

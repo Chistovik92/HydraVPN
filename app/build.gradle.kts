@@ -31,8 +31,8 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 37
-        versionName = "0.6.24"
+        versionCode = 38
+        versionName = "0.6.25"
 
         // Языки интерфейса (Фаза 8). Без фильтра библиотеки (AppCompat и др.) тащат строки ~90
         // языков: APK толще, а на, скажем, немецком телефоне системные диалоги библиотек
@@ -283,8 +283,11 @@ dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.09.02")
     implementation(composeBom)
 
-    // Shared KMP module (data layer: models, parsers, config builders)
-    implementation(project(":shared"))
+    // :shared (KMP) сюда пока НЕ подключается: в app лежат свои копии тех же классов
+    // (ru.gidravpn.hydra.data.model.*, data.subscription.*, vpn.ppp.*) с теми же FQN, но
+    // другой реализацией. С зависимостью в APK попадала только одна копия из двух —
+    // какая, решал порядок слияния dex. Перевод Android на :shared — отдельный шаг
+    // (удалить дубли из app), см. docs/MULTIPLATFORM.md.
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.2")
