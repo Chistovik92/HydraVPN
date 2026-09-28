@@ -32,3 +32,9 @@ keystore.properties
 /app/libs/olcrtc/
 # OpenFlux: libopenflux.so по ABI (scripts/build-openflux.sh)
 /app/libs/openflux/
+
+# Build-артефакты новых модулей
+/shared/build
+/desktop/build
+/ios/build
+/.kotlin/

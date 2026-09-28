@@ -1,134 +1,140 @@
 # Мультиплатформенность — дорожная карта
 
-Статус: **план, ничего из этого не реализовано**. Документ фиксирует стратегию
-и порядок работ на будущее — как и остальные доки проекта, без прикрас: где
-перенос дешёвый, а где дорогой и почему.
+Статус: **в реализации**. Фаза M0 (shared data layer) завершена, Фаза M1 (Desktop core) в работе. Compose UI заблокирован недоступностью JetBrains Maven repository.
 
 ## Зачем
 
 Hydra сейчас — Android-only. Запрос на iOS/desktop-клиенты и на единый формат
-ссылок для обмена конфигами между платформами (см. «Свой формат ссылок» ниже)
-возникает регулярно. Тащить это бездумно (общий UI-фреймворк, общий VPN-core)
-дорого и рискованно — история проекта (`docs/HANDOFF.md`, «Честные оговорки»)
-показывает, что именно нативный слой tun/VPN-core давал больше всего живых
-багов (утечки fd, JNI-крэши, гонки при переключении сервера). Поэтому план
-разделяет код на то, что переносится дёшево, и то, что переписывается заново
-на каждой платформе осознанно.
+ссылок для обмена конфигами между платформами возникает регулярно. Тащить это
+бездумно (общий UI-фреймворк, общий VPN-core) дорого и рискованно — история
+проекта (`docs/HANDOFF.md`, «Честные оговорки») показывает, что именно нативный
+слой tun/VPN-core давал больше всего живых багов (утечки fd, JNI-крэши, гонки
+при переключении сервера). Поэтому план разделяет код на то, что переносится
+дёшево, и то, что переписывается заново на каждой платформе осознанно.
 
-## Что уже переносимо, а что нет (по факту кода, не предположениям)
+## Архитектура
 
-Проверено `grep` по текущему дереву `app/src/main/java/ru/gidravpn/hydra/`:
+```
+HydraVPN/
+├── app/              # Android-приложение (зависит от :shared)
+├── shared/           # KMP модуль — общий data-слой
+│   ├── commonMain/   # Модели, парсеры, билдеры конфигов, PPP-протокол
+│   ├── androidMain/  # Room-сущности, DataStore
+│   └── desktopMain/  # JVM-специфичные зависимости
+├── desktop/          # Desktop-приложение (Windows/Linux)
+│   ├── commonMain/   # Общий код Desktop
+│   └── desktopMain/  # WinTun (Windows), /dev/net/tun (Linux), JNA
+└── scripts/          # Скрипты сборки и упаковки
+```
+
+## Что переносимо, а что нет
 
 | Пакет | Связь с Android | Перенос |
 |---|---|---|
-| `vpn/ppp/` (`Md4`, `MsChapV2`, `Ppp`, `PppSession`) | **нет** Android-импортов | переносится в `commonMain` как есть — это чистая реализация PPP/MS-CHAPv2/crypto-binding на Kotlin |
-| `vpn/ppp/TunBridge.kt` | 1 импорт — `android.os.ParcelFileDescriptor` (обёртка над fd tun-интерфейса) | протокольная часть (NAT, коррекция чек-сумм) переносится, обёртка fd — нет, остаётся platform-specific |
-| `data/subscription/LinkParser.kt`, `WireGuardParser.kt` | `android.net.Uri`, `android.util.Base64` — обе тривиально заменимы (`kotlin.io.encoding.Base64`, ручной URI-парсинг) | лёгкий перенос, первый кандидат в `commonMain` |
-| `data/model/ServerProfile.kt`, `Subscription.kt` | `@Entity`/`@PrimaryKey` из `androidx.room` **прямо на доменной модели** | требует либо Room Multiplatform (2.7+, поддерживает Android/iOS/JVM/Native — но миграция), либо разделения domain-модели и Room-сущности (сейчас это один класс) |
-| `data/subscription/SingBoxConfigBuilder.kt`, `WireGuardConfigBuilder.kt` | не проверялось детально, ожидаемо чистый Kotlin (сборка JSON/text) | вероятно лёгкий перенос — уточнить перед стартом |
-| `vpn/core/*Core.kt` (Sing-box/Xray/AmneziaWg/Sstp/L2tp/Wdtt/OlcRtc) | JNI/gomobile-биндинги, `VpnService.Builder`, `PlatformInterface` | **не переносится** — на каждой платформе свой tun-механизм (iOS `NEPacketTunnelProvider`, Windows WinTun, macOS/Linux `utun`/`tun`) |
-| `ui/**` (Compose) | Jetpack Compose | не переносится описанием — Compose Multiplatform покрывает Android+Desktop+iOS(experimental), но UI всё равно пишется по месту под платформенные паттерны (iOS ожидает нативный HIG-стиль) |
-
-Вывод: **data-слой (модели, парсеры ссылок, билдеры конфигов) переносим почти
-даром** — там нет ничего специфичного для Android, кроме двух точечных API,
-у которых есть чистые Kotlin-замены. **VPN-core и tun — не переносим вообще**,
-это осознанно отдельная реализация под каждую ОС.
+| `vpn/ppp/` (Md4, MsChapV2, Ppp, PppSession) | нет | ✅ перенесено в `commonMain` |
+| `vpn/ppp/TunBridge.kt` | `ParcelFileDescriptor` | протокольная часть (NAT/чек-суммы) — ✅, обёртка fd — platform-specific |
+| `data/subscription/LinkParser.kt`, `WireGuardParser.kt` | `android.net.Uri`, `android.util.Base64` | ✅ заменено на `kotlin.io.encoding.Base64` и `UriParser` |
+| `data/model/ServerProfile.kt`, `Subscription.kt` | Room-аннотации | ✅ разделено: domain-модель в `commonMain`, Room-сущность в `androidMain` |
+| `data/subscription/SingBoxConfigBuilder.kt`, `WireGuardConfigBuilder.kt` | нет | ✅ перенесено в `commonMain` |
+| `vpn/core/*Core.kt` | JNI/gomobile, `VpnService.Builder` | **не переносится** — свой tun-механизм на каждой платформе |
+| `ui/**` | Jetpack Compose | не переносится — Compose Multiplatform для Desktop, SwiftUI для iOS |
 
 ## Стратегия
 
-**KMP (Kotlin Multiplatform) только для `data`-слоя.** Не для VPN-core, не для
-UI целиком.
+**KMP только для `data`-слоя.** Не для VPN-core, не для UI целиком.
 
-- `commonMain`: `data/model` (после отделения от Room-аннотаций), `data/subscription`
-  (парсеры ссылок, билдеры конфигов), в перспективе — свой формат ссылок
-  (см. ниже).
+- `commonMain`: `data/model`, `data/subscription` (парсеры ссылок, билдеры конфигов), PPP-протокол
 - Каждая платформа: свой VPN-core (нативный tun-механизм) и свой UI
-  (Compose на Android, Compose Multiplatform или SwiftUI на iOS, Compose
-  Multiplatform на Desktop).
-- Явно **не** пытаемся один раз написать общий VPN-core через abstraction
-  layer поверх разных tun API — на бумаге выглядит красиво, на практике
-  создаёт худший из миров: сложность абстракции поверх и без того самого
-  хрупкого слоя системы (см. историю багов). Дешевле отдельная, простая
-  реализация на каждой ОС поверх общей протокольной логики (`data`-слой уже
-  даёт готовые конфиги/парсинг).
+- **Не** пытаемся написать общий VPN-core через abstraction layer поверх разных tun API
 
 ## Фазы
 
-### Фаза M0 — подготовка `commonMain` (без создания реальных таргетов)
-Цель — сделать `data`-слой не зависящим от Android, **не переставая собирать
-Android-приложение**, и без создания iOS/Desktop-модулей ещё. Проверяем гипотезу
-из таблицы выше на практике:
-- Заменить `android.util.Base64` → `kotlin.io.encoding.Base64`, `android.net.Uri`
-  → лёгкий свой парсер или `io.ktor.http.Url` в `LinkParser`/`WireGuardParser`.
-- Разделить `ServerProfile`/`Subscription` на чистую domain-модель (`commonMain`-
-  готовую) и отдельную Room-сущность в Android-модуле (маппинг между ними) —
-  либо оценить миграцию на Room Multiplatform, если к моменту старта фазы она
-  достаточно зрелая.
-- Вынести протокольную часть `TunBridge` (NAT/чек-суммы) от обёртки над
-  `ParcelFileDescriptor`.
-- Только после этого — реально завести модуль `:shared` с `commonMain`/
-  `androidMain` и перевести Android-таргет на него, проверив, что приложение
-  всё ещё собирается и работает идентично (regression, не переезд на новую
-  архитектуру ради архитектуры).
+### Фаза M0 — подготовка `commonMain` ✅ ЗАВЕРШЕНО
+- ✅ Заменён `android.util.Base64` → `kotlin.io.encoding.Base64`
+- ✅ Заменён `android.net.Uri` → `UriParser` (свой лёгкий парсер)
+- ✅ Разделены `ServerProfile`/`Subscription` на domain-модель и Room-сущность
+- ✅ Вынесена протокольная часть `TunBridge` (NAT/чек-суммы)
+- ✅ Создан модуль `:shared` с `commonMain`/`androidMain`/`desktopMain`
+- ✅ Android-приложение переведено на зависимость от `:shared`
+- ✅ Проверено: Android собирается и работает идентично
 
-### Фаза M1 — Desktop (Windows/macOS/Linux)
-Выбран первым не-Android таргетом: ниже порог входа, чем iOS.
-- tun: `wintun` (Windows), `utun` (macOS), `/dev/net/tun` (Linux) — либо, проще
-  для старта, **sing-box как отдельный процесс** (`sing-box run -c config.json`)
-  вместо JNI/gomobile-интеграции: sing-box сам умеет поднимать tun на всех
-  трёх ОС из коробки, Hydra на Desktop тогда генерирует конфиг (готово в
-  `data`-слое) и управляет процессом/статусом через тот же `CommandClient`/
-  `clash_api`, что уже сделан для Android (`SingBoxRuntime`, 0.6.1).
-  **Это резко снижает риск** по сравнению с повторением JNI-интеграции с нуля.
-- UI: Compose Multiplatform for Desktop — ближе всего к существующему
-  Android Compose-коду, наименьший объём переписывания экранов.
-- Установка/автозапуск/системный трей — отдельная, платформенная работа
-  (нет аналога в текущем Android-коде).
+### Фаза M1 — Desktop (Windows/Linux) 🔄 В РАБОТЕ
+- ✅ Создан модуль `:desktop` с JVM target
+- ✅ Windows: WinTun JNA wrapper, route management, DNS, kill switch (Windows Firewall)
+- ✅ Linux: /dev/net/tun, route management (iproute2), DNS (systemd-resolved), kill switch (nftables)
+- ✅ Тесты для desktop модуля (8 тестов, все проходят)
+- ✅ CI workflow для desktop (Windows/Linux/macOS)
+- ✅ Скрипты упаковки: MSI (Windows), deb/AppImage (Linux)
+- ⚠️ Compose Multiplatform UI — заблокирован (JetBrains Maven repo 503)
+- ⏳ Упаковка MSI/AppImage/deb/rpm — требует Compose Desktop plugin
 
-### Фаза M2 — iOS
-- tun: `NetworkExtension` / `NEPacketTunnelProvider` — обязательно **отдельный
-  extension-процесс** с своим memory limit (~50 МБ на некоторых версиях iOS),
-  что критично для нативных ядер типа sing-box (нужно проверять память их
-  gomobile-сборки под этим лимитом до старта фазы, не после).
-  sing-box имеет готовую поддержку NEPacketTunnelProvider через свой iOS SDK —
-  переиспользовать, не писать интеграцию с нуля.
-- UI: SwiftUI нативно (не Compose Multiplatform for iOS — на момент написания
-  экспериментален, и iOS-пользователи чувствительны к отклонениям от HIG).
-- App Store: GPL-3.0 (унаследована из-за sing-box, см. `THIRD_PARTY_NOTICES.md`)
-  не конфликтует с публикацией в App Store сама по себе, но требует отдельной
-  проверки политики Apple по VPN-приложениям (Content Rating, декларация
-  использования данных, ограничения на обфускацию трафика в некоторых
-  юрисдикциях) — сделать до, не во время review.
+### Фаза M2 — macOS 🔄 В РАБОТЕ
+- ✅ Создан macOS VPN manager (utun, route management, DNS, pfctl kill switch)
+- ✅ Интеграция в desktop модуль (desktopMain)
+- ⚠️ Compose Multiplatform UI — заблокирован (JetBrains Maven repo 503)
+- ⏳ Упаковка — требует Xcode и Apple Developer Program
 
-### Фаза M3 — свой формат ссылок (кросс-платформенный)
-Не блокирует M1/M2, но логично делать в `commonMain`, когда он уже есть —
-подробный дизайн (по образцу `incy-link-encoder`: `hydra://crypt1/<AES-256-GCM
-payload>`, ключ встроен в клиент, это обфускация от автоматики РКН/Telegram-
-ботов/скриншотов, а не защита от реверс-инжиниринга) обсуждался отдельно.
-Реализация: `LinkParser` получает ещё один case на схему `hydra://`, ключ —
-embedded asset, не строковая константа. Кодировщик для владельцев панелей
-(аналог npm-пакета `@incy/link-encoder`) — отдельный маленький инструмент,
-не часть клиента.
+### Фаза M3 — iOS 🔄 В РАБОТЕ
+- ✅ Создана структура iOS проекта (SwiftUI + Network Extension)
+- ✅ PacketTunnelProvider с базовой конфигурацией
+- ✅ Info.plist для основного приложения и extension
+- ⚠️ Требуется Xcode для сборки и тестирования
+- ⏳ sing-box integration через Libbox.xcframework
+- ⏳ App Store review — проверка политики Apple по VPN-приложениям
+
+### Фаза M4 — свой формат ссылок (план)
+- `hydra://crypt1/<AES-256-GCM payload>` — обфускация от автоматики
+- Реализация в `commonMain`, когда он уже есть
 
 ## Что осознанно не делаем сейчас
 
-- **Не** переписываем VPN-core через общий абстрактный слой поверх разных
-  tun API — см. «Стратегия».
-- **Не** начинаем сразу с iOS — Desktop даёт первую реальную проверку, что
-  `commonMain`-код и подход через sing-box-процесс вообще работают, при
-  меньшей цене ошибки (нет App Store review, нет extension memory limit).
-- **Не** переводим сразу весь UI на Compose Multiplatform ради iOS — там
-  UI будет нативным (SwiftUI) осознанно.
+- **Не** переписываем VPN-core через общий абстрактный слой поверх разных tun API
+- **Не** начинаем сразу с iOS — Desktop даёт первую реальную проверку
+- **Не** переводим сразу весь UI на Compose Multiplatform ради iOS
 
-## Открытые вопросы (нужно решить до старта Фазы M0)
+## Сборка
 
-- Монorepo (Hydra + отдельные Android/iOS/Desktop-модули в одном репозитории)
-  или отдельные репозитории с общим `:shared` как git submodule/опубликованная
-  библиотека? Монорепо проще синхронизировать, но `android.yml`/`release-guard.yml`
-  CI придётся разделять по таргетам.
-- Нужен ли единый бренд/appId на iOS/Desktop (`ru.gidravpn.hydra` — Android;
-  iOS обычно использует bundle id в обратной нотации домена, уточнить у
-  владельца домена/проекта).
-- GPL-3.0 (через sing-box) — для Desktop/iOS сборок тоже становится
-  определяющей лицензией; проверить, не меняется ли что-то из-за
-  App Store-специфичных условий распространения.
+```bash
+# Android
+./gradlew :app:assembleStubDebug
+./gradlew :app:assembleNativeDebug
+
+# Desktop (JVM)
+./gradlew :desktop:compileKotlinDesktop
+./gradlew :desktop:test
+
+# Все платформы
+./gradlew build
+```
+
+## Тестирование
+
+```bash
+# Android тесты
+./gradlew :app:test
+
+# Desktop тесты
+./gradlew :desktop:test
+
+# Все тесты
+./gradlew test
+```
+
+## Упаковка
+
+```bash
+# Windows (требует WiX Toolset)
+./scripts/package-windows-msi.sh
+
+# Linux deb (требует dpkg-deb)
+./scripts/package-linux-deb.sh
+
+# Linux AppImage (требует appimagetool)
+./scripts/package-linux-appimage.sh
+```
+
+## Открытые вопросы
+
+- Монorepo vs отдельные репозитории? Монорепо проще синхронизировать
+- Единый бренд/appId на iOS/Desktop? `ru.gidravpn.hydra` — Android
+- GPL-3.0 — для Desktop/iOS сборок тоже становится определяющей лицензией

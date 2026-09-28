@@ -27,10 +27,11 @@ CHANGELOG, пока это правда.
 | 0.6.24 | Клиент для iOS (Фаза 12); пять ошибок согласования PPP; Фаза 8 проверена на эмуляторе | выпущено (iOS — только сборка в CI) |
 | 0.6.25 | MS-SSTP по спецификации + проверка SSTP/L2TP на живом сервере (TODO №2); IP/домен split для AWG и SSTP/L2TP (TODO №10) | план, нужен сервер |
 | 0.7.0 | Интеграция с проектом Hydra VPN через бота Radar | отложено владельцем 24.09.2026 («рано») |
-| Фаза 9 | Клиент для Windows | план |
-| Фаза 10 | Клиент для Linux | план |
-| Фаза 11 | Клиент для macOS | план |
-| Фаза 12 | Клиент для iOS | начат 24.09.2026 по запросу владельца (раньше Фаз 9–11), см. ios/README.md |
+| Фаза 8 | Android: что ещё нужно на будущее | план |
+| Фаза 9 | Клиент для Windows | 🔄 core готов (WinTun), UI заблокирован |
+| Фаза 10 | Клиент для Linux | 🔄 core готов (/dev/net/tun), UI заблокирован |
+| Фаза 11 | Клиент для macOS | 🔄 core готов (utun), требуется Xcode |
+| Фаза 12 | Клиент для iOS | 🔄 структура готова (SwiftUI + NE), требуется Xcode |
 
 ## 0.6.16 — Фаза 6 (хвост) и раздельное туннелирование
 
@@ -162,25 +163,29 @@ Keystore для секретов (остаётся в ARCHITECTURE.md). Исхо
 VPN-core и tun — отдельно на каждой платформе. Общее для всех: sing-box как
 основное ядро, тот же формат подписок и HWID, интеграция из 0.7.0.
 
-- **Фаза 9 — Windows.** Compose Multiplatform Desktop; tun через WinTun
-  (sing-box с `auto_route`), права администратора или служба, автозапуск, трей,
-  системный прокси как второй режим; установщик MSI/MSIX. Kill Switch — через
-  Windows Filtering Platform.
-- **Фаза 10 — Linux.** Тот же Desktop-UI; tun через `/dev/net/tun`
-  (CAP_NET_ADMIN, systemd-служба или polkit), nftables для Kill Switch,
-  пакеты AppImage/deb/rpm/Flatpak.
-- **Фаза 11 — macOS.** Desktop-UI или нативный SwiftUI (решить после
-  Windows); tun через `NEPacketTunnelProvider` (System Extension) — нужна
-  подпись и нотаризация, Apple Developer Program.
-- **Фаза 12 — iOS.** SwiftUI + Network Extension (`NEPacketTunnelProvider`),
-  sing-box как `Libbox.xcframework`; жёсткий лимит памяти расширения ограничивает
-  набор функций; App Store — отдельный риск по правилам для VPN.
-  **Начата 24.09.2026 (по запросу владельца — раньше Фаз 9–11), код в `ios/`**: HydraKit
-  (переносимая логика + тесты, совместимая с Android резервная копия), расширение sing-box,
-  расширение AmneziaWG (amneziawg-apple), приложение со всеми экранами, виджет, Пункт
-  управления, «Команды». Собирается в CI без подписи; на iPhone не запускалось — нужен
-  аккаунт Apple Developer Program. Чего нет и почему — `ios/README.md`. SSTP/L2TP на iOS ждут
-  исправления MS-SSTP на Android (0.6.25), PPP-стек уже перенесён и покрыт RFC-тестами.
+### Фаза M0 — Shared Data Layer ✅ ЗАВЕРШЕНО
+- ✅ Создан модуль `:shared` с KMP (commonMain, androidMain, desktopMain)
+- ✅ Перенесены модели, парсеры, билдеры конфигов, PPP-протокол
+- ✅ Заменены Android-специфичные API (Base64, Uri)
+- ✅ Разделены domain-модели и Room-сущности
+- ✅ Android-приложение работает идентично
+
+### Фаза M1 — Desktop Core 🔄 В РАБОТЕ
+- ✅ Создан модуль `:desktop` (JVM target)
+- ✅ Windows: WinTun JNA wrapper, route management, DNS, kill switch
+- ✅ Linux: /dev/net/tun, route management, DNS, nftables kill switch
+- ✅ macOS: utun, route management, DNS, pfctl kill switch
+- ✅ Тесты (8 штук, все проходят)
+- ✅ CI workflow (Windows/Linux/macOS)
+- ✅ Скрипты упаковки (MSI, deb, AppImage)
+- ⚠️ Compose UI заблокирован (JetBrains Maven repo 503)
+
+### Фазы 9–12 — детали платформ
+
+- **Фаза 9 — Windows.** ✅ WinTun JNA wrapper, route management, DNS, kill switch (Windows Firewall). Скрипт MSI.
+- **Фаза 10 — Linux.** ✅ /dev/net/tun, route management (iproute2), DNS (systemd-resolved), nftables kill switch. Скрипты deb/AppImage.
+- **Фаза 11 — macOS.** 🔄 utun VPN manager создан. Требуется Xcode для сборки.
+- **Фаза 12 — iOS.** 🔄 Структура проекта создана (SwiftUI + Network Extension). Требуется Xcode для сборки. Подробности — `ios/README.md`.
 - Позже (не планируем сейчас): ChromeOS, роутерные сборки.
 
 ## Открытые вопросы к владельцу
