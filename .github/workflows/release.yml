@@ -1,0 +1,96 @@
+name: Release
+
+# Релиз Hydra для всех платформ. Порядок:
+#   1) scripts/release.sh (локально, там ключ подписи Android) собирает и проверяет
+#      оба APK, ставит тег vX.Y.Z и создаёт ЧЕРНОВИК релиза с APK;
+#   2) тег запускает этот workflow: desktop-пакеты (5 раннеров, с тестами, sing-box check,
+#      сквозной проверкой трафика PROXY+TUN и дымовым запуском) и iOS (.ipa без подписи);
+#   3) publish докладывает всё в черновик, проверяет, что на месте КАЖДЫЙ обязательный
+#      файл (и что внутри full-APK есть ядро), и только тогда публикует релиз.
+# Не хватает хоть одной платформы — релиз остаётся черновиком, workflow падает.
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Тег (например v0.6.25)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    uses: ./.github/workflows/desktop.yml
+    with:
+      package: true
+
+  ios:
+    uses: ./.github/workflows/ios.yml
+
+  publish:
+    needs: [ desktop, ios ]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Версия
+        run: |
+          set -euo pipefail
+          v="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
+          [ "v$v" = "$TAG" ] || { echo "::error::versionName=$v не совпадает с тегом $TAG"; exit 1; }
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: hydra-*
+          path: assets
+          merge-multiple: true
+
+      - name: iOS — имя файла с версией
+        run: mv assets/Hydra-ios-unsigned.ipa "assets/Hydra-ios-$VERSION-unsigned.ipa"
+
+      - name: Дождаться черновика от scripts/release.sh
+        run: |
+          for i in $(seq 1 90); do
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && exit 0
+            echo "релиза $TAG ещё нет (release.sh создаёт его вместе с APK), жду… $i"
+            sleep 20
+          done
+          echo "::error::Релиз $TAG не появился за 30 минут. Выпускайте через scripts/release.sh."
+          exit 1
+
+      - name: Загрузить desktop и iOS
+        run: gh release upload "$TAG" assets/* --clobber --repo "$GITHUB_REPOSITORY"
+
+      - name: Проверить полный состав релиза
+        run: |
+          set -euo pipefail
+          have="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          echo "$have" | sed 's/^/  /'
+          missing=0
+          for f in \
+            "Hydra-full-$VERSION.apk" "Hydra-stub-$VERSION.apk" \
+            "Hydra-desktop-$VERSION-windows-x64.msi" "Hydra-desktop-$VERSION-windows-x64.exe" "Hydra-desktop-$VERSION-windows-x64-portable.zip" \
+            "Hydra-desktop-$VERSION-linux-x64.deb" "Hydra-desktop-$VERSION-linux-x64.rpm" "Hydra-desktop-$VERSION-linux-x64.AppImage" "Hydra-desktop-$VERSION-linux-x64.tar.gz" \
+            "Hydra-desktop-$VERSION-linux-arm64.deb" "Hydra-desktop-$VERSION-linux-arm64.rpm" "Hydra-desktop-$VERSION-linux-arm64.AppImage" "Hydra-desktop-$VERSION-linux-arm64.tar.gz" \
+            "Hydra-desktop-$VERSION-macos-arm64.dmg" "Hydra-desktop-$VERSION-macos-x64.dmg" \
+            "Hydra-ios-$VERSION-unsigned.ipa"; do
+            if ! grep -qxF "$f" <<<"$have"; then echo "::error::нет $f"; missing=1; fi
+          done
+          [ $missing -eq 0 ] || exit 1
+
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "Hydra-full-$VERSION.apk" --dir /tmp/apk
+          unzip -l "/tmp/apk/Hydra-full-$VERSION.apk" | awk '{print $NF}' | grep -qE '^lib/[^/]+/libbox\.so$' \
+            || { echo "::error::в full-APK нет lib/*/libbox.so"; exit 1; }
+          echo "Все платформы на месте, ядро в full-APK есть."
+
+      - name: Опубликовать
+        run: gh release edit "$TAG" --draft=false --latest --repo "$GITHUB_REPOSITORY"

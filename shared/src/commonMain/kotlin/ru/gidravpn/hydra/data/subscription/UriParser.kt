@@ -4,84 +4,59 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 
 /**
- * Lightweight URI parser to replace android.net.Uri for KMP.
- * Only implements the subset of functionality used in LinkParser and WireGuardParser.
+ * Лёгкий разбор URI вместо android.net.Uri (KMP). Повторяет поведение Android
+ * там, где на него опирается LinkParser:
+ *  - authority заканчивается на первом '/', '?' или '#' — '@' в пути, query или
+ *    имени (#…) не считается разделителем userinfo;
+ *  - IPv6-хост в скобках (`[2001:db8::1]:443`) отдаётся без скобок;
+ *  - [userInfo] уже percent-декодирован (как Uri.getUserInfo), причём '+'
+ *    остаётся '+' — в паролях Trojan/Hysteria2/SS-2022 он встречается постоянно.
  */
 class UriParser(private val uri: String) {
 
-    val scheme: String = uri.substringBefore("://").lowercase()
-    val userInfo: String = extractUserInfo()
-    val host: String = extractHost()
-    val port: Int = extractPort()
-    val path: String = extractPath()
-    val query: String = extractQuery()
-    val fragment: String = extractFragment()
+    val scheme: String = uri.substringBefore("://", "").lowercase()
+    private val rest = uri.substringAfter("://")
 
-    private fun extractUserInfo(): String {
-        val afterScheme = uri.substringAfter("://")
-        val beforeHost = afterScheme.substringBefore("@")
-        return if ("@" in afterScheme && beforeHost.isNotEmpty()) beforeHost else ""
-    }
+    /** Сырой фрагмент (имя профиля) — декодирует вызывающий. */
+    val fragment: String = rest.substringAfter('#', "")
+    private val beforeFragment = rest.substringBefore('#')
+    val query: String = beforeFragment.substringAfter('?', "")
+    private val beforeQuery = beforeFragment.substringBefore('?')
+    private val authority = beforeQuery.substringBefore('/')
+    val path: String = beforeQuery.substringAfter('/', "")
 
-    private fun extractHost(): String {
-        var authority = uri.substringAfter("://")
-        if ("@" in authority) {
-            authority = authority.substringAfter("@")
+    val userInfo: String =
+        if ('@' in authority) percentDecode(authority.substringBeforeLast('@')) else ""
+
+    private val hostPort = authority.substringAfterLast('@')
+    val host: String
+    val port: Int
+
+    init {
+        if (hostPort.startsWith("[")) {
+            host = hostPort.substringAfter('[').substringBefore(']')
+            port = hostPort.substringAfter("]:", "").toIntOrNull() ?: -1
+        } else {
+            host = hostPort.substringBefore(':')
+            port = hostPort.substringAfter(':', "").toIntOrNull() ?: -1
         }
-        // Remove path, query, fragment
-        authority = authority.substringBefore("/")
-        authority = authority.substringBefore("?")
-        authority = authority.substringBefore("#")
-        // Remove port
-        return authority.substringBefore(":")
     }
 
-    private fun extractPort(): Int {
-        var authority = uri.substringAfter("://")
-        if ("@" in authority) {
-            authority = authority.substringAfter("@")
-        }
-        authority = authority.substringBefore("/")
-        authority = authority.substringBefore("?")
-        authority = authority.substringBefore("#")
-        if (":" in authority) {
-            return authority.substringAfter(":").toIntOrNull() ?: -1
-        }
-        return -1
-    }
-
-    private fun extractPath(): String {
-        var afterAuthority = uri.substringAfter("://")
-        if ("@" in afterAuthority) {
-            afterAuthority = afterAuthority.substringAfter("@")
-        }
-        val path = afterAuthority.substringAfter("/")
-        val pathOnly = path.substringBefore("?").substringBefore("#")
-        return pathOnly
-    }
-
-    private fun extractQuery(): String {
-        val afterQuery = uri.substringAfter("?", "")
-        return afterQuery.substringBefore("#")
-    }
-
-    private fun extractFragment(): String {
-        return uri.substringAfter("#", "")
-    }
-
-    fun queryMap(): Map<String, String> {
-        return query.split('&').filter { '=' in it }.associate { it.substringBefore("=") to decode(it.substringAfter("=")) }
-    }
+    fun queryMap(): Map<String, String> =
+        query.split('&').filter { '=' in it }
+            .associate { decode(it.substringBefore("=")) to decode(it.substringAfter("=")) }
 
     companion object {
         fun parse(uri: String): UriParser = UriParser(uri)
     }
-
-    private fun decode(s: String): String = runCatching { URLDecoder.decode(s, "UTF-8") }.getOrDefault(s)
 }
 
 /** Кодирование строки для URL. */
 fun enc(s: String): String = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 
-/** Декодирование строки из URL. */
+/** Декодирование query/имени (form-encoding: '+' → пробел, как у Uri.getQueryParameter). */
 fun decode(s: String): String = runCatching { URLDecoder.decode(s, "UTF-8") }.getOrDefault(s)
+
+/** Percent-декодирование без form-правила '+' → пробел (userinfo, пароли). */
+fun percentDecode(s: String): String =
+    runCatching { URLDecoder.decode(s.replace("+", "%2B"), "UTF-8") }.getOrDefault(s)

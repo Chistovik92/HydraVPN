@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+#
+# Сквозная проверка desktop-ядра: реальный трафик через конфиг, который строит Hydra.
+#
+#   scripts/desktop-e2e.sh <sing-box> <каталог-с-конфигами> <windows|linux|macos> [proxy|tun|all]
+#
+# Поднимает локальный сервер sing-box (Shadowsocks 2022 на 127.0.0.1:18388) и клиент
+# из desktop/build/singbox-configs/desktop-ss-<os>-<mode>.json (их пишет DesktopConfigTest),
+# направленный на этот сервер. Затем:
+#   proxy — curl через mixed-inbound 127.0.0.1:12080 (HTTP и SOCKS5) + delay через clash_api;
+#   tun   — curl БЕЗ прокси: трафик ОС должен уйти в tun (auto_route) — проверяется по логу
+#           клиента. Нужны права: root (sudo) на Linux/macOS, администратор на Windows.
+# Трафик самого сервера в TUN-режиме уводится мимо туннеля правилом process_name.
+#
+set -euo pipefail
+
+SB="$1"; CFG_DIR="$2"; OS="$3"; MODES="${4:-all}"
+WORK="$(mktemp -d)"
+trap 'kill_all; rm -rf "$WORK"' EXIT
+
+EXE=""; [[ "$OS" == "windows" ]] && EXE=".exe"
+SERVER_BIN="$WORK/sing-box-server$EXE"
+cp "$SB" "$SERVER_BIN"; chmod +x "$SERVER_BIN" 2>/dev/null || true
+
+SUDO=""
+if [[ "$OS" != "windows" && "$(id -u)" != "0" ]]; then SUDO="sudo"; fi
+
+PIDS=()
+kill_all() {
+  for p in "${PIDS[@]:-}"; do [[ -n "$p" ]] && { $SUDO kill "$p" 2>/dev/null || kill "$p" 2>/dev/null || true; }; done
+  if [[ "$OS" == "windows" ]]; then taskkill //F //IM "sing-box-server.exe" >/dev/null 2>&1 || true; fi
+  PIDS=()
+  sleep 1
+}
+
+fail() { echo "::error::$*"; echo "--- client log"; tail -40 "$WORK/client.log" 2>/dev/null || true; echo "--- server log"; tail -20 "$WORK/server.log" 2>/dev/null || true; exit 1; }
+
+cat > "$WORK/server.json" <<'EOF'
+{"log":{"level":"warn"},
+ "inbounds":[{"type":"shadowsocks","listen":"127.0.0.1","listen_port":18388,
+   "method":"2022-blake3-aes-128-gcm","password":"AAAAAAAAAAAAAAAAAAAAAA=="}],
+ "outbounds":[{"type":"direct"}]}
+EOF
+
+make_client() { # $1 = mode
+  # e2e-<os>-<mode>.json пишет DesktopConfigTest («e2e configs»): тот же DesktopConfig,
+  # сервер 127.0.0.1:18388, прокси :12080, clash_api :19090, в TUN — process_name → direct.
+  local src="$CFG_DIR/e2e-$OS-$1.json"
+  [[ -f "$src" ]] || fail "нет $src — сначала gradle :desktop:test"
+  cp "$src" "$WORK/client.json"
+}
+
+start() { # $1 = sudo-or-empty, $2 = bin, $3 = config, $4 = log
+  $1 "$2" run -c "$3" -D "$WORK" > "$4" 2>&1 &
+  PIDS+=($!)
+}
+
+run_proxy() {
+  echo "=== $OS: режим PROXY"
+  make_client proxy
+  start "" "$SERVER_BIN" "$WORK/server.json" "$WORK/server.log"
+  start "" "$SB" "$WORK/client.json" "$WORK/client.log"
+  sleep 3
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -x http://127.0.0.1:12080 https://www.gstatic.com/generate_204) || true
+  [[ "$code" == "204" ]] || fail "PROXY/HTTP: ожидался 204, получено '$code'"
+  echo "    HTTP-прокси: 204"
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --socks5-hostname 127.0.0.1:12080 https://www.gstatic.com/generate_204) || true
+  [[ "$code" == "204" ]] || fail "PROXY/SOCKS5: ожидался 204, получено '$code'"
+  echo "    SOCKS5: 204"
+  delay=$(curl -s --max-time 15 -H 'Authorization: Bearer secret' \
+    'http://127.0.0.1:19090/proxies/proxy/delay?url=https%3A%2F%2Fwww.gstatic.com%2Fgenerate_204&timeout=8000' \
+    | grep -o '"delay":[0-9]*' | cut -d: -f2 || true)
+  [[ -n "$delay" ]] || fail "clash_api delay не ответил"
+  echo "    clash_api delay: ${delay} мс"
+  kill_all
+}
+
+run_tun() {
+  echo "=== $OS: режим TUN"
+  make_client tun
+  start "" "$SERVER_BIN" "$WORK/server.json" "$WORK/server.log"
+  start "$SUDO" "$SB" "$WORK/client.json" "$WORK/client.log"
+  sleep 6
+  grep -qiE 'FATAL|start inbound.*error' "$WORK/client.log" && fail "TUN: ядро не поднялось"
+  ok=""
+  for _ in 1 2 3; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' --noproxy '*' --max-time 20 https://www.gstatic.com/generate_204) || true
+    if [[ "$code" == "204" ]] && grep -q 'inbound/tun\[tun-in\].*www.gstatic.com\|inbound/tun\[tun-in\]: inbound connection to' "$WORK/client.log"; then ok=1; break; fi
+    sleep 3
+  done
+  [[ -n "$ok" ]] || fail "TUN: трафик не прошёл через tun (curl=$code)"
+  grep -q 'outbound/shadowsocks\[proxy\]' "$WORK/client.log" || fail "TUN: соединение не ушло в outbound proxy"
+  echo "    curl без прокси → tun-in → proxy: 204"
+  kill_all
+}
+
+case "$MODES" in
+  proxy) run_proxy ;;
+  tun) run_tun ;;
+  all) run_proxy; run_tun ;;
+  *) echo "режим: proxy|tun|all" >&2; exit 2 ;;
+esac
+echo "=== $OS: сквозная проверка пройдена"

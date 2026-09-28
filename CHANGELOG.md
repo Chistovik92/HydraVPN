@@ -1,5 +1,70 @@
 # Changelog
 
+## [0.6.25] — клиенты для Windows, Linux и macOS; релиз всех платформ одним конвейером
+
+### Добавлено
+- **Hydra Desktop — рабочий клиент для Windows, Linux и macOS** (`desktop/`, Compose Desktop).
+  Заготовка из 1936f1d (консольный «Core Test», ручные маршруты netsh/nftables/pfctl, без
+  интерфейса и без ядра) заменена полностью:
+  - экраны «Главная» (подключение, скорость, проверка задержки через туннель), «Серверы»
+    (импорт из буфера/поля, пинг, выбор, группы по подпискам), «Подписки» (добавление,
+    обновление, автообновление, трафик и срок из заголовков панели), «Настройки», «Журнал»;
+    иконка в трее, один экземпляр приложения;
+  - ядро — официальный sing-box **1.12.9** (как libbox в Android и iOS) отдельным процессом;
+    архивы скачиваются при сборке со **сверкой SHA-256**, в каждый пакет кладётся ядро его ОС;
+  - режим **«Системный прокси»** без прав администратора (Windows — реестр + WinINet, macOS —
+    networksetup, Linux — GNOME/KDE) с восстановлением прежних настроек, в т.ч. после сбоя;
+  - режим **TUN — весь трафик**: Windows — перезапуск от администратора (UAC), Linux —
+    однократный `pkexec setcap cap_net_admin` на копию ядра, macOS — ядро от root через
+    системный запрос пароля;
+  - «Подключено» — только после реального HTTP-запроса через туннель (clash_api delay);
+  - протоколы: VLESS (REALITY, ws/grpc/http), VMess, Trojan, Shadowsocks (вкл. 2022), Hysteria2,
+    TUIC, WireGuard (endpoint по схеме 1.12); DNS-пресеты и свой DoH/DoT; geo-маршрутизация по
+    тем же `.srs`, что в Android; фрагментация TLS.
+- **Пакеты:** Windows — MSI, EXE, portable ZIP; Linux x64 и arm64 — DEB, RPM, AppImage, tar.gz;
+  macOS arm64 и x64 — DMG (ad-hoc подпись).
+- **CI для desktop на 5 раннерах** (`desktop.yml`): тесты и рендер всех экранов, `sing-box check`
+  каждого конфига, сквозная проверка **реального трафика** в режимах PROXY и TUN через
+  локальный сервер (`scripts/desktop-e2e.sh`), дымовой запуск каждого собранного пакета.
+- **`release.yml`**: тег → desktop ×5 + iOS → в черновик релиза; релиз публикуется, только
+  если на месте **все** платформы и в full-APK есть ядро. `release-guard.yml` с 0.6.25
+  требует все платформы и при ручной публикации.
+
+### Исправлено
+- **Android: `app` подключал `:shared`, где лежат классы с теми же полными именами
+  (`data.model.*`, `data.subscription.*`, `vpn.ppp.*`), но с другой реализацией** — все 23
+  файла отличаются. В APK попадала одна копия из двух, какая — решал порядок слияния dex.
+  Зависимость снята; оба флейвора пересобраны, юнит-тесты и `sing-box check` конфигов Android — OK.
+- `:shared` `UriParser`: IPv6-хост `[2001:db8::1]:443` разбирался как `[2001`; `@` в имени
+  (`#…@…`) или в query принимался за разделитель userinfo; `+` в паролях Trojan/Hysteria2
+  превращался в пробел; пароль с `%40` не декодировался.
+- `:shared` `LinkParser`: base64-подписка с переносами строк (MIME, по 76 символов) не
+  разбиралась — `kotlin.io.encoding.Base64` в отличие от `android.util.Base64` не пропускает пробелы.
+- Desktop CI падал на каждом пуше (`./gradlew` без `gradle-wrapper.jar`).
+- Из `settings.gradle.kts` убран закрытый репозиторий `maven.pkg.jetbrains.space` — из-за
+  него «блокировался» Compose; Compose Multiplatform берётся из Maven Central.
+- `scripts/release.sh`: проверка ядра в APK вызывала `unzip` даже там, где его нет (Windows) —
+  теперь PowerShell-запасной путь; путь `gh` из `where.exe` с `\r`; попытка собирать iOS и
+  desktop локально на Windows убрана — это делает CI на своих ОС.
+
+### Проверено
+- Android: `:app:testStubDebugUnitTest`, `assembleStubDebug`, `assembleNativeDebug` (libbox.so в APK).
+- Desktop локально (Windows 11): тесты, 54 конфига через `sing-box check`, трафик через
+  локальный Shadowsocks-сервер в режиме прокси (HTTP 204, SOCKS5, delay), MSI/EXE/ZIP,
+  запуск собранного приложения, рендер всех экранов.
+- Desktop в CI на Windows/Linux x64/Linux arm64/macOS arm64/macOS x64 — см. «Честные оговорки».
+
+### Известные ограничения
+- Desktop не проверялся на живом сервере владельца; TUN локально не запускался (нужен администратор).
+- На ПК нет AmneziaWG, SSTP, L2TP, olcRTC, OpenFlux, WDTT, kill switch и split по приложениям;
+  интерфейс только русский.
+- Пакеты не подписаны сертификатом издателя: SmartScreen на Windows, «Всё равно открыть» на macOS.
+- iOS: `.ipa` без подписи — на iPhone ставится только после переподписи платным аккаунтом
+  Apple Developer Program. Лишние заглушки `ios/HydraVPN*` из 1936f1d в проект не входят.
+- Нерабочие заготовки 1936f1d (`desktop/src/{commonMain,desktopMain,desktopTest}`,
+  `scripts/build-desktop.sh`, `scripts/package-{windows-msi,linux-deb,linux-appimage}.sh`)
+  не компилируются и не используются — к удалению.
+
 ## [0.6.24] — клиент для iOS; исправлено согласование PPP (SSTP/L2TP); Фаза 8 проверена на эмуляторе
 
 ### Добавлено

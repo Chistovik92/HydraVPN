@@ -10,8 +10,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
-        maven("https://maven.pkg.jetbrains.space/public/p/compose/maven")
+        // Compose Multiplatform публикуется в Maven Central; старый репозиторий
+        // maven.pkg.jetbrains.space закрыт (503/301) — из-за него и «блокировался» Compose.
         // Локальные .aar (libbox.aar, libXray.aar) лежат в app/libs
         flatDir { dirs("app/libs") }
     }
