@@ -78,9 +78,10 @@ object BotAccountJson {
     /**
      * Приводит введённый адрес к виду `https://host[:port]`; null — адрес негоден.
      * Токен и ссылки подписок идут по этому соединению, поэтому обычный http допускается
-     * только в своей сети (localhost, 10.x, 192.168.x, 172.16–31.x).
+     * только в своей сети (localhost, 10.x, 192.168.x, 172.16–31.x) и только если [allowHttp]: в релизе
+     * приложение вообще не пускает открытый трафик (network_security_config), http там бесполезен.
      */
-    fun normalizeServer(input: String): String? {
+    fun normalizeServer(input: String, allowHttp: Boolean = true): String? {
         var s = input.trim().trimEnd('/')
         if (s.isEmpty() || s.any { it.isWhitespace() }) return null
         if (!s.contains("://")) s = "https://$s"
@@ -91,7 +92,7 @@ object BotAccountJson {
         if (authority.isEmpty() || '@' in authority) return null
         val host = authority.substringBefore(':').lowercase()
         if (host.isEmpty()) return null
-        if (scheme == "http" && !isLocalHost(host)) return null
+        if (scheme == "http" && (!allowHttp || !isLocalHost(host))) return null
         return "$scheme://$authority"
     }
 

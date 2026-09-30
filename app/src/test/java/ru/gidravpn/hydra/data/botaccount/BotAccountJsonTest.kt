@@ -54,6 +54,7 @@ class BotAccountJsonTest {
         assertNull(BotAccountJson.normalizeServer("http://radar.example.org"))
         assertEquals("http://192.168.1.5:8080", BotAccountJson.normalizeServer("http://192.168.1.5:8080"))
         assertEquals("http://localhost:8080", BotAccountJson.normalizeServer("http://localhost:8080"))
+        assertNull(BotAccountJson.normalizeServer("http://localhost:8080", allowHttp = false))
         assertFalse(BotAccountJson.isLocalHost("8.8.8.8"))
         assertTrue(BotAccountJson.isLocalHost("172.20.0.1"))
         assertFalse(BotAccountJson.isLocalHost("172.40.0.1"))
