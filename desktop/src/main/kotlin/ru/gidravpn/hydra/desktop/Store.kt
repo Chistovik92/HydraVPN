@@ -13,6 +13,7 @@ import ru.gidravpn.hydra.data.model.SplitTunnelMode
 import ru.gidravpn.hydra.data.model.Subscription
 import ru.gidravpn.hydra.data.model.TlsFragmentMode
 import ru.gidravpn.hydra.desktop.core.Rules
+import ru.gidravpn.hydra.router.RouterLink
 import java.io.File
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
@@ -80,6 +81,8 @@ data class HydraState(
     val subscriptions: List<Subscription> = emptyList(),
     val settings: DesktopSettings = DesktopSettings(),
     val profiles: List<RoutingProfile> = emptyList(),
+    /** Роутеры HydraVPN for Router (ссылка сопряжения: адрес, токен, TLS-отпечаток). */
+    val routers: List<RouterLink> = emptyList(),
 )
 
 /**
@@ -132,6 +135,7 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
             .put("subscriptions", JSONArray(s.subscriptions.map(::subToJson)))
             .put("settings", settingsToJson(s.settings))
             .put("profiles", JSONArray(s.profiles.map { JSONObject().put("name", it.name).put("routing", routingToJson(it.routing)) }))
+            .put("routers", JSONArray(s.routers.map { JSONObject().put("name", it.name).put("link", it.toUri()) }))
 
         fun fromJson(o: JSONObject): HydraState = HydraState(
             servers = o.optJSONArray("servers").objects().map(::serverFromJson)
@@ -139,6 +143,9 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
                 .distinctBy { it.id },
             subscriptions = o.optJSONArray("subscriptions").objects().map(::subFromJson).distinctBy { it.id },
             settings = o.optJSONObject("settings")?.let(::settingsFromJson) ?: DesktopSettings(),
+            routers = o.optJSONArray("routers").objects().mapNotNull { r ->
+                RouterLink.parse(r.optString("link"))?.let { l -> l.copy(name = r.optString("name").trim().take(40).ifEmpty { l.host }) }
+            }.distinctBy { it.baseUrl },
             profiles = o.optJSONArray("profiles").objects().mapNotNull { p ->
                 val name = p.optString("name").trim().take(40).ifEmpty { return@mapNotNull null }
                 RoutingProfile(name, routingFromJson(p.optJSONObject("routing") ?: JSONObject()))
