@@ -312,4 +312,23 @@
     <string name="srv_empty_desc">Add a subscription or a server: paste a link, scan a QR code or pick a photo.</string>
     <string name="srv_more">More…</string>
     <string name="sub_refresh_short">Update</string>
+    <!-- Аккаунт бота «Радар» -->
+    <string name="bot_title">Bot account</string>
+    <string name="bot_hint">Sign in to your Radar bot account to get the subscriptions issued to you. In the bot open VPN → Connect an app and enter the code here.</string>
+    <string name="bot_server">Bot server address</string>
+    <string name="bot_code">Code from the bot (8 digits)</string>
+    <string name="bot_connect">Connect</string>
+    <string name="bot_linked">Connected to the bot</string>
+    <string name="bot_linked_as">Connected as @%1$s</string>
+    <string name="bot_sync">Get subscriptions</string>
+    <string name="bot_unlink">Disconnect</string>
+    <string name="bot_unlinked">Disconnected. Subscriptions already added stay in the list.</string>
+    <string name="bot_sync_ok">Subscriptions added or updated: %1$d, servers: %2$d.</string>
+    <string name="bot_sync_partial">Subscriptions: %1$d, servers: %2$d. Failed to load: %3$d.</string>
+    <string name="bot_sync_none">The bot has no working subscriptions for you yet. Access is issued by the administrator.</string>
+    <string name="bot_err_server">Enter the bot server address, for example radar.example.org. Plain http works only in a local network.</string>
+    <string name="bot_err_network">No connection to the bot server.</string>
+    <string name="bot_err_auth">The code is wrong or expired, or this device was disconnected in the bot. Get a new code.</string>
+    <string name="bot_err_off">The API for apps is off on this server.</string>
+    <string name="bot_err_rate">Too many attempts. Wait a few minutes.</string>
 </resources>
