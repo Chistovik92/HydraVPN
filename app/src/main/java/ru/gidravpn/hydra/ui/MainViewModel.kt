@@ -457,6 +457,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val linked: Boolean = false,
         val server: String = "",
         val username: String = "",
+        /** Сколько панелей выдано в боте (из `/me`); null — ещё не узнавали. */
+        val panels: Int? = null,
         val busy: Boolean = false,
         val message: String? = null,
     )
@@ -520,7 +522,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 else -> botText(ru.gidravpn.hydra.R.string.bot_sync_ok, r.subscriptions, r.servers)
             }
             VpnState.log("Аккаунт бота: подписок ${r.subscriptions}, серверов ${r.servers}, ошибок ${r.failed}")
-            _bot.update { it.copy(busy = false, message = text) }
+            val profile = runCatching { botApi.profile(server, token) }.getOrNull()
+            _bot.update { it.copy(busy = false, message = text, panels = profile?.panels ?: it.panels) }
         } catch (e: ru.gidravpn.hydra.data.botaccount.BotAccountException) {
             // Токен отозван (устройство отключили в боте) — держать его дальше незачем.
             if (e.code == 401) {

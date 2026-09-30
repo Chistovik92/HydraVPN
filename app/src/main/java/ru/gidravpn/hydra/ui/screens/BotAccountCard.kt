@@ -38,6 +38,9 @@ fun BotAccountCard(vm: MainViewModel) {
                 color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
             )
             Text(bot.server, color = TextMuted, fontSize = 12.sp)
+            bot.panels?.let {
+                Text(stringResource(R.string.bot_panels, it), color = TextSecondary, fontSize = 12.sp)
+            }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Button(onClick = { vm.syncBot() }, enabled = !bot.busy) {

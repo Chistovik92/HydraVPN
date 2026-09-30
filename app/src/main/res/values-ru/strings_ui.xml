@@ -320,6 +320,7 @@
     <string name="bot_linked">Подключено к боту</string>
     <string name="bot_linked_as">Подключено как @%1$s</string>
     <string name="bot_sync">Получить подписки</string>
+    <string name="bot_panels">Панелей с доступом в боте: %1$d</string>
     <string name="bot_unlink">Отключить</string>
     <string name="bot_unlinked">Отключено. Уже добавленные подписки остались в списке.</string>
     <string name="bot_sync_ok">Подписок добавлено или обновлено: %1$d, серверов: %2$d.</string>

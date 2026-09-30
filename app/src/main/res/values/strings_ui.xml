@@ -321,6 +321,7 @@
     <string name="bot_linked">Connected to the bot</string>
     <string name="bot_linked_as">Connected as @%1$s</string>
     <string name="bot_sync">Get subscriptions</string>
+    <string name="bot_panels">Panels with access in the bot: %1$d</string>
     <string name="bot_unlink">Disconnect</string>
     <string name="bot_unlinked">Disconnected. Subscriptions already added stay in the list.</string>
     <string name="bot_sync_ok">Subscriptions added or updated: %1$d, servers: %2$d.</string>
