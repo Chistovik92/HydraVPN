@@ -1,14 +1,14 @@
 # Мультиплатформенность
 
-Статус на 0.6.25: **Android, Windows, Linux, macOS — рабочие клиенты; iOS — собирается в CI
+Статус на 0.6.26: **Android, Windows, Linux, macOS — рабочие клиенты; iOS — собирается в CI
 без подписи.** Каждый релиз публикуется только со всеми платформами (`.github/workflows/release.yml`).
 
 | Платформа | Клиент | Ядро | Сборка / проверка |
 |---|---|---|---|
 | Android | `app/` (Jetpack Compose) | libbox (sing-box 1.12.9), Xray, AWG, olcRTC, OpenFlux, SSTP/L2TP | локально `scripts/release.sh` (подпись) + `android.yml` |
-| Windows 10/11 x64 | `desktop/` (Compose Desktop) | sing-box 1.12.9 процессом | `desktop.yml` на `windows-latest`: MSI, EXE, portable ZIP |
-| Linux x64 / arm64 | `desktop/` | sing-box 1.12.9 процессом | `ubuntu-24.04`, `ubuntu-24.04-arm`: DEB, RPM, AppImage, tar.gz |
-| macOS 12+ arm64 / x64 | `desktop/` | sing-box 1.12.9 процессом | `macos-15`, `macos-15-intel`: DMG (ad-hoc подпись) |
+| Windows 10/11 x64 | `desktop/` (Compose Desktop) | sing-box 1.12.9 + Xray-core 26.3.27 процессами | `desktop.yml` на `windows-latest`: MSI, EXE, portable ZIP |
+| Linux x64 / arm64 | `desktop/` | sing-box 1.12.9 + Xray-core 26.3.27 процессами | `ubuntu-24.04`, `ubuntu-24.04-arm`: DEB, RPM, AppImage, tar.gz |
+| macOS 12+ arm64 / x64 | `desktop/` | sing-box 1.12.9 + Xray-core 26.3.27 процессами | `macos-15`, `macos-15-intel`: DMG (ad-hoc подпись) |
 | iOS | `ios/` (SwiftUI + Network Extension) | Libbox.xcframework, WireGuardKit (AWG) | `ios.yml`: неподписанный `.ipa` |
 
 ## Архитектура
@@ -25,7 +25,16 @@ HydraVPN/
 
 ### Desktop изнутри
 
-- **Ядро** — официальный бинарник sing-box той же версии, что libbox в Android/iOS.
+- **Движки** — как на Android: sing-box (все протоколы ПК) и Xray-core (VLESS/VMess/Trojan/SS).
+  Xray поднимается отдельным процессом с socks-inbound на 127.0.0.1 **с паролем**, sing-box —
+  мост к нему (TUN/прокси, DNS, все правила маршрутизации). Выбор — `EngineToggles` из `:shared`,
+  тумблеры в Настройки → Движки. В TUN трафик самого Hydra и процесса Xray идёт мимо туннеля
+  (`process_path` → direct), адрес сервера для Xray разрешается до подъёма туннеля.
+- **Маршрутизация** — раздельное туннелирование по программам (`process_name`/`process_path`,
+  `find_process`; INCLUDE — логическое правило с `invert`, ограниченное локальным inbound, чтобы
+  не задеть раздачу в LAN), по сайтам/IP (те же `netRules`, что на Android), по странам, профили.
+  Все значения проходят `core/Rules.kt` (валидация) — и из UI, и из `hydra.json`/резервной копии.
+- **Ядра** — официальные бинарники sing-box (той же версии, что libbox в Android/iOS) и Xray-core.
   Gradle-задача `downloadSingBox` берёт архив с GitHub SagerNet, **сверяет SHA-256**
   (закреплены в `desktop/build.gradle.kts`) и кладёт в ресурсы пакета своей ОС/архитектуры.
 - **Конфиг** — `DesktopConfig` поверх общего `SingBoxConfigBuilder`: outbound, DNS,
@@ -66,9 +75,13 @@ HydraVPN/
 
 ## Ограничения (честно)
 
-- На ПК только протоколы ядра sing-box: VLESS/REALITY, VMess, Trojan, Shadowsocks,
+- На ПК только протоколы ядер sing-box и Xray: VLESS/REALITY, VMess, Trojan, Shadowsocks,
   Hysteria2, TUIC, WireGuard. AmneziaWG, SSTP, L2TP, olcRTC, OpenFlux, WDTT — только Android.
-- Нет kill switch и раздельного туннелирования по приложениям на ПК.
+- Kill switch на ПК — только в режиме «Системный прокси» (прокси ОС остаётся на мёртвый порт).
+  В TUN блокировки на уровне брандмауэра нет: при обрыве до переподключения трафик идёт напрямую.
+- Раздельное туннелирование по программам в режиме «Системный прокси» касается только программ,
+  которые ходят через системный прокси; для всех программ — режим TUN.
+- Нет блокировки приложения паролем, тем оформления и языков кроме русского (есть на Android).
 - Пакеты не подписаны сертификатами издателя (Windows — SmartScreen, macOS — не
   нотаризовано, нужно «Всё равно открыть»).
 - Интерфейс ПК — только русский.

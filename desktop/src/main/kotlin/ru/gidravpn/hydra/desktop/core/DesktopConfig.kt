@@ -4,21 +4,27 @@ import org.json.JSONArray
 import org.json.JSONObject
 import ru.gidravpn.hydra.data.model.DnsEndpoint
 import ru.gidravpn.hydra.data.model.Engine
+import ru.gidravpn.hydra.data.model.EngineToggles
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
-import ru.gidravpn.hydra.data.model.MtuPreset
 import ru.gidravpn.hydra.data.model.ServerProfile
+import ru.gidravpn.hydra.data.model.SplitTunnel
+import ru.gidravpn.hydra.data.model.SplitTunnelMode
 import ru.gidravpn.hydra.data.subscription.SingBoxConfigBuilder
+import ru.gidravpn.hydra.data.subscription.XrayConfigBuilder
 import ru.gidravpn.hydra.desktop.ConnectionMode
 import ru.gidravpn.hydra.desktop.DesktopSettings
 import ru.gidravpn.hydra.desktop.Os
 import java.io.File
 
 /**
- * Конфиг sing-box для ПК. Основа — тот же [SingBoxConfigBuilder], что в Android
- * (outbound, DNS, sniff/hijack-dns, split/geo-правила), а платформенная часть
- * заменяется:
- *  - Android отдаёт tun через VpnService (auto_route выключен) — на ПК маршруты
- *    ставит сам sing-box: tun с auto_route + strict_route, либо mixed-inbound;
+ * Конфиги ядер для ПК. Основа — тот же [SingBoxConfigBuilder], что в Android
+ * (outbound, DNS, sniff/hijack-dns, split/geo-правила), платформенная часть своя:
+ *  - Android отдаёт tun через VpnService — на ПК маршруты ставит сам sing-box:
+ *    tun с auto_route + strict_route, либо mixed-inbound для системного прокси;
+ *  - раздельное туннелирование по приложениям — правила process_name/process_path
+ *    sing-box (на Android это делает VpnService по пакетам приложений);
+ *  - движок Xray — как на Android: Xray headless с socks-inbound, sing-box — мост
+ *    (tun/прокси, DNS, все правила) с единственным outbound socks на Xray;
  *  - clash_api слушает 127.0.0.1 с секретом — оттуда UI берёт скорость;
  *  - WireGuard — endpoint (схема 1.12), а не устаревший outbound.
  */
@@ -27,62 +33,112 @@ object DesktopConfig {
     class UnsupportedProtocol(val profile: ServerProfile) :
         IllegalArgumentException("Протокол «${profile.protocol?.displayName ?: profile.protocolId}» на ПК пока не поддерживается")
 
-    /** На ПК работает только то, что обслуживает само ядро sing-box. */
+    /** На ПК работают протоколы ядер sing-box и Xray (Xray обслуживает их подмножество). */
     fun isSupported(p: ServerProfile): Boolean = p.protocol?.engine == Engine.SINGBOX
+
+    /** Кто обслужит профиль с текущими тумблерами движков; null — подходящий движок выключен. */
+    fun engineFor(p: ServerProfile, settings: DesktopSettings, xrayAvailable: Boolean): EngineToggles.Kind? =
+        if (!isSupported(p)) null else settings.engines.engineFor(p.protocol, xrayAvailable)
 
     data class Api(val port: Int, val secret: String)
 
+    /** Локальный socks-inbound Xray, к которому подключается мост sing-box. */
+    data class XrayBridge(val port: Int, val auth: XrayConfigBuilder.SocksAuth)
+
+    /** Теги локальных inbound'ов — правила «по приложениям» касаются только их, не раздачи в LAN. */
+    private const val TUN_TAG = "tun-in"
+    private const val MIXED_TAG = "mixed-in"
+    private const val LAN_TAG = "lan-in"
+
+    /**
+     * Конфиг sing-box.
+     * @param bridge не null — движок Xray: sing-box становится мостом к его socks-inbound.
+     * @param bypassPaths программы, чей трафик в TUN всегда идёт мимо туннеля: сам Hydra
+     *   (как Android исключает своё приложение) и процесс Xray — иначе его соединение с
+     *   сервером вернулось бы в tun и зациклилось.
+     */
     fun build(
         profile: ServerProfile,
         settings: DesktopSettings,
         os: Os,
         api: Api,
         geoDir: File?,
+        bridge: XrayBridge? = null,
+        bypassPaths: List<String> = emptyList(),
     ): JSONObject {
         if (!isSupported(profile)) throw UnsupportedProtocol(profile)
+        val r = settings.routing
 
-        val dns: DnsEndpoint? = if (settings.dns.equals("system", ignoreCase = true)) null
-        else DnsEndpoint.parse(settings.dns) ?: DnsEndpoint.doh("1.1.1.1")
-
-        val geo = geoRouting(settings, geoDir)
-        val root = SingBoxConfigBuilder.build(
-            profile = profile,
-            dns = dns,
-            geoRouting = geo,
-            mtu = MtuPreset.AUTO.value,
-            tlsFragment = settings.tlsFragment,
-        )
+        val split = SplitTunnel(netMode = r.netMode, netRules = r.netRules)
+        val root = if (bridge != null) {
+            SingBoxConfigBuilder.buildXrayBridge(
+                socksPort = bridge.port, splitTunnel = split, dns = dnsEndpoint(settings),
+                geoRouting = geoRouting(settings, geoDir), mtu = r.mtu.value, socksAuth = bridge.auth,
+            )
+        } else {
+            SingBoxConfigBuilder.build(
+                profile = profile, splitTunnel = split, dns = dnsEndpoint(settings),
+                geoRouting = geoRouting(settings, geoDir), mtu = r.mtu.value, tlsFragment = r.tlsFragment,
+            )
+        }
 
         root.put("log", JSONObject().put("level", "info").put("timestamp", true))
         root.put("experimental", JSONObject().put("clash_api", JSONObject()
             .put("external_controller", "127.0.0.1:${api.port}")
             .put("secret", api.secret)))
 
-        root.put("inbounds", JSONArray().put(
-            when (settings.mode) {
-                ConnectionMode.TUN -> tunInbound(os)
+        root.put("inbounds", JSONArray().apply {
+            put(when (settings.mode) {
+                ConnectionMode.TUN -> tunInbound(os, settings)
                 ConnectionMode.PROXY -> JSONObject()
-                    .put("type", "mixed").put("tag", "mixed-in")
+                    .put("type", "mixed").put("tag", MIXED_TAG)
                     .put("listen", "127.0.0.1").put("listen_port", settings.proxyPort)
+            })
+            // Раздача VPN в локальную сеть — только с логином и паролем (открытый прокси в
+            // чужой сети — открытый выход в интернет с вашего адреса).
+            val lan = settings.lanShare
+            if (lan.isUsable && !(settings.mode == ConnectionMode.PROXY && lan.port == settings.proxyPort)) {
+                put(JSONObject().put("type", "mixed").put("tag", LAN_TAG)
+                    .put("listen", "0.0.0.0").put("listen_port", lan.port)
+                    .put("users", JSONArray().put(JSONObject().put("username", lan.username).put("password", lan.password))))
             }
-        ))
+        })
 
-        if (settings.mode == ConnectionMode.TUN) {
+        if (settings.mode == ConnectionMode.TUN && !r.ipv6) {
             // IPv6-адрес у tun нужен, чтобы IPv6 не утекал мимо туннеля, но тогда ОС
             // предпочитает AAAA — а у большинства серверов IPv6 наружу нет: стек tun
             // принимает соединение и тут же рвёт его, и приложение не откатывается на IPv4
-            // (поймано e2e на Windows). Как в Android по умолчанию (Ipv6Mode выключен):
+            // (поймано e2e на Windows). Как в Android по умолчанию (IPv6 блокируется):
             // имена резолвятся только в IPv4.
             root.getJSONObject("dns").put("strategy", "ipv4_only")
         }
 
+        addProcessRules(root, settings, bypassPaths)
         convertWireGuard(root)
         return root
     }
 
-    private fun tunInbound(os: Os): JSONObject = JSONObject().apply {
+    /**
+     * Конфиг Xray для движка Xray. [resolvedIp] — адрес сервера, заранее разрешённый
+     * Hydra (режим TUN): иначе Xray спросил бы DNS у ОС, запрос ушёл бы в tun, а оттуда —
+     * через этот же ещё не подключённый Xray. Имя сервера при этом остаётся в SNI.
+     */
+    fun xray(profile: ServerProfile, settings: DesktopSettings, bridge: XrayBridge, resolvedIp: String? = null): JSONObject {
+        val p = if (resolvedIp == null || resolvedIp == profile.address) profile
+        else profile.copy(sni = profile.sni.ifBlank { profile.address }, address = resolvedIp)
+        val dnsUrl = dnsEndpoint(settings)?.toXrayAddress()
+        return XrayConfigBuilder.build(p, bridge.port, dnsUrl, bridge.auth)
+    }
+
+    private fun dnsEndpoint(settings: DesktopSettings): DnsEndpoint? {
+        val dns = settings.routing.dns
+        return if (dns.equals("system", ignoreCase = true)) null
+        else DnsEndpoint.parse(dns) ?: DnsEndpoint.doh("1.1.1.1")
+    }
+
+    private fun tunInbound(os: Os, settings: DesktopSettings): JSONObject = JSONObject().apply {
         put("type", "tun")
-        put("tag", "tun-in")
+        put("tag", TUN_TAG)
         // macOS разрешает только utunN — имя выбирает система.
         when (os) {
             Os.WINDOWS -> put("interface_name", "Hydra")
@@ -90,7 +146,7 @@ object DesktopConfig {
             Os.MACOS -> Unit
         }
         put("address", JSONArray().put("172.19.0.1/30").put("fdfe:dcba:9876::1/126"))
-        put("mtu", 9000)
+        put("mtu", settings.routing.mtu.value)
         put("auto_route", true)
         // strict_route: на Windows закрывает утечку DNS через другие адаптеры,
         // на Linux — трафик в обход tun при смене маршрутов.
@@ -98,14 +154,69 @@ object DesktopConfig {
         put("stack", "mixed")
     }
 
+    /**
+     * Правила по процессам — сразу после sniff и hijack-dns, до правил по адресам и geo:
+     * на Android приложение, исключённое из VPN, не видит туннель вовсе, и здесь так же
+     * решение «по приложению» сильнее всех остальных.
+     *  - EXCLUDE: трафик выбранных программ → direct;
+     *  - INCLUDE: трафик всех ОСТАЛЬНЫХ программ локальных inbound'ов → direct, а выбранные
+     *    идут дальше по обычным правилам. Раздачу в LAN (у неё нет «программы») не трогаем.
+     */
+    private fun addProcessRules(root: JSONObject, settings: DesktopSettings, bypassPaths: List<String>) {
+        val r = settings.routing
+        val front = mutableListOf<JSONObject>()
+        val bypass = if (settings.mode == ConnectionMode.TUN) bypassPaths.filter { it.isNotBlank() }.distinct() else emptyList()
+        if (bypass.isNotEmpty()) {
+            front += JSONObject().put("process_path", JSONArray(bypass)).put("outbound", "direct")
+        }
+        if (r.appsActive) {
+            val match = processMatch(r.apps)
+            val localInbound = if (settings.mode == ConnectionMode.TUN) TUN_TAG else MIXED_TAG
+            front += when (r.appMode) {
+                SplitTunnelMode.EXCLUDE -> JSONObject()
+                    .put("type", "logical").put("mode", "and")
+                    .put("rules", JSONArray().put(JSONObject().put("inbound", JSONArray().put(localInbound))).put(match))
+                    .put("outbound", "direct")
+                else -> JSONObject()
+                    .put("type", "logical").put("mode", "and")
+                    .put("rules", JSONArray()
+                        .put(JSONObject().put("inbound", JSONArray().put(localInbound)))
+                        .put(match.put("invert", true)))
+                    .put("outbound", "direct")
+            }
+        }
+        if (front.isEmpty()) return
+
+        val route = root.getJSONObject("route")
+        val old = route.getJSONArray("rules")
+        // Первые два правила общего билдера — sniff и hijack-dns: без sniff у соединения
+        // нет домена, а DNS приложений должен перехватываться при любом процессе.
+        val head = (0 until old.length()).map { old.getJSONObject(it) }
+        val keep = head.takeWhile { it.optString("action") == "sniff" || it.optString("action") == "hijack-dns" }
+        route.put("rules", JSONArray(keep + front + head.drop(keep.size)))
+        route.put("find_process", true)
+    }
+
+    /** Имена → process_name, пути → process_path; оба вида — через логическое «или». */
+    private fun processMatch(apps: List<String>): JSONObject {
+        val (paths, names) = apps.partition(Rules::isPath)
+        val parts = buildList {
+            if (names.isNotEmpty()) add(JSONObject().put("process_name", JSONArray(names)))
+            if (paths.isNotEmpty()) add(JSONObject().put("process_path", JSONArray(paths)))
+        }
+        return if (parts.size == 1) parts[0]
+        else JSONObject().put("type", "logical").put("mode", "or").put("rules", JSONArray(parts))
+    }
+
     private fun geoRouting(settings: DesktopSettings, geoDir: File?): SingBoxConfigBuilder.GeoRouting? {
-        if (settings.geoMode == GeoRoutingMode.OFF || geoDir == null) return null
-        val countries = settings.geoCountries.mapNotNull { code ->
+        val r = settings.routing
+        if (r.geoMode == GeoRoutingMode.OFF || geoDir == null) return null
+        val countries = Rules.countries(r.geoCountries).mapNotNull { code ->
             val ip = File(geoDir, "geoip/$code.srs").takeIf { it.isFile } ?: return@mapNotNull null
             val site = File(geoDir, "geosite/$code.srs").takeIf { it.isFile }
             SingBoxConfigBuilder.GeoCountry(code, ip.absolutePath, site?.absolutePath)
         }
-        return SingBoxConfigBuilder.GeoRouting(settings.geoMode, countries).takeIf { it.active }
+        return SingBoxConfigBuilder.GeoRouting(r.geoMode, countries).takeIf { it.active }
     }
 
     /** outbound type=wireguard (удалён в sing-box 1.13) → endpoint wireguard. */

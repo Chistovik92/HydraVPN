@@ -19,7 +19,7 @@ import ru.gidravpn.hydra.desktop.ui.HydraApp
 import java.awt.SystemTray
 import kotlin.system.exitProcess
 
-fun main() {
+fun main(args: Array<String>) {
     // Второй экземпляр запустил бы второе ядро на тех же портах.
     if (!SingleInstance.acquire()) {
         javax.swing.JOptionPane.showMessageDialog(null, "Hydra уже запущена.", "Hydra", javax.swing.JOptionPane.INFORMATION_MESSAGE)
@@ -29,8 +29,9 @@ fun main() {
         val scope = rememberCoroutineScope()
         val controller = remember { AppController(scope) }
         val ui by controller.ui.collectAsState()
-        var visible by remember { mutableStateOf(true) }
         val trayOk = remember { runCatching { SystemTray.isSupported() }.getOrDefault(false) }
+        // Автозапуск при входе в систему — сразу в трей (если трей есть).
+        var visible by remember { mutableStateOf(!(trayOk && ru.gidravpn.hydra.desktop.core.Autostart.MINIMIZED_ARG in args)) }
         val icon = remember {
             val bytes = AppController::class.java.getResourceAsStream("/hydra-icon.png")!!.use { it.readBytes() }
             BitmapPainter(org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap())
@@ -44,6 +45,7 @@ fun main() {
 
         LaunchedEffect(Unit) {
             Runtime.getRuntime().addShutdownHook(Thread { controller.shutdown() })
+            controller.onStartup()
         }
 
         if (trayOk) {
@@ -53,7 +55,7 @@ fun main() {
                 onAction = { visible = true },
                 menu = {
                     Item("Открыть Hydra", onClick = { visible = true })
-                    Item(if (ui.active) "Отключить" else "Подключить", onClick = { controller.toggle() })
+                    Item(if (ui.active || ui.blocked) "Отключить" else "Подключить", onClick = { if (ui.blocked && !ui.active) controller.disconnect() else controller.toggle() })
                     Separator()
                     Item("Выход", onClick = { quit() })
                 },

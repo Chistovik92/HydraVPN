@@ -2,9 +2,9 @@ name: Desktop CI
 
 # Hydra Desktop (Windows / Linux / macOS). На каждом раннере:
 #   1) юнит-тесты + рендер всех экранов (:desktop:test);
-#   2) `sing-box check` каждого сгенерированного конфига;
+#   2) `sing-box check` каждого сгенерированного конфига и `xray run -test` конфигов Xray;
 #   3) сквозная проверка реального трафика (scripts/desktop-e2e.sh): режим PROXY и
-#      режим TUN (на раннерах есть sudo / администратор);
+#      режим TUN (на раннерах есть sudo / администратор), движки sing-box и Xray;
 #   4) при package=true — пакеты (scripts/package-desktop.sh) + дымовой запуск,
 #      выкладываются артефактом. Так вызывает release.yml.
 
@@ -59,7 +59,7 @@ jobs:
         run: sudo apt-get update -q && sudo apt-get install -y -q fakeroot rpm xvfb libfuse2t64 || sudo apt-get install -y -q fakeroot rpm xvfb
 
       - name: Тесты (конфиги, парсеры, хранилище, рендер UI)
-        run: gradle :desktop:test :desktop:downloadSingBox --stacktrace
+        run: gradle :desktop:test :desktop:downloadSingBox :desktop:downloadXray --stacktrace
 
       - name: sing-box check каждого конфига
         run: |
@@ -73,10 +73,23 @@ jobs:
           done
           echo "проверено конфигов: $n"
 
+      - name: xray run -test каждого конфига Xray
+        run: |
+          set -euo pipefail
+          xray="$(ls desktop/build/hydra-app-resources/${{ matrix.target }}/xray* | head -1)"
+          "$xray" version | head -1
+          n=0
+          for c in desktop/build/xray-configs/*.json; do
+            "$xray" run -test -c "$c" > /dev/null || { echo "::error::xray -test: $c"; "$xray" run -test -c "$c" || true; exit 1; }
+            n=$((n+1))
+          done
+          echo "проверено конфигов Xray: $n"
+
       - name: Сквозная проверка трафика (PROXY + TUN)
         run: |
           core="$(ls desktop/build/hydra-app-resources/${{ matrix.target }}/sing-box* | head -1)"
-          bash scripts/desktop-e2e.sh "$core" desktop/build/singbox-configs ${{ matrix.os }} all
+          xray="$(ls desktop/build/hydra-app-resources/${{ matrix.target }}/xray* | head -1)"
+          bash scripts/desktop-e2e.sh "$core" desktop/build/singbox-configs ${{ matrix.os }} all "$xray"
 
       - name: Пакеты + дымовой запуск
         if: inputs.package

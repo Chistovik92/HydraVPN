@@ -2,7 +2,7 @@
 #
 # Сквозная проверка desktop-ядра: реальный трафик через конфиг, который строит Hydra.
 #
-#   scripts/desktop-e2e.sh <sing-box> <каталог-с-конфигами> <windows|linux|macos> [proxy|tun|all]
+#   scripts/desktop-e2e.sh <sing-box> <каталог-с-конфигами> <windows|linux|macos> [proxy|tun|all] [xray]
 #
 # Поднимает локальный сервер sing-box (Shadowsocks 2022 на 127.0.0.1:18388) и клиент
 # из desktop/build/singbox-configs/desktop-ss-<os>-<mode>.json (их пишет DesktopConfigTest),
@@ -12,9 +12,14 @@
 #           клиента. Нужны права: root (sudo) на Linux/macOS, администратор на Windows.
 # Трафик самого сервера в TUN-режиме уводится мимо туннеля правилом process_name.
 #
+# С пятым аргументом (путь к xray) то же самое повторяется для движка Xray: Xray-клиент
+# (xray-configs/e2e-xray-<os>-<mode>.json, socks 127.0.0.1:18090 с паролем) + sing-box-мост
+# (e2e-xray-<os>-<mode>.json) — трафик должен пройти tun/прокси → мост → Xray → сервер.
+#
 set -euo pipefail
 
-SB="$1"; CFG_DIR="$2"; OS="$3"; MODES="${4:-all}"
+SB="$1"; CFG_DIR="$2"; OS="$3"; MODES="${4:-all}"; XRAY="${5:-}"
+ENGINE="sing-box"   # текущий прогон: sing-box | xray
 WORK="$(mktemp -d)"
 trap 'kill_all; rm -rf "$WORK"' EXIT
 
@@ -28,12 +33,15 @@ if [[ "$OS" != "windows" && "$(id -u)" != "0" ]]; then SUDO="sudo"; fi
 PIDS=()
 kill_all() {
   for p in "${PIDS[@]:-}"; do [[ -n "$p" ]] && { $SUDO kill "$p" 2>/dev/null || kill "$p" 2>/dev/null || true; }; done
-  if [[ "$OS" == "windows" ]]; then taskkill //F //IM "sing-box-server.exe" >/dev/null 2>&1 || true; fi
+  if [[ "$OS" == "windows" ]]; then
+    taskkill //F //IM "sing-box-server.exe" >/dev/null 2>&1 || true
+    taskkill //F //IM "xray.exe" >/dev/null 2>&1 || true
+  fi
   PIDS=()
   sleep 1
 }
 
-fail() { echo "::error::$*"; echo "--- client log"; tail -40 "$WORK/client.log" 2>/dev/null || true; echo "--- server log"; tail -20 "$WORK/server.log" 2>/dev/null || true; exit 1; }
+fail() { echo "::error::[$ENGINE] $*"; echo "--- client log"; tail -40 "$WORK/client.log" 2>/dev/null || true; echo "--- xray log"; tail -20 "$WORK/xray.log" 2>/dev/null || true; echo "--- server log"; tail -20 "$WORK/server.log" 2>/dev/null || true; exit 1; }
 
 cat > "$WORK/server.json" <<'EOF'
 {"log":{"level":"warn"},
@@ -45,10 +53,27 @@ EOF
 make_client() { # $1 = mode
   # e2e-<os>-<mode>.json пишет DesktopConfigTest («e2e configs»): тот же DesktopConfig,
   # сервер 127.0.0.1:18388, прокси :12080, clash_api :19090, в TUN — process_name → direct.
-  local src="$CFG_DIR/e2e-$OS-$1.json"
+  local prefix="e2e"; [[ "$ENGINE" == "xray" ]] && prefix="e2e-xray"
+  local src="$CFG_DIR/$prefix-$OS-$1.json"
   [[ -f "$src" ]] || fail "нет $src — сначала gradle :desktop:test"
   cp "$src" "$WORK/client.json"
+  if [[ "$ENGINE" == "xray" ]]; then
+    local xsrc="$CFG_DIR/../xray-configs/e2e-xray-$OS-$1.json"
+    [[ -f "$xsrc" ]] || fail "нет $xsrc — сначала gradle :desktop:test"
+    cp "$xsrc" "$WORK/xray.json"
+  fi
 }
+
+start_xray() { # мост sing-box без Xray не работает — Xray первым
+  [[ "$ENGINE" == "xray" ]] || return 0
+  "$WORK/xray$EXE" run -c "$WORK/xray.json" > "$WORK/xray.log" 2>&1 &
+  PIDS+=($!)
+  sleep 2
+  if grep -qi 'failed' "$WORK/xray.log"; then fail "Xray не поднялся"; fi
+  return 0
+}
+
+proxy_tag() { if [[ "$ENGINE" == "xray" ]]; then echo 'outbound/socks\[proxy\]'; else echo 'outbound/shadowsocks\[proxy\]'; fi; }
 
 start() { # $1 = sudo-or-empty, $2 = bin, $3 = config, $4 = log
   $1 "$2" run -c "$3" -D "$WORK" > "$4" 2>&1 &
@@ -56,9 +81,10 @@ start() { # $1 = sudo-or-empty, $2 = bin, $3 = config, $4 = log
 }
 
 run_proxy() {
-  echo "=== $OS: режим PROXY"
+  echo "=== $OS [$ENGINE]: режим PROXY"
   make_client proxy
   start "" "$SERVER_BIN" "$WORK/server.json" "$WORK/server.log"
+  start_xray
   start "" "$SB" "$WORK/client.json" "$WORK/client.log"
   sleep 3
   code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -x http://127.0.0.1:12080 https://www.gstatic.com/generate_204) || true
@@ -76,9 +102,10 @@ run_proxy() {
 }
 
 run_tun() {
-  echo "=== $OS: режим TUN"
+  echo "=== $OS [$ENGINE]: режим TUN"
   make_client tun
   start "" "$SERVER_BIN" "$WORK/server.json" "$WORK/server.log"
+  start_xray
   start "$SUDO" "$SB" "$WORK/client.json" "$WORK/client.log"
   sleep 6
   grep -qiE 'FATAL|start inbound.*error' "$WORK/client.log" && fail "TUN: ядро не поднялось"
@@ -89,15 +116,24 @@ run_tun() {
     sleep 3
   done
   [[ -n "$ok" ]] || fail "TUN: трафик не прошёл через tun (curl=$code)"
-  grep -q 'outbound/shadowsocks\[proxy\]' "$WORK/client.log" || fail "TUN: соединение не ушло в outbound proxy"
+  grep -q "$(proxy_tag)" "$WORK/client.log" || fail "TUN: соединение не ушло в outbound proxy"
   echo "    curl без прокси → tun-in → proxy: 204"
   kill_all
 }
 
-case "$MODES" in
-  proxy) run_proxy ;;
-  tun) run_tun ;;
-  all) run_proxy; run_tun ;;
-  *) echo "режим: proxy|tun|all" >&2; exit 2 ;;
-esac
+run_modes() {
+  case "$MODES" in
+    proxy) run_proxy ;;
+    tun) run_tun ;;
+    all) run_proxy; run_tun ;;
+    *) echo "режим: proxy|tun|all" >&2; exit 2 ;;
+  esac
+}
+
+run_modes
+if [[ -n "$XRAY" ]]; then
+  ENGINE="xray"
+  cp "$XRAY" "$WORK/xray$EXE"; chmod +x "$WORK/xray$EXE" 2>/dev/null || true
+  run_modes
+fi
 echo "=== $OS: сквозная проверка пройдена"

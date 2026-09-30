@@ -58,8 +58,15 @@ class ClashApi(private val api: DesktopConfig.Api) {
 }
 
 object Subscriptions {
+    /** Больше — не подписка: не даём чужому серверу занять всю память приложения. */
+    const val MAX_BYTES = 8L shl 20
+
     private val http = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build()
+        .connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS)
+        .callTimeout(60, TimeUnit.SECONDS)
+        // https → http при редиректе раскрыл бы токен подписки в URL по открытому каналу.
+        .followSslRedirects(false)
+        .build()
 
     data class Fetched(val servers: List<ServerProfile>, val info: SubscriptionHeaders.Info)
 
@@ -71,7 +78,9 @@ object Subscriptions {
             .build()
         http.newCall(req).execute().use { r ->
             check(r.isSuccessful) { "HTTP ${r.code}" }
-            val body = r.body?.string().orEmpty()
+            val src = r.body?.source() ?: error("пустой ответ")
+            check(!src.request(MAX_BYTES + 1)) { "ответ больше ${MAX_BYTES shr 20} МБ — это не подписка" }
+            val body = src.buffer.readUtf8()
             val servers = LinkParser.parseSubscription(body, subscriptionId)
             check(servers.isNotEmpty()) { "в ответе нет поддерживаемых ссылок" }
             return Fetched(servers, SubscriptionHeaders.parse { r.header(it) })
@@ -88,4 +97,18 @@ object Ping {
             ((System.nanoTime() - t0) / 1_000_000).toInt().coerceAtLeast(1)
         }
     }.getOrDefault(-2)
+}
+
+/** Запущенные программы — для выбора в «Раздельном туннелировании по приложениям». */
+object Processes {
+    data class Proc(val name: String, val path: String)
+
+    fun running(): List<Proc> = runCatching {
+        ProcessHandle.allProcesses().use { stream ->
+            stream.map { it.info().command().orElse(null) }.toList()
+        }.filterNotNull()
+            .map { Proc(java.io.File(it).name, it) }
+            .distinctBy { it.path.lowercase() }
+            .sortedBy { it.name.lowercase() }
+    }.getOrDefault(emptyList())
 }

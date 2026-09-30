@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -81,9 +82,9 @@ import java.awt.datatransfer.StringSelection
 import java.text.SimpleDateFormat
 import java.util.Date
 
-private val Accent = Color(0xFF2EC4B6)
-private val Danger = Color(0xFFE5484D)
-private val Warn = Color(0xFFF5A524)
+internal val Accent = Color(0xFF2EC4B6)
+internal val Danger = Color(0xFFE5484D)
+internal val Warn = Color(0xFFF5A524)
 
 private val HydraColors = darkColorScheme(
     primary = Accent,
@@ -99,7 +100,7 @@ private val HydraColors = darkColorScheme(
     error = Danger,
 )
 
-private enum class Tab(val title: String) { HOME("Главная"), SERVERS("Серверы"), SUBS("Подписки"), SETTINGS("Настройки"), LOG("Журнал") }
+private enum class Tab(val title: String) { HOME("Главная"), SERVERS("Серверы"), SUBS("Подписки"), ROUTING("Маршруты"), SETTINGS("Настройки"), LOG("Журнал") }
 
 @Composable
 fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTab: Int = 0) {
@@ -118,6 +119,7 @@ fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTa
                                     Tab.HOME -> Icons.Default.Home
                                     Tab.SERVERS -> Icons.AutoMirrored.Filled.List
                                     Tab.SUBS -> Icons.Default.Share
+                                    Tab.ROUTING -> Icons.Default.Place
                                     Tab.SETTINGS -> Icons.Default.Settings
                                     Tab.LOG -> Icons.Default.Info
                                 }, contentDescription = t.title)
@@ -131,8 +133,9 @@ fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTa
                         Tab.HOME -> HomeScreen(c, ui, onRelaunchAdmin, openServers = { tab = Tab.SERVERS })
                         Tab.SERVERS -> ServersScreen(c, ui)
                         Tab.SUBS -> SubscriptionsScreen(c, ui)
+                        Tab.ROUTING -> RoutingScreen(c, ui)
                         Tab.SETTINGS -> SettingsScreen(c, ui)
-                        Tab.LOG -> LogScreen(ui)
+                        Tab.LOG -> LogScreen(c, ui)
                     }
                 }
             }
@@ -175,6 +178,14 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
         Spacer(Modifier.height(20.dp))
         Text(ui.statusText, style = MaterialTheme.typography.titleMedium, color = if (ui.status == Status.ERROR) Danger else MaterialTheme.colorScheme.onSurface)
         ui.delayMs?.let { Text("Проверка через туннель: $it мс", color = Accent, fontSize = 13.sp) }
+        if (ui.blocked) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = { c.disconnect() }) { Text("Снять блокировку (kill switch)") }
+        }
+        ui.update?.let { u ->
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = { openUrl(u.pageUrl) }) { Text("Доступна Hydra ${u.version} — открыть страницу загрузки", color = Accent) }
+        }
         Spacer(Modifier.height(20.dp))
 
         Card(Modifier.width(520.dp).clickable(enabled = !ui.active) { openServers() },
@@ -185,7 +196,9 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
                 if (s == null) Text("Не выбран — добавьте ссылку или подписку", fontWeight = FontWeight.Medium)
                 else {
                     Text("${s.flag} ${s.name}", fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(s.summary, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val engine = DesktopConfig.engineFor(s, settings, c.xrayAvailable)
+                    Text(s.summary + " · " + engineLabel(engine), fontSize = 12.sp,
+                        color = if (engine == null) Danger else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -268,6 +281,7 @@ private fun ServersScreen(c: AppController, ui: UiState) {
 @Composable
 private fun ServerRow(c: AppController, ui: UiState, s: ServerProfile) {
     val supported = DesktopConfig.isSupported(s)
+    val engine = DesktopConfig.engineFor(s, ui.data.settings, c.xrayAvailable)
     val selected = ui.data.settings.selectedServerId == s.id
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
@@ -281,8 +295,11 @@ private fun ServerRow(c: AppController, ui: UiState, s: ServerProfile) {
             Text("${s.flag} ${s.name}", maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = if (supported) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
-                (s.protocol?.displayName ?: s.protocolId) + " · " + s.address + ":" + s.port +
-                    if (!supported) " · на ПК недоступно" else "",
+                (s.protocol?.displayName ?: s.protocolId) + " · " + s.address + ":" + s.port + " · " +
+                    when {
+                        !supported -> "на ПК недоступно"
+                        else -> engineLabel(engine)
+                    },
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
@@ -300,6 +317,13 @@ private fun ServerRow(c: AppController, ui: UiState, s: ServerProfile) {
                 else -> MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
+        IconButton(onClick = {
+            val link = c.shareLink(s.id)
+            if (link == null) c.toast("Для этого протокола нет формата ссылки")
+            else { setClipboard(link); c.toast("Ссылка на «${s.name}» скопирована в буфер обмена.\nВ ней пароль сервера — передавайте только тем, кому доверяете.") }
+        }) {
+            Icon(Icons.Default.Share, "Поделиться", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         IconButton(onClick = { c.deleteServer(s.id) }, enabled = !(ui.active && ui.connectedId == s.id)) {
             Icon(Icons.Default.Delete, "Удалить", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -341,6 +365,11 @@ private fun SubscriptionsScreen(c: AppController, ui: UiState) {
                             }
                             Text(parts.joinToString(" · "), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (s.lastError.isNotEmpty()) Text("Ошибка: ${s.lastError}", fontSize = 12.sp, color = Danger)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Switch(s.autoUpdateHours > 0, { on -> c.setSubscriptionAutoUpdate(s.id, if (on) 12 else 0) })
+                                Spacer(Modifier.width(8.dp))
+                                Text(if (s.autoUpdateHours > 0) "Обновлять автоматически (раз в ${s.autoUpdateHours} ч)" else "Автообновление выключено", fontSize = 12.sp)
+                            }
                         }
                         if (s.id in ui.updatingSubs) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                         else IconButton(onClick = { c.refreshSubscription(s.id) }) { Icon(Icons.Default.Refresh, "Обновить") }
@@ -352,106 +381,9 @@ private fun SubscriptionsScreen(c: AppController, ui: UiState) {
     }
 }
 
-// ============================================================== Настройки
-@Composable
-private fun SettingsScreen(c: AppController, ui: UiState) {
-    val s = ui.data.settings
-    val locked = ui.active
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { Header("Настройки") {} }
-        if (locked) item { Text("Изменения применятся при следующем подключении.", color = Warn, fontSize = 13.sp) }
-
-        item {
-            Section("Режим подключения") {
-                ModeOption(s.mode == ConnectionMode.PROXY, "Системный прокси",
-                    "HTTP/SOCKS5 на 127.0.0.1:${s.proxyPort}. Права администратора не нужны. Работает для браузеров и программ, " +
-                        "которые используют системный прокси.") { c.updateSettings { it.copy(mode = ConnectionMode.PROXY) } }
-                ModeOption(s.mode == ConnectionMode.TUN, "TUN — весь трафик",
-                    when (Platform.os) {
-                        Os.WINDOWS -> "Виртуальный адаптер для всех программ. Нужен запуск Hydra от имени администратора."
-                        Os.LINUX -> "Виртуальный адаптер для всех программ. При первом включении система один раз спросит пароль (права CAP_NET_ADMIN для ядра)."
-                        Os.MACOS -> "Виртуальный адаптер для всех программ. При подключении и отключении macOS спросит пароль администратора."
-                    }) { c.updateSettings { it.copy(mode = ConnectionMode.TUN) } }
-            }
-        }
-        item {
-            Section("Прокси") {
-                var port by remember(s.proxyPort) { mutableStateOf(s.proxyPort.toString()) }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(port, { v ->
-                        port = v.filter(Char::isDigit).take(5)
-                        port.toIntOrNull()?.takeIf { it in 1024..65535 }?.let { p -> c.updateSettings { it.copy(proxyPort = p) } }
-                    }, Modifier.width(140.dp), singleLine = true, label = { Text("Порт") })
-                    Switch(s.setSystemProxy, { v -> c.updateSettings { it.copy(setSystemProxy = v) } })
-                    Text("Включать системный прокси автоматически")
-                }
-            }
-        }
-        item {
-            Section("DNS") {
-                var dns by remember(s.dns) { mutableStateOf(s.dns) }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("1.1.1.1" to "Cloudflare", "8.8.8.8" to "Google", "9.9.9.9" to "Quad9", "94.140.14.14" to "AdGuard", "system" to "Системный")
-                        .forEach { (v, label) ->
-                            FilterChip(selected = s.dns == v, onClick = { dns = v; c.updateSettings { it.copy(dns = v) } }, label = { Text(label) })
-                        }
-                }
-                OutlinedTextField(dns, { v -> dns = v; if (v.isNotBlank()) c.updateSettings { it.copy(dns = v.trim()) } },
-                    Modifier.fillMaxWidth(), singleLine = true,
-                    label = { Text("Свой DNS: IP, https://…/dns-query, tls://…, udp://…") })
-            }
-        }
-        item {
-            Section("Маршрутизация по странам (geoip/geosite)") {
-                val available = Platform.geoDir() != null
-                if (!available) Text("Базы geo не найдены в пакете — функция недоступна.", color = Warn, fontSize = 13.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(GeoRoutingMode.OFF to "Выключено", GeoRoutingMode.DIRECT to "Эти страны — напрямую", GeoRoutingMode.VIA_PROXY to "Только эти страны — через VPN")
-                        .forEach { (m, label) ->
-                            FilterChip(selected = s.geoMode == m, enabled = available, onClick = { c.updateSettings { it.copy(geoMode = m) } }, label = { Text(label) })
-                        }
-                }
-                var countries by remember(s.geoCountries) { mutableStateOf(s.geoCountries.joinToString(", ")) }
-                OutlinedTextField(countries, { v ->
-                    countries = v
-                    val list = v.split(',', ' ', ';').map { it.trim().lowercase() }.filter { it.length == 2 }
-                    c.updateSettings { it.copy(geoCountries = list) }
-                }, Modifier.fillMaxWidth(), singleLine = true, enabled = available, label = { Text("Коды стран (ISO): ru, by, kz …") })
-            }
-        }
-        item {
-            Section("Обход DPI: фрагментация TLS ClientHello") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(TlsFragmentMode.OFF to "Выключено", TlsFragmentMode.RECORD to "TLS-записи", TlsFragmentMode.TCP to "TCP-сегменты")
-                        .forEach { (m, label) -> FilterChip(selected = s.tlsFragment == m, onClick = { c.updateSettings { it.copy(tlsFragment = m) } }, label = { Text(label) }) }
-                }
-            }
-        }
-        item {
-            Section("О программе") {
-                Text("Hydra ${Platform.version} · ядро sing-box 1.12.9 · ${System.getProperty("os.name")} ${System.getProperty("os.arch")}", fontSize = 13.sp)
-                Text("Данные: ${Platform.dataDir.absolutePath}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("На ПК поддерживаются: VLESS (в т.ч. REALITY), VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard. " +
-                    "AmneziaWG, SSTP, L2TP, olcRTC, OpenFlux и WDTT пока только в Android.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModeOption(selected: Boolean, title: String, text: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(6.dp), verticalAlignment = Alignment.Top) {
-        RadioButton(selected, onClick)
-        Column(Modifier.padding(top = 10.dp)) {
-            Text(title, fontWeight = FontWeight.Medium)
-            Text(text, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
 // ============================================================== Журнал
 @Composable
-private fun LogScreen(ui: UiState) {
+private fun LogScreen(c: AppController, ui: UiState) {
     val state = rememberLazyListState()
     LaunchedEffect(ui.log.size) { if (ui.log.isNotEmpty()) state.scrollToItem(ui.log.size - 1) }
     Column(Modifier.fillMaxSize()) {
@@ -459,6 +391,7 @@ private fun LogScreen(ui: UiState) {
             OutlinedButton(onClick = {
                 Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(ui.log.joinToString("\n")), null)
             }, enabled = ui.log.isNotEmpty()) { Text("Копировать") }
+            OutlinedButton(onClick = { c.clearLog() }, enabled = ui.log.isNotEmpty()) { Text("Очистить") }
         }
         if (ui.log.isEmpty()) { Empty("Журнал появится после подключения."); return }
         SelectionContainer {
@@ -471,7 +404,7 @@ private fun LogScreen(ui: UiState) {
 
 // ============================================================== общее
 @Composable
-private fun Header(title: String, actions: @Composable () -> Unit) {
+internal fun Header(title: String, actions: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
@@ -479,7 +412,7 @@ private fun Header(title: String, actions: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+internal fun Section(title: String, content: @Composable () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, fontWeight = FontWeight.SemiBold)
@@ -490,15 +423,15 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Empty(text: String) = Box(Modifier.fillMaxWidth().fillMaxHeight(0.6f), contentAlignment = Alignment.Center) {
+internal fun Empty(text: String) = Box(Modifier.fillMaxWidth().fillMaxHeight(0.6f), contentAlignment = Alignment.Center) {
     Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-private fun clipboard(): String = runCatching {
+internal fun clipboard(): String = runCatching {
     Toolkit.getDefaultToolkit().systemClipboard.getData(DataFlavor.stringFlavor) as String
 }.getOrDefault("")
 
-private fun bytes(b: Long): String = when {
+internal fun bytes(b: Long): String = when {
     b >= 1L shl 30 -> "%.2f ГБ".format(b / (1L shl 30).toDouble())
     b >= 1L shl 20 -> "%.1f МБ".format(b / (1L shl 20).toDouble())
     b >= 1L shl 10 -> "%.0f КБ".format(b / 1024.0)
@@ -509,3 +442,18 @@ private fun speed(b: Long) = bytes(b) + "/с"
 
 private fun date(ms: Long, time: Boolean = false): String =
     SimpleDateFormat(if (time) "dd.MM.yyyy HH:mm" else "dd.MM.yyyy").format(Date(ms))
+
+internal fun setClipboard(text: String) {
+    runCatching { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null) }
+}
+
+internal fun openUrl(url: String) {
+    runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url)) }
+}
+
+internal fun engineLabel(kind: ru.gidravpn.hydra.data.model.EngineToggles.Kind?): String = when (kind) {
+    ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY -> "Xray"
+    ru.gidravpn.hydra.data.model.EngineToggles.Kind.SINGBOX -> "sing-box"
+    null -> "ядро выключено"
+    else -> kind.name
+}

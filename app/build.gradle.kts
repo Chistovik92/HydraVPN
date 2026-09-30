@@ -31,8 +31,8 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 38
-        versionName = "0.6.25"
+        versionCode = 39
+        versionName = "0.6.26"
 
         // Языки интерфейса (Фаза 8). Без фильтра библиотеки (AppCompat и др.) тащат строки ~90
         // языков: APK толще, а на, скажем, немецком телефоне системные диалоги библиотек

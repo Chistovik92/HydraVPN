@@ -9,7 +9,7 @@
 #   Windows: Hydra-desktop-<v>-windows-x64.msi / .exe / -portable.zip
 #   Linux:   Hydra-desktop-<v>-linux-<arch>.deb / .rpm / .AppImage / .tar.gz
 #   macOS:   Hydra-desktop-<v>-macos-<arch>.dmg
-# Каждый пакет содержит ядро sing-box своей платформы; перед выкладкой проверяется,
+# Каждый пакет содержит ядра sing-box и Xray своей платформы; перед выкладкой проверяется,
 # что ядро внутри и что собранное приложение запускается (дымовой тест).
 #
 set -euo pipefail
@@ -27,9 +27,9 @@ step() { printf '\n==> %s\n' "$*"; }
 err() { echo "::error::$*" >&2; exit 1; }
 
 case "$TARGET" in
-  windows-*) CORE="sing-box.exe"; APP_DIR="$BIN/app/Hydra"; LAUNCHER="$APP_DIR/Hydra.exe"; RES="$APP_DIR/app/resources" ;;
-  linux-*)   CORE="sing-box";     APP_DIR="$BIN/app/Hydra"; LAUNCHER="$APP_DIR/bin/Hydra";  RES="$APP_DIR/lib/app/resources" ;;
-  macos-*)   CORE="sing-box";     APP_DIR="$BIN/app/Hydra.app"; LAUNCHER="$APP_DIR/Contents/MacOS/Hydra"; RES="$APP_DIR/Contents/app/resources" ;;
+  windows-*) CORE="sing-box.exe"; XRAY="xray.exe"; APP_DIR="$BIN/app/Hydra"; LAUNCHER="$APP_DIR/Hydra.exe"; RES="$APP_DIR/app/resources" ;;
+  linux-*)   CORE="sing-box";     XRAY="xray"; APP_DIR="$BIN/app/Hydra"; LAUNCHER="$APP_DIR/bin/Hydra";  RES="$APP_DIR/lib/app/resources" ;;
+  macos-*)   CORE="sing-box";     XRAY="xray"; APP_DIR="$BIN/app/Hydra.app"; LAUNCHER="$APP_DIR/Contents/MacOS/Hydra"; RES="$APP_DIR/Contents/app/resources" ;;
   *) err "неизвестная цель $TARGET" ;;
 esac
 
@@ -55,10 +55,12 @@ case "$TARGET" in
   macos-*)   "$GRADLE" :desktop:createDistributable --stacktrace ;;
 esac
 
-step "Проверка: ядро и geo-базы внутри пакета"
+step "Проверка: ядра и geo-базы внутри пакета"
 [[ -f "$RES/$CORE" ]] || err "в пакете нет ядра: $RES/$CORE"
+[[ -f "$RES/$XRAY" ]] || err "в пакете нет ядра Xray: $RES/$XRAY"
 [[ -d "$RES/geo/geoip" ]] || err "в пакете нет geo-баз: $RES/geo/geoip"
 "$RES/$CORE" version | head -1
+"$RES/$XRAY" version | head -1
 
 step "Дымовой тест: приложение запускается и живёт 20 с"
 smoke_log="$(mktemp)"
@@ -92,11 +94,16 @@ case "$TARGET" in
   linux-*)
     cp "$BIN"/deb/*.deb "$DIST/$NAME.deb"
     dpkg-deb -c "$DIST/$NAME.deb" | grep 'resources/sing-box' | sed 's/^/    deb: /'
-    dpkg-deb -c "$DIST/$NAME.deb" | grep 'resources/sing-box$' | grep -q '^-rwx' \
-      || err "в DEB ядро без бита исполнения"
+    # Без grep -q в конвейере: под pipefail его ранний выход даёт SIGPIPE и ложную ошибку.
+    for bin in sing-box xray; do
+      line="$(dpkg-deb -c "$DIST/$NAME.deb" | grep "resources/$bin\$" || true)"
+      [[ "$line" == -rwx* ]] || err "в DEB $bin без бита исполнения"
+    done
     cp "$BIN"/rpm/*.rpm "$DIST/$NAME.rpm"
-    rpm -qplv "$DIST/$NAME.rpm" | grep 'resources/sing-box$' | grep -q '^-rwx' \
-      || err "в RPM ядро без бита исполнения"
+    for bin in sing-box xray; do
+      line="$(rpm -qplv "$DIST/$NAME.rpm" | grep "resources/$bin\$" || true)"
+      [[ "$line" == -rwx* ]] || err "в RPM $bin без бита исполнения"
+    done
     tar -C "$BIN/app" -czf "$DIST/$NAME.tar.gz" Hydra
 
     arch="x86_64"; [[ "$TARGET" == "linux-arm64" ]] && arch="aarch64"

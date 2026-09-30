@@ -55,9 +55,11 @@ object SingBoxConfigBuilder {
         geoRouting: GeoRouting? = null,
         mtu: Int = MtuPreset.AUTO.value,
         hotspot: HotspotSettings? = null,
+        socksAuth: XrayConfigBuilder.SocksAuth? = null,
     ): JSONObject {
         val outbound = JSONObject().put("type", "socks").put("tag", "proxy")
             .put("server", "127.0.0.1").put("server_port", socksPort)
+        socksAuth?.let { outbound.put("username", it.user).put("password", it.pass) }
         return baseConfig(outbound, splitTunnel, dns, geoRouting, mtu, hotspot)
     }
 
