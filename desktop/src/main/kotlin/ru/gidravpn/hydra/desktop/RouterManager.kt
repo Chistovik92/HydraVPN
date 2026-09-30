@@ -24,6 +24,8 @@ data class RouterUi(
     val error: String? = null,
     val version: String = "",
     val state: String = "",
+    val uptime: String = "",
+    val lastError: String = "",
     val sections: List<RouterSection> = emptyList(),
     val subscriptions: List<RouterSubscription> = emptyList(),
     val nodes: List<RouterNode> = emptyList(),
@@ -83,7 +85,7 @@ class RouterManager(
         val logs = runCatching { c.logs(150) }.getOrDefault(emptyList())
         _ui.update {
             it.copy(online = true, error = null, version = ver,
-                state = st.optString("state", st.optString("status")),
+                state = st.optString("state"), uptime = st.optString("uptime"), lastError = st.optString("last_error"),
                 sections = sections, subscriptions = subs,
                 nodes = nodes.getOrDefault(emptyList()),
                 nodesError = nodes.exceptionOrNull()?.message,

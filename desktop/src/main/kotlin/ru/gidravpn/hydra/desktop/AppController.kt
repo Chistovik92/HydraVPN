@@ -83,6 +83,14 @@ class AppController(
     private val _ui = MutableStateFlow(UiState(data = store.load()))
     val ui: StateFlow<UiState> = _ui
 
+    /** Роутеры HydraVPN for Router, которыми управляет приложение (экран «Роутеры»). */
+    val routers = RouterManager(
+        scope,
+        routers = { _ui.value.data.routers },
+        saveRouters = { list -> mutate { it.copy(routers = list) } },
+        toast = ::toast,
+    )
+
     /** Номер сеанса ядра: колбэки и корутины старого сеанса ничего не меняют. */
     @Volatile private var session = 0
     /** Пользователь сам отключился — выход ядра не ошибка и не повод переподключаться. */
