@@ -108,7 +108,7 @@ data class RouterSection(val name: String, val label: String, val enabled: Boole
 data class RouterLogEntry(val time: String, val level: String, val message: String)
 
 /**
- * Клиент управляющего API роутера (`/api/v1/*`, docs/API.md проекта роутера). Только
+ * Клиент управляющего API роутера (`/api/v1/…`, docs/API.md проекта роутера). Только
  * java.net — работает и на Android, и на ПК. Всё синхронно: вызывать не из UI-потока.
  *
  * TLS: при известном отпечатке сертификат проверяется ТОЛЬКО по нему (самоподписанный
