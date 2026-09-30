@@ -25,10 +25,19 @@ object Platform {
             Os.MACOS -> File(home, "Library/Application Support/Hydra")
             Os.LINUX -> File(System.getenv("XDG_CONFIG_HOME")?.takeIf { it.isNotBlank() } ?: "$home/.config", "hydra")
         }
-        dir.apply { mkdirs() }
+        dir.apply { mkdirs(); privateDir(this) }
     }
 
-    val runDir: File get() = File(dataDir, "run").apply { mkdirs() }
+    /** Конфиги с паролями, pid-файлы, лог ядра — каталог только для владельца. */
+    val runDir: File get() = File(dataDir, "run").apply { mkdirs(); privateDir(this) }
+
+    /** chmod 700 (Linux/macOS); на Windows %APPDATA% и так закрыт для других пользователей. */
+    fun privateDir(dir: File) {
+        if (os == Os.WINDOWS) return
+        runCatching {
+            java.nio.file.Files.setPosixFilePermissions(dir.toPath(), java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"))
+        }
+    }
 
     /**
      * Каталог ресурсов пакета (Compose кладёт сюда common/ + <os>-<arch>/ из
@@ -37,19 +46,29 @@ object Platform {
     private val resourcesDir: File? =
         System.getProperty("compose.application.resources.dir")?.let(::File)?.takeIf { it.isDirectory }
 
-    private val coreName = if (os == Os.WINDOWS) "sing-box.exe" else "sing-box"
+    private fun exe(name: String) = if (os == Os.WINDOWS) "$name.exe" else name
 
-    /** Ядро из пакета; HYDRA_SING_BOX — ручное переопределение (разработка). */
-    fun bundledCore(): File? {
-        System.getenv("HYDRA_SING_BOX")?.let { File(it) }?.takeIf { it.isFile }?.let { return it }
-        val core = resourcesDir?.let { File(it, coreName) }?.takeIf { it.isFile } ?: return null
+    /** Ядро sing-box из пакета; HYDRA_SING_BOX — ручное переопределение (разработка). */
+    fun bundledCore(): File? = bundled("sing-box", "HYDRA_SING_BOX")
+
+    /** Ядро Xray-core из пакета; HYDRA_XRAY — ручное переопределение (разработка). */
+    fun bundledXray(): File? = bundled("xray", "HYDRA_XRAY")
+
+    private fun bundled(name: String, env: String): File? {
+        System.getenv(env)?.let { File(it) }?.takeIf { it.isFile }?.let { return it }
+        val file = exe(name)
+        val core = resourcesDir?.let { File(it, file) }?.takeIf { it.isFile } ?: return null
         if (os == Os.WINDOWS || core.canExecute() || core.setExecutable(true)) return core
         // Пакет без бита исполнения на read-only носителе (AppImage/DMG): копия в каталог данных.
-        val copy = File(dataDir, "bin/$coreName").apply { parentFile.mkdirs() }
+        val bin = File(dataDir, "bin").apply { mkdirs() }
+        val copy = File(bin, file)
         if (!copy.isFile || copy.length() != core.length()) core.copyTo(copy, overwrite = true)
         copy.setExecutable(true, true)
         return copy
     }
+
+    /** Путь к исполняемому файлу самого Hydra (лаунчер jpackage или java в `gradle run`). */
+    val selfExecutable: String? by lazy { ProcessHandle.current().info().command().orElse(null) }
 
     /** Каталог с geoip/ и geosite/ (*.srs); null — баз нет, geo-маршрутизация недоступна. */
     fun geoDir(): File? {

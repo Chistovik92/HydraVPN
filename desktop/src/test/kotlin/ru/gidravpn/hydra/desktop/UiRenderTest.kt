@@ -22,14 +22,23 @@ class UiRenderTest {
         val out = File(System.getProperty("hydra.configDump") ?: "build").parentFile.resolve("ui-render").apply { mkdirs() }
         val storeFile = File.createTempFile("hydra-ui", ".json").apply { deleteOnExit(); delete() }
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-        val c = AppController(scope, Store(storeFile))
+        val c = AppController(scope, Store(storeFile), background = false)
         c.import(
             "vless://11111111-2222-3333-4444-555555555555@nl.example.com:443?security=reality&pbk=x&sid=1&sni=a.com#Нидерланды\n" +
                 "trojan://pw@de.example.com:443#Германия\n" +
                 "awg://AAAA@fi.example.com:51820#AmneziaWG Финляндия",
         )
+        // Все редакторы маршрутизации и раздачи — открыты, чтобы рисовались и они.
+        c.updateRouting {
+            it.copy(appMode = ru.gidravpn.hydra.data.model.SplitTunnelMode.EXCLUDE, apps = listOf("chrome.exe"),
+                netMode = ru.gidravpn.hydra.data.model.SplitTunnelMode.INCLUDE,
+                geoMode = ru.gidravpn.hydra.data.model.GeoRoutingMode.DIRECT)
+        }
+        c.addNetRule(null, "youtube.com")
+        c.setLanShare(true)
+        c.saveProfile("Дом")
         c.toast(null)
-        for (tab in 0 until 5) {
+        for (tab in 0 until 6) {
             val scene = ImageComposeScene(980, 680, Density(1f)) {
                 val ui by c.ui.collectAsState()
                 HydraApp(c, ui, onRelaunchAdmin = {}, startTab = tab)

@@ -7,8 +7,8 @@ import java.net.URI
 import java.security.MessageDigest
 import javax.imageio.ImageIO
 
-// Hydra Desktop (Windows / Linux / macOS): Compose Desktop UI + ядро sing-box
-// отдельным процессом. Данные/парсеры/конфиг sing-box — из :shared.
+// Hydra Desktop (Windows / Linux / macOS): Compose Desktop UI + ядра sing-box и
+// Xray-core отдельными процессами. Данные/парсеры/конфиг sing-box — из :shared.
 //
 // Код лежит в src/main/kotlin и src/test/kotlin. Каталоги src/commonMain,
 // src/desktopMain, src/desktopTest — заготовка 1936f1d (консольный «Core Test»,
@@ -106,6 +106,53 @@ val downloadSingBox by tasks.registering {
     }
 }
 
+// ---- Ядро Xray-core (второй движок, как на Android) ------------------------------
+// Последний стабильный (не pre-release) релиз XTLS/Xray-core. SHA-256 — дайджесты
+// ассетов релиза https://github.com/XTLS/Xray-core/releases/tag/v26.3.27 .
+val xrayVersion = "26.3.27"
+
+val xrayArchives = mapOf(
+    "windows-x64" to ("windows-64" to "d004c39288ce9ada487c6f398c7c545f7d749e44bdfdd59dbc9f865afba4e1ad"),
+    "windows-arm64" to ("windows-arm64-v8a" to "35d4ed6ec21224fb22b07c2c3f672e2350cd536f2c74d309150175a76365ea88"),
+    "linux-x64" to ("linux-64" to "23cd9af937744d97776ee35ecad4972cf4b2109d1e0fe6be9930467608f7c8ae"),
+    "linux-arm64" to ("linux-arm64-v8a" to "4d30283ae614e3057f730f67cd088a42be6fdf91f8639d82cb69e48cde80413c"),
+    "macos-x64" to ("macos-64" to "f5b0471d3459eff1b82e48af0aeac186abcc3298210070afbbbd8437a4e8b203"),
+    "macos-arm64" to ("macos-arm64-v8a" to "2e93a67e8aa1936ecefb307e120830fcbd4c643ab9b1c46a2d0838d5f8409eaf"),
+)
+
+/** Xray-core своей платформы в тот же каталог ресурсов, что и sing-box. */
+val downloadXray by tasks.registering {
+    group = "hydra"
+    val target = hostTarget()
+    val (suffix, sha256) = xrayArchives.getValue(target)
+    val exe = if (target.startsWith("windows")) "xray.exe" else "xray"
+    val outDir = appResourcesDir.map { it.dir(target) }
+    outputs.dir(outDir)
+    inputs.property("xray", "$xrayVersion-$suffix-$sha256")
+    doLast {
+        val cache = coreCacheDir.get().asFile.apply { mkdirs() }
+        val file = cache.resolve("Xray-$xrayVersion-$suffix.zip")
+        fun sha(f: File) = MessageDigest.getInstance("SHA-256").digest(f.readBytes())
+            .joinToString("") { "%02x".format(it) }
+        if (!file.exists() || sha(file) != sha256) {
+            val url = "https://github.com/XTLS/Xray-core/releases/download/v$xrayVersion/Xray-$suffix.zip"
+            logger.lifecycle("Скачиваю $url")
+            URI(url).toURL().openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+        }
+        val actual = sha(file)
+        check(actual == sha256) { "SHA-256 ${file.name} не совпал: $actual (ожидался $sha256)" }
+        val dest = outDir.get().asFile
+        project.copy {
+            from(zipTree(file))
+            include(exe, "LICENSE")
+            eachFile { path = if (name == "LICENSE") "LICENSE-xray" else name }
+            includeEmptyDirs = false
+            into(dest)
+        }
+        dest.resolve(exe).setExecutable(true, false)
+    }
+}
+
 /** geoip/geosite .srs — те же базы, что в Android (app/src/main/assets). */
 val syncGeoAssets by tasks.registering(Sync::class) {
     group = "hydra"
@@ -115,7 +162,7 @@ val syncGeoAssets by tasks.registering(Sync::class) {
 
 val hydraAppResources by tasks.registering {
     group = "hydra"
-    dependsOn(downloadSingBox, syncGeoAssets)
+    dependsOn(downloadSingBox, downloadXray, syncGeoAssets)
 }
 
 // ---- Иконки: PNG/ICO/ICNS из одной 1024px-иконки iOS ---------------------------
@@ -258,7 +305,7 @@ tasks.matching { it.name == "prepareAppResources" }.configureEach {
     dependsOn(hydraAppResources)
     // Compose копирует ресурсы без бита исполнения — ядро в пакете было бы «Permission denied».
     (this as? AbstractCopyTask)?.eachFile {
-        if (name == "sing-box") permissions { unix("rwxr-xr-x") }
+        if (name == "sing-box" || name == "xray") permissions { unix("rwxr-xr-x") }
     }
 }
 tasks.matching { it.name.startsWith("package") || it.name.startsWith("createDistributable") || it.name.startsWith("createReleaseDistributable") }
@@ -268,6 +315,6 @@ tasks.matching { it.name.startsWith("package") || it.name.startsWith("createDist
 // образе: из него же собираются DEB/RPM (--app-image) и DMG в scripts/package-desktop.sh.
 tasks.matching { it.name == "createDistributable" || it.name == "createReleaseDistributable" }.configureEach {
     doLast {
-        outputs.files.asFileTree.matching { include("**/resources/sing-box") }.forEach { it.setExecutable(true, false) }
+        outputs.files.asFileTree.matching { include("**/resources/sing-box", "**/resources/xray") }.forEach { it.setExecutable(true, false) }
     }
 }

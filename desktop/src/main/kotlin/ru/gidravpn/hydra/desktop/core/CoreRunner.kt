@@ -5,9 +5,12 @@ import com.sun.jna.win32.StdCallLibrary
 import ru.gidravpn.hydra.desktop.ConnectionMode
 import ru.gidravpn.hydra.desktop.Os
 import ru.gidravpn.hydra.desktop.Platform
+import ru.gidravpn.hydra.desktop.Store
 import java.io.File
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.net.Socket
 import java.nio.file.Files
-import java.nio.file.attribute.PosixFilePermissions
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
@@ -15,79 +18,137 @@ import kotlin.concurrent.thread
 class NeedsElevation : IllegalStateException("Режим TUN на Windows требует запуска Hydra от имени администратора")
 
 /**
- * Процесс ядра sing-box. Права для TUN:
+ * Процессы ядер. sing-box — всегда (tun/прокси, DNS, маршрутизация); Xray-core — когда
+ * профиль обслуживает движок Xray: он поднимается первым как обычный процесс
+ * пользователя (ему нужен только socks на 127.0.0.1), sing-box становится мостом к нему.
+ *
+ * Права sing-box для TUN:
  *  - Windows — сам Hydra запущен от администратора ([Elevation]), ядро наследует токен;
  *  - Linux — копия ядра в каталоге данных с capabilities (однократно через pkexec setcap);
  *  - macOS — ядро запускается от root через osascript (системный запрос пароля).
  * В режиме PROXY ядро всегда обычный процесс пользователя.
+ *
+ * Колбэки несут номер сеанса: выход ядра прошлого подключения не должен ронять текущее.
  */
 class CoreRunner(
     private val onLog: (String) -> Unit,
-    private val onExit: (Int) -> Unit,
+    private val onExit: (session: Int, code: Int, core: String) -> Unit,
 ) {
     private interface Handle {
         val alive: Boolean
         fun stop()
     }
 
-    @Volatile private var handle: Handle? = null
+    @Volatile private var singBox: Handle? = null
+    @Volatile private var xray: Handle? = null
 
-    val isAlive: Boolean get() = handle?.alive == true
+    /** Все запущенные ядра живы. */
+    val isAlive: Boolean get() = singBox?.alive == true && (xray == null || xray?.alive == true)
 
-    fun start(configJson: String, mode: ConnectionMode) {
-        check(!isAlive) { "ядро уже запущено" }
+    @Synchronized
+    fun start(session: Int, configJson: String, mode: ConnectionMode, xrayConfig: String? = null, xraySocksPort: Int = 0) {
+        check(singBox?.alive != true && xray?.alive != true) { "ядро уже запущено" }
         val core = Platform.bundledCore()
             ?: error("Не найдено ядро sing-box в пакете приложения — переустановите Hydra")
         val dir = Platform.runDir
-        val config = File(dir, "config.json")
-        writePrivate(config, configJson)
 
-        handle = when {
-            mode == ConnectionMode.PROXY -> spawn(listOf(core.absolutePath, "run", "-c", config.absolutePath, "-D", dir.absolutePath))
-            Platform.os == Os.WINDOWS -> {
-                if (!Elevation.isAdmin()) throw NeedsElevation()
-                spawn(listOf(core.absolutePath, "run", "-c", config.absolutePath, "-D", dir.absolutePath))
+        xray = null
+        if (xrayConfig != null) {
+            val xr = Platform.bundledXray()
+                ?: error("Не найдено ядро Xray в пакете приложения — переустановите Hydra или выключите движок Xray")
+            val xcfg = File(dir, "xray.json")
+            Store.writePrivateAtomic(xcfg, xrayConfig)
+            val h = spawn(session, "xray", listOf(xr.absolutePath, "run", "-c", xcfg.absolutePath), XRAY_PID, dir) { "[xray] $it" }
+            xray = h
+            // sing-box, стартовавший раньше Xray, первые соединения отдал бы в закрытый порт.
+            if (!waitPort(xraySocksPort, h)) {
+                stop()
+                error("Xray не запустился — подробности в журнале")
             }
-            Platform.os == Os.LINUX -> {
-                val capCore = LinuxCaps.prepare(core, onLog)
-                spawn(listOf(capCore.absolutePath, "run", "-c", config.absolutePath, "-D", dir.absolutePath))
+        }
+
+        val config = File(dir, "config.json")
+        Store.writePrivateAtomic(config, configJson)
+        val cmd = { bin: File -> listOf(bin.absolutePath, "run", "-c", config.absolutePath, "-D", dir.absolutePath) }
+        try {
+            singBox = when {
+                mode == ConnectionMode.PROXY -> spawn(session, "sing-box", cmd(core), CORE_PID, dir)
+                Platform.os == Os.WINDOWS -> {
+                    if (!Elevation.isAdmin()) throw NeedsElevation()
+                    spawn(session, "sing-box", cmd(core), CORE_PID, dir)
+                }
+                Platform.os == Os.LINUX -> spawn(session, "sing-box", cmd(LinuxCaps.prepare(core, onLog)), CORE_PID, dir)
+                else -> startMacRoot(session, core, config, dir)
             }
-            else -> startMacRoot(core, config, dir)
+        } catch (e: Exception) {
+            stop()
+            throw e
         }
     }
 
+    /** Сначала sing-box (снимает маршруты tun), потом Xray. */
+    @Synchronized
     fun stop() {
-        handle?.stop()
-        handle = null
+        singBox?.stop()
+        singBox = null
+        xray?.stop()
+        xray = null
+    }
+
+    private fun waitPort(port: Int, h: Handle, timeoutMs: Long = 8000): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (!h.alive) return false
+            val open = runCatching {
+                Socket(Proxy.NO_PROXY).use { it.connect(InetSocketAddress("127.0.0.1", port), 300) }
+            }.isSuccess
+            if (open) return true
+            Thread.sleep(100)
+        }
+        return false
     }
 
     companion object {
-        private val pidFile get() = File(Platform.runDir, "core.pid")
+        private const val CORE_PID = "core.pid"
+        private const val XRAY_PID = "xray.pid"
 
         /**
          * На Windows дочерний процесс переживает падение родителя: ядро прошлого
-         * запуска держало бы порт прокси. Гасим его, если pid всё ещё принадлежит sing-box.
+         * запуска держало бы порты. Гасим его, если pid всё ещё принадлежит нашему ядру.
          */
         fun killStale() {
-            val pid = runCatching { pidFile.readText().trim().toLong() }.getOrNull() ?: return
-            ProcessHandle.of(pid).filter { h ->
-                h.info().command().map { File(it).name.startsWith("sing-box") }.orElse(false)
-            }.ifPresent { h ->
-                h.destroy()
-                runCatching { h.onExit().get(3, TimeUnit.SECONDS) }
-                if (h.isAlive) h.destroyForcibly()
+            killStale(CORE_PID, "sing-box")
+            killStale(XRAY_PID, "xray")
+        }
+
+        private fun killStale(pidName: String, prefix: String) {
+            val pidFile = File(Platform.runDir, pidName)
+            val pid = runCatching { pidFile.readText().trim().toLong() }.getOrNull()
+            if (pid != null) {
+                ProcessHandle.of(pid).filter { h ->
+                    h.info().command().map { File(it).name.startsWith(prefix) }.orElse(false)
+                }.ifPresent { h ->
+                    h.destroy()
+                    runCatching { h.onExit().get(3, TimeUnit.SECONDS) }
+                    if (h.isAlive) h.destroyForcibly()
+                }
             }
             pidFile.delete()
         }
     }
 
-    private fun spawn(cmd: List<String>): Handle {
-        val p = ProcessBuilder(cmd).redirectErrorStream(true).start()
+    private fun spawn(session: Int, name: String, cmd: List<String>, pidName: String, dir: File, tag: (String) -> String = { it }): Handle {
+        val pb = ProcessBuilder(cmd).redirectErrorStream(true).directory(dir)
+        // Своих geo-баз Xray не даём (маршрутизация — в sing-box), но ищет он их здесь.
+        pb.environment()["XRAY_LOCATION_ASSET"] = dir.absolutePath
+        val p = pb.start()
+        val pidFile = File(dir, pidName)
         runCatching { pidFile.writeText(p.pid().toString()) }
-        thread(isDaemon = true, name = "sing-box-log") {
-            runCatching { p.inputStream.bufferedReader().forEachLine(onLog) }
+        thread(isDaemon = true, name = "$name-log") {
+            runCatching { p.inputStream.bufferedReader().forEachLine { onLog(tag(it)) } }
             val code = runCatching { p.waitFor() }.getOrDefault(-1)
-            onExit(code)
+            runCatching { if (pidFile.readText().trim() == p.pid().toString()) pidFile.delete() }
+            onExit(session, code, name)
         }
         return object : Handle {
             override val alive get() = p.isAlive
@@ -100,9 +161,10 @@ class CoreRunner(
     }
 
     /** macOS: root-процесс через osascript; лог — в файл, который читаем «хвостом». */
-    private inner class MacRootHandle(val pid: Long, val log: File) : Handle {
+    private inner class MacRootHandle(val session: Int, val pid: Long, val log: File) : Handle {
         @Volatile private var stopped = false
-        override val alive get() = !stopped && ProcessBuilder("ps", "-p", "$pid").start().waitFor() == 0
+        // ProcessHandle видит и процессы root — без запуска `ps` на каждый вопрос «жив ли».
+        override val alive get() = !stopped && ProcessHandle.of(pid).map { it.isAlive }.orElse(false)
 
         init {
             thread(isDaemon = true, name = "sing-box-log") {
@@ -116,7 +178,7 @@ class CoreRunner(
                             bytes.decodeToString().lines().filter { it.isNotBlank() }.forEach(onLog)
                         }
                     }
-                    if (!alive) { onExit(0); break }
+                    if (!alive) { onExit(session, 0, "sing-box"); break }
                     Thread.sleep(500)
                 }
             }
@@ -129,28 +191,21 @@ class CoreRunner(
         }
     }
 
-    private fun startMacRoot(core: File, config: File, dir: File): Handle {
+    private fun startMacRoot(session: Int, core: File, config: File, dir: File): Handle {
         val log = File(dir, "sing-box.log").apply { writeText("") }
         fun q(f: File) = "'" + f.absolutePath.replace("'", "'\\''") + "'"
         val shell = "${q(core)} run -c ${q(config)} -D ${q(dir)} > ${q(log)} 2>&1 & echo \$!"
         val out = osascript("do shell script \"${shell.replace("\\", "\\\\").replace("\"", "\\\"")}\" with administrator privileges")
         val pid = out.trim().toLongOrNull() ?: error("Не удалось запустить ядро с правами администратора: ${out.trim()}")
-        return MacRootHandle(pid, log)
+        return MacRootHandle(session, pid, log)
     }
 
     private fun osascript(script: String): String {
         val p = ProcessBuilder("osascript", "-e", script).redirectErrorStream(true).start()
         val out = p.inputStream.bufferedReader().readText()
-        p.waitFor(120, TimeUnit.SECONDS)
+        if (!p.waitFor(120, TimeUnit.SECONDS)) { p.destroyForcibly(); error("Запрос прав администратора не завершился") }
         if (p.exitValue() != 0) error(if ("-128" in out) "Запрос прав администратора отменён" else out.trim())
         return out
-    }
-
-    private fun writePrivate(f: File, text: String) {
-        f.writeText(text)
-        if (Platform.os != Os.WINDOWS) {
-            runCatching { Files.setPosixFilePermissions(f.toPath(), PosixFilePermissions.fromString("rw-------")) }
-        }
     }
 }
 
@@ -190,9 +245,10 @@ private object LinuxCaps {
     private const val CAPS = "cap_net_admin,cap_net_raw,cap_net_bind_service+ep"
 
     fun prepare(bundled: File, log: (String) -> Unit): File {
-        val bin = File(Platform.dataDir, "bin").apply { mkdirs() }
+        // Каталог только для владельца: копию с CAP_NET_ADMIN не запустят другие пользователи.
+        val bin = File(Platform.dataDir, "bin").apply { mkdirs(); Platform.privateDir(this) }
         val copy = File(bin, "sing-box")
-        if (!copy.isFile || copy.length() != bundled.length() || !copy.readBytes().contentEquals(bundled.readBytes())) {
+        if (!copy.isFile || copy.length() != bundled.length() || Files.mismatch(copy.toPath(), bundled.toPath()) != -1L) {
             bundled.copyTo(copy, overwrite = true)
             copy.setExecutable(true, true)
         }
@@ -205,7 +261,8 @@ private object LinuxCaps {
         log("Hydra: запрашиваю права на TUN (pkexec setcap)…")
         val p = ProcessBuilder(pkexec, setcap, CAPS, copy.absolutePath).redirectErrorStream(true).start()
         val out = p.inputStream.bufferedReader().readText()
-        check(p.waitFor(180, TimeUnit.SECONDS) && p.exitValue() == 0) {
+        if (!p.waitFor(180, TimeUnit.SECONDS)) { p.destroyForcibly(); error("Запрос прав не завершился за 3 минуты") }
+        check(p.exitValue() == 0) {
             if (p.exitValue() == 126) "Запрос прав отменён" else "setcap не удался: ${out.trim()}"
         }
         check(hasCaps(copy)) {
@@ -218,7 +275,7 @@ private object LinuxCaps {
         val getcap = listOf("/usr/sbin/getcap", "/sbin/getcap", "/usr/bin/getcap").firstOrNull { File(it).canExecute() } ?: return false
         val p = ProcessBuilder(getcap, f.absolutePath).redirectErrorStream(true).start()
         val out = p.inputStream.bufferedReader().readText()
-        p.waitFor(10, TimeUnit.SECONDS)
+        if (!p.waitFor(10, TimeUnit.SECONDS)) { p.destroyForcibly(); return false }
         return "cap_net_admin" in out
     }
 }

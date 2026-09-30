@@ -2,6 +2,11 @@ package ru.gidravpn.hydra.desktop
 
 import org.json.JSONObject
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
+import ru.gidravpn.hydra.data.model.HotspotSettings
+import ru.gidravpn.hydra.data.model.MtuPreset
+import ru.gidravpn.hydra.data.model.NetRuleType
+import ru.gidravpn.hydra.data.model.NetworkRule
+import ru.gidravpn.hydra.data.model.SplitTunnelMode
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.subscription.LinkParser
@@ -43,7 +48,7 @@ class DesktopConfigTest {
             val p = parse(link)
             assertTrue(DesktopConfig.isSupported(p), "$name должен поддерживаться")
             for (os in Os.entries) for (mode in ConnectionMode.entries) {
-                val settings = DesktopSettings(mode = mode, geoMode = GeoRoutingMode.DIRECT, geoCountries = listOf("ru"))
+                val settings = DesktopSettings(mode = mode, routing = RoutingSettings(geoMode = GeoRoutingMode.DIRECT, geoCountries = listOf("ru")))
                 val cfg = DesktopConfig.build(p, settings, os, api, geoDir)
                 val inbound = cfg.getJSONArray("inbounds").getJSONObject(0)
                 if (mode == ConnectionMode.TUN) {
@@ -84,6 +89,26 @@ class DesktopConfigTest {
                 route.put("rules", all)
             }
             File(dir, "e2e-${os.name.lowercase()}-${mode.name.lowercase()}.json").writeText(cfg.toString(2))
+
+            // Движок Xray: тот же сервер, Xray на 127.0.0.1:18090 с паролем, sing-box — мост.
+            val bridge = DesktopConfig.XrayBridge(18090, ru.gidravpn.hydra.data.subscription.XrayConfigBuilder.SocksAuth("hydra", "e2e"))
+            val xs = DesktopSettings(mode = mode, proxyPort = 12080, preferXray = true)
+            val exe = if (os == Os.WINDOWS) ".exe" else ""
+            val bridged = DesktopConfig.build(p, xs, os, DesktopConfig.Api(19090, "secret"), null, bridge)
+            if (mode == ConnectionMode.TUN) {
+                // В приложении это process_path бинарника Xray (bypassPaths); в e2e путь неизвестен — по имени.
+                val route = bridged.getJSONObject("route").put("find_process", true)
+                val rules = route.getJSONArray("rules")
+                val all = org.json.JSONArray().put(JSONObject()
+                    .put("process_name", org.json.JSONArray().put("sing-box-server$exe").put("xray$exe"))
+                    .put("outbound", "direct"))
+                for (i in 0 until rules.length()) all.put(rules.get(i))
+                route.put("rules", all)
+            }
+            File(dir, "e2e-xray-${os.name.lowercase()}-${mode.name.lowercase()}.json").writeText(bridged.toString(2))
+            File(dir.parentFile, "xray-configs").apply { mkdirs() }
+                .resolve("e2e-xray-${os.name.lowercase()}-${mode.name.lowercase()}.json")
+                .writeText(DesktopConfig.xray(p, xs, bridge).toString(2))
         }
     }
 
@@ -130,7 +155,16 @@ class DesktopConfigTest {
         val store = Store(f)
         val state = HydraState(
             servers = listOf(parse(links.getValue("vless-reality")).copy(subscriptionId = 3, pingMs = 42)),
-            settings = DesktopSettings(mode = ConnectionMode.TUN, dns = "https://dns.example/dns-query", selectedServerId = 1),
+            settings = DesktopSettings(
+                mode = ConnectionMode.TUN, selectedServerId = 1, preferXray = true, killSwitch = true,
+                routing = RoutingSettings(
+                    dns = "https://dns.example/dns-query", appMode = SplitTunnelMode.EXCLUDE, apps = listOf("chrome.exe", "C:\\Apps\\tg.exe"),
+                    netMode = SplitTunnelMode.INCLUDE, netRules = listOf(NetworkRule(NetRuleType.DOMAIN_SUFFIX, "youtube.com")),
+                    mtu = MtuPreset.MTU_1400, ipv6 = true,
+                ),
+                lanShare = HotspotSettings(enabled = true, port = 3000, password = "secret1"),
+            ),
+            profiles = listOf(RoutingProfile("Дом", RoutingSettings(dns = "8.8.8.8"))),
         )
         store.save(state)
         assertEquals(state, store.load())
