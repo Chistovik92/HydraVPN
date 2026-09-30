@@ -214,6 +214,8 @@ RouterOS 7 (контейнер); ядра sing-box, zapret/zapret2, ByeDPI; ко
 `hydravpn-router://host:port?token=…&tls=1&fp=<sha256>` (`hydravpn-router pair --host …`).
 Старый Clash-подобный `internal/api` удалён. Клиент `RouterClient` (`:shared`) написан под этот контракт.
 
+Состояние работы и что продолжить — [HANDOFF_ROUTERS.md](HANDOFF_ROUTERS.md).
+
 **Не закрыто (нужно в роутере):** `/api/v1/capabilities` для старых версий; права «смотреть/управлять»
 (токен один, полный доступ); `?token=` принимается на любом пути (нужно только для SSE); автогенерация
 самоподписанного сертификата (сейчас TLS — вручную); `/traffics` и соединения (Clash-эндпоинты не
