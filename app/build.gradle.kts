@@ -96,7 +96,18 @@ android {
     // так `assembleNativeDebug` не ломается, если libXray.aar ещё не собран.
     // .so и classes.dex для процесса :xray подключаются НЕ как Gradle-зависимость
     // (см. extractLibXrayNativeLibs/libXrayToDex ниже и комментарий там же).
+    // Клиент роутера (пакет ru.gidravpn.hydra.router) общий с ПК-версией и лежит в :shared, но
+    // :shared в app не подключается целиком (см. комментарий у dependencies: в app свои копии
+    // тех же классов, дубли ломали слияние dex). Поэтому в сборку берётся только этот пакет —
+    // копией в build/generated, без дублирования исходников в репозитории.
+    val syncSharedRouter = tasks.register<Sync>("syncSharedRouter") {
+        from(rootProject.file("shared/src/commonMain/kotlin/ru/gidravpn/hydra/router"))
+        into(layout.buildDirectory.dir("generated/sharedRouter/ru/gidravpn/hydra/router"))
+    }
     sourceSets {
+        getByName("main") {
+            java.srcDir(files(layout.buildDirectory.dir("generated/sharedRouter")).builtBy(syncSharedRouter))
+        }
         getByName("native") {
             val hasLibXray = file("libs/libXray.aar").exists()
             java.srcDir(if (hasLibXray) "src/nativeXrayReal/java" else "src/nativeXrayStub/java")

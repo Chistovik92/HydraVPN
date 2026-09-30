@@ -34,6 +34,7 @@ import ru.gidravpn.hydra.desktop.core.Rules
 import ru.gidravpn.hydra.desktop.core.Subscriptions
 import ru.gidravpn.hydra.desktop.core.SystemProxy
 import ru.gidravpn.hydra.desktop.core.Updates
+import ru.gidravpn.hydra.router.RouterManager
 import java.io.File
 import java.net.Inet4Address
 import java.net.InetAddress

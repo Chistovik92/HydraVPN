@@ -47,8 +47,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import ru.gidravpn.hydra.desktop.AppController
-import ru.gidravpn.hydra.desktop.RouterManager
-import ru.gidravpn.hydra.desktop.RouterUi
+import ru.gidravpn.hydra.router.RouterManager
+import ru.gidravpn.hydra.router.RouterUi
 import ru.gidravpn.hydra.desktop.UiState
 import ru.gidravpn.hydra.router.RouterLink
 import ru.gidravpn.hydra.router.RouterNode
