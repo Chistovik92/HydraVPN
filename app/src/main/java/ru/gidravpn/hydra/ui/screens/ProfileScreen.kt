@@ -90,6 +90,8 @@ fun ProfileScreen(vm: MainViewModel) {
             }
         }
 
+        BotAccountCard(vm)
+
         Card(Modifier.fillMaxWidth()) {
             Label(stringResource(R.string.profile_stats))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {

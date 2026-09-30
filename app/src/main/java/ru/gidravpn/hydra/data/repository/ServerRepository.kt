@@ -1,6 +1,7 @@
 package ru.gidravpn.hydra.data.repository
 
 import android.content.Context
+import ru.gidravpn.hydra.data.botaccount.BotSubscription
 import ru.gidravpn.hydra.data.db.AppDatabase
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.Subscription
@@ -38,6 +39,27 @@ class ServerRepository(context: Context) {
         val existing = subs.getAll().firstOrNull { it.url.trim() == url.trim() }
         val subId = existing?.id ?: subs.upsert(Subscription(name = name, url = url))
         return refreshSubscription(subId)
+    }
+
+    /** Итог синхронизации с аккаунтом бота: подписок взято, серверов в них, подписок с ошибкой. */
+    data class BotSyncResult(val subscriptions: Int, val servers: Int, val failed: Int)
+
+    /**
+     * Завести подписки, выданные в боте «Радар». Берутся только ссылки подписок в рабочем состоянии
+     * ([BotSubscription.importable]); тот же URL не плодит дубликат ([addSubscription]). Подписки,
+     * пропавшие из бота, здесь не удаляются: решение об этом остаётся за человеком.
+     */
+    suspend fun syncBotSubscriptions(items: List<BotSubscription>): BotSyncResult {
+        var subscriptions = 0
+        var servers = 0
+        var failed = 0
+        for (item in items.filter { it.importable }) {
+            runCatching { addSubscription(item.title, item.url) }.fold(
+                onSuccess = { subscriptions++; servers += it },
+                onFailure = { failed++ },
+            )
+        }
+        return BotSyncResult(subscriptions, servers, failed)
     }
 
     data class RefreshResult(val total: Int, val added: Int, val removed: Int)

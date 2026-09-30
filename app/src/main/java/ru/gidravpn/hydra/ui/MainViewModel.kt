@@ -451,6 +451,96 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Аппаратный ID, который клиент отдаёт панелям (`x-hwid`) — показывается в Профиле. */
     val hwid: String by lazy { ru.gidravpn.hydra.data.repository.HydraDevice.hwid(getApplication()) }
 
+    // ----- Аккаунт бота «Радар»: вход по коду и забор выданных подписок -----
+
+    data class BotAccountUi(
+        val linked: Boolean = false,
+        val server: String = "",
+        val username: String = "",
+        val busy: Boolean = false,
+        val message: String? = null,
+    )
+
+    private val botStore = ru.gidravpn.hydra.data.botaccount.BotAccountStore(app)
+    private val botApi = ru.gidravpn.hydra.data.botaccount.BotAccountApi()
+    private val _bot = MutableStateFlow(BotAccountUi(botStore.linked, botStore.server, botStore.username))
+    val bot: StateFlow<BotAccountUi> = _bot.asStateFlow()
+
+    fun dismissBotMessage() { _bot.update { it.copy(message = null) } }
+
+    private fun botText(id: Int, vararg args: Any): String = getApplication<Application>().getString(id, *args)
+
+    private fun botError(e: ru.gidravpn.hydra.data.botaccount.BotAccountException): String = when (e.code) {
+        0 -> botText(ru.gidravpn.hydra.R.string.bot_err_network)
+        401 -> botText(ru.gidravpn.hydra.R.string.bot_err_auth)
+        404 -> botText(ru.gidravpn.hydra.R.string.bot_err_off)
+        429 -> botText(ru.gidravpn.hydra.R.string.bot_err_rate)
+        else -> e.message ?: "HTTP ${e.code}"
+    }
+
+    /** Код из бота → токен устройства → первая синхронизация. */
+    fun linkBot(serverInput: String, code: String) = safeLaunch {
+        if (_bot.value.busy) return@safeLaunch
+        val server = ru.gidravpn.hydra.data.botaccount.BotAccountJson.normalizeServer(serverInput)
+        if (server == null) {
+            _bot.update { it.copy(message = botText(ru.gidravpn.hydra.R.string.bot_err_server)) }
+            return@safeLaunch
+        }
+        _bot.update { it.copy(busy = true, message = null) }
+        try {
+            val token = botApi.link(server, code, ru.gidravpn.hydra.data.repository.HydraDevice.model)
+            val name = runCatching { botApi.profile(server, token).username }.getOrDefault("")
+            botStore.save(server, token, name)
+            _bot.update { it.copy(linked = true, server = server, username = name) }
+            syncBotNow(server, token)
+        } catch (e: ru.gidravpn.hydra.data.botaccount.BotAccountException) {
+            _bot.update { it.copy(busy = false, message = botError(e)) }
+        }
+    }
+
+    fun syncBot() = safeLaunch {
+        if (_bot.value.busy) return@safeLaunch
+        val token = botStore.token
+        if (token == null) {
+            botStore.clear()
+            _bot.value = BotAccountUi(message = botText(ru.gidravpn.hydra.R.string.bot_err_auth))
+            return@safeLaunch
+        }
+        _bot.update { it.copy(busy = true, message = null) }
+        syncBotNow(botStore.server, token)
+    }
+
+    private suspend fun syncBotNow(server: String, token: String) {
+        try {
+            val items = botApi.subscriptions(server, token)
+            val r = repo.syncBotSubscriptions(items)
+            val text = when {
+                items.none { it.importable } -> botText(ru.gidravpn.hydra.R.string.bot_sync_none)
+                r.failed > 0 -> botText(ru.gidravpn.hydra.R.string.bot_sync_partial, r.subscriptions, r.servers, r.failed)
+                else -> botText(ru.gidravpn.hydra.R.string.bot_sync_ok, r.subscriptions, r.servers)
+            }
+            VpnState.log("Аккаунт бота: подписок ${r.subscriptions}, серверов ${r.servers}, ошибок ${r.failed}")
+            _bot.update { it.copy(busy = false, message = text) }
+        } catch (e: ru.gidravpn.hydra.data.botaccount.BotAccountException) {
+            // Токен отозван (устройство отключили в боте) — держать его дальше незачем.
+            if (e.code == 401) {
+                botStore.clear()
+                _bot.value = BotAccountUi(message = botError(e))
+            } else {
+                _bot.update { it.copy(busy = false, message = botError(e)) }
+            }
+        }
+    }
+
+    /** Отключить устройство в боте и забыть токен. Уже заведённые подписки остаются. */
+    fun unlinkBot() = safeLaunch {
+        val token = botStore.token
+        val server = botStore.server
+        if (token != null) runCatching { botApi.logout(server, token) }
+        botStore.clear()
+        _bot.value = BotAccountUi(message = botText(ru.gidravpn.hydra.R.string.bot_unlinked))
+    }
+
     fun refreshSubscription(sub: Subscription) = safeLaunch {
         if (sub.id in _refreshingSubs.value) return@safeLaunch
         _refreshingSubs.update { it + sub.id }

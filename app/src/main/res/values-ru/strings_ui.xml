@@ -311,4 +311,23 @@
     <string name="srv_empty_desc">Добавьте подписку или сервер: вставьте ссылку, отсканируйте QR или выберите фото.</string>
     <string name="srv_more">Ещё…</string>
     <string name="sub_refresh_short">Обновить</string>
+    <!-- Аккаунт бота «Радар» -->
+    <string name="bot_title">Аккаунт бота</string>
+    <string name="bot_hint">Войдите в аккаунт бота «Радар», чтобы получить выданные вам подписки. В боте откройте «VPN» → «Подключить приложение» и введите код здесь.</string>
+    <string name="bot_server">Адрес сервера бота</string>
+    <string name="bot_code">Код из бота (8 цифр)</string>
+    <string name="bot_connect">Подключить</string>
+    <string name="bot_linked">Подключено к боту</string>
+    <string name="bot_linked_as">Подключено как @%1$s</string>
+    <string name="bot_sync">Получить подписки</string>
+    <string name="bot_unlink">Отключить</string>
+    <string name="bot_unlinked">Отключено. Уже добавленные подписки остались в списке.</string>
+    <string name="bot_sync_ok">Подписок добавлено или обновлено: %1$d, серверов: %2$d.</string>
+    <string name="bot_sync_partial">Подписок: %1$d, серверов: %2$d. Не загрузилось: %3$d.</string>
+    <string name="bot_sync_none">В боте пока нет рабочих подписок для вас. Доступ выдаёт администратор.</string>
+    <string name="bot_err_server">Укажите адрес сервера бота, например radar.example.org. Обычный http — только в своей сети.</string>
+    <string name="bot_err_network">Нет связи с сервером бота.</string>
+    <string name="bot_err_auth">Код неверен или устарел, либо это устройство отключили в боте. Возьмите новый код.</string>
+    <string name="bot_err_off">На этом сервере API для приложений выключен.</string>
+    <string name="bot_err_rate">Слишком много попыток. Подождите несколько минут.</string>
 </resources>
