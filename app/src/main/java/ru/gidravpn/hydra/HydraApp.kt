@@ -26,6 +26,7 @@ class HydraApp : Application() {
 
         LogStore.init(filesDir)
         runCatching { ru.gidravpn.hydra.data.work.SubscriptionUpdateWorker.schedule(this) }
+        runCatching { ru.gidravpn.hydra.data.work.BotSyncWorker.schedule(this) }
         installCrashHandler()
         val logSettings = LogSettingsRepository(this)
         appScope.launch { logSettings.mode.collect { LogStore.mode = it } }
