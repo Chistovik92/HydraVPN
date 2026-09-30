@@ -205,14 +205,22 @@ RouterOS 7 (контейнер); ядра sing-box, zapret/zapret2, ByeDPI; ко
 `/etc/hydravpn-router/config.yaml` (секции, подписки, urltest, списки, DNS/FakeIP).
 Цель фазы — чтобы роутером можно было управлять из приложения Hydra, как VPN на самом устройстве.
 
-**Что у роутера уже есть для этого.** Clash-совместимый HTTP API (`internal/api/clash.go`) с
-секретом `Authorization: Bearer …`: `/version`, `/configs`, `/proxies` (+ выбор узла в группе),
-`/rules`, `/connections` (+ разрыв), `/traffics`, `/memory`, `/logs`. Этого хватает на мониторинг
-и переключение узлов. **Чего нет:** управления секциями, подписками, списками, провайдером
-(sing-box/zapret/ByeDPI) и перезапуском — их придётся добавить в роутерный сервис.
+**Что у роутера уже есть (сверено 30.09.2026, main, v1.2.0).** Управляющий API `/api/v1/*`
+(`internal/mgmt`, [docs/API.md](https://github.com/Chistovik92/HydraVPNforRouters/blob/main/docs/API.md)):
+`version`, `status`, `config`, `reload`, `restart`, `sections` (CRUD), `subscriptions` (добавить/удалить/
+`refresh`), `servers`, `nodes` (+ `select`, `test`), `logs` (+ SSE `logs/stream`), `check/{name}`.
+Доступ: `Authorization: Bearer <token>`, только частные сети (`api_allow`), 10 неверных токенов в минуту →
+429, журнал аудита, TLS по `api_tls_cert/key`. Ссылка сопряжения:
+`hydravpn-router://host:port?token=…&tls=1&fp=<sha256>` (`hydravpn-router pair --host …`).
+Старый Clash-подобный `internal/api` удалён. Клиент `RouterClient` (`:shared`) написан под этот контракт.
+
+**Не закрыто (нужно в роутере):** `/api/v1/capabilities` для старых версий; права «смотреть/управлять»
+(токен один, полный доступ); `?token=` принимается на любом пути (нужно только для SSE); автогенерация
+самоподписанного сертификата (сейчас TLS — вручную); `/traffics` и соединения (Clash-эндпоинты не
+проброшены); mDNS `_hydra-router._tcp`; откат конфига при ошибке `sing-box check` (есть только `.bak`).
 
 **13a. Подключение к роутеру (клиенты).** Экран «Роутеры»: добавить по адресу + секрету или по
-QR/ссылке `hydra-router://host:port?secret=…` из LuCI/веб-UI роутера; поиск в локальной сети
+QR/ссылке `hydravpn-router://host:port?token=…&tls=1&fp=…` из LuCI/веб-UI роутера; поиск в локальной сети
 (mDNS `_hydra-router._tcp` — нужна поддержка в роутере; до неё — ручной ввод и шлюз по умолчанию).
 Секрет — в защищённом хранилище (Android Keystore / Keychain / файл 0600 на ПК). Общая логика
 клиента API — в `:shared` (Android и ПК), для iOS — в `HydraKit`.
@@ -221,11 +229,10 @@ QR/ссылке `hydra-router://host:port?secret=…` из LuCI/веб-UI роу
 трафик (`/traffics`), активные соединения с разрывом, журнал (`/logs`), список групп и узлов с
 задержкой и выбором узла (`/proxies`). Виджет/плитка «роутер: онлайн, узел, скорость».
 
-**13c. Управляющий API в роутере (изменения в HydraVPNforRouters).** Новые эндпоинты
-`/hydra/v1/…`: секции (вкл/выкл, action, provider, community_lists, fully_routed_ips), подписки
+**13c. Управляющий API в роутере (изменения в HydraVPNforRouters).** Расширение `/api/v1/…`: секции (вкл/выкл, action, provider, community_lists, fully_routed_ips), подписки
 (добавить/удалить/обновить сейчас/интервал), списки и rule_set, DNS, «применить и перезапустить»
 с откатом конфига при ошибке `sing-box check`, обновление компонентов. Версионирование API и
-`/hydra/v1/capabilities`, чтобы клиент скрывал то, чего старый роутер не умеет.
+`/api/v1/capabilities`, чтобы клиент скрывал то, чего старый роутер не умеет.
 
 **13d. Управление из клиентов.** Редактор секций и подписок роутера; **«Отправить на роутер»**
 для сервера или подписки из Hydra (одна кнопка вместо ручного копирования ссылки в LuCI);
