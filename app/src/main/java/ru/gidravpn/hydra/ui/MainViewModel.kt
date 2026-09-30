@@ -481,7 +481,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Код из бота → токен устройства → первая синхронизация. */
     fun linkBot(serverInput: String, code: String) = safeLaunch {
         if (_bot.value.busy) return@safeLaunch
-        val server = ru.gidravpn.hydra.data.botaccount.BotAccountJson.normalizeServer(serverInput)
+        val server = ru.gidravpn.hydra.data.botaccount.BotAccountJson.normalizeServer(serverInput, allowHttp = ru.gidravpn.hydra.BuildConfig.DEBUG)
         if (server == null) {
             _bot.update { it.copy(message = botText(ru.gidravpn.hydra.R.string.bot_err_server)) }
             return@safeLaunch
