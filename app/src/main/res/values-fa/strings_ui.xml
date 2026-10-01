@@ -17,6 +17,7 @@
 
     <!-- Main screen -->
     <string name="main_protocol">پروتکل</string>
+    <string name="main_account">حساب</string>
     <string name="main_current_config">پیکربندی فعلی</string>
     <string name="main_change">تغییر ←</string>
     <string name="main_cfg">سرور: %1$s\nپورت: %2$d\nنوع: %3$s</string>

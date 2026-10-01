@@ -17,6 +17,7 @@
 
     <!-- Main screen -->
     <string name="main_protocol">Protocol</string>
+    <string name="main_account">Account</string>
     <string name="main_current_config">Current configuration</string>
     <string name="main_change">Change →</string>
     <string name="main_cfg">Server: %1$s\nPort: %2$d\nType: %3$s</string>

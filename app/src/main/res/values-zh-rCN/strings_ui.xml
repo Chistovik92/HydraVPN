@@ -17,6 +17,7 @@
 
     <!-- Main screen -->
     <string name="main_protocol">协议</string>
+    <string name="main_account">账户</string>
     <string name="main_current_config">当前配置</string>
     <string name="main_change">更改 →</string>
     <string name="main_cfg">服务器：%1$s\n端口：%2$d\n类型：%3$s</string>

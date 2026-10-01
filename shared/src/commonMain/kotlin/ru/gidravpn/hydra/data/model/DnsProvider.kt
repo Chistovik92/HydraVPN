@@ -11,6 +11,8 @@ enum class DnsProvider(val label: String, val address: String?, val labelRes: In
     GOOGLE("Google", "8.8.8.8"),
     QUAD9("Quad9", "9.9.9.9"),
     ADGUARD("AdGuard", "94.140.14.14"),
+    /** Приватный DNS проекта Hydra VPN (0.7.0). */
+    HYDRA("Hydra VPN", "dns.hydravpn.us"),
     SYSTEM("System", null, 0),
     CUSTOM("Custom", null, 0);
 

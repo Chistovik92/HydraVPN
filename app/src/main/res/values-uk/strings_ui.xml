@@ -17,6 +17,7 @@
 
     <!-- Main screen -->
     <string name="main_protocol">Протокол</string>
+    <string name="main_account">Акаунт</string>
     <string name="main_current_config">Поточна конфігурація</string>
     <string name="main_change">Змінити →</string>
     <string name="main_cfg">Сервер: %1$s\nПорт: %2$d\nТип: %3$s</string>
