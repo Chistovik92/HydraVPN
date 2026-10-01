@@ -16,6 +16,7 @@
 
     <!-- Main screen -->
     <string name="main_protocol">Протокол</string>
+    <string name="main_account">Аккаунт</string>
     <string name="main_current_config">Текущая конфигурация</string>
     <string name="main_change">Изменить →</string>
     <string name="main_cfg">Сервер: %1$s\nПорт: %2$d\nТип: %3$s</string>
@@ -178,6 +179,8 @@
     <string name="dns_label">DNS (внутри туннеля)</string>
     <string name="dns_custom_hint">IP, хост или DoH/DoT-URL</string>
     <string name="dns_system_hint">Резолвер устройства, без шифрования — запросы идут мимо туннеля</string>
+    <string name="dns_hydra">Hydra VPN (приватный)</string>
+    <string name="dns_hydra_hint">Приватный шифрованный DNS проекта — для вошедших через бота</string>
     <string name="dns_invalid">Не похоже на адрес DNS. Примеры: 94.140.14.14, dns.example.com, https://dns.example.com/dns-query/токен, tls://dns.example.com</string>
     <string name="dns_supported">Поддерживаются IP, хост (→ DoH), https://… (DoH, можно с путём и токеном), tls://… (DoT), udp://…</string>
     <string name="geo_label">GeoIP-маршрутизация по странам</string>
@@ -320,6 +323,7 @@
     <string name="bot_linked">Подключено к боту</string>
     <string name="bot_linked_as">Подключено как @%1$s</string>
     <string name="bot_sync">Получить подписки</string>
+    <string name="bot_panels">Панелей с доступом в боте: %1$d</string>
     <string name="bot_unlink">Отключить</string>
     <string name="bot_unlinked">Отключено. Уже добавленные подписки остались в списке.</string>
     <string name="bot_sync_ok">Подписок добавлено или обновлено: %1$d, серверов: %2$d.</string>

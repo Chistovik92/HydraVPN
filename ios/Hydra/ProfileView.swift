@@ -17,6 +17,7 @@ struct ProfileView: View {
                     }
                     LabeledContent(L("info_server"), value: model.selected.map { ServerLocation.label($0) } ?? "—")
                 }
+                BotAccountSection()
                 Section(footer: Text(L("profile_hwid_hint"))) {
                     Button {
                         UIPasteboard.general.string = HydraDevice.hwid

@@ -128,8 +128,9 @@ struct RoutingSettingsView: View {
 
             Section(header: Text(L("dns_label")), footer: Text(L("apply_next_connect"))) {
                 Picker(L("dns_label"), selection: set(\.dnsProvider)) {
-                    ForEach(DnsProvider.allCases, id: \.self) { p in
-                        Text(p == .system ? L("dns_system") : p == .custom ? L("dns_custom") : "\(p.label) · \(p.address ?? "")").tag(p)
+                    // Приватный DNS Hydra VPN — только вошедшим через бота (адрес с токеном есть только в такой сборке).
+                    ForEach(DnsProvider.allCases.filter { $0 != .hydra || (model.state.bot != nil && HydraPrivateDNS.url != nil) }, id: \.self) { p in
+                        Text(p == .system ? L("dns_system") : p == .custom ? L("dns_custom") : p == .hydra ? L("dns_hydra") : "\(p.label) · \(p.address ?? "")").tag(p)
                     }
                 }
                 .pickerStyle(.inline).labelsHidden()

@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -100,7 +101,7 @@ private val HydraColors = darkColorScheme(
     error = Danger,
 )
 
-private enum class Tab(val title: String) { HOME("Главная"), SERVERS("Серверы"), SUBS("Подписки"), ROUTING("Маршруты"), SETTINGS("Настройки"), LOG("Журнал") }
+private enum class Tab(val title: String) { HOME("Главная"), SERVERS("Серверы"), SUBS("Подписки"), ROUTING("Маршруты"), ROUTERS("Роутеры"), SETTINGS("Настройки"), LOG("Журнал") }
 
 @Composable
 fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTab: Int = 0) {
@@ -120,6 +121,7 @@ fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTa
                                     Tab.SERVERS -> Icons.AutoMirrored.Filled.List
                                     Tab.SUBS -> Icons.Default.Share
                                     Tab.ROUTING -> Icons.Default.Place
+                                    Tab.ROUTERS -> Icons.Default.Build
                                     Tab.SETTINGS -> Icons.Default.Settings
                                     Tab.LOG -> Icons.Default.Info
                                 }, contentDescription = t.title)
@@ -134,6 +136,7 @@ fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTa
                         Tab.SERVERS -> ServersScreen(c, ui)
                         Tab.SUBS -> SubscriptionsScreen(c, ui)
                         Tab.ROUTING -> RoutingScreen(c, ui)
+                        Tab.ROUTERS -> RoutersScreen(c, ui)
                         Tab.SETTINGS -> SettingsScreen(c, ui)
                         Tab.LOG -> LogScreen(c, ui)
                     }
@@ -201,6 +204,10 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
                         color = if (engine == null) Danger else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+        }
+        if (ui.data.subscriptions.any { it.botPanel.isNotEmpty() }) {
+            Spacer(Modifier.height(12.dp))
+            AccountStatus(ui)
         }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

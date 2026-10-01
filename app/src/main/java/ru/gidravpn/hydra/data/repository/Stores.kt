@@ -22,6 +22,13 @@ internal val Context.vpnSettingsStore: DataStore<Preferences> by preferencesData
 internal val Context.routingStore: DataStore<Preferences> by preferencesDataStore(name = "routing_settings")
 internal val Context.profilesStore: DataStore<Preferences> by preferencesDataStore(name = "routing_profiles")
 
+/**
+ * Роутеры HydraVPN for Router. Намеренно НЕ входит в [allStores]: токены зашифрованы ключом
+ * Android Keystore этого устройства, в резервной копии на другом телефоне они бесполезны
+ * (и не должны туда попадать), а сброс настроек Hydra не должен молча разрывать сопряжение.
+ */
+internal val Context.routersStore: DataStore<Preferences> by preferencesDataStore(name = "routers")
+
 /** Имя файла → хранилище; порядок стабилен (бэкап, сброс). */
 internal fun Context.allStores(): Map<String, DataStore<Preferences>> = linkedMapOf(
     "settings" to settingsStore,

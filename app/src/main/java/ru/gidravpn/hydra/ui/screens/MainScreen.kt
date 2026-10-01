@@ -81,6 +81,11 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
             Spacer(Modifier.height(12.dp))
         }
 
+        val subs by vm.subscriptions.collectAsState()
+        if (subs.any { it.botPanel.isNotEmpty() }) {
+            AccountStatusCard(subs)
+            Spacer(Modifier.height(12.dp))
+        }
 
         // Выбор протокола (отражает протокол выбранного сервера)
         Card(Modifier.fillMaxWidth()) {

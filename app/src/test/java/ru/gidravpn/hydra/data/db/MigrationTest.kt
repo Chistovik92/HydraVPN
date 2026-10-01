@@ -48,7 +48,7 @@ class MigrationTest {
 
         val db = Room.databaseBuilder(
             ApplicationProvider.getApplicationContext(), AppDatabase::class.java, dbName
-        ).addMigrations(AppDatabase.MIGRATION_1_2).allowMainThreadQueries().build()
+        ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3).allowMainThreadQueries().build()
         try {
             runBlocking {
                 val server = db.serverDao().getAll().single()
@@ -65,6 +65,23 @@ class MigrationTest {
                 assertEquals(false, sub.collapsed)
                 assertEquals("", sub.lastError)
             }
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun v2ToV3_addsBotPanelColumn() {
+        helper.createDatabase(dbName, 2).apply {
+            execSQL("INSERT INTO subscriptions (id, name, url, userAgent, lastUpdated, autoUpdateHours) VALUES (1, 'P', 'https://p/s', '', 0, 12)")
+            close()
+        }
+        helper.runMigrationsAndValidate(dbName, 3, true, AppDatabase.MIGRATION_2_3).close()
+        val db = Room.databaseBuilder(
+            ApplicationProvider.getApplicationContext(), AppDatabase::class.java, dbName
+        ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3).allowMainThreadQueries().build()
+        try {
+            runBlocking { assertEquals("", db.subscriptionDao().getAll().single().botPanel) }
         } finally {
             db.close()
         }

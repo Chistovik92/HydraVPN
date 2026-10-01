@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -27,11 +28,12 @@ import ru.gidravpn.hydra.ui.components.clickableNoRipple
 import ru.gidravpn.hydra.ui.screens.*
 import ru.gidravpn.hydra.ui.theme.*
 
-// 4 вкладки нижней навигации: Главная/Серверы/Профиль/Настройки.
+// 5 вкладок нижней навигации: Главная/Серверы/Профиль/Роутеры/Настройки.
 enum class Tab(@androidx.annotation.StringRes val label: Int, val icon: ImageVector) {
     MAIN(R.string.tab_main, Icons.Filled.Home),
     SERVERS(R.string.tab_servers, Icons.Filled.Dns),
     PROFILE(R.string.tab_profile, Icons.Filled.Person),
+    ROUTERS(R.string.tab_routers, Icons.Filled.Router),
     SETTINGS(R.string.tab_settings, Icons.Filled.Settings),
 }
 
@@ -62,6 +64,7 @@ fun HydraRoot(
                             Tab.MAIN -> MainScreen(vm, onGoServers = { tab = Tab.SERVERS })
                             Tab.SERVERS -> ServersScreen(vm, onSelected = { tab = Tab.MAIN })
                             Tab.PROFILE -> ProfileScreen(vm)
+                            Tab.ROUTERS -> RoutersScreen(vm)
                             Tab.SETTINGS -> SettingsScreen(vm)
                         }
                     }

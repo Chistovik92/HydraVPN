@@ -24,11 +24,13 @@ permissions:
 jobs:
   desktop:
     uses: ./.github/workflows/desktop.yml
+    secrets: inherit
     with:
       package: true
 
   ios:
     uses: ./.github/workflows/ios.yml
+    secrets: inherit
 
   publish:
     needs: [ desktop, ios ]

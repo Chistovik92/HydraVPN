@@ -46,6 +46,7 @@
 				<string>awg</string>
 				<string>sing-box</string>
 				<string>hydra</string>
+				<string>hydravpn-router</string>
 			</array>
 		</dict>
 	</array>
@@ -57,6 +58,8 @@
 	<string>Hydra uses Face ID to unlock the app when App lock is on.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Hydra reads QR codes from the picture you choose.</string>
+	<key>HydraPrivateDNS</key>
+	<string>$(HYDRA_PRIVATE_DNS)</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>ru.gidravpn.hydra.subscriptions</string>

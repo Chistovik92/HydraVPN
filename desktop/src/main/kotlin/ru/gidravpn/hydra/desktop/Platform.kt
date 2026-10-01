@@ -17,6 +17,14 @@ object Platform {
 
     val version: String = System.getProperty("hydra.version") ?: "dev"
 
+    /** Как устройство называется в боте при подключении: «Hydra Windows · имя-компьютера». */
+    fun deviceName(): String {
+        val host = runCatching { java.net.InetAddress.getLocalHost().hostName }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: System.getenv("COMPUTERNAME") ?: System.getenv("HOSTNAME") ?: ""
+        val name = when (os) { Os.WINDOWS -> "Windows"; Os.MACOS -> "macOS"; Os.LINUX -> "Linux" }
+        return ("Hydra $name" + if (host.isNotEmpty()) " · $host" else "").take(60)
+    }
+
     /** %APPDATA%\Hydra, ~/Library/Application Support/Hydra, $XDG_CONFIG_HOME/hydra. */
     val dataDir: File by lazy {
         val home = System.getProperty("user.home")

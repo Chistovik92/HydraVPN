@@ -17,6 +17,7 @@
 
     <!-- Main screen -->
     <string name="main_protocol">Протокол</string>
+    <string name="main_account">Акаунт</string>
     <string name="main_current_config">Поточна конфігурація</string>
     <string name="main_change">Змінити →</string>
     <string name="main_cfg">Сервер: %1$s\nПорт: %2$d\nТип: %3$s</string>
@@ -180,6 +181,27 @@
     <string name="dns_label">DNS (усередині тунелю)</string>
     <string name="dns_custom_hint">IP, хост або URL DoH/DoT</string>
     <string name="dns_system_hint">Резолвер пристрою, без шифрування — запити йдуть повз тунель</string>
+    <string name="dns_hydra">Hydra VPN (приватний)</string>
+    <string name="dns_hydra_hint">Приватний шифрований DNS проєкту — для тих, хто увійшов через бота</string>
+    <string name="bot_title">Акаунт бота</string>
+    <string name="bot_hint">Увійдіть в акаунт бота «Радар», щоб отримати видані вам підписки. У боті відкрийте «VPN» → «Підключити застосунок» і введіть код тут.</string>
+    <string name="bot_server">Адреса сервера бота</string>
+    <string name="bot_code">Код із бота (8 цифр)</string>
+    <string name="bot_connect">Підключити</string>
+    <string name="bot_linked">Підключено до бота</string>
+    <string name="bot_linked_as">Підключено як @%1$s</string>
+    <string name="bot_sync">Отримати підписки</string>
+    <string name="bot_panels">Панелей із доступом у боті: %1$d</string>
+    <string name="bot_unlink">Відключити</string>
+    <string name="bot_unlinked">Відключено. Уже додані підписки залишилися в списку.</string>
+    <string name="bot_sync_ok">Підписок додано або оновлено: %1$d, серверів: %2$d.</string>
+    <string name="bot_sync_partial">Підписок: %1$d, серверів: %2$d. Не завантажилось: %3$d.</string>
+    <string name="bot_sync_none">У боті поки немає робочих підписок для вас. Доступ видає адміністратор.</string>
+    <string name="bot_err_server">Вкажіть адресу сервера бота, наприклад radar.example.org. Звичайний http — лише у своїй мережі.</string>
+    <string name="bot_err_network">Немає зв’язку з сервером бота.</string>
+    <string name="bot_err_auth">Код хибний чи застарів, або цей пристрій відключили в боті. Візьміть новий код.</string>
+    <string name="bot_err_off">На цьому сервері API для застосунків вимкнено.</string>
+    <string name="bot_err_rate">Забагато спроб. Зачекайте кілька хвилин.</string>
     <string name="dns_invalid">Не схоже на адресу DNS. Приклади: 94.140.14.14, dns.example.com, https://dns.example.com/dns-query/token, tls://dns.example.com</string>
     <string name="dns_supported">Підтримуються: IP, хост (→ DoH), https://… (DoH, можна зі шляхом і токеном), tls://… (DoT), udp://…</string>
     <string name="geo_label">GeoIP-маршрутизація за країнами</string>

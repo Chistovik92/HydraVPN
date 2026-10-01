@@ -14,6 +14,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
+import ru.gidravpn.hydra.bot.BotClient
+import ru.gidravpn.hydra.bot.BotException
+import ru.gidravpn.hydra.bot.BotJson
+import ru.gidravpn.hydra.bot.BotSyncPlanner
 import ru.gidravpn.hydra.data.model.EngineToggles
 import ru.gidravpn.hydra.data.model.HotspotSettings
 import ru.gidravpn.hydra.data.model.NetRuleType
@@ -34,11 +38,15 @@ import ru.gidravpn.hydra.desktop.core.Rules
 import ru.gidravpn.hydra.desktop.core.Subscriptions
 import ru.gidravpn.hydra.desktop.core.SystemProxy
 import ru.gidravpn.hydra.desktop.core.Updates
+import ru.gidravpn.hydra.router.RouterManager
 import java.io.File
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.security.SecureRandom
+
+/** Значение routing.dns для приватного DNS Hydra VPN (адрес с токеном в файл настроек не пишется). */
+const val HYDRA_DNS = "hydra"
 
 enum class Status { DISCONNECTED, CONNECTING, CONNECTED, STOPPING, ERROR }
 
@@ -62,6 +70,8 @@ data class UiState(
     /** Kill switch сработал: системный прокси оставлен на мёртвый порт, трафик не утекает. */
     val blocked: Boolean = false,
     val update: Updates.Release? = null,
+    /** Идёт вход или синхронизация с ботом «Радар». */
+    val botBusy: Boolean = false,
 ) {
     val selected: ServerProfile? get() = data.servers.firstOrNull { it.id == data.settings.selectedServerId }
     val active get() = status == Status.CONNECTING || status == Status.CONNECTED
@@ -82,6 +92,14 @@ class AppController(
 
     private val _ui = MutableStateFlow(UiState(data = store.load()))
     val ui: StateFlow<UiState> = _ui
+
+    /** Роутеры HydraVPN for Router, которыми управляет приложение (экран «Роутеры»). */
+    val routers = RouterManager(
+        scope,
+        routers = { _ui.value.data.routers },
+        saveRouters = { list -> mutate { it.copy(routers = list) } },
+        toast = ::toast,
+    )
 
     /** Номер сеанса ядра: колбэки и корутины старого сеанса ничего не меняют. */
     @Volatile private var session = 0
@@ -112,6 +130,7 @@ class AppController(
                 // Подписки — сейчас и затем раз в полчаса проверяем, не пора ли.
                 while (isActive) {
                     autoUpdateSubscriptions()
+                    autoSyncBot()
                     delay(30 * 60_000L)
                 }
             }
@@ -217,23 +236,139 @@ class AppController(
     }
 
     fun refreshSubscription(id: Long) {
-        val sub = _ui.value.data.subscriptions.firstOrNull { it.id == id } ?: return
+        scope.launch(Dispatchers.IO) { refreshNow(id) }
+    }
+
+    /** Блокирующее обновление одной подписки (вызывать из IO); true — серверы получены. */
+    private fun refreshNow(id: Long, quiet: Boolean = false): Boolean {
+        val sub = _ui.value.data.subscriptions.firstOrNull { it.id == id } ?: return false
         var started = false
         _ui.update { if (id in it.updatingSubs) it else { started = true; it.copy(updatingSubs = it.updatingSubs + id) } }
-        if (!started) return
+        if (!started) return false
+        try {
+            val result = runCatching { Subscriptions.fetch(sub.url, id) }
+            result.onSuccess { f -> mutate { s -> if (s.subscriptions.none { it.id == id }) s else applySubscription(s, id, f) } }
+            result.onFailure { e ->
+                mutate { s -> s.copy(subscriptions = s.subscriptions.map { if (it.id == id) it.copy(lastError = e.message ?: e.toString()) else it }) }
+                if (!quiet) toast("Подписка «${sub.displayName}»: ${e.message}")
+            }
+            return result.isSuccess
+        } finally {
+            _ui.update { it.copy(updatingSubs = it.updatingSubs - id) }
+        }
+    }
+
+    // ------------------------------------------------------------------ аккаунт бота «Радар» (0.7.0)
+
+    private val bot = BotClient()
+    @Volatile private var lastBotSync = 0L
+
+    private fun botError(e: BotException): String = when (e.code) {
+        0 -> "Нет связи с сервером бота."
+        401 -> "Код неверен или устарел, либо это устройство отключили в боте. Возьмите новый код."
+        404 -> "На этом сервере API для приложений выключен."
+        429 -> "Слишком много попыток. Подождите несколько минут."
+        else -> e.message ?: "HTTP ${e.code}"
+    }
+
+    /** Код из бота («VPN» → «Подключить приложение») → токен устройства → первая синхронизация. */
+    fun linkBot(serverInput: String, code: String) {
+        if (_ui.value.botBusy) return
+        val server = BotJson.normalizeServer(serverInput)
+            ?: return toast("Укажите адрес сервера бота, например radar.example.org. Обычный http — только в своей сети.")
+        _ui.update { it.copy(botBusy = true) }
         scope.launch(Dispatchers.IO) {
             try {
-                val result = runCatching { Subscriptions.fetch(sub.url, id) }
-                result.onSuccess { f -> mutate { s -> if (s.subscriptions.none { it.id == id }) s else applySubscription(s, id, f) } }
-                result.onFailure { e ->
-                    mutate { s -> s.copy(subscriptions = s.subscriptions.map { if (it.id == id) it.copy(lastError = e.message ?: e.toString()) else it }) }
-                    toast("Подписка «${sub.displayName}»: ${e.message}")
-                }
+                val token = bot.link(server, code, Platform.deviceName())
+                val profile = runCatching { bot.profile(server, token) }.getOrNull()
+                mutate { it.copy(bot = BotLink(server, token, profile?.username.orEmpty(), profile?.panels)) }
+                toast(syncBotNow())
+            } catch (e: BotException) {
+                toast(botError(e))
             } finally {
-                _ui.update { it.copy(updatingSubs = it.updatingSubs - id) }
+                _ui.update { it.copy(botBusy = false) }
             }
         }
     }
+
+    fun syncBot() {
+        if (_ui.value.botBusy || _ui.value.data.bot == null) return
+        _ui.update { it.copy(botBusy = true) }
+        scope.launch(Dispatchers.IO) {
+            try { toast(syncBotNow()) } finally { _ui.update { it.copy(botBusy = false) } }
+        }
+    }
+
+    /** Отключить устройство в боте и забыть токен. Уже заведённые подписки остаются. */
+    fun unlinkBot() {
+        val link = _ui.value.data.bot ?: return
+        scope.launch(Dispatchers.IO) {
+            runCatching { bot.logout(link.server, link.token) }
+            mutate { it.copy(bot = null, settings = it.settings.copy(routing = it.settings.routing.let { r ->
+                if (r.dns == HYDRA_DNS) r.copy(dns = "1.1.1.1") else r })) }
+            toast("Отключено. Уже добавленные подписки остались в списке.")
+        }
+    }
+
+    /** Синхронизация: заводит/обновляет подписки бота. Возвращает текст для пользователя. */
+    private fun syncBotNow(): String {
+        val link = _ui.value.data.bot ?: return ""
+        val items = try {
+            bot.subscriptions(link.server, link.token)
+        } catch (e: BotException) {
+            // Токен отозван (устройство отключили в боте) — держать его дальше незачем.
+            if (e.code == 401) mutate { it.copy(bot = null) }
+            return botError(e)
+        }
+        runCatching { bot.profile(link.server, link.token) }.getOrNull()?.let { p ->
+            mutate { s -> s.copy(bot = s.bot?.copy(username = p.username.ifBlank { s.bot.username }, panels = p.panels)) }
+        }
+        var subs = 0; var failed = 0
+        for (step in BotSyncPlanner.plan(_ui.value.data.subscriptions, items)) {
+            when (step) {
+                is BotSyncPlanner.Step.Disable -> mutate { s ->
+                    s.copy(subscriptions = s.subscriptions.map {
+                        if (it.id == step.sub.id) it.copy(autoUpdateHours = 0, lastError = BotSyncPlanner.DISABLED_MARK) else it
+                    })
+                }
+                is BotSyncPlanner.Step.Add -> {
+                    var id = 0L
+                    mutate { s ->
+                        id = nextId(s.subscriptions.map { it.id })
+                        s.copy(subscriptions = s.subscriptions + Subscription(id = id, name = step.item.title.take(80), url = step.item.url, botPanel = step.item.panel))
+                    }
+                    if (refreshNow(id, quiet = true)) subs++ else failed++
+                }
+                is BotSyncPlanner.Step.Update -> {
+                    mutate { s ->
+                        s.copy(subscriptions = s.subscriptions.map {
+                            if (it.id != step.sub.id) it else it.copy(
+                                url = step.item.url, botPanel = step.item.panel,
+                                autoUpdateHours = if (it.autoUpdateHours == 0 && it.lastError == BotSyncPlanner.DISABLED_MARK) 12 else it.autoUpdateHours,
+                            )
+                        })
+                    }
+                    if (refreshNow(step.sub.id, quiet = true)) subs++ else failed++
+                }
+            }
+        }
+        lastBotSync = System.currentTimeMillis()
+        return when {
+            items.none { it.importable } -> "В боте пока нет рабочих подписок для вас. Доступ выдаёт администратор."
+            failed > 0 -> "Подписок: $subs. Не загрузилось: $failed."
+            else -> "Подписок добавлено или обновлено: $subs."
+        }
+    }
+
+    /** Раз в 6 часов, как BotSyncWorker на Android. */
+    private fun autoSyncBot() {
+        if (_ui.value.data.bot == null || _ui.value.botBusy) return
+        if (System.currentTimeMillis() - lastBotSync < 6 * 3_600_000L) return
+        syncBotNow()
+    }
+
+    /** Приватный DNS Hydra VPN доступен только вошедшему через бота и только если сборка знает адрес. */
+    val hydraDnsAvailable: Boolean get() = _ui.value.data.bot != null && HydraSecrets.PRIVATE_DNS.isNotBlank()
 
     fun refreshAll() = _ui.value.data.subscriptions.forEach { refreshSubscription(it.id) }
 
@@ -321,7 +456,7 @@ class AppController(
 
     fun setDns(value: String): Boolean {
         val v = value.trim()
-        val ok = v.equals("system", true) || ru.gidravpn.hydra.data.model.DnsEndpoint.parse(v) != null
+        val ok = v.equals("system", true) || (v == HYDRA_DNS && hydraDnsAvailable) || ru.gidravpn.hydra.data.model.DnsEndpoint.parse(v) != null
         if (ok) updateRouting { it.copy(dns = v) }
         return ok
     }
@@ -372,7 +507,7 @@ class AppController(
 
     // ------------------------------------------------------------------ резервная копия
     fun exportBackup(file: File) = scope.launch(Dispatchers.IO) {
-        runCatching { Store.writePrivateAtomic(file, Store.toJson(_ui.value.data).toString(2)) }
+        runCatching { Store.writePrivateAtomic(file, Store.toJson(_ui.value.data.copy(bot = null)).toString(2)) }
             .onSuccess { toast("Резервная копия сохранена: ${file.name}\nВ ней пароли серверов — храните файл в надёжном месте.") }
             .onFailure { toast("Не удалось сохранить: ${it.message}") }
     }
@@ -387,7 +522,7 @@ class AppController(
                 state
             }.onSuccess { state ->
                 // Автозапуск — состояние ОС, а не файла: его копия не включает.
-                mutate { cur -> state.copy(settings = state.settings.copy(launchAtLogin = cur.settings.launchAtLogin)) }
+                mutate { cur -> state.copy(settings = state.settings.copy(launchAtLogin = cur.settings.launchAtLogin), bot = cur.bot) }
                 toast("Восстановлено: серверов ${state.servers.size}, подписок ${state.subscriptions.size}")
             }.onFailure { toast("Не удалось восстановить: ${it.message}") }
         }
@@ -427,8 +562,13 @@ class AppController(
             it.copy(status = Status.CONNECTING, statusText = text, connectedId = profile.id, engine = engine,
                 upSpeed = 0, downSpeed = 0, delayMs = null, needsElevation = false)
         }
-        scope.launch(Dispatchers.IO) { connLock.withLock { startSession(sessionId, profile, settings, engine) } }
+        scope.launch(Dispatchers.IO) { connLock.withLock { startSession(sessionId, profile, effectiveSettings(settings), engine) } }
     }
+
+    /** Подставляет настоящий адрес вместо метки приватного DNS (адрес с токеном нигде не сохраняется). */
+    private fun effectiveSettings(s: DesktopSettings): DesktopSettings =
+        if (s.routing.dns != HYDRA_DNS) s
+        else s.copy(routing = s.routing.copy(dns = if (hydraDnsAvailable) HydraSecrets.PRIVATE_DNS else "1.1.1.1"))
 
     private suspend fun startSession(sessionId: Int, profile: ServerProfile, settings: DesktopSettings, engine: EngineToggles.Kind) {
         if (session != sessionId) return

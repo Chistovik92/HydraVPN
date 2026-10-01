@@ -10,6 +10,8 @@ on:
   workflow_call:   # release.yml: неподписанный .ipa в релиз
 
 env:
+  # Приватный DNS Hydra VPN (секрет репозитория): нужен сборке, в исходниках его нет. Пусто — пункт DNS скрыт.
+  HYDRA_PRIVATE_DNS: ${{ secrets.HYDRA_PRIVATE_DNS }}
   SING_BOX_VERSION: "1.12.9"
   AWG_APPLE_COMMIT: "9d5ee60"
 

@@ -2,6 +2,7 @@ package ru.gidravpn.hydra.data.repository
 
 import android.content.Context
 import ru.gidravpn.hydra.data.botaccount.BotSubscription
+import ru.gidravpn.hydra.data.botaccount.BotSyncPlanner
 import ru.gidravpn.hydra.data.db.AppDatabase
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.Subscription
@@ -46,18 +47,35 @@ class ServerRepository(context: Context) {
 
     /**
      * Завести подписки, выданные в боте «Радар». Берутся только ссылки подписок в рабочем состоянии
-     * ([BotSubscription.importable]); тот же URL не плодит дубликат ([addSubscription]). Подписки,
-     * пропавшие из бота, здесь не удаляются: решение об этом остаётся за человеком.
+     * ([BotSubscription.importable]), связь с подпиской в приложении — по панели бота (0.6.28), поэтому
+     * смена `url` обновляет ту же подписку, а не заводит вторую ([BotSyncPlanner]). Выключенные в боте
+     * подписки перестают автообновляться и помечаются; пропавшие из бота не удаляются: решение об этом
+     * остаётся за человеком.
      */
     suspend fun syncBotSubscriptions(items: List<BotSubscription>): BotSyncResult {
         var subscriptions = 0
         var servers = 0
         var failed = 0
-        for (item in items.filter { it.importable }) {
-            runCatching { addSubscription(item.title, item.url) }.fold(
-                onSuccess = { subscriptions++; servers += it },
-                onFailure = { failed++ },
-            )
+        for (step in BotSyncPlanner.plan(subs.getAll(), items)) {
+            when (step) {
+                is BotSyncPlanner.Step.Disable ->
+                    subs.update(step.sub.copy(autoUpdate = false, lastError = BotSyncPlanner.DISABLED_MARK))
+                is BotSyncPlanner.Step.Add -> runCatching {
+                    val id = subs.upsert(Subscription(name = step.item.title, url = step.item.url, botPanel = step.item.panel))
+                    refreshSubscription(id)
+                }.fold(onSuccess = { subscriptions++; servers += it }, onFailure = { failed++ })
+                is BotSyncPlanner.Step.Update -> runCatching {
+                    val sub = step.sub
+                    subs.update(
+                        sub.copy(
+                            url = step.item.url,
+                            botPanel = step.item.panel,
+                            autoUpdate = sub.autoUpdate || sub.lastError == BotSyncPlanner.DISABLED_MARK,
+                        )
+                    )
+                    refreshSubscription(sub.id)
+                }.fold(onSuccess = { subscriptions++; servers += it }, onFailure = { failed++ })
+            }
         }
         return BotSyncResult(subscriptions, servers, failed)
     }

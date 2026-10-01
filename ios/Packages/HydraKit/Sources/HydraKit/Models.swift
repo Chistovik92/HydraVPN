@@ -153,18 +153,20 @@ public struct Subscription: Codable, Identifiable, Hashable, Sendable {
     public var autoUpdate: Bool
     public var collapsed: Bool
     public var lastError: String
+    /// Идентификатор панели в боте «Радар» (0.7.0). Optional — старые state.json без этого поля читаются как раньше.
+    public var botPanel: String?
 
     public init(
         id: Int64 = 0, name: String, url: String, userAgent: String = "", lastUpdated: Int64 = 0,
         autoUpdateHours: Int = 12, serverTitle: String = "", uploadBytes: Int64 = 0, downloadBytes: Int64 = 0,
         totalBytes: Int64 = 0, expireAt: Int64 = 0, supportUrl: String = "", autoUpdate: Bool = true,
-        collapsed: Bool = false, lastError: String = ""
+        collapsed: Bool = false, lastError: String = "", botPanel: String? = nil
     ) {
         self.id = id; self.name = name; self.url = url; self.userAgent = userAgent
         self.lastUpdated = lastUpdated; self.autoUpdateHours = autoUpdateHours; self.serverTitle = serverTitle
         self.uploadBytes = uploadBytes; self.downloadBytes = downloadBytes; self.totalBytes = totalBytes
         self.expireAt = expireAt; self.supportUrl = supportUrl; self.autoUpdate = autoUpdate
-        self.collapsed = collapsed; self.lastError = lastError
+        self.collapsed = collapsed; self.lastError = lastError; self.botPanel = botPanel
     }
 
     public var displayName: String { serverTitle.isEmpty ? name : serverTitle }
@@ -211,14 +213,14 @@ public enum MtuPreset: String, Codable, CaseIterable, Sendable {
 
 public enum DnsProvider: String, Codable, CaseIterable, Sendable {
     case cloudflare = "CLOUDFLARE", google = "GOOGLE", quad9 = "QUAD9", adguard = "ADGUARD"
-    case system = "SYSTEM", custom = "CUSTOM"
+    case hydra = "HYDRA", system = "SYSTEM", custom = "CUSTOM"
     public var address: String? {
         switch self {
         case .cloudflare: "1.1.1.1"
         case .google: "8.8.8.8"
         case .quad9: "9.9.9.9"
         case .adguard: "94.140.14.14"
-        case .system, .custom: nil
+        case .hydra, .system, .custom: nil
         }
     }
     public var label: String {
@@ -227,6 +229,7 @@ public enum DnsProvider: String, Codable, CaseIterable, Sendable {
         case .google: "Google"
         case .quad9: "Quad9"
         case .adguard: "AdGuard"
+        case .hydra: "Hydra VPN"
         case .system: "System"
         case .custom: "Custom"
         }
@@ -237,6 +240,9 @@ public enum DnsProvider: String, Codable, CaseIterable, Sendable {
 public struct RoutingSettings: Codable, Hashable, Sendable {
     public var dnsProvider: DnsProvider = .cloudflare
     public var dnsCustomAddress: String = ""
+    /// Приватный DoH Hydra VPN (с токеном в пути): пишется приложением при входе через бота, читается туннелем.
+    /// Optional — см. botPanel. Не входит в резервную копию.
+    public var hydraDnsUrl: String?
     public var geoMode: GeoRoutingMode = .off
     public var geoCountries: [String] = ["ru"]
     public var mtu: MtuPreset = .auto
@@ -253,6 +259,7 @@ public struct RoutingSettings: Codable, Hashable, Sendable {
         switch dnsProvider {
         case .system: return nil
         case .custom: return DnsEndpoint.parse(dnsCustomAddress) ?? .doh("1.1.1.1")
+        case .hydra: return hydraDnsUrl.flatMap { DnsEndpoint.parse($0) } ?? .doh("1.1.1.1")
         default: return .doh(dnsProvider.address ?? "1.1.1.1")
         }
     }
@@ -282,6 +289,8 @@ public struct HydraState: Codable, Sendable {
     public var routing = RoutingSettings()
     public var app = AppSettings()
     public var routingProfiles: [RoutingProfile] = []
+    /// Аккаунт бота «Радар» (токен — в Keychain, не здесь). nil — не подключено. Optional по той же причине, что botPanel.
+    public var bot: BotAccountInfo?
     public init() {}
 
     public var selectedServer: ServerProfile? {

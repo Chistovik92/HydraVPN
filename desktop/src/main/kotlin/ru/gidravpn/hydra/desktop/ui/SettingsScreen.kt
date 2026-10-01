@@ -108,12 +108,16 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
 
         item { LanSection(c, ui) }
 
+        item { BotAccountSection(c, ui) }
+
         item {
             Section("DNS") {
                 var dns by remember(r.dns) { mutableStateOf(r.dns) }
                 var invalid by remember { mutableStateOf(false) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("1.1.1.1" to "Cloudflare", "8.8.8.8" to "Google", "9.9.9.9" to "Quad9", "94.140.14.14" to "AdGuard", "system" to "Системный")
+                    (listOf("1.1.1.1" to "Cloudflare", "8.8.8.8" to "Google", "9.9.9.9" to "Quad9", "94.140.14.14" to "AdGuard", "system" to "Системный") +
+                        // Приватный DNS проекта — только вошедшим через бота (адрес с токеном в настройки не пишется).
+                        if (c.hydraDnsAvailable) listOf(ru.gidravpn.hydra.desktop.HYDRA_DNS to "Hydra VPN (приватный)") else emptyList())
                         .forEach { (v, label) ->
                             FilterChip(selected = r.dns == v, onClick = { dns = v; invalid = false; c.setDns(v) }, label = { Text(label) })
                         }

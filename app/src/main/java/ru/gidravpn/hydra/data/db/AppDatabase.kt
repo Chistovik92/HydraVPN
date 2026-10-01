@@ -9,7 +9,7 @@ import ru.gidravpn.hydra.data.model.Subscription
 
 @Database(
     entities = [ServerProfile::class, Subscription::class],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,6 +34,13 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** 0.6.28: привязка подписки к панели бота «Радар». */
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE subscriptions ADD COLUMN botPanel TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         @Volatile private var INSTANCE: AppDatabase? = null
         // Фаза 7e: вторая проверка ВНУТРИ synchronized обязательна. Без неё два
         // потока, одновременно увидевшие null, по очереди собирали по своему
@@ -44,7 +51,7 @@ abstract class AppDatabase : RoomDatabase() {
             INSTANCE ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "hydra.db")
                 // Раньше здесь был fallbackToDestructiveMigration(): любое изменение схемы без
                 // миграции молча стёрло бы все серверы. С 0.6.21 — только явные миграции.
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build().also { INSTANCE = it }
         }
     }

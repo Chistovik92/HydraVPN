@@ -243,6 +243,24 @@ kotlin {
     }
 }
 
+// Приватный DNS Hydra VPN (DoH с токеном в пути) — только для вошедших через бота. Токен — секрет и в
+// публичный репозиторий не попадает: берётся из свойства Gradle `hydraPrivateDns` или переменной
+// окружения HYDRA_PRIVATE_DNS (в CI — секрет репозитория). Пусто — пункт DNS в приложении скрыт.
+val generateSecrets by tasks.registering {
+    val out = layout.buildDirectory.dir("generated/secrets")
+    val raw = (findProperty("hydraPrivateDns") as String?) ?: System.getenv("HYDRA_PRIVATE_DNS") ?: ""
+    val value = raw.trim().filter { it.isLetterOrDigit() || it in ":/._-?=&%" }
+    inputs.property("privateDns", value)
+    outputs.dir(out)
+    doLast {
+        val f = out.get().file("ru/gidravpn/hydra/desktop/HydraSecrets.kt").asFile
+        f.parentFile.mkdirs()
+        f.writeText("package ru.gidravpn.hydra.desktop\n\n/** Сгенерировано сборкой (generateSecrets); не править. */\nobject HydraSecrets {\n    const val PRIVATE_DNS: String = \"$value\"\n}\n")
+    }
+}
+kotlin.sourceSets.getByName("main").kotlin.srcDir(layout.buildDirectory.dir("generated/secrets"))
+tasks.matching { it.name.startsWith("compileKotlin") || it.name.endsWith("SourcesJar") }.configureEach { dependsOn(generateSecrets) }
+
 tasks.processResources {
     from(iconSource) { rename { "hydra-icon.png" } }
 }

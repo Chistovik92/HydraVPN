@@ -4,7 +4,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.6.27.1**
+- Статус: **0.7.0**
 
 ## Скриншоты
 

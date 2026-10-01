@@ -17,6 +17,7 @@
 
     <!-- Main screen -->
     <string name="main_protocol">Protocol</string>
+    <string name="main_account">Account</string>
     <string name="main_current_config">Current configuration</string>
     <string name="main_change">Change →</string>
     <string name="main_cfg">Server: %1$s\nPort: %2$d\nType: %3$s</string>
@@ -180,6 +181,8 @@
     <string name="dns_label">DNS (inside the tunnel)</string>
     <string name="dns_custom_hint">IP, host or DoH/DoT URL</string>
     <string name="dns_system_hint">Device resolver, unencrypted — queries bypass the tunnel</string>
+    <string name="dns_hydra">Hydra VPN (private)</string>
+    <string name="dns_hydra_hint">Private encrypted DNS of the project — for accounts signed in through the bot</string>
     <string name="dns_invalid">Doesn\'t look like a DNS address. Examples: 94.140.14.14, dns.example.com, https://dns.example.com/dns-query/token, tls://dns.example.com</string>
     <string name="dns_supported">Supported: IP, host (→ DoH), https://… (DoH, path and token allowed), tls://… (DoT), udp://…</string>
     <string name="geo_label">GeoIP routing by country</string>
@@ -321,6 +324,7 @@
     <string name="bot_linked">Connected to the bot</string>
     <string name="bot_linked_as">Connected as @%1$s</string>
     <string name="bot_sync">Get subscriptions</string>
+    <string name="bot_panels">Panels with access in the bot: %1$d</string>
     <string name="bot_unlink">Disconnect</string>
     <string name="bot_unlinked">Disconnected. Subscriptions already added stay in the list.</string>
     <string name="bot_sync_ok">Subscriptions added or updated: %1$d, servers: %2$d.</string>

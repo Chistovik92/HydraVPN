@@ -31,8 +31,13 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 41
-        versionName = "0.6.27.1"
+        versionCode = 43
+        versionName = "0.7.0"
+        // Приватный DNS (DoH с токеном в пути) для вошедших через бота: секрет, в репозитории его нет.
+        // Свойство Gradle `hydraPrivateDns` или переменная окружения HYDRA_PRIVATE_DNS; пусто — пункт скрыт.
+        val privateDns = ((project.findProperty("hydraPrivateDns") as String?) ?: System.getenv("HYDRA_PRIVATE_DNS") ?: "")
+            .trim().filter { it.isLetterOrDigit() || it in ":/._-?=&%" }
+        buildConfigField("String", "HYDRA_PRIVATE_DNS", "\"$privateDns\"")
 
         // Языки интерфейса (Фаза 8). Без фильтра библиотеки (AppCompat и др.) тащат строки ~90
         // языков: APK толще, а на, скажем, немецком телефоне системные диалоги библиотек
@@ -96,7 +101,23 @@ android {
     // так `assembleNativeDebug` не ломается, если libXray.aar ещё не собран.
     // .so и classes.dex для процесса :xray подключаются НЕ как Gradle-зависимость
     // (см. extractLibXrayNativeLibs/libXrayToDex ниже и комментарий там же).
+    // Клиент роутера (пакет ru.gidravpn.hydra.router) общий с ПК-версией и лежит в :shared, но
+    // :shared в app не подключается целиком (см. комментарий у dependencies: в app свои копии
+    // тех же классов, дубли ломали слияние dex). Поэтому в сборку берётся только этот пакет —
+    // копией в build/generated, без дублирования исходников в репозитории.
+    val syncSharedRouter = tasks.register<Sync>("syncSharedRouter") {
+        from(rootProject.file("shared/src/commonMain/kotlin/ru/gidravpn/hydra/router"))
+        into(layout.buildDirectory.dir("generated/sharedRouter/ru/gidravpn/hydra/router"))
+    }
+    // Копия должна появиться до любой задачи, читающей исходники (Kotlin, KSP/KAPT, lint).
+    tasks.configureEach {
+        if (name != "syncSharedRouter" && (name.startsWith("compile") || name.startsWith("ksp") ||
+                name.startsWith("kapt") || name.startsWith("lint"))) dependsOn(syncSharedRouter)
+    }
     sourceSets {
+        getByName("main") {
+            kotlin.srcDir(layout.buildDirectory.dir("generated/sharedRouter"))
+        }
         getByName("native") {
             val hasLibXray = file("libs/libXray.aar").exists()
             java.srcDir(if (hasLibXray) "src/nativeXrayReal/java" else "src/nativeXrayStub/java")

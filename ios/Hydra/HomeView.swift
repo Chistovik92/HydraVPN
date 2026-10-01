@@ -17,6 +17,8 @@ struct HomeView: View {
                         Text(model.selected?.serverProtocol?.displayName ?? "—").font(.body)
                     }
 
+                    AccountStatusCard()
+
                     ConnectButton(status: model.status, accent: theme.accent) { model.toggle() }
                         .padding(.vertical, 12)
 

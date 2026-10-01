@@ -145,6 +145,19 @@ class SingBoxConfigBuilderTest {
         assertEquals("1.1.1.1", servers.single { it.getString("tag") == "bootstrap" }.getString("server"))
     }
 
+    /** Приватный DNS «Hydra VPN» (0.7.0): токен в пути, хост резолвится через bootstrap; без входа в бота — нет. */
+    @Test fun hydraPrivateDnsOnlyForBotAccounts() {
+        val url = "https://dns.hydravpn.us/dns-query/0123456789abcdef0123456789abcdef"
+        assertEquals(null, ru.gidravpn.hydra.data.repository.RoutingRepository.hydraEndpoint(url, botLinked = false))
+        assertEquals(null, ru.gidravpn.hydra.data.repository.RoutingRepository.hydraEndpoint("", botLinked = true))
+        val endpoint = ru.gidravpn.hydra.data.repository.RoutingRepository.hydraEndpoint(url, botLinked = true)!!
+        val dns = dump("hydra_dns", SingBoxConfigBuilder.buildXrayBridge(10808, dns = endpoint)).getJSONObject("dns")
+        val remote = dns.getJSONArray("servers").objects().single { it.getString("tag") == "remote" }
+        assertEquals("dns.hydravpn.us", remote.getString("server"))
+        assertEquals("/dns-query/0123456789abcdef0123456789abcdef", remote.getString("path"))
+        assertEquals("bootstrap", remote.getString("domain_resolver"))
+    }
+
     @Test fun dotEndpoint() {
         val endpoint = DnsEndpoint.parse("tls://dns.example.net:853")!!
         val remote = dump("dot", SingBoxConfigBuilder.build(profile, dns = endpoint)).getJSONObject("dns")
