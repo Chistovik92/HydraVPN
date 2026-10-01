@@ -124,6 +124,7 @@ public struct RouterLogEntry: Hashable, Sendable {
 }
 
 public struct RouterStatus: Sendable {
+    public init() {}
     public var version = ""
     public var state = ""
     public var uptime = ""

@@ -112,7 +112,7 @@ struct RoutersView: View {
     }
 
     private func statusSection(_ cur: RouterLink) -> some View {
-        Section(L("rt_state")) {
+        Section(header: Text(L("rt_state"))) {
             HStack {
                 Text(model.online ? L("rt_online") : (model.busy && model.error == nil ? L("rt_connecting") : L("rt_offline")))
                     .bold().foregroundStyle(model.online ? theme.accent : (model.busy && model.error == nil ? Color.orange : Color.red))
@@ -132,7 +132,7 @@ struct RoutersView: View {
     private var nodesSection: some View {
         let groups = model.nodes.filter { $0.isGroup && $0.type.lowercased() == "selector" }
         let byName = Dictionary(model.nodes.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
-        return Section(L("rt_nodes")) {
+        return Section(header: Text(L("rt_nodes"))) {
             if let e = model.nodesError { Text(L("rt_nodes_error", e)).font(.footnote).foregroundStyle(.orange) }
             if groups.isEmpty && model.nodesError == nil { Text(L("rt_nodes_empty")).font(.footnote).foregroundStyle(.secondary) }
             ForEach(groups, id: \.name) { g in
@@ -159,7 +159,7 @@ struct RoutersView: View {
     }
 
     private var sectionsSection: some View {
-        Section(L("rt_sections")) {
+        Section(header: Text(L("rt_sections"))) {
             if model.sections.isEmpty { Text(L("rt_sections_empty")).font(.footnote).foregroundStyle(.secondary) }
             ForEach(model.sections, id: \.name) { s in
                 VStack(alignment: .leading) {
@@ -171,7 +171,7 @@ struct RoutersView: View {
     }
 
     private var subscriptionsSection: some View {
-        Section(L("rt_subs")) {
+        Section(header: Text(L("rt_subs"))) {
             if model.subscriptions.isEmpty { Text(L("rt_subs_empty")).font(.footnote).foregroundStyle(.secondary) }
             ForEach(model.subscriptions, id: \.index) { s in
                 VStack(alignment: .leading, spacing: 4) {
@@ -215,7 +215,7 @@ struct RoutersView: View {
     }
 
     private var logSection: some View {
-        Section(L("rt_log")) {
+        Section(header: Text(L("rt_log"))) {
             if model.logs.isEmpty { Text(L("rt_log_empty")).font(.footnote).foregroundStyle(.secondary) }
             ForEach(Array(model.logs.suffix(40).enumerated()), id: \.offset) { _, e in
                 let time = e.time.split(separator: "T").last.map { String($0.prefix(8)) } ?? ""
