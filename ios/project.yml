@@ -9,8 +9,8 @@ options:
 
 settings:
   base:
-    MARKETING_VERSION: "0.6.24"
-    CURRENT_PROJECT_VERSION: "37"
+    MARKETING_VERSION: "0.7.0"
+    CURRENT_PROJECT_VERSION: "43"
     SWIFT_VERSION: "5.10"
     DEVELOPMENT_TEAM: ""            # задать свой Team ID для подписи (docs в ios/README.md)
     ENABLE_BITCODE: NO
@@ -44,6 +44,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ru.gidravpn.hydra
         INFOPLIST_FILE: Hydra/Info.plist
+        # Приватный DNS Hydra VPN (DoH с токеном в пути) — секрет, в репозитории его нет: переменная окружения
+        # HYDRA_PRIVATE_DNS при `xcodegen generate` (в CI — секрет репозитория). Пусто — пункт DNS скрыт.
+        HYDRA_PRIVATE_DNS: "${HYDRA_PRIVATE_DNS}"
         CODE_SIGN_ENTITLEMENTS: Hydra/Hydra.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"

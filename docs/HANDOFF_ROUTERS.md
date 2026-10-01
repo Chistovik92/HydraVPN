@@ -1,7 +1,7 @@
 # HANDOFF — управление роутером из Hydra (Фаза 13)
 
-Состояние работы на 30.09.2026 для продолжения на другой машине. Ветка с кодом:
-**`claude/routers-screen`** (от `master` после PR #19). Роутерная часть — отдельный репозиторий
+Состояние на 01.10.2026. Код слит в ветку 0.7.0 (`claude/roadmap-radar-integration-a9ec65`); отдельная ветка
+**`claude/routers-screen`** больше не нужна. Роутерная часть — отдельный репозиторий
 [HydraVPNforRouters](https://github.com/Chistovik92/HydraVPNforRouters) (Go), релиз **v1.2.0**.
 
 ## Что сделано
@@ -23,7 +23,7 @@
 
 ## Что сломано / не проверено — начать с этого
 
-1. **Android не собирается.** Приложение (`:app`) не подключает `:shared` (в `app` свои копии классов;
+1. **(исправлено в 0.7.0: Android собирается, пакет `router` берётся через `kotlin.srcDir` + зависимость задач от `syncSharedRouter`.)** Было: Android не собирается. Приложение (`:app`) не подключает `:shared` (в `app` свои копии классов;
    целиком подключать нельзя — дубли ломали слияние dex, см. комментарий в `app/build.gradle.kts`).
    Поэтому пакет `ru.gidravpn.hydra.router` подтягивается в `:app` копированием: задача `syncSharedRouter`
    (Sync в `app/build/generated/sharedRouter`) + `java.srcDir(...)` в `sourceSets["main"]`. Kotlin эту

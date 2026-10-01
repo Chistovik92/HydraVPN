@@ -162,6 +162,7 @@
 "apply_next_connect" = "Applied on the next connection.";
 "status_error" = "Error";
 "main_protocol" = "Protocol";
+"main_account" = "Account";
 "main_current_config" = "Current configuration";
 "main_change" = "Change →";
 "main_cfg" = "Server: %1$@\nPort: %2$ld\nType: %3$@";
@@ -307,6 +308,8 @@
 "dns_label" = "DNS (inside the tunnel)";
 "dns_custom_hint" = "IP, host or DoH/DoT URL";
 "dns_system_hint" = "Device resolver, unencrypted — queries bypass the tunnel";
+"dns_hydra" = "Hydra VPN (private)";
+"dns_hydra_hint" = "Private encrypted DNS of the project — for accounts signed in through the bot";
 "dns_invalid" = "Doesn't look like a DNS address. Examples: 94.140.14.14, dns.example.com, https://dns.example.com/dns-query/token, tls://dns.example.com";
 "dns_supported" = "Supported: IP, host (→ DoH), https://… (DoH, path and token allowed), tls://… (DoT), udp://…";
 "geo_label" = "GeoIP routing by country";
@@ -431,6 +434,25 @@
 "srv_empty_desc" = "Add a subscription or a server: paste a link, scan a QR code or pick a photo.";
 "srv_more" = "More…";
 "sub_refresh_short" = "Update";
+"bot_title" = "Bot account";
+"bot_hint" = "Sign in to your Radar bot account to get the subscriptions issued to you. In the bot open VPN → Connect an app and enter the code here.";
+"bot_server" = "Bot server address";
+"bot_code" = "Code from the bot (8 digits)";
+"bot_connect" = "Connect";
+"bot_linked" = "Connected to the bot";
+"bot_linked_as" = "Connected as @%1$@";
+"bot_sync" = "Get subscriptions";
+"bot_panels" = "Panels with access in the bot: %1$ld";
+"bot_unlink" = "Disconnect";
+"bot_unlinked" = "Disconnected. Subscriptions already added stay in the list.";
+"bot_sync_ok" = "Subscriptions added or updated: %1$ld, servers: %2$ld.";
+"bot_sync_partial" = "Subscriptions: %1$ld, servers: %2$ld. Failed to load: %3$ld.";
+"bot_sync_none" = "The bot has no working subscriptions for you yet. Access is issued by the administrator.";
+"bot_err_server" = "Enter the bot server address, for example radar.example.org. Plain http works only in a local network.";
+"bot_err_network" = "No connection to the bot server.";
+"bot_err_auth" = "The code is wrong or expired, or this device was disconnected in the bot. Get a new code.";
+"bot_err_off" = "The API for apps is off on this server.";
+"bot_err_rate" = "Too many attempts. Wait a few minutes.";
 /* iOS-only (ios/Shared/IOSStrings) */
 "ios_protocol_not_on_ios" = "%1$@ is not available on iOS yet. sing-box protocols work: VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard.";
 "ios_killswitch_desc" = "The system does not let any traffic past the tunnel while the VPN is on (includeAllNetworks). Local network devices stay reachable.";

@@ -5,7 +5,7 @@ import SwiftUI
 /// (как вкладка «Роутеры» на Android и ПК).
 struct RoutersView: View {
     @EnvironmentObject var app: AppModel
-    @StateObject private var model = RouterModel()
+    @EnvironmentObject private var model: RouterModel
     @State private var link = ""
     @State private var token = ""
     @State private var name = ""

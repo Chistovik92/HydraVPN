@@ -26,6 +26,10 @@ on:
         type: boolean
         default: true
 
+# Приватный DNS Hydra VPN (секрет репозитория): нужен сборке, в исходниках его нет. Пусто — пункт DNS скрыт.
+env:
+  HYDRA_PRIVATE_DNS: ${{ secrets.HYDRA_PRIVATE_DNS }}
+
 jobs:
   desktop:
     name: ${{ matrix.target }}

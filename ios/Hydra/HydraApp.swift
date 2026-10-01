@@ -6,6 +6,7 @@ import SwiftUI
 @main
 struct HydraApp: App {
     @StateObject private var model = AppModel()
+    @StateObject private var routers = RouterModel()
     @Environment(\.scenePhase) private var phase
     @State private var unlocked = false
     @State private var backgroundedAt: Date?
@@ -39,9 +40,14 @@ struct HydraApp: App {
                 }
             }
             .environmentObject(model)
+            .environmentObject(routers)
             .preferredColorScheme(.dark)
             // hydra://open — тап по виджету: просто открыть приложение; остальное — импорт ссылки.
-            .onOpenURL { url in if url.scheme != "hydra" { model.importText(url.absoluteString) } }
+            // hydravpn-router://… — ссылка сопряжения роутера: добавить его на вкладку «Роутеры».
+            .onOpenURL { url in
+                if url.scheme == RouterLink.scheme { routers.add(link: url.absoluteString, token: "", name: "") }
+                else if url.scheme != "hydra" { model.importText(url.absoluteString) }
+            }
             // При включённой блокировке содержимое не показывается в переключателе приложений.
             .overlay { if model.state.app.appLock && phase != .active { LockView(onUnlock: nil) } }
         }
@@ -54,6 +60,7 @@ struct HydraApp: App {
                 if let t = backgroundedAt, Date().timeIntervalSince(t) > 30 { unlocked = false }
                 backgroundedAt = nil
                 model.refreshDueSubscriptions()
+                Task { await BotSync.syncIfDue(model) }
                 Task { await model.refreshStatus() }
             default: break
             }
