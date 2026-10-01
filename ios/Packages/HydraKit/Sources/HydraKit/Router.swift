@@ -124,7 +124,9 @@ public struct RouterLogEntry: Hashable, Sendable {
 }
 
 public struct RouterStatus: Sendable {
-    public init() {}
+    public init(version: String = "", state: String = "", uptime: String = "", lastError: String = "") {
+        self.version = version; self.state = state; self.uptime = uptime; self.lastError = lastError
+    }
     public var version = ""
     public var state = ""
     public var uptime = ""
