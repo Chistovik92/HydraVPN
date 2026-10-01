@@ -77,7 +77,18 @@ class RoutingRepository(private val context: Context) {
             when (provider) {
                 DnsProvider.SYSTEM -> null
                 DnsProvider.CUSTOM -> DnsEndpoint.parse(custom) ?: DnsEndpoint.doh(DnsProvider.CLOUDFLARE.address!!)
+                // Приватный DNS — только пока устройство подключено к боту; иначе Cloudflare.
+                DnsProvider.HYDRA -> hydraEndpoint(
+                    ru.gidravpn.hydra.BuildConfig.HYDRA_PRIVATE_DNS,
+                    ru.gidravpn.hydra.data.botaccount.BotAccountStore(context).linked,
+                ) ?: DnsEndpoint.doh(DnsProvider.CLOUDFLARE.address!!)
                 else -> DnsEndpoint.doh(provider.address!!)
             }
         }.firstOrNull()
+
+    companion object {
+        /** Приватный DoH Hydra VPN: null, если устройство не вошло через бота или адрес не задан сборкой. */
+        fun hydraEndpoint(url: String, botLinked: Boolean): DnsEndpoint? =
+            if (botLinked && url.isNotBlank()) DnsEndpoint.parse(url) else null
+    }
 }

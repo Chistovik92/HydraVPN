@@ -179,6 +179,8 @@
     <string name="dns_label">DNS (внутри туннеля)</string>
     <string name="dns_custom_hint">IP, хост или DoH/DoT-URL</string>
     <string name="dns_system_hint">Резолвер устройства, без шифрования — запросы идут мимо туннеля</string>
+    <string name="dns_hydra">Hydra VPN (приватный)</string>
+    <string name="dns_hydra_hint">Приватный шифрованный DNS проекта — для вошедших через бота</string>
     <string name="dns_invalid">Не похоже на адрес DNS. Примеры: 94.140.14.14, dns.example.com, https://dns.example.com/dns-query/токен, tls://dns.example.com</string>
     <string name="dns_supported">Поддерживаются IP, хост (→ DoH), https://… (DoH, можно с путём и токеном), tls://… (DoT), udp://…</string>
     <string name="geo_label">GeoIP-маршрутизация по странам</string>

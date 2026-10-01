@@ -181,6 +181,8 @@
     <string name="dns_label">DNS (inside the tunnel)</string>
     <string name="dns_custom_hint">IP, host or DoH/DoT URL</string>
     <string name="dns_system_hint">Device resolver, unencrypted — queries bypass the tunnel</string>
+    <string name="dns_hydra">Hydra VPN (private)</string>
+    <string name="dns_hydra_hint">Private encrypted DNS of the project — for accounts signed in through the bot</string>
     <string name="dns_invalid">Doesn\'t look like a DNS address. Examples: 94.140.14.14, dns.example.com, https://dns.example.com/dns-query/token, tls://dns.example.com</string>
     <string name="dns_supported">Supported: IP, host (→ DoH), https://… (DoH, path and token allowed), tls://… (DoT), udp://…</string>
     <string name="geo_label">GeoIP routing by country</string>

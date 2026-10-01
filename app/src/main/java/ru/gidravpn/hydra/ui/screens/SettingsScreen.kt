@@ -369,13 +369,18 @@ private fun RoutingContent(vm: MainViewModel) {
 
 
         Label(stringResource(R.string.dns_label))
-        ru.gidravpn.hydra.data.model.DnsProvider.entries.forEach { provider ->
+        val botLinked by vm.bot.collectAsState()
+        val hydraDnsAvailable = botLinked.linked && ru.gidravpn.hydra.BuildConfig.HYDRA_PRIVATE_DNS.isNotBlank()
+        ru.gidravpn.hydra.data.model.DnsProvider.entries
+            .filter { it != ru.gidravpn.hydra.data.model.DnsProvider.HYDRA || hydraDnsAvailable }
+            .forEach { provider ->
             RoutingOptionCard(
                 title = provider.labelRes?.let { stringResource(it) } ?: provider.label,
                 subtitle = when {
                     provider.address != null -> "${provider.address} · DoH"
                     provider == ru.gidravpn.hydra.data.model.DnsProvider.CUSTOM ->
                         if (dnsCustom.isNotBlank()) dnsCustom else stringResource(R.string.dns_custom_hint)
+                    provider == ru.gidravpn.hydra.data.model.DnsProvider.HYDRA -> stringResource(R.string.dns_hydra_hint)
                     else -> stringResource(R.string.dns_system_hint)
                 },
                 selected = dnsProvider == provider,

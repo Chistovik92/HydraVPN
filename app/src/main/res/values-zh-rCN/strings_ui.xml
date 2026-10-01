@@ -181,6 +181,8 @@
     <string name="dns_label">DNS（隧道内）</string>
     <string name="dns_custom_hint">IP、主机名或 DoH/DoT 地址</string>
     <string name="dns_system_hint">设备解析器，未加密 — 查询绕过隧道</string>
+    <string name="dns_hydra">Hydra VPN（私有）</string>
+    <string name="dns_hydra_hint">项目的私有加密 DNS — 仅限通过机器人登录的账户</string>
     <string name="dns_invalid">不像是 DNS 地址。示例：94.140.14.14、dns.example.com、https://dns.example.com/dns-query/token、tls://dns.example.com</string>
     <string name="dns_supported">支持：IP、主机名（→ DoH）、https://…（DoH，可带路径和令牌）、tls://…（DoT）、udp://…</string>
     <string name="geo_label">按国家的 GeoIP 路由</string>

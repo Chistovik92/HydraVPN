@@ -205,6 +205,10 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
                 }
             }
         }
+        if (ui.data.subscriptions.any { it.botPanel.isNotEmpty() }) {
+            Spacer(Modifier.height(12.dp))
+            AccountStatus(ui)
+        }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ConnectionMode.entries.forEach { m ->

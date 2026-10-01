@@ -31,6 +31,8 @@ data class Subscription(
     val collapsed: Boolean = false,
     /** Текст последней ошибки обновления; пусто — последнее обновление прошло. */
     val lastError: String = "",
+    /** Идентификатор панели в боте «Радар» (0.7.0): по нему находим подписку при смене её `url`. Пусто — не из бота. */
+    val botPanel: String = "",
 ) {
     /** То, что показываем в списке: название от панели, иначе пользовательское. */
     val displayName: String get() = serverTitle.ifBlank { name }

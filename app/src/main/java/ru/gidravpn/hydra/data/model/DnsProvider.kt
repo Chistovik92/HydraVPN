@@ -11,8 +11,8 @@ enum class DnsProvider(val label: String, val address: String?, @androidx.annota
     GOOGLE("Google", "8.8.8.8"),
     QUAD9("Quad9", "9.9.9.9"),
     ADGUARD("AdGuard", "94.140.14.14"),
-    /** Приватный DNS проекта Hydra VPN (0.7.0). */
-    HYDRA("Hydra VPN", "dns.hydravpn.us"),
+    /** Приватный DoH Hydra VPN с токеном в пути (0.7.0): только для вошедших через бота, адрес — BuildConfig.HYDRA_PRIVATE_DNS. */
+    HYDRA("Hydra VPN", null, ru.gidravpn.hydra.R.string.dns_hydra),
     SYSTEM("System", null, ru.gidravpn.hydra.R.string.dns_system),
     CUSTOM("Custom", null, ru.gidravpn.hydra.R.string.dns_custom);
 

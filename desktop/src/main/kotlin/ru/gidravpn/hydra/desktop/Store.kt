@@ -76,6 +76,9 @@ data class DesktopSettings(
         get() = EngineToggles(singBox = singBoxEnabled, xray = xrayEnabled, preferXray = preferXray)
 }
 
+/** Подключение к боту «Радар» (0.7.0). [panels] — сколько панелей выдано (из `/me`), null — ещё не узнавали. */
+data class BotLink(val server: String, val token: String, val username: String = "", val panels: Int? = null)
+
 data class HydraState(
     val servers: List<ServerProfile> = emptyList(),
     val subscriptions: List<Subscription> = emptyList(),
@@ -83,6 +86,8 @@ data class HydraState(
     val profiles: List<RoutingProfile> = emptyList(),
     /** Роутеры HydraVPN for Router (ссылка сопряжения: адрес, токен, TLS-отпечаток). */
     val routers: List<RouterLink> = emptyList(),
+    /** Аккаунт бота «Радар»: адрес, токен устройства (файл только для владельца), имя. null — не подключено. */
+    val bot: BotLink? = null,
 )
 
 /**
@@ -136,6 +141,7 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
             .put("settings", settingsToJson(s.settings))
             .put("profiles", JSONArray(s.profiles.map { JSONObject().put("name", it.name).put("routing", routingToJson(it.routing)) }))
             .put("routers", JSONArray(s.routers.map { JSONObject().put("name", it.name).put("link", it.toUri()) }))
+            .put("bot", s.bot?.let { JSONObject().put("server", it.server).put("token", it.token).put("username", it.username).put("panels", it.panels ?: JSONObject.NULL) } ?: JSONObject.NULL)
 
         fun fromJson(o: JSONObject): HydraState = HydraState(
             servers = o.optJSONArray("servers").objects().map(::serverFromJson)
@@ -143,6 +149,11 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
                 .distinctBy { it.id },
             subscriptions = o.optJSONArray("subscriptions").objects().map(::subFromJson).distinctBy { it.id },
             settings = o.optJSONObject("settings")?.let(::settingsFromJson) ?: DesktopSettings(),
+            bot = o.optJSONObject("bot")?.let { b ->
+                val server = b.optString("server"); val token = b.optString("token")
+                if (server.isBlank() || token.isBlank()) null
+                else BotLink(server, token, b.optString("username"), if (b.isNull("panels")) null else b.optInt("panels"))
+            },
             routers = o.optJSONArray("routers").objects().mapNotNull { r ->
                 RouterLink.parse(r.optString("link"))?.let { l -> l.copy(name = r.optString("name").trim().take(40).ifEmpty { l.host }) }
             }.distinctBy { it.baseUrl },
@@ -184,7 +195,7 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
             .put("serverTitle", s.serverTitle).put("uploadBytes", s.uploadBytes)
             .put("downloadBytes", s.downloadBytes).put("totalBytes", s.totalBytes)
             .put("expireAt", s.expireAt).put("supportUrl", s.supportUrl).put("lastError", s.lastError)
-            .put("autoUpdateHours", s.autoUpdateHours)
+            .put("autoUpdateHours", s.autoUpdateHours).put("botPanel", s.botPanel)
 
         private fun subFromJson(o: JSONObject): Subscription = Subscription(
             id = o.optLong("id"), name = o.optString("name"), url = o.optString("url"),
@@ -192,6 +203,7 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
             uploadBytes = o.optLong("uploadBytes"), downloadBytes = o.optLong("downloadBytes"),
             totalBytes = o.optLong("totalBytes"), expireAt = o.optLong("expireAt"),
             supportUrl = o.optString("supportUrl"), lastError = o.optString("lastError"),
+            botPanel = o.optString("botPanel"),
             // 0 — не обновлять автоматически; иначе не чаще раза в час и не реже раза в неделю.
             autoUpdateHours = o.optInt("autoUpdateHours", 12).let { if (it <= 0) 0 else it.coerceIn(1, 168) },
         )

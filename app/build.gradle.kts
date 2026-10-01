@@ -33,6 +33,11 @@ android {
         targetSdk = 35
         versionCode = 43
         versionName = "0.7.0"
+        // Приватный DNS (DoH с токеном в пути) для вошедших через бота: секрет, в репозитории его нет.
+        // Свойство Gradle `hydraPrivateDns` или переменная окружения HYDRA_PRIVATE_DNS; пусто — пункт скрыт.
+        val privateDns = ((project.findProperty("hydraPrivateDns") as String?) ?: System.getenv("HYDRA_PRIVATE_DNS") ?: "")
+            .trim().filter { it.isLetterOrDigit() || it in ":/._-?=&%" }
+        buildConfigField("String", "HYDRA_PRIVATE_DNS", "\"$privateDns\"")
 
         // Языки интерфейса (Фаза 8). Без фильтра библиотеки (AppCompat и др.) тащат строки ~90
         // языков: APK толще, а на, скажем, немецком телефоне системные диалоги библиотек
@@ -104,9 +109,14 @@ android {
         from(rootProject.file("shared/src/commonMain/kotlin/ru/gidravpn/hydra/router"))
         into(layout.buildDirectory.dir("generated/sharedRouter/ru/gidravpn/hydra/router"))
     }
+    // Копия должна появиться до любой задачи, читающей исходники (Kotlin, KSP/KAPT, lint).
+    tasks.configureEach {
+        if (name != "syncSharedRouter" && (name.startsWith("compile") || name.startsWith("ksp") ||
+                name.startsWith("kapt") || name.startsWith("lint"))) dependsOn(syncSharedRouter)
+    }
     sourceSets {
         getByName("main") {
-            java.srcDir(files(layout.buildDirectory.dir("generated/sharedRouter")).builtBy(syncSharedRouter))
+            kotlin.srcDir(layout.buildDirectory.dir("generated/sharedRouter"))
         }
         getByName("native") {
             val hasLibXray = file("libs/libXray.aar").exists()
