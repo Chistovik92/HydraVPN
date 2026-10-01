@@ -103,7 +103,8 @@ struct RootView: View {
             HomeView(goServers: { tab = 1 }).tabItem { Label(L("tab_main"), systemImage: "house.fill") }.tag(0)
             ServersView(onSelected: { tab = 0 }).tabItem { Label(L("tab_servers"), systemImage: "server.rack") }.tag(1)
             ProfileView().tabItem { Label(L("tab_profile"), systemImage: "person.fill") }.tag(2)
-            SettingsView().tabItem { Label(L("tab_settings"), systemImage: "gearshape.fill") }.tag(3)
+            RoutersView().tabItem { Label(L("tab_routers"), systemImage: "wifi.router") }.tag(3)
+            SettingsView().tabItem { Label(L("tab_settings"), systemImage: "gearshape.fill") }.tag(4)
         }
         .tint(theme.accent)
         .alert(model.message ?? "", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {

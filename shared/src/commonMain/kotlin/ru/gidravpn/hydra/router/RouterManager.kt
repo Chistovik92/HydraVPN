@@ -1,4 +1,4 @@
-package ru.gidravpn.hydra.desktop
+package ru.gidravpn.hydra.router
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -8,13 +8,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import ru.gidravpn.hydra.router.RouterClient
-import ru.gidravpn.hydra.router.RouterException
-import ru.gidravpn.hydra.router.RouterLink
-import ru.gidravpn.hydra.router.RouterLogEntry
-import ru.gidravpn.hydra.router.RouterNode
-import ru.gidravpn.hydra.router.RouterSection
-import ru.gidravpn.hydra.router.RouterSubscription
 
 /** Что известно о выбранном роутере после последнего опроса. */
 data class RouterUi(
@@ -24,6 +17,8 @@ data class RouterUi(
     val error: String? = null,
     val version: String = "",
     val state: String = "",
+    val uptime: String = "",
+    val lastError: String = "",
     val sections: List<RouterSection> = emptyList(),
     val subscriptions: List<RouterSubscription> = emptyList(),
     val nodes: List<RouterNode> = emptyList(),
@@ -83,7 +78,7 @@ class RouterManager(
         val logs = runCatching { c.logs(150) }.getOrDefault(emptyList())
         _ui.update {
             it.copy(online = true, error = null, version = ver,
-                state = st.optString("state", st.optString("status")),
+                state = st.optString("state"), uptime = st.optString("uptime"), lastError = st.optString("last_error"),
                 sections = sections, subscriptions = subs,
                 nodes = nodes.getOrDefault(emptyList()),
                 nodesError = nodes.exceptionOrNull()?.message,
@@ -127,7 +122,10 @@ class RouterManager(
                         is RouterException -> e.message
                         is javax.net.ssl.SSLException -> "TLS: ${e.message}"
                         is java.net.ConnectException, is java.net.SocketTimeoutException -> "роутер ${link.host}:${link.port} не отвечает"
-                        else -> e.message ?: e.toString()
+                        // Android без исключения для HTTP (network_security_config): работает только TLS.
+                        else -> if (e.message?.contains("cleartext", true) == true)
+                            "система запрещает HTTP без TLS — включите api_tls_cert/api_tls_key на роутере и сопрягитесь заново по https-ссылке"
+                        else e.message ?: e.toString()
                     }
                     _ui.update { it.copy(online = e is RouterException, error = msg) }
                     if (!quiet) toast("Роутер: $msg")

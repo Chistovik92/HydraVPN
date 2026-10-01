@@ -34,6 +34,7 @@ import ru.gidravpn.hydra.desktop.core.Rules
 import ru.gidravpn.hydra.desktop.core.Subscriptions
 import ru.gidravpn.hydra.desktop.core.SystemProxy
 import ru.gidravpn.hydra.desktop.core.Updates
+import ru.gidravpn.hydra.router.RouterManager
 import java.io.File
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -82,6 +83,14 @@ class AppController(
 
     private val _ui = MutableStateFlow(UiState(data = store.load()))
     val ui: StateFlow<UiState> = _ui
+
+    /** Роутеры HydraVPN for Router, которыми управляет приложение (экран «Роутеры»). */
+    val routers = RouterManager(
+        scope,
+        routers = { _ui.value.data.routers },
+        saveRouters = { list -> mutate { it.copy(routers = list) } },
+        toast = ::toast,
+    )
 
     /** Номер сеанса ядра: колбэки и корутины старого сеанса ничего не меняют. */
     @Volatile private var session = 0

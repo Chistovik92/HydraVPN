@@ -38,7 +38,7 @@ class UiRenderTest {
         c.setLanShare(true)
         c.saveProfile("Дом")
         c.toast(null)
-        for (tab in 0 until 6) {
+        for (tab in 0 until 7) {
             val scene = ImageComposeScene(980, 680, Density(1f)) {
                 val ui by c.ui.collectAsState()
                 HydraApp(c, ui, onRelaunchAdmin = {}, startTab = tab)
