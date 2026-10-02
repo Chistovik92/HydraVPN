@@ -138,7 +138,7 @@ private fun TunnelInfoContent(vm: MainViewModel) {
             checked = t.singBox) { vm.setEngineEnabled(ru.gidravpn.hydra.data.model.EngineToggles.Kind.SINGBOX, it) }
 
         EngineCard(stringResource(R.string.eng_xray), stringResource(if (xrayBuilt) R.string.eng_xray_desc else R.string.xray_toggle_missing),
-            AccentIndigo, checked = t.xray && xrayBuilt, enabled = xrayBuilt, beta = true) { vm.setEngineEnabled(ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY, it) }
+            AccentIndigo, checked = t.xray && xrayBuilt, enabled = xrayBuilt) { vm.setEngineEnabled(ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY, it) }
         if (xrayBuilt && t.xray) {
             Card(Modifier.fillMaxWidth().padding(start = 16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

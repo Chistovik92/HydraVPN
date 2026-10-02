@@ -57,6 +57,13 @@ step "Предполётные проверки"
        Соберите ядро по docs/BUILD.md (раздел 2.1) или положите готовый .aar."
 echo "    libbox.aar на месте"
 
+# Xray — штатное второе ядро: без libXray.aar переключатель «Xray Core» в настройках неактивен
+# (так вышли 0.6.x–0.7.2, пока ядро не было собрано).
+[[ -f app/libs/libXray.aar ]] || err \
+"нет app/libs/libXray.aar — в full-APK не будет ядра Xray.
+       Соберите его по docs/BUILD.md (раздел 2.2) или положите готовый .aar."
+echo "    libXray.aar на месте"
+
 [[ -f keystore.properties ]] || err \
 "нет keystore.properties в корне проекта — без него release-сборка уйдёт
        неподписанной/подписанной debug-ключом (см. docs/HANDOFF.md, «Честные
@@ -132,6 +139,9 @@ for i in "${!ABIS[@]}"; do
   [[ "$(apk_list "$src" | grep -cE "^lib/$abi/libbox\.so$" || true)" -ge 1 ]] || err \
 "внутри $src нет lib/$abi/libbox.so.
        Это НЕ рабочая сборка — публикация отменена."
+  [[ "$(apk_list "$src" | grep -cE '^assets/libxray\.dex$' || true)" -ge 1 ]] || err \
+"внутри $src нет assets/libxray.dex — ядро Xray не встроено (нужен app/libs/libXray.aar).
+       Это неполная сборка — публикация отменена."
   if apk_list "$src" | grep -E '^lib/[^/]+/' | grep -vqE "^lib/$abi/"; then
     err "в $src есть библиотеки чужой архитектуры — разделение по ABI не сработало"
   fi
