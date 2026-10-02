@@ -16,7 +16,8 @@ Hydra распространяется под GPL-3.0 (см. [LICENSE](../LICENS
 | wireguard-go | git.zx2c4.com/wireguard-go | MIT | референс WG-стека (входит в amneziawg-go) |
 | hev-socks5-tunnel | github.com/heiyehack/hev-socks5-tunnel | MIT — сверьте upstream | tun2socks-мост для Xray/olcRTC |
 | WDTT libclient (beta) | upstream WDTT | **проверить перед включением** | WG через TURN ВК |
-| olcRTC (beta) | upstream olcRTC | **проверить перед включением** | TCP over WebRTC |
+| olcRTC (beta) | github.com/openlibrecommunity/olcrtc | WTFPL (апстрим заархивирован) | TCP over WebRTC; Android — libolcrtc.so, ПК — собирается из закреплённого коммита |
+| OpenFlux (beta) | github.com/p1neappleXpress/OpenFlux | GPL-3.0 | TCP-туннель с транспортами; Android — libopenflux.so, ПК — бинарь релиза v0.3.0 (SHA-256 закреплён) |
 
 ## Библиотеки приложения (через Gradle/Maven)
 
