@@ -409,6 +409,6 @@ tasks.matching { it.name.startsWith("package") || it.name.startsWith("createDist
 // образе: из него же собираются DEB/RPM (--app-image) и DMG в scripts/package-desktop.sh.
 tasks.matching { it.name == "createDistributable" || it.name == "createReleaseDistributable" }.configureEach {
     doLast {
-        outputs.files.asFileTree.matching { include("**/resources/sing-box", "**/resources/xray") }.forEach { it.setExecutable(true, false) }
+        outputs.files.asFileTree.matching { include("**/resources/sing-box", "**/resources/xray", "**/resources/openflux", "**/resources/olcrtc") }.forEach { it.setExecutable(true, false) }
     }
 }
