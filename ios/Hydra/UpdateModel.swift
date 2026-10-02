@@ -87,7 +87,7 @@ private final class Redirects: NSObject, URLSessionDownloadDelegate, @unchecked 
 }
 
 /// Системное меню «Поделиться» для файла.
-struct ShareSheet: UIViewControllerRepresentable {
+struct UpdateShareSheet: UIViewControllerRepresentable {
     let url: URL
     func makeUIViewController(context: Context) -> UIActivityViewController {
         UIActivityViewController(activityItems: [url], applicationActivities: nil)
@@ -122,7 +122,7 @@ struct UpdateBanner: View {
             .background(theme.card, in: RoundedRectangle(cornerRadius: 16))
             .overlay(RoundedRectangle(cornerRadius: 16).stroke(theme.accent.opacity(0.5)))
             .sheet(isPresented: Binding(get: { model.shareURL != nil }, set: { if !$0 { model.shareURL = nil } })) {
-                if let url = model.shareURL { ShareSheet(url: url) }
+                if let url = model.shareURL { UpdateShareSheet(url: url) }
             }
         }
     }
