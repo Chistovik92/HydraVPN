@@ -74,7 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           core="$(ls desktop/build/hydra-app-resources/${{ matrix.target }}/sing-box* | head -1)"
-          "$core" version | head -1
+          "$core" version | sed -n 1p
           n=0
           for c in desktop/build/singbox-configs/*.json; do
             "$core" check -c "$c" || { echo "::error::sing-box check: $c"; exit 1; }
@@ -86,7 +86,7 @@ jobs:
         run: |
           set -euo pipefail
           xray="$(ls desktop/build/hydra-app-resources/${{ matrix.target }}/xray* | head -1)"
-          "$xray" version | head -1
+          "$xray" version | sed -n 1p
           n=0
           for c in desktop/build/xray-configs/*.json; do
             "$xray" run -test -c "$c" > /dev/null || { echo "::error::xray -test: $c"; "$xray" run -test -c "$c" || true; exit 1; }

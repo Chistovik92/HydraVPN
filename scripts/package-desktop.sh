@@ -62,8 +62,8 @@ step "Проверка: ядра и geo-базы внутри пакета"
 [[ -f "$RES/$OPENFLUX" ]] || err "в пакете нет клиента OpenFlux: $RES/$OPENFLUX"
 [[ -f "$RES/$OLCRTC" ]] || err "в пакете нет клиента olcRTC: $RES/$OLCRTC (на сборочной машине нужен go)"
 [[ -d "$RES/geo/geoip" ]] || err "в пакете нет geo-баз: $RES/geo/geoip"
-"$RES/$CORE" version | head -1
-"$RES/$XRAY" version | head -1
+"$RES/$CORE" version | sed -n 1p
+"$RES/$XRAY" version | sed -n 1p
 
 step "Дымовой тест: приложение запускается и живёт 20 с"
 smoke_log="$(mktemp)"
