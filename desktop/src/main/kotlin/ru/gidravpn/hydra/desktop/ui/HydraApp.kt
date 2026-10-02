@@ -187,7 +187,7 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
         }
         ui.update?.let { u ->
             Spacer(Modifier.height(8.dp))
-            TextButton(onClick = { openUrl(u.pageUrl) }) { Text("Доступна Hydra ${u.version} — открыть страницу загрузки", color = Accent) }
+            UpdateBanner(c, ui, u)
         }
         Spacer(Modifier.height(20.dp))
 

@@ -196,6 +196,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _update = MutableStateFlow<UpdateUi>(UpdateUi.Idle)
     val update: StateFlow<UpdateUi> = _update.asStateFlow()
     fun dismissUpdate() { _update.value = UpdateUi.Idle }
+    /** Идёт загрузка обновления: 0..1; null — не идёт. */
+    private val _updateProgress = MutableStateFlow<Float?>(null)
+    val updateProgress: StateFlow<Float?> = _updateProgress.asStateFlow()
+
+    /** Скачать APK (SHA-256 сверяется) и открыть системный установщик. */
+    fun installUpdate(release: ru.gidravpn.hydra.data.update.UpdateChecker.Release) = safeLaunch {
+        if (_updateProgress.value != null) return@safeLaunch
+        val app = getApplication<Application>()
+        _updateProgress.value = 0f
+        try {
+            when (ru.gidravpn.hydra.data.update.AppUpdater.downloadAndInstall(app, release) { _updateProgress.value = it }) {
+                ru.gidravpn.hydra.data.update.AppUpdater.Result.NEEDS_PERMISSION ->
+                    _importMessage.value = app.getString(ru.gidravpn.hydra.R.string.upd_need_permission)
+                ru.gidravpn.hydra.data.update.AppUpdater.Result.NO_FILE ->
+                    _importMessage.value = app.getString(ru.gidravpn.hydra.R.string.upd_no_file)
+                ru.gidravpn.hydra.data.update.AppUpdater.Result.INSTALLER_OPENED -> {}
+            }
+        } catch (e: Exception) {
+            _importMessage.value = app.getString(ru.gidravpn.hydra.R.string.upd_install_failed, e.message ?: e.javaClass.simpleName)
+        } finally {
+            _updateProgress.value = null
+        }
+    }
+
 
     /** [manual] — по кнопке; иначе не чаще раза в сутки и только если проверка включена. */
     fun checkForUpdates(manual: Boolean) = safeLaunch {

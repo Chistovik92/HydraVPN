@@ -9,3 +9,7 @@
 "ios_lang_hint" = "The interface language follows the language set for Hydra in iOS Settings.";
 "ios_open_settings" = "Open Hydra settings →";
 "ios_import_file" = "Import from file";
+"upd_ios_banner" = "Hydra %1$@ is available — tap to download";
+"upd_ios_downloading" = "Downloading update… %1$ld%%";
+"upd_ios_hint" = "iOS does not let an app install itself. After downloading, open the file in your sideloading tool (AltStore, Sideloadly…).";
+"upd_ios_bad_hash" = "The checksum does not match — the file was not opened.";

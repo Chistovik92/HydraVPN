@@ -61,6 +61,12 @@
     <string name="upd_auto">بررسی خودکار</string>
     <string name="upd_auto_desc">روزی یک بار هنگام اجرا. درخواست مستقیم به api.github.com می‌رود، نه از طریق VPN.</string>
     <string name="upd_banner">Hydra %1$s در دسترس است — برای باز کردن لمس کنید</string>
+    <string name="upd_banner_install">Hydra %1$s در دسترس است — برای به‌روزرسانی لمس کنید</string>
+    <string name="upd_install">دانلود و نصب</string>
+    <string name="upd_downloading">در حال دانلود به‌روزرسانی… %1$d%%</string>
+    <string name="upd_need_permission">در صفحه‌ای که باز شد به Hydra اجازهٔ نصب برنامه بدهید و دوباره «به‌روزرسانی» را لمس کنید.</string>
+    <string name="upd_no_file">این نسخه فایلی برای این ساخت ندارد — صفحهٔ انتشار را باز کنید.</string>
+    <string name="upd_install_failed">به‌روزرسانی ناموفق بود: %1$s</string>
 
     <string name="a11y_dismiss">بستن</string>
     <string name="a11y_more_actions">کارهای بیشتر</string>

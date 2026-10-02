@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Автозапуск после перезагрузки (опционально) -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Установка скачанного обновления (0.7.1): без этого разрешения система не даёт Hydra открыть установщик APK. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Android TV и устройства без сенсорного экрана/камеры (Фаза 8): ни одна из этих
          возможностей не обязательна — иначе магазины прячут приложение на TV, а камера
@@ -157,6 +159,11 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Результат установки обновления (0.7.1): открывает системное подтверждение. -->
+        <receiver
+            android:name=".data.update.AppUpdater$InstallResultReceiver"
+            android:exported="false" />
 
         <!-- Собственно VPN-туннель (Xray / sing-box) -->
         <service

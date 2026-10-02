@@ -61,13 +61,19 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
         val dismissLabel = stringResource(R.string.a11y_dismiss)
         (update as? MainViewModel.UpdateUi.Available)?.let { u ->
             val ctx = androidx.compose.ui.platform.LocalContext.current
+            val progress by vm.updateProgress.collectAsState()
             Card(Modifier.fillMaxWidth(), borderColor = AccentCyan) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // 0.7.1: тап скачивает APK напрямую и открывает установщик; нет файла в релизе — страница релиза.
+                    val direct = u.release.apk != null
                     Text(
-                        stringResource(R.string.upd_banner, u.release.version), color = AccentCyan, fontSize = 13.sp,
+                        progress?.let { stringResource(R.string.upd_downloading, (it * 100).toInt()) }
+                            ?: stringResource(if (direct) R.string.upd_banner_install else R.string.upd_banner, u.release.version),
+                        color = AccentCyan, fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f).clickableNoRipple {
-                            runCatching {
+                            if (progress != null) return@clickableNoRipple
+                            if (direct) vm.installUpdate(u.release) else runCatching {
                                 ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
                                     android.net.Uri.parse(u.release.pageUrl)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
                             }

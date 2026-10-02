@@ -70,6 +70,12 @@
     <string name="upd_auto">Check automatically</string>
     <string name="upd_auto_desc">Once a day on app start. The request goes to api.github.com directly, not through the VPN.</string>
     <string name="upd_banner">Hydra %1$s is available — tap to open</string>
+    <string name="upd_banner_install">Hydra %1$s is available — tap to update</string>
+    <string name="upd_install">Download and install</string>
+    <string name="upd_downloading">Downloading update… %1$d%%</string>
+    <string name="upd_need_permission">Allow Hydra to install apps on the screen that just opened, then tap «Update» again.</string>
+    <string name="upd_no_file">This release has no file for this build — open the release page.</string>
+    <string name="upd_install_failed">Update failed: %1$s</string>
 
     <!-- Accessibility -->
     <string name="a11y_dismiss">Dismiss</string>

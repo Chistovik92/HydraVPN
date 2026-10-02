@@ -61,6 +61,12 @@
     <string name="upd_auto">自动检查</string>
     <string name="upd_auto_desc">每天启动时检查一次。请求直接发往 api.github.com，不经过 VPN。</string>
     <string name="upd_banner">Hydra %1$s 已发布 — 点按打开</string>
+    <string name="upd_banner_install">Hydra %1$s 已发布 — 点按更新</string>
+    <string name="upd_install">下载并安装</string>
+    <string name="upd_downloading">正在下载更新… %1$d%%</string>
+    <string name="upd_need_permission">请在刚打开的界面中允许 Hydra 安装应用，然后再次点按「更新」。</string>
+    <string name="upd_no_file">此版本没有适用于当前构建的文件 — 请打开发布页面。</string>
+    <string name="upd_install_failed">更新失败：%1$s</string>
 
     <string name="a11y_dismiss">关闭</string>
     <string name="a11y_more_actions">更多操作</string>

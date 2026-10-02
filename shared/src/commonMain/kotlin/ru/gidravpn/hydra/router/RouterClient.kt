@@ -101,7 +101,19 @@ data class RouterSubscription(
     val updateIntervalHours: Double,
 )
 
-data class RouterSection(val name: String, val label: String, val enabled: Boolean, val action: String, val provider: String) {
+/**
+ * [raw] — раздел как его отдал роутер (с замаскированными секретами): правка через PUT берёт его за основу, чтобы не
+ * потерять поля, которых приложение не показывает.
+ */
+data class RouterSection(
+    val name: String, val label: String, val enabled: Boolean, val action: String, val provider: String,
+    val raw: JSONObject? = null,
+) {
+    /** Ссылки и JSON исходящих роутер отдаёт замаскированными («********»): записать такой раздел обратно значило бы стереть ключи. */
+    val editable: Boolean get() = raw == null || listOf("selector_proxy_links", "outbound_jsons").none { k ->
+        raw.optJSONArray(k)?.let { a -> (0 until a.length()).any { a.optString(it).isNotEmpty() } } == true
+    }
+    fun list(key: String): List<String> = raw?.optJSONArray(key)?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
     val title: String get() = label.ifBlank { name }
 }
 
@@ -122,7 +134,7 @@ class RouterClient(val link: RouterLink, private val timeoutMs: Int = 10_000) {
 
     fun sections(): List<RouterSection> = arr(get("/api/v1/sections")).objects().map {
         RouterSection(it.optString("name"), it.optString("label"), it.optBoolean("enabled"),
-            it.optString("action"), it.optString("provider").ifBlank { "singbox" })
+            it.optString("action"), it.optString("provider").ifBlank { "singbox" }, it)
     }
 
     fun subscriptions(): List<RouterSubscription> = arr(get("/api/v1/subscriptions")).objects().map {
@@ -176,6 +188,37 @@ class RouterClient(val link: RouterLink, private val timeoutMs: Int = 10_000) {
         return get("/api/v1/check/$name")
     }
 
+    // ------------------------------------------------------------ разделы (PUT заменяет раздел целиком)
+
+    fun addSection(section: JSONObject) { post("/api/v1/sections", section) }
+
+    fun replaceSection(name: String, section: JSONObject) {
+        require(name.matches(NAME)) { "имя раздела" }
+        request("PUT", "/api/v1/sections/$name", section)
+    }
+
+    fun deleteSection(name: String) {
+        require(name.matches(NAME)) { "имя раздела" }
+        request("DELETE", "/api/v1/sections/$name", null)
+    }
+
+    // ------------------------------------------------------------ аккаунт бота «Радар» на самом роутере
+
+    /** `{"linked":true,"server":"…","username":"…"}`; токен роутер никогда не отдаёт. */
+    fun radar(): JSONObject = obj(get("/api/v1/radar"))
+
+    /** Роутер меняет код на токен и сам забирает подписки в раздел [section] (пусто — `main`). */
+    fun radarLink(server: String, code: String, section: String?): JSONObject {
+        val b = JSONObject().put("server", server).put("code", code.filter { it.isDigit() })
+        if (!section.isNullOrBlank()) b.put("section", section)
+        return obj(post("/api/v1/radar/link", b))
+    }
+
+    fun radarSync(section: String?): JSONObject =
+        obj(post("/api/v1/radar/sync", JSONObject().apply { if (!section.isNullOrBlank()) put("section", section) }))
+
+    fun radarUnlink() { request("DELETE", "/api/v1/radar", null) }
+
     // ------------------------------------------------------------ транспорт
     private fun get(path: String) = request("GET", path, null)
     private fun post(path: String, body: JSONObject?) = request("POST", path, body ?: JSONObject())
@@ -192,7 +235,7 @@ class RouterClient(val link: RouterLink, private val timeoutMs: Int = 10_000) {
             conn.requestMethod = method
             conn.connectTimeout = timeoutMs
             // Проверки и обновление подписки на роутере идут до минуты с лишним.
-            conn.readTimeout = if (path.startsWith("/api/v1/check") || path.endsWith("/refresh")) 100_000 else timeoutMs
+            conn.readTimeout = if (path.startsWith("/api/v1/check") || path.startsWith("/api/v1/radar") || path.endsWith("/refresh") || method != "GET") 100_000 else timeoutMs
             conn.instanceFollowRedirects = false
             conn.setRequestProperty("Authorization", "Bearer ${link.token}")
             conn.setRequestProperty("Accept", "application/json")
@@ -226,6 +269,7 @@ class RouterClient(val link: RouterLink, private val timeoutMs: Int = 10_000) {
 
     companion object {
         private const val MAX_RESPONSE = 4 shl 20
+        private val NAME = Regex("^[A-Za-z0-9_.-]{1,64}$")
 
         /** Не больше [MAX_RESPONSE] байт (readNBytes на Android — только с API 33). */
         private fun readLimited(s: java.io.InputStream): String {
