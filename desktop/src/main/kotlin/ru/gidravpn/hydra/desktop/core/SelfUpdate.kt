@@ -148,7 +148,10 @@ object SelfUpdate {
         file.setExecutable(true)
         val cmd = when (os) {
             Os.WINDOWS -> listOf("cmd", "/c", "start", "\"\"", "/min", file.absolutePath)
-            else -> listOf("sh", "-c", "(setsid sh '${file.absolutePath}' >/dev/null 2>&1 &) || (nohup sh '${file.absolutePath}' >/dev/null 2>&1 &)")
+            // setsid есть на Linux, но не на macOS: без него — nohup (скрипт всё равно переживает выход Hydra).
+            else -> listOf("sh", "-c",
+                "if command -v setsid >/dev/null 2>&1; then (setsid sh '${file.absolutePath}' >/dev/null 2>&1 &); " +
+                    "else (nohup sh '${file.absolutePath}' >/dev/null 2>&1 &); fi")
         }
         ProcessBuilder(cmd).redirectErrorStream(true).start()
         return file
