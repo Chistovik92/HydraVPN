@@ -9,8 +9,8 @@ options:
 
 settings:
   base:
-    MARKETING_VERSION: "0.7.1"
-    CURRENT_PROJECT_VERSION: "44"
+    MARKETING_VERSION: "0.7.2"
+    CURRENT_PROJECT_VERSION: "45"
     SWIFT_VERSION: "5.10"
     DEVELOPMENT_TEAM: ""            # задать свой Team ID для подписи (docs в ios/README.md)
     ENABLE_BITCODE: NO

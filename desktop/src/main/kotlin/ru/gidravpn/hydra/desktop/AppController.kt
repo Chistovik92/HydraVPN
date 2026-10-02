@@ -159,6 +159,9 @@ class AppController(
 
     fun toast(msg: String?) = _ui.update { it.copy(message = msg) }
 
+    /** Для скриншотов и тестов отрисовки: подменяет состояние интерфейса (в самом приложении не используется). */
+    internal fun previewState(f: (UiState) -> UiState) { _ui.update(f) }
+
     fun updateSettings(block: (DesktopSettings) -> DesktopSettings) =
         mutate { it.copy(settings = block(it.settings)) }
 

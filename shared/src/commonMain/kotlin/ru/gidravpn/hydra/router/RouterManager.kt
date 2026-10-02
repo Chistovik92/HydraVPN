@@ -54,6 +54,9 @@ class RouterManager(
 
     val current: RouterLink? get() = routers().firstOrNull { it.baseUrl == _ui.value.selected }
 
+    /** Для скриншотов и тестов отрисовки: подменяет состояние экрана (в самом приложении не используется). */
+    fun previewState(state: RouterUi) { _ui.value = state }
+
     /** Ссылка `hydravpn-router://…` или адрес + отдельно токен. */
     fun add(link: String, token: String, name: String): Boolean {
         val l = RouterLink.parse(link, token.ifBlank { null })
