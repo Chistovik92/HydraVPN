@@ -51,7 +51,7 @@
     <string name="profiles_delete_q">نمایه «%1$s» حذف شود؟</string>
 
     <string name="upd_title">به‌روزرسانی‌ها</string>
-    <string name="upd_desc">Hydra آخرین انتشار را در GitHub بررسی می‌کند. برنامه خودش چیزی دانلود یا نصب نمی‌کند — صفحه انتشار را باز می‌کند.</string>
+    <string name="upd_desc">Hydra آخرین انتشار را در GitHub بررسی می‌کند. دکمهٔ «دانلود و نصب» فایل را می‌گیرد (جمع کنترلی بررسی می‌شود) و نصب‌کنندهٔ سیستم را باز می‌کند؛ صفحهٔ انتشار نیز همیشه در دسترس است.</string>
     <string name="upd_checking">در حال بررسی…</string>
     <string name="upd_latest">آخرین نسخه را دارید</string>
     <string name="upd_failed">بررسی نشد: %1$s</string>

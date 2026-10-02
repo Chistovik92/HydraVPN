@@ -14,6 +14,20 @@ import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
+
+/**
+ * Клиент «исполняемый файл → локальный SOCKS5» (olcRTC, OpenFlux; 0.7.4). Запускается ДО sing-box: когда SOCKS5 готов
+ * (клиент сначала устанавливает сессию с транспортом — это может занять десятки секунд), sing-box поднимается мостом
+ * к нему. [secrets] — файлы с ключами, их удаляет [CoreRunner.stop].
+ */
+class Sidecar(
+    val name: String,
+    val exe: File,
+    val args: List<String>,
+    val socksPort: Int,
+    val readyTimeoutMs: Long = 45_000,
+    val secrets: List<File> = emptyList(),
+)
 /** Нужен перезапуск Hydra от имени администратора (TUN на Windows). */
 class NeedsElevation : IllegalStateException("Режим TUN на Windows требует запуска Hydra от имени администратора")
 
@@ -41,12 +55,13 @@ class CoreRunner(
 
     @Volatile private var singBox: Handle? = null
     @Volatile private var xray: Handle? = null
+    @Volatile private var sidecarSecrets: List<File> = emptyList()
 
     /** Все запущенные ядра живы. */
     val isAlive: Boolean get() = singBox?.alive == true && (xray == null || xray?.alive == true)
 
     @Synchronized
-    fun start(session: Int, configJson: String, mode: ConnectionMode, xrayConfig: String? = null, xraySocksPort: Int = 0) {
+    fun start(session: Int, configJson: String, mode: ConnectionMode, xrayConfig: String? = null, xraySocksPort: Int = 0, sidecar: Sidecar? = null) {
         check(singBox?.alive != true && xray?.alive != true) { "ядро уже запущено" }
         val core = Platform.bundledCore()
             ?: error("Не найдено ядро sing-box в пакете приложения — переустановите Hydra")
@@ -64,6 +79,17 @@ class CoreRunner(
             if (!waitPort(xraySocksPort, h)) {
                 stop()
                 error("Xray не запустился — подробности в журнале")
+            }
+        }
+
+        if (sidecar != null) {
+            val h = spawn(session, sidecar.name, listOf(sidecar.exe.absolutePath) + sidecar.args, SIDECAR_PID, dir) { "[${sidecar.name}] $it" }
+            xray = h
+            sidecarSecrets = sidecar.secrets
+            // Клиент сначала устанавливает сессию с транспортом, и лишь потом открывает SOCKS5 — ждём долго.
+            if (!waitPort(sidecar.socksPort, h, sidecar.readyTimeoutMs)) {
+                stop()
+                error("${sidecar.name}: SOCKS5 не поднялся за ${sidecar.readyTimeoutMs / 1000} с — проверьте параметры и журнал")
             }
         }
 
@@ -93,6 +119,8 @@ class CoreRunner(
         singBox = null
         xray?.stop()
         xray = null
+        sidecarSecrets.forEach { runCatching { it.delete() } }
+        sidecarSecrets = emptyList()
     }
 
     private fun waitPort(port: Int, h: Handle, timeoutMs: Long = 8000): Boolean {
@@ -111,6 +139,7 @@ class CoreRunner(
     companion object {
         private const val CORE_PID = "core.pid"
         private const val XRAY_PID = "xray.pid"
+        private const val SIDECAR_PID = "sidecar.pid"
 
         /**
          * На Windows дочерний процесс переживает падение родителя: ядро прошлого
@@ -119,14 +148,15 @@ class CoreRunner(
         fun killStale() {
             killStale(CORE_PID, "sing-box")
             killStale(XRAY_PID, "xray")
+            killStale(SIDECAR_PID, "olcrtc", "openflux")
         }
 
-        private fun killStale(pidName: String, prefix: String) {
+        private fun killStale(pidName: String, vararg prefixes: String) {
             val pidFile = File(Platform.runDir, pidName)
             val pid = runCatching { pidFile.readText().trim().toLong() }.getOrNull()
             if (pid != null) {
                 ProcessHandle.of(pid).filter { h ->
-                    h.info().command().map { File(it).name.startsWith(prefix) }.orElse(false)
+                    h.info().command().map { c -> prefixes.any { File(c).name.startsWith(it) } }.orElse(false)
                 }.ifPresent { h ->
                     h.destroy()
                     runCatching { h.onExit().get(3, TimeUnit.SECONDS) }

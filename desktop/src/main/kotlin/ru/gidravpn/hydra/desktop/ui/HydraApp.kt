@@ -461,6 +461,8 @@ internal fun openUrl(url: String) {
 internal fun engineLabel(kind: ru.gidravpn.hydra.data.model.EngineToggles.Kind?): String = when (kind) {
     ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY -> "Xray"
     ru.gidravpn.hydra.data.model.EngineToggles.Kind.SINGBOX -> "sing-box"
+    ru.gidravpn.hydra.data.model.EngineToggles.Kind.OLCRTC -> "olcRTC (BETA)"
+    ru.gidravpn.hydra.data.model.EngineToggles.Kind.OPENFLUX -> "OpenFlux (BETA)"
     null -> "ядро выключено"
     else -> kind.name
 }

@@ -13,6 +13,7 @@ import ru.gidravpn.hydra.data.model.SplitTunnelMode
 import ru.gidravpn.hydra.data.model.Subscription
 import ru.gidravpn.hydra.data.model.TlsFragmentMode
 import ru.gidravpn.hydra.desktop.core.Rules
+import ru.gidravpn.hydra.desktop.core.hasValidEndpoint
 import ru.gidravpn.hydra.router.RouterLink
 import java.io.File
 import java.nio.file.AtomicMoveNotSupportedException
@@ -62,6 +63,9 @@ data class DesktopSettings(
     // Движки (Настройки → Движки, как «Туннель» на Android).
     val singBoxEnabled: Boolean = true,
     val xrayEnabled: Boolean = true,
+    /** olcRTC и OpenFlux (0.7.4, BETA): клиенты-подпроцессы, нужны бинарники в пакете. */
+    val olcRtcEnabled: Boolean = true,
+    val openFluxEnabled: Boolean = true,
     val preferXray: Boolean = false,
     // Безопасность.
     val killSwitch: Boolean = false,
@@ -73,7 +77,7 @@ data class DesktopSettings(
     val checkUpdates: Boolean = true,
 ) {
     val engines: EngineToggles
-        get() = EngineToggles(singBox = singBoxEnabled, xray = xrayEnabled, preferXray = preferXray)
+        get() = EngineToggles(singBox = singBoxEnabled, xray = xrayEnabled, preferXray = preferXray, olcRtc = olcRtcEnabled, openFlux = openFluxEnabled)
 }
 
 /** Подключение к боту «Радар» (0.7.0). [panels] — сколько панелей выдано (из `/me`), null — ещё не узнавали. */
@@ -145,7 +149,7 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
 
         fun fromJson(o: JSONObject): HydraState = HydraState(
             servers = o.optJSONArray("servers").objects().map(::serverFromJson)
-                .filter { it.address.isNotBlank() && it.port in 1..65535 }
+                .filter { it.hasValidEndpoint }
                 .distinctBy { it.id },
             subscriptions = o.optJSONArray("subscriptions").objects().map(::subFromJson).distinctBy { it.id },
             settings = o.optJSONObject("settings")?.let(::settingsFromJson) ?: DesktopSettings(),
@@ -240,6 +244,7 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
             .put("selectedServerId", s.selectedServerId ?: JSONObject.NULL)
             .put("routing", routingToJson(s.routing))
             .put("singBoxEnabled", s.singBoxEnabled).put("xrayEnabled", s.xrayEnabled).put("preferXray", s.preferXray)
+            .put("olcRtcEnabled", s.olcRtcEnabled).put("openFluxEnabled", s.openFluxEnabled)
             .put("killSwitch", s.killSwitch).put("autoReconnect", s.autoReconnect)
             .put("autoConnect", s.autoConnect).put("launchAtLogin", s.launchAtLogin)
             .put("lanShare", JSONObject().put("enabled", s.lanShare.enabled).put("port", s.lanShare.port)
@@ -258,6 +263,8 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
                 routing = routing,
                 singBoxEnabled = o.optBoolean("singBoxEnabled", true),
                 xrayEnabled = o.optBoolean("xrayEnabled", true),
+                olcRtcEnabled = o.optBoolean("olcRtcEnabled", true),
+                openFluxEnabled = o.optBoolean("openFluxEnabled", true),
                 preferXray = o.optBoolean("preferXray", false),
                 killSwitch = o.optBoolean("killSwitch", false),
                 autoReconnect = o.optBoolean("autoReconnect", true),

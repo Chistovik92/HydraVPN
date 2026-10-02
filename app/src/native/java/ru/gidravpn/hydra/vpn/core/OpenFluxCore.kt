@@ -28,12 +28,18 @@ class OpenFluxCore : SocksBridgeCore() {
             add("--role"); add("client")
             add("--inbound"); add("socks5")
             add("--socks5"); add("127.0.0.1:$socksPort")
-            add("--transport"); add(transport)
-            if (transport == "oneme") {
-                add("--maxToken"); add(extra.optString("maxToken"))
-                add("--maxUid"); add(extra.optString("maxUid"))
-            } else if (profile.address.isNotEmpty()) {
-                add("--url"); add(profile.address)
+            when {
+                // Обычный TCP до своего exit-узла: у апстрима это режим нескольких транспортов, ключ обязателен.
+                transport == "direct" -> { add("--transports"); add("direct:100"); add("--direct-dial"); add(profile.address) }
+                transport == "oneme" -> {
+                    add("--transport"); add(transport)
+                    add("--maxToken"); add(extra.optString("maxToken"))
+                    add("--maxUid"); add(extra.optString("maxUid"))
+                }
+                else -> {
+                    add("--transport"); add(transport)
+                    if (profile.address.isNotEmpty()) { add("--url"); add(profile.address) }
+                }
             }
             extra.optString("codec").takeIf { it == "legacy" }?.let { add("--codec"); add(it) }
             if (profile.uuidOrPassword.isNotEmpty()) {

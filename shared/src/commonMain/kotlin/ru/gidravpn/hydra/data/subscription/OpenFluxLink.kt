@@ -13,14 +13,14 @@ import java.net.URLEncoder
  *
  *   openflux://<transport>?url=<url>&maxToken=<t>&maxUid=<u>&codec=<batched|legacy>&key=<секрет>#<имя>
  *
- * transport: yandex | vyandex | oneme | cupsonline | mailru. Для `oneme` вместо url — maxToken и maxUid.
+ * transport: yandex | vyandex | oneme | cupsonline | mailru | direct (обычный TCP до своего exit-узла: `url=host:port`). Для `oneme` вместо url — maxToken и maxUid.
  * key — общий секрет шифрования AES-256-GCM (`--encryption-key-file`), необязателен.
  * Соответствие профилю: transport = transport, address = url, uuidOrPassword = key,
  * extra = {maxToken, maxUid, codec}; порт не используется (0).
  */
 object OpenFluxLink {
 
-    val TRANSPORTS = listOf("yandex", "vyandex", "oneme", "cupsonline", "mailru")
+    val TRANSPORTS = listOf("yandex", "vyandex", "oneme", "cupsonline", "mailru", "direct")
 
     fun parse(link: String): ServerProfile? {
         if (!link.startsWith("openflux://", ignoreCase = true)) return null
@@ -35,7 +35,8 @@ object OpenFluxLink {
         val url = q["url"].orEmpty()
         val token = q["maxToken"].orEmpty()
         val uid = q["maxUid"].orEmpty()
-        // Без обязательных параметров транспорта клиент всё равно не запустится.
+        // Без обязательных параметров транспорта клиент всё равно не запустится (для direct нужен и ключ).
+        if (transport == "direct" && (url.isEmpty() || q["key"].isNullOrEmpty())) return null
         if (transport == "oneme") {
             if (token.isEmpty() || uid.isEmpty()) return null
         } else if (transport != "cupsonline" && url.isEmpty()) {

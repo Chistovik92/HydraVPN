@@ -206,6 +206,13 @@ private fun EnginesSection(c: AppController, ui: UiState) {
                 }
             }
         }
+        // 0.7.4 (BETA): клиенты «подпроцесс → SOCKS5», sing-box — мост к ним (как на Android).
+        ToggleRow("olcRTC (BETA)", s.olcRtcEnabled && c.olcRtcAvailable,
+            if (c.olcRtcAvailable) "TCP поверх WebRTC через сервисы видеозвонков (Jitsi, Телемост, WB Stream). Нужен свой сервер olcRTC с тем же ключом; апстрим заморожен."
+            else "Клиент olcRTC не вошёл в эту сборку.", enabled = c.olcRtcAvailable) { v -> c.setEngine(EngineToggles.Kind.OLCRTC, v) }
+        ToggleRow("OpenFlux (BETA)", s.openFluxEnabled && c.openFluxAvailable,
+            if (c.openFluxAvailable) "TCP-туннель через сервисы документов и чатов (Яндекс, MAX, Mail.ru, Cups) или напрямую до своего узла. Нужен exit-узел OpenFlux."
+            else "Клиент OpenFlux не вошёл в эту сборку.", enabled = c.openFluxAvailable) { v -> c.setEngine(EngineToggles.Kind.OPENFLUX, v) }
         if (!s.singBoxEnabled && !(s.xrayEnabled && xrayBuilt)) Text("Все движки выключены — подключиться не к чему.", color = Danger, fontSize = 12.sp)
         else if (!s.singBoxEnabled) Text("Hysteria2, TUIC и WireGuard без sing-box недоступны.", color = Warn, fontSize = 12.sp)
     }

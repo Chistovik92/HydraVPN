@@ -62,8 +62,13 @@ jobs:
         if: matrix.os == 'linux'
         run: sudo apt-get update -q && sudo apt-get install -y -q fakeroot rpm xvfb libfuse2t64 || sudo apt-get install -y -q fakeroot rpm xvfb
 
+      # olcRTC собирается из закреплённого коммита (чистый Go, версия — по go.mod апстрима).
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
       - name: Тесты (конфиги, парсеры, хранилище, рендер UI)
-        run: gradle :desktop:test :desktop:downloadSingBox :desktop:downloadXray --stacktrace
+        run: gradle :desktop:downloadSingBox :desktop:downloadXray :desktop:downloadOpenFlux :desktop:buildOlcRtc :desktop:test --stacktrace
 
       - name: sing-box check каждого конфига
         run: |

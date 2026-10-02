@@ -160,9 +160,85 @@ val syncGeoAssets by tasks.registering(Sync::class) {
     into(appResourcesDir.map { it.dir("common/geo") })
 }
 
+
+// ---- olcRTC и OpenFlux (0.7.4, BETA): клиенты-подпроцессы -------------------------
+// OpenFlux — готовые бинари из релиза апстрима (GPL-3.0), SHA-256 закреплены (SHA256SUMS.txt релиза v0.3.0).
+val openFluxVersion = "0.3.0"
+val openFluxBinaries = mapOf(
+    "windows-x64" to ("openflux-windows-amd64.exe" to "0399506ee56381dc140e67a47e4e3c3bb8e7d5af102cccdb0d27c0e50060e70a"),
+    "windows-arm64" to ("openflux-windows-arm64.exe" to "ea3c8535c676f56d3c46e72e5f7d39231b45369aece3d4fa91581c954b58a127"),
+    "linux-x64" to ("openflux-linux-amd64" to "429bd9545c7ec52998ed98f9f06947cc4724239aa1dd2cc024c82c1a948a5883"),
+    "linux-arm64" to ("openflux-linux-arm64" to "41f0c8acb98487949b3697482d5e314f7ee72cb7c82bc517636688d9338bd771"),
+    "macos-x64" to ("openflux-darwin-amd64" to "726012d80fed1be8e3e39a64079b6d788cba83f3df58cbaaf89768e61e9764fc"),
+    "macos-arm64" to ("openflux-darwin-arm64" to "0be53af3567ef9e11c8ee8ff57df3e27d5948c8e99e3f828d2825dde00c441dc"),
+)
+
+val downloadOpenFlux by tasks.registering {
+    group = "hydra"
+    val target = hostTarget()
+    val (asset, sha256) = openFluxBinaries.getValue(target)
+    val exe = if (target.startsWith("windows")) "openflux.exe" else "openflux"
+    val outDir = appResourcesDir.map { it.dir(target) }
+    outputs.dir(outDir)
+    inputs.property("openflux", "$openFluxVersion-$asset-$sha256")
+    doLast {
+        val cache = coreCacheDir.get().asFile.apply { mkdirs() }
+        val file = cache.resolve("OpenFlux-$openFluxVersion-$asset")
+        fun sha(f: File) = MessageDigest.getInstance("SHA-256").digest(f.readBytes()).joinToString("") { "%02x".format(it) }
+        if (!file.exists() || sha(file) != sha256) {
+            val url = "https://github.com/p1neappleXpress/OpenFlux/releases/download/v$openFluxVersion/$asset"
+            logger.lifecycle("Скачиваю $url")
+            URI(url).toURL().openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+        }
+        val actual = sha(file)
+        check(actual == sha256) { "SHA-256 ${file.name} не совпал: $actual (ожидался $sha256)" }
+        val dest = outDir.get().asFile.apply { mkdirs() }
+        file.copyTo(dest.resolve(exe), overwrite = true)
+        dest.resolve(exe).setExecutable(true, false)
+    }
+}
+
+// olcRTC — апстрим заархивирован и релизов не выпускает: клиент (`cmd/olcrtc`, чистый Go, WTFPL) собирается из закреплённого
+// коммита. Нужен `go` (и git); без них клиент в пакет не попадает, а в приложении пункт olcRTC неактивен.
+val olcRtcCommit = "f3ad8fb7c0d0fa981423f83269526fa94077c23d"
+val buildOlcRtc by tasks.registering {
+    group = "hydra"
+    val target = hostTarget()
+    val exe = if (target.startsWith("windows")) "olcrtc.exe" else "olcrtc"
+    val outDir = appResourcesDir.map { it.dir(target) }
+    val workDir = layout.buildDirectory.dir("olcrtc-src")
+    outputs.dir(outDir)
+    inputs.property("olcrtc", olcRtcCommit)
+    doLast {
+        fun run(dir: File, vararg cmd: String, env: Map<String, String> = emptyMap()) {
+            val pb = ProcessBuilder(*cmd).directory(dir).redirectErrorStream(true)
+            pb.environment().putAll(env)
+            val p = pb.start()
+            val out = p.inputStream.bufferedReader().readText()
+            check(p.waitFor() == 0) { "${cmd.joinToString(" ")}: $out" }
+        }
+        val haveTools = runCatching { run(workDir.get().asFile.apply { mkdirs() }, "go", "version"); run(workDir.get().asFile, "git", "--version") }.isSuccess
+        if (!haveTools) {
+            logger.warn("buildOlcRtc: нет go или git — клиент olcRTC в пакет не войдёт")
+            return@doLast
+        }
+        val src = workDir.get().asFile
+        if (!src.resolve(".git").isDirectory) {
+            run(src, "git", "init", "-q")
+            run(src, "git", "remote", "add", "origin", "https://github.com/openlibrecommunity/olcrtc.git")
+        }
+        run(src, "git", "fetch", "-q", "--depth", "1", "origin", olcRtcCommit)
+        run(src, "git", "checkout", "-q", "--force", "FETCH_HEAD")
+        val dest = outDir.get().asFile.apply { mkdirs() }
+        // Сборка под ЭТУ платформу, без cgo — один и тот же результат на любой машине.
+        run(src, "go", "build", "-trimpath", "-ldflags=-s -w", "-o", dest.resolve(exe).absolutePath, "./cmd/olcrtc", env = mapOf("CGO_ENABLED" to "0"))
+        dest.resolve(exe).setExecutable(true, false)
+    }
+}
+
 val hydraAppResources by tasks.registering {
     group = "hydra"
-    dependsOn(downloadSingBox, downloadXray, syncGeoAssets)
+    dependsOn(downloadSingBox, downloadXray, downloadOpenFlux, buildOlcRtc, syncGeoAssets)
 }
 
 // ---- Иконки: PNG/ICO/ICNS из одной 1024px-иконки iOS ---------------------------

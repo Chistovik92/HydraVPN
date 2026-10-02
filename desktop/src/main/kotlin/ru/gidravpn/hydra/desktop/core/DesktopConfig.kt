@@ -33,8 +33,10 @@ object DesktopConfig {
     class UnsupportedProtocol(val profile: ServerProfile) :
         IllegalArgumentException("Протокол «${profile.protocol?.displayName ?: profile.protocolId}» на ПК пока не поддерживается")
 
-    /** На ПК работают протоколы ядер sing-box и Xray (Xray обслуживает их подмножество). */
-    fun isSupported(p: ServerProfile): Boolean = p.protocol?.engine == Engine.SINGBOX
+    /** На ПК работают протоколы ядер sing-box и Xray (Xray обслуживает их подмножество), а также olcRTC и OpenFlux (0.7.4, BETA). */
+    fun isSupported(p: ServerProfile): Boolean = p.protocol?.engine in SUPPORTED_ENGINES
+
+    private val SUPPORTED_ENGINES = setOf(Engine.SINGBOX, Engine.OLCRTC, Engine.OPENFLUX)
 
     /** Кто обслужит профиль с текущими тумблерами движков; null — подходящий движок выключен. */
     fun engineFor(p: ServerProfile, settings: DesktopSettings, xrayAvailable: Boolean): EngineToggles.Kind? =
@@ -43,7 +45,7 @@ object DesktopConfig {
     data class Api(val port: Int, val secret: String)
 
     /** Локальный socks-inbound Xray, к которому подключается мост sing-box. */
-    data class XrayBridge(val port: Int, val auth: XrayConfigBuilder.SocksAuth)
+    data class XrayBridge(val port: Int, val auth: XrayConfigBuilder.SocksAuth?)
 
     /** Теги локальных inbound'ов — правила «по приложениям» касаются только их, не раздачи в LAN. */
     private const val TUN_TAG = "tun-in"
@@ -127,7 +129,7 @@ object DesktopConfig {
         val p = if (resolvedIp == null || resolvedIp == profile.address) profile
         else profile.copy(sni = profile.sni.ifBlank { profile.address }, address = resolvedIp)
         val dnsUrl = dnsEndpoint(settings)?.toXrayAddress()
-        return XrayConfigBuilder.build(p, bridge.port, dnsUrl, bridge.auth)
+        return XrayConfigBuilder.build(p, bridge.port, dnsUrl, bridge.auth ?: error("для Xray нужен пароль socks-моста"))
     }
 
     private fun dnsEndpoint(settings: DesktopSettings): DnsEndpoint? {

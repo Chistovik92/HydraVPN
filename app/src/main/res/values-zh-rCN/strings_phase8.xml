@@ -51,7 +51,7 @@
     <string name="profiles_delete_q">删除配置方案“%1$s”？</string>
 
     <string name="upd_title">更新</string>
-    <string name="upd_desc">Hydra 会检查 GitHub 上的最新版本。应用本身不会下载或安装任何内容，只会打开发布页面。</string>
+    <string name="upd_desc">Hydra 会检查 GitHub 上的最新版本。点按「下载并安装」会获取文件（校验其校验和）并打开系统安装程序；也始终可以打开发布页面。</string>
     <string name="upd_checking">正在检查…</string>
     <string name="upd_latest">已是最新版本</string>
     <string name="upd_failed">检查失败：%1$s</string>
