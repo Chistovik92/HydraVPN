@@ -399,7 +399,7 @@ tasks.matching { it.name == "prepareAppResources" }.configureEach {
     dependsOn(hydraAppResources)
     // Compose копирует ресурсы без бита исполнения — ядро в пакете было бы «Permission denied».
     (this as? AbstractCopyTask)?.eachFile {
-        if (name == "sing-box" || name == "xray") permissions { unix("rwxr-xr-x") }
+        if (name in setOf("sing-box", "xray", "openflux", "olcrtc")) permissions { unix("rwxr-xr-x") }
     }
 }
 tasks.matching { it.name.startsWith("package") || it.name.startsWith("createDistributable") || it.name.startsWith("createReleaseDistributable") }
