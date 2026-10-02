@@ -1,133 +1,142 @@
 # Hydra
 
-**Мультипротокольный VPN-клиент** для Android, Windows, Linux и macOS (iOS — сборка без подписи). См. [docs/MULTIPLATFORM.md](docs/MULTIPLATFORM.md).
+**Мультипротокольный VPN-клиент** для Android, Windows, Linux, macOS и iOS. Один проект, один аккаунт
+(бот «Радар» / Hydra VPN), одно управление — телефон, компьютер и домашний роутер.
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.7.1**
+- Статус: **0.7.2** · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md)
+
+## Скачать
+
+Каждый релиз публикуется только со всеми платформами сразу.
+
+| Платформа | Файл в релизе |
+|---|---|
+| **Android 8+** | `Hydra-full-<версия>-arm64-v8a.apk` — большинство телефонов; `…-armeabi-v7a.apk` — старые 32-битные; `…-x86_64.apk` — эмуляторы. `Hydra-stub-…apk` — без ядра, только для разработки |
+| **Windows 10/11 x64** | `…-windows-x64.msi` / `.exe` (установщик) или `…-portable.zip` |
+| **Linux x64 / arm64** | `.deb`, `.rpm`, `.AppImage`, `.tar.gz` |
+| **macOS 12+** | `…-macos-arm64.dmg` (Apple Silicon), `…-macos-x64.dmg` (Intel) |
+| **iOS 17+** | `Hydra-ios-<версия>-unsigned.ipa` — без подписи, ставится через переподпись (AltStore, Sideloadly) |
+
+**Обновления** приложение скачивает само: кнопка «Обновить» грузит файл под вашу систему (SHA-256 из релиза
+проверяется) и запускает установку — на Android через системный установщик, на ПК через установщик ОС.
+iOS не даёт приложению поставить себя само: оно скачивает `.ipa` и отдаёт его в «Поделиться».
 
 ## Скриншоты
 
-Снято на реальном телефоне (OnePlus CPH2747, Android 16).
+**Телефон** (Android, эмулятор; данные демонстрационные)
 
-| Главная (подключено) | Серверы и подписка | Настройки |
+| Главная | Серверы и подписка | Профиль: аккаунт бота |
 |:---:|:---:|:---:|
-| <img src="docs/screenshots/main.png" width="250"> | <img src="docs/screenshots/servers.png" width="250"> | <img src="docs/screenshots/settings.png" width="250"> |
+| <img src="docs/screenshots/phone-main.png" width="250"> | <img src="docs/screenshots/phone-servers.png" width="250"> | <img src="docs/screenshots/phone-profile.png" width="250"> |
 
-| Меню «Добавить» | Ядра (Туннель) | Раздельное туннелирование |
-|:---:|:---:|:---:|
-| <img src="docs/screenshots/add.png" width="250"> | <img src="docs/screenshots/tunnel.png" width="250"> | <img src="docs/screenshots/split.png" width="250"> |
+| Настройки | Маршрутизация | Ядра (Туннель) | Раздельное туннелирование |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/phone-settings.png" width="200"> | <img src="docs/screenshots/phone-routing.png" width="200"> | <img src="docs/screenshots/phone-tunnel.png" width="200"> | <img src="docs/screenshots/phone-split.png" width="200"> |
+
+**Компьютер** (Windows / Linux / macOS, один и тот же интерфейс; данные демонстрационные)
+
+| Главная (подключено, аккаунт) | Серверы |
+|:---:|:---:|
+| <img src="docs/screenshots/desktop-home.png" width="420"> | <img src="docs/screenshots/desktop-servers.png" width="420"> |
+
+| Роутеры: узлы, разделы | Подписки |
+|:---:|:---:|
+| <img src="docs/screenshots/desktop-routers.png" width="420"> | <img src="docs/screenshots/desktop-subscriptions.png" width="420"> |
+
+| Маршруты | Настройки |
+|:---:|:---:|
+| <img src="docs/screenshots/desktop-routing.png" width="420"> | <img src="docs/screenshots/desktop-settings.png" width="420"> |
 
 ---
 
 ## Возможности
 
-- 🎛 **Единый клиент** для нескольких семейств протоколов:
-  - proxy (VLESS/VMess/Trojan/Shadowsocks/Hysteria2/TUIC/WireGuard) — sing-box;
-  - Xray — альтернативное ядро (XTLS Vision, REALITY);
-  - **AmneziaWG 1.0 – 3.x** — обфусцированный WireGuard (amneziawg-go);
-  - **SSTP** и **L2TP** — реализованы целиком на Kotlin (userspace-PPP),
-    без нативных зависимостей и root;
-  - olcRTC и OpenFlux — ознакомительные движки (BETA); WDTT не интегрирован (см. docs/ECOSYSTEM.md);
-  - PPTP — честный отказ (GRE требует root, стек удалён из Android 12/13).
-- 📥 **Импорт**: подписки (base64/список) из панелей x-ui / 3x-ui / PasarGuard /
-  Remnawave, одиночные ссылки (`vless:// vmess:// trojan:// ss:// hysteria2://
-  tuic:// wireguard:// awg:// sstp:// l2tp://`), `.conf` WireGuard/AmneziaWG,
-  deep-links.
-- ✂️ **Раздельное туннелирование**: весь трафик / только выбранные приложения /
-  кроме выбранных (DataStore + `addAllowed/addDisallowedApplication`).
-- 🧭 **Маршрутизация**: DoH/DoT, GeoIP по ~250 странам офлайн, фрагментация TLS,
-  MTU, режим IPv6, **профили маршрутизации** («Дом», «Поездка») — с 0.6.23.
-- 🛡 **Безопасность**: Kill Switch, переподключение, блокировка приложения
-  отпечатком/PIN, скрытие ключей на экране, статус системного Always-on VPN.
-- 📱 **Вне приложения**: плитка в шторке с подключённой локацией (тап — открыть
-  Hydra), виджет на рабочем столе, ярлыки на иконке; Android TV и планшеты.
-- 🌍 Интерфейс: русский, английский, украинский, персидский, китайский.
-- 🌗 Тёмный интерфейс на Compose; экран логов, статистика трафика,
-  foreground-уведомление.
+- 🎛 **Единый клиент** для нескольких семейств протоколов (что где доступно — таблица ниже):
+  sing-box (VLESS/REALITY, VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard), Xray, AmneziaWG 1.0–3.x,
+  SSTP и L2TP (userspace-PPP на Kotlin, без root), olcRTC и OpenFlux (BETA).
+- 👤 **Аккаунт бота «Радар» (Hydra VPN)** — вход по одноразовому коду («VPN» → «Подключить приложение»):
+  подписки, выданные в боте, заводятся сами и обновляются раз в 6 часов; смена ссылки у панели обновляет ту
+  же подписку, выключенные в боте помечаются; на главном экране — срок и трафик. Токен хранится в Android
+  Keystore / iOS Keychain / файле только для владельца на ПК. Для вошедших доступен приватный DNS Hydra VPN.
+- 📡 **Управление роутером** [HydraVPN for Router](https://github.com/Chistovik92/HydraVPNforRouters)
+  (OpenWrt, Keenetic, MikroTik): сопряжение по ссылке/QR с закреплением отпечатка TLS, статус, узлы и выбор
+  узла, подписки («отправить на роутер» из Hydra), журнал, перезапуск. На ПК — ещё разделы (включить, править,
+  добавить, удалить), подключение самого роутера к боту и диагностика.
+- 📥 **Импорт**: подписки (base64/список) из панелей x-ui / 3x-ui / PasarGuard / Remnawave / Marzban, одиночные
+  ссылки (`vless:// vmess:// trojan:// ss:// hysteria2:// tuic:// wireguard:// awg:// sstp:// l2tp://`), `.conf`
+  WireGuard/AmneziaWG, QR (камера, фото), буфер обмена, deep-links; HWID для панелей.
+- ✂️ **Раздельное туннелирование**: по приложениям (Android) или программам (ПК), по IP/доменам, по странам.
+- 🧭 **Маршрутизация**: DoH/DoT/UDP-DNS, GeoIP по ~250 странам офлайн, фрагментация TLS, MTU, IPv6,
+  **профили маршрутизации** («Дом», «Поездка»).
+- 🛡 **Безопасность**: Kill Switch, переподключение, блокировка приложения отпечатком/PIN/Face ID, скрытие
+  ключей на экране.
+- 📱 **Вне приложения**: плитка и виджет (Android), виджет и Пункт управления (iOS), трей, автозапуск и раздача
+  в локальную сеть (ПК); Android TV и планшеты.
+- 🔄 **Обновления прямо из приложения** (см. «Скачать»).
+- 🌍 Интерфейс Android и iOS: русский, английский, украинский, персидский, китайский (ПК — русский).
 
-## Поддержка протоколов
+## Протоколы по платформам
 
-| Протокол | Движок | Статус |
-|---|---|---|
-| VLESS (+REALITY/Vision), VMess, Trojan, Shadowsocks | sing-box / Xray | конфиг готов, нужен `.aar` |
-| Hysteria2, TUIC v5 | sing-box | конфиг готов, нужен `.aar` |
-| WireGuard | sing-box | конфиг готов, нужен `.aar` |
-| AmneziaWG 1.0 – 3.x | amneziawg-go | работает (`libwg-go.so`) |
-| **SSTP** (TLS/PPP, MS-CHAPv2, crypto-binding) | userspace (Kotlin) | **реализован**, нужен on-device тест |
-| **L2TP** (RFC 2661, без IPsec) | userspace (Kotlin) | **реализован**, нужен on-device тест |
-| Xray (альт. ядро) | libXray.aar + tun2socks | каркас, нужен `.aar` |
-| WDTT (WG over TURN ВК) | libclient.so | **BETA**, каркас |
-| olcRTC (TCP over WebRTC) | olcrtc.aar + tun2socks | **BETA**, каркас |
-| PPTP | — | **недоступно**: GRE → root; стек удалён из Android 12/13 |
+| Протокол | Android | Windows / Linux / macOS | iOS |
+|---|:---:|:---:|:---:|
+| VLESS (+REALITY/Vision), VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard (sing-box) | ✅ | ✅ | ✅ |
+| Xray как второе ядро | ✅ | ✅ | — |
+| AmneziaWG 1.0–3.x | ✅ | — | ✅ |
+| SSTP, L2TP (без IPsec) | ✅ нужен тест на сервере | — | PPP-стек есть, транспорт ждёт проверки |
+| olcRTC, OpenFlux (BETA) | ✅ | — | — |
+| PPTP | — недоступно (GRE требует root) | — | — |
 
-Полное описание протоколов и ограничений — [docs/PROTOCOLS.md](docs/PROTOCOLS.md),
-сервисы — [docs/SERVICES.md](docs/SERVICES.md).
+Подробности и ограничения — [docs/PROTOCOLS.md](docs/PROTOCOLS.md), сервисы — [docs/SERVICES.md](docs/SERVICES.md).
 
-## Быстрый старт
+## Быстрый старт (сборка)
 
 ```bash
 git clone https://github.com/Chistovik92/HydraVPN.git
 cd HydraVPN
-# Открыть в Android Studio, либо:
-gradle wrapper --gradle-version 8.9
-./gradlew :app:assembleStubDebug      # без нативных ядер (симуляция)
+gradle wrapper --gradle-version 8.9             # один раз
+./gradlew :app:assembleStubDebug                # Android без ядер (симуляция), для разработки интерфейса
+./gradlew :desktop:run                          # ПК (скачает ядро sing-box с проверкой SHA-256)
+./gradlew :app:testStubDebugUnitTest :desktop:test
 ```
 
-Для реальных туннелей соберите ядра и положите `.aar`/`.so` в `app/libs/`
-(libbox, libXray, amneziawg-go, olcrtc — инструкции: [docs/BUILD.md](docs/BUILD.md)),
-затем:
+Реальные Android-туннели: положите `libbox.aar` (и при желании `libXray`, AmneziaWG, olcRTC) в `app/libs/`
+([docs/BUILD.md](docs/BUILD.md)), затем `./gradlew :app:assembleNativeRelease`. iOS собирается на macOS
+([ios/README.md](ios/README.md)). Релиз всех платформ — `scripts/release.sh`.
 
-```bash
-./gradlew :app:assembleNativeRelease
-```
+Приватный DNS для вошедших через бота — секрет сборки: свойство Gradle `hydraPrivateDns` или переменная окружения
+`HYDRA_PRIVATE_DNS` (в CI — секрет репозитория); без него пункт скрыт.
 
-> `gradle-wrapper.jar` в репозиторий не кладётся (бинарник) — CI генерирует
-> его сам, локально: `gradle wrapper`.
+> `gradle-wrapper.jar` в репозиторий не кладётся (бинарник) — CI генерирует его сам, локально: `gradle wrapper`.
 
 ## Архитектура (кратко)
 
 ```
-UI (Compose) → MainViewModel → ServerRepository (Room + подписки)
-                    │                + SplitTunnelRepository (DataStore)
-                    ▼
-        HydraVpnService (tun + SocketGuard.protect) → VpnCore
-              ├─ SingBoxCore   (libbox.aar; HydraPlatformInterface)
-              ├─ XrayCore      (libXray.aar + tun2socks)
-              ├─ AmneziaWgCore (amneziawg-go.aar)
-              ├─ SstpCore / L2tpCore (userspace PPP: vpn/ppp + TunBridge)
-              ├─ PptpCore      (честный отказ GRE)
-              ├─ WdttCore / OlcRtcCore (BETA)
-              └─ NoopCore      (stub-сборка)
+HydraVPN/
+├── app/       Android (Compose): UI → MainViewModel → репозитории (Room, DataStore) → HydraVpnService → VpnCore
+│              (SingBoxCore, XrayCore, AmneziaWgCore, SstpCore/L2tpCore, OlcRtc/OpenFlux, NoopCore для stub)
+├── shared/    Kotlin Multiplatform: модели, парсеры ссылок, билдеры конфигов sing-box/Xray, PPP-протокол,
+│              клиент роутера (router), клиент бота (bot), поиск и загрузка обновлений (update)
+├── desktop/   Compose Desktop (Windows/Linux/macOS): sing-box и Xray процессами, TUN/прокси, kill switch
+└── ios/       SwiftUI + Network Extension (Libbox), AmneziaWG-расширение, виджеты; общая логика — Packages/HydraKit
 ```
 
-Подробно — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-Что осталось сделать — [docs/HANDOFF.md](docs/HANDOFF.md) и [CHANGELOG.md](CHANGELOG.md).
-
-## Мультиплатформенность (план)
-
-Сейчас Hydra — Android-only. В планах — iOS и Desktop (Windows/macOS/Linux)
-через Kotlin Multiplatform для слоя данных (модели, парсер ссылок, билдеры
-конфигов) при отдельной, нативной реализации VPN-core и UI на каждой
-платформе — общий tun-слой через абстракцию сознательно не делается, это
-исторически самая хрупкая часть системы. Порядок: сначала Desktop (ниже
-порог входа, sing-box можно запускать отдельным процессом), затем iOS
-(`NetworkExtension`, отдельный extension-процесс с memory limit). Отдельным
-треком — свой формат ссылок для обмена конфигами между платформами
-(`hydra://`, по образцу `incy-link-encoder`). Подробности, включая честную
-оценку что в текущем коде уже переносимо, а что нет — [docs/MULTIPLATFORM.md](docs/MULTIPLATFORM.md).
+Подробно — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/MULTIPLATFORM.md](docs/MULTIPLATFORM.md).
+Состояние работ и что осталось — [docs/HANDOFF.md](docs/HANDOFF.md) и [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Документация
 
 - [docs/PROTOCOLS.md](docs/PROTOCOLS.md) — протоколы, форматы ссылок, ограничения
 - [docs/SERVICES.md](docs/SERVICES.md) — сервисы и интеграции (SoftEther, WDTT, olcRTC)
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — архитектура и потоки данных
-- [docs/BUILD.md](docs/BUILD.md) — сборка ядер и приложения
 - [docs/PANELS.md](docs/PANELS.md) — совместимость с панелями подписок
-- [docs/SECURITY.md](docs/SECURITY.md) — политика безопасности
-- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — как контрибьютить
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/MULTIPLATFORM.md](docs/MULTIPLATFORM.md) — устройство проекта
+- [docs/BUILD.md](docs/BUILD.md) — сборка ядер и приложений · [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) — распространение
+- [docs/SECURITY.md](docs/SECURITY.md) — политика безопасности · [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — как контрибьютить
 - [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md) — olcRTC / OpenFlux / snolc / AmneziaWG: апстримы, статус, клиенты
-- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.6.25
+- [docs/HANDOFF_ROUTERS.md](docs/HANDOFF_ROUTERS.md) — управление роутером: контракт API и что проверено
+- [desktop/README.md](desktop/README.md) · [ios/README.md](ios/README.md) — клиенты для ПК и iOS
+- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.7.2
 
 ## Лицензия
 

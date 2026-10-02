@@ -497,6 +497,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun botText(id: Int, vararg args: Any): String = getApplication<Application>().getString(id, *args)
 
     private fun botError(e: ru.gidravpn.hydra.data.botaccount.BotAccountException): String = when (e.code) {
+        -1 -> botText(ru.gidravpn.hydra.R.string.bot_err_not_radar)
         0 -> botText(ru.gidravpn.hydra.R.string.bot_err_network)
         401 -> botText(ru.gidravpn.hydra.R.string.bot_err_auth)
         404 -> botText(ru.gidravpn.hydra.R.string.bot_err_off)

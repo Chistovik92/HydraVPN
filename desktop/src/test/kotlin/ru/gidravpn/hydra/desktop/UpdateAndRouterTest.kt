@@ -60,3 +60,24 @@ class UpdateAndRouterTest {
         assertFalse(sec(""","outbound_jsons":["********"]""").editable)
     }
 }
+
+class AndroidAbiPickTest {
+    private fun info(vararg names: String) = ru.gidravpn.hydra.update.ReleaseInfo(
+        "0.7.2", "https://github.com/x",
+        names.map { ru.gidravpn.hydra.update.ReleaseAsset(it, "https://github.com/x/$it", 1, null) },
+    )
+
+    @Test fun picksFirstSupportedAbi() {
+        val i = info("Hydra-full-0.7.2-arm64-v8a.apk", "Hydra-full-0.7.2-armeabi-v7a.apk", "Hydra-full-0.7.2-x86_64.apk", "Hydra-stub-0.7.2.apk")
+        assertEquals("Hydra-full-0.7.2-arm64-v8a.apk", UpdateFeed.pickAndroid(i, false, listOf("arm64-v8a", "armeabi-v7a", "armeabi"))?.name)
+        assertEquals("Hydra-full-0.7.2-armeabi-v7a.apk", UpdateFeed.pickAndroid(i, false, listOf("armeabi-v7a", "armeabi"))?.name)
+        assertEquals("Hydra-full-0.7.2-x86_64.apk", UpdateFeed.pickAndroid(i, false, listOf("x86_64", "x86"))?.name)
+        assertEquals("Hydra-stub-0.7.2.apk", UpdateFeed.pickAndroid(i, true, listOf("arm64-v8a"))?.name)
+    }
+
+    @Test fun oldUniversalReleaseStillWorks() {
+        val i = info("Hydra-full-0.7.1.apk", "Hydra-stub-0.7.1.apk")
+        assertEquals("Hydra-full-0.7.1.apk", UpdateFeed.pickAndroid(i, false, listOf("arm64-v8a"))?.name)
+        assertNull(UpdateFeed.pickAndroid(info("Hydra-full-0.7.2-x86_64.apk"), false, listOf("arm64-v8a")))
+    }
+}

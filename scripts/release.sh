@@ -44,7 +44,6 @@ err()  { printf '\nОШИБКА: %s\n' "$*" >&2; exit 1; }
 VERSION="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)"
 [[ -n "$VERSION" ]] || err "не удалось прочитать versionName из app/build.gradle.kts"
 TAG="v$VERSION"
-FULL_APK="Hydra-full-$VERSION.apk"
 STUB_APK="Hydra-stub-$VERSION.apk"
 
 echo "Релиз Hydra $VERSION (тег $TAG)"
@@ -112,36 +111,46 @@ step "Сборка stub-варианта"
 step "Сборка full-варианта (native, с ядром sing-box)"
 "$GRADLE" :app:assembleNativeRelease
 
-SRC_FULL="app/build/outputs/apk/native/release/app-native-release.apk"
-SRC_STUB="app/build/outputs/apk/stub/release/app-stub-release.apk"
-[[ -f "$SRC_FULL" ]] || err "full-APK не собрался: $SRC_FULL"
+# 0.7.2: full-APK — отдельный файл на каждую архитектуру (arm64-v8a, armeabi-v7a, x86_64); stub — один (без ядра).
+ABIS=(arm64-v8a armeabi-v7a x86_64)
+SRC_STUB="app/build/outputs/apk/stub/release/app-stub-arm64-v8a-release.apk"
+SRC_FULLS=()
+FULL_APKS=()
+for abi in "${ABIS[@]}"; do
+  src="app/build/outputs/apk/native/release/app-native-$abi-release.apk"
+  [[ -f "$src" ]] || err "full-APK ($abi) не собрался: $src"
+  SRC_FULLS+=("$src")
+  FULL_APKS+=("Hydra-full-$VERSION-$abi.apk")
+done
 [[ -f "$SRC_STUB" ]] || err "stub-APK не собрался: $SRC_STUB"
 
-# --- 4. Главная проверка: внутри full-APK реально есть ядро -------------------
+# --- 4. Главная проверка: внутри каждого full-APK реально есть ядро своей архитектуры ---
 step "Проверка содержимого full-APK"
 
-SO_LIST="$(apk_list "$SRC_FULL" | grep -E '^lib/[^/]+/libbox\.so$' || true)"
-[[ -n "$SO_LIST" ]] || err \
-"внутри $SRC_FULL нет lib/*/libbox.so.
+for i in "${!ABIS[@]}"; do
+  abi="${ABIS[$i]}"; src="${SRC_FULLS[$i]}"
+  [[ "$(apk_list "$src" | grep -cE "^lib/$abi/libbox\.so$" || true)" -ge 1 ]] || err \
+"внутри $src нет lib/$abi/libbox.so.
        Это НЕ рабочая сборка — публикация отменена."
-echo "$SO_LIST" | sed 's/^/    ядро: /'
+  if apk_list "$src" | grep -E '^lib/[^/]+/' | grep -vqE "^lib/$abi/"; then
+    err "в $src есть библиотеки чужой архитектуры — разделение по ABI не сработало"
+  fi
+  size=$(stat -c %s "$src" 2>/dev/null || stat -f %z "$src")
+  [[ "$size" -gt 15000000 ]] || err "$src подозрительно мал ($size Б) — ядро скорее всего не попало внутрь"
+  echo "    $abi: ядро на месте, $((size / 1024 / 1024)) МБ"
+done
 
 if apk_list "$SRC_STUB" | grep -q 'libbox\.so'; then
   err "в stub-APK оказался libbox.so — артефакты перепутаны, публикация отменена"
 fi
 echo "    stub чист от ядра (как и ожидалось)"
 
-FULL_SIZE=$(stat -c %s "$SRC_FULL" 2>/dev/null || stat -f %z "$SRC_FULL")
-[[ "$FULL_SIZE" -gt 40000000 ]] || err \
-"full-APK подозрительно мал ($FULL_SIZE Б) — ядро скорее всего не попало внутрь"
-echo "    размер full-APK: $((FULL_SIZE / 1024 / 1024)) МБ"
-
 # --- 4b. Проверка: подпись — не Android Debug ---------------------------------
 # История: релизы 0.5.1–0.6.1 уходили с автосгенерированным debug-ключом
 # (assembleXxxDebug вместо assembleXxxRelease) — apksigner показывал
 # "CN=Android Debug". У debug-ключа на каждой машине своё значение, поэтому
 # случайное возвращение к debug-сборке ломает обновление для всех, у кого
-# уже стоит правильно подписанная версия. Проверяем обе сборки.
+# уже стоит правильно подписанная версия. Проверяем все сборки.
 step "Проверка подписи (не должна быть Android Debug)"
 
 APKSIGNER="$(command -v apksigner || true)"
@@ -151,9 +160,9 @@ fi
 
 if [[ -z "$APKSIGNER" ]]; then
   echo "    ВНИМАНИЕ: apksigner не найден — подпись НЕ проверена автоматически." >&2
-  echo "    Проверьте вручную: apksigner verify --print-certs $SRC_FULL" >&2
+  echo "    Проверьте вручную: apksigner verify --print-certs ${SRC_FULLS[0]}" >&2
 else
-  for apk in "$SRC_FULL" "$SRC_STUB"; do
+  for apk in "${SRC_FULLS[@]}" "$SRC_STUB"; do
     CERT_DN="$("$APKSIGNER" verify --print-certs "$apk" 2>/dev/null | grep 'certificate DN' | head -1)"
     if [[ "$CERT_DN" == *"Android Debug"* ]]; then
       err "$apk подписан debug-ключом (Android Debug) — это не релизная подпись.
@@ -161,13 +170,13 @@ else
     fi
     [[ -n "$CERT_DN" ]] || err "$apk: не удалось определить подпись — файл не подписан?"
   done
-  echo "    обе сборки подписаны релизным ключом (не Android Debug)"
+  echo "    все сборки подписаны релизным ключом (не Android Debug)"
 fi
 
 # --- 5. Готовим ассеты --------------------------------------------------------
-cp -f "$SRC_FULL" "$FULL_APK"
+for i in "${!ABIS[@]}"; do cp -f "${SRC_FULLS[$i]}" "${FULL_APKS[$i]}"; done
 cp -f "$SRC_STUB" "$STUB_APK"
-trap 'rm -f "$FULL_APK" "$STUB_APK"' EXIT
+trap 'rm -f "${FULL_APKS[@]}" "$STUB_APK"' EXIT
 
 if [[ $DRY_RUN -eq 1 ]]; then
   step "--dry-run: публикация пропущена"
@@ -193,7 +202,9 @@ if [[ -z "$NOTES_FILE" ]]; then
 ### Android
 | Файл | Что внутри |
 |---|---|
-| **\`$FULL_APK\`** | **Рабочее приложение** — с реальным ядром sing-box. |
+| **\`Hydra-full-$VERSION-arm64-v8a.apk\`** | **Рабочее приложение** для большинства телефонов (64-бит ARM) — с реальным ядром sing-box. |
+| \`Hydra-full-$VERSION-armeabi-v7a.apk\` | То же для старых 32-битных телефонов (ARM). |
+| \`Hydra-full-$VERSION-x86_64.apk\` | То же для эмуляторов и устройств на x86. |
 | \`$STUB_APK\` | Только для разработки/CI: соединение **симулируется**. |
 
 ### Windows 10/11 (x64)
@@ -235,9 +246,9 @@ git tag -a "$TAG" -m "Hydra $VERSION"
 git push origin "$TAG"
 
 if "$GH" release view "$TAG" >/dev/null 2>&1; then
-  "$GH" release upload "$TAG" "$FULL_APK" "$STUB_APK" --clobber
+  "$GH" release upload "$TAG" "${FULL_APKS[@]}" "$STUB_APK" --clobber
 else
-  "$GH" release create "$TAG" "$FULL_APK" "$STUB_APK" --draft \
+  "$GH" release create "$TAG" "${FULL_APKS[@]}" "$STUB_APK" --draft \
     --title "Hydra $VERSION" --notes-file "$NOTES_FILE"
 fi
 echo "    черновик $TAG с APK создан; остальные платформы собирает release.yml"

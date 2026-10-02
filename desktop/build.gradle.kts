@@ -286,8 +286,8 @@ compose.desktop {
             licenseFile.set(rootProject.file("LICENSE"))
             appResourcesRootDir.set(appResourcesDir)
             // Модули JRE сверх java.base/java.desktop: OkHttp (logging, TLS с EC-шифрами),
-            // JNA (jdk.unsupported), Compose (management/naming/accessibility).
-            modules("java.logging", "java.naming", "java.management", "java.net.http",
+            // JNA (jdk.unsupported), Compose (management/naming/accessibility). java.net.http не нужен: всё идёт через OkHttp и HttpURLConnection.
+            modules("java.logging", "java.naming", "java.management",
                 "jdk.crypto.ec", "jdk.unsupported", "jdk.accessibility")
 
             windows {

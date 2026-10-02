@@ -73,9 +73,17 @@ object UpdateFeed {
 
     // ------------------------------------------------------------ выбор файла
 
-    /** Android: `Hydra-full-X.apk` (рабочий) или `Hydra-stub-X.apk` для stub-сборки. */
-    fun pickAndroid(info: ReleaseInfo, stub: Boolean): ReleaseAsset? =
-        info.assets.firstOrNull { it.name.matches(Regex(if (stub) "Hydra-stub-.*\\.apk" else "Hydra-full-.*\\.apk")) }
+    /**
+     * Android: с 0.7.2 `Hydra-full-X-<abi>.apk` (по одному на архитектуру; берётся первая из [abis] телефона по
+     * порядку предпочтения), раньше — один универсальный `Hydra-full-X.apk`. `stub` — для stub-сборки.
+     */
+    fun pickAndroid(info: ReleaseInfo, stub: Boolean, abis: List<String> = emptyList()): ReleaseAsset? {
+        val kind = if (stub) "stub" else "full"
+        for (abi in abis) {
+            info.assets.firstOrNull { it.name.matches(Regex("Hydra-$kind-[0-9][0-9.]*-${Regex.escape(abi)}[.]apk")) }?.let { return it }
+        }
+        return info.assets.firstOrNull { it.name.matches(Regex("Hydra-$kind-[0-9][0-9.]*[.]apk")) }
+    }
 
     /**
      * ПК: `Hydra-desktop-X-<os>-<arch>[-portable].<ext>`. [os] — windows/linux/macos, [arch] — x64/arm64,

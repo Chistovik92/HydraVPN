@@ -199,6 +199,7 @@
     <string name="bot_sync_none">هنوز اشتراک کاری برای شما در ربات نیست. دسترسی را مدیر می‌دهد.</string>
     <string name="bot_err_server">نشانی سرور ربات را وارد کنید، مثلاً radar.example.org. http ساده فقط در شبکه محلی.</string>
     <string name="bot_err_network">ارتباط با سرور ربات برقرار نیست.</string>
+    <string name="bot_err_not_radar">این سرور ربات «Radar» نیست — نشانی را بررسی کنید.</string>
     <string name="bot_err_auth">کد نادرست یا منقضی است، یا این دستگاه در ربات قطع شده است. کد جدید بگیرید.</string>
     <string name="bot_err_off">API برنامه‌ها در این سرور خاموش است.</string>
     <string name="bot_err_rate">تلاش‌های زیاد. چند دقیقه صبر کنید.</string>

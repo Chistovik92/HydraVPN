@@ -20,6 +20,10 @@ data class BotSubscription(
     val state: String,
     val enabled: Boolean,
     val url: String,
+    /** Из ответа бота: unix-время окончания (0 — бессрочно), лимит и использованный трафик в байтах (0 — без предела). */
+    val expire: Long = 0,
+    val trafficLimit: Long = 0,
+    val trafficUsed: Long = 0,
 ) {
     val importable: Boolean get() = state == "ok" && enabled && linkKind == "subscription" && url.isNotBlank()
 }
@@ -52,6 +56,7 @@ object BotJson {
                 state = o.optString("state", "ok"),
                 enabled = o.optBoolean("enabled", false),
                 url = o.optString("url"),
+                expire = o.optLong("expire", 0), trafficLimit = o.optLong("traffic_limit", 0), trafficUsed = o.optLong("traffic_used", 0),
             )
         }
     }
@@ -85,8 +90,16 @@ object BotJson {
 /** Блокирующий клиент (вызывать из IO). Редиректы не выполняются: токен не должен уйти на чужой адрес. */
 class BotClient(private val timeoutMs: Int = 15_000) {
 
+    /** Проверка адреса без токена (`GET /app/ping` → `{"api":1,"service":"radar"}`): понятная ошибка вместо «неверный код». */
+    fun ping(server: String) {
+        val text = try { call("GET", "$server/api/v1/app/ping", null, null) } catch (e: BotException) { if (e.code == 404 || e.code == 0) throw e else throw BotException(-1, "Это не сервер бота «Радар» — проверьте адрес.") }
+        val o = runCatching { JSONObject(text) }.getOrNull()
+        if (o == null || o.optString("service") != "radar") throw BotException(-1, "Это не сервер бота «Радар» — проверьте адрес.")
+    }
+
     fun link(server: String, code: String, device: String): String {
-        val body = JSONObject().put("code", code.filter { it.isDigit() }).put("device", device).put("app", "hydravpn")
+        ping(server)
+        val body = JSONObject().put("code", code.filter { it.isDigit() }).put("device", device.take(40)).put("app", "hydravpn")
         return BotJson.token(call("POST", "$server/api/v1/app/link", null, body))
     }
 

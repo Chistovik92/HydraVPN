@@ -159,6 +159,9 @@ class AppController(
 
     fun toast(msg: String?) = _ui.update { it.copy(message = msg) }
 
+    /** Для скриншотов и тестов отрисовки: подменяет состояние интерфейса (в самом приложении не используется). */
+    internal fun previewState(f: (UiState) -> UiState) { _ui.update(f) }
+
     fun updateSettings(block: (DesktopSettings) -> DesktopSettings) =
         mutate { it.copy(settings = block(it.settings)) }
 
@@ -268,6 +271,7 @@ class AppController(
     private fun botError(e: BotException): String = when (e.code) {
         0 -> "Нет связи с сервером бота."
         401 -> "Код неверен или устарел, либо это устройство отключили в боте. Возьмите новый код."
+        -1 -> e.message ?: "Это не сервер бота «Радар»."
         404 -> "На этом сервере API для приложений выключен."
         429 -> "Слишком много попыток. Подождите несколько минут."
         else -> e.message ?: "HTTP ${e.code}"
@@ -312,6 +316,14 @@ class AppController(
         }
     }
 
+    /** Срок и трафик из ответа бота — запасной источник: заголовки панели при обновлении подписки главнее. */
+    private fun applyBotQuota(subId: Long, item: ru.gidravpn.hydra.bot.BotSubscription) = mutate { s ->
+        s.copy(subscriptions = s.subscriptions.map {
+            if (it.id != subId || it.expireAt != 0L || it.totalBytes != 0L) it
+            else it.copy(expireAt = item.expire, totalBytes = item.trafficLimit, downloadBytes = item.trafficUsed, uploadBytes = 0)
+        })
+    }
+
     /** Синхронизация: заводит/обновляет подписки бота. Возвращает текст для пользователя. */
     private fun syncBotNow(): String {
         val link = _ui.value.data.bot ?: return ""
@@ -339,7 +351,7 @@ class AppController(
                         id = nextId(s.subscriptions.map { it.id })
                         s.copy(subscriptions = s.subscriptions + Subscription(id = id, name = step.item.title.take(80), url = step.item.url, botPanel = step.item.panel))
                     }
-                    if (refreshNow(id, quiet = true)) subs++ else failed++
+                    if (refreshNow(id, quiet = true)) { subs++; applyBotQuota(id, step.item) } else failed++
                 }
                 is BotSyncPlanner.Step.Update -> {
                     mutate { s ->
@@ -350,7 +362,7 @@ class AppController(
                             )
                         })
                     }
-                    if (refreshNow(step.sub.id, quiet = true)) subs++ else failed++
+                    if (refreshNow(step.sub.id, quiet = true)) { subs++; applyBotQuota(step.sub.id, step.item) } else failed++
                 }
             }
         }

@@ -115,10 +115,20 @@ class BotAccountApi(
 ) {
     private val json = "application/json; charset=utf-8".toMediaType()
 
+    /** Проверка адреса без токена: понятная ошибка вместо «неверный код» (`GET /app/ping`). */
+    suspend fun ping(server: String) {
+        val text = try { call(Request.Builder().url("$server/api/v1/app/ping").build()) } catch (e: BotAccountException) {
+            if (e.code == 404 || e.code == 0) throw e else throw BotAccountException(-1, "")
+        }
+        val service = runCatching { JSONObject(text).optString("service") }.getOrDefault("")
+        if (service != "radar") throw BotAccountException(-1, "")
+    }
+
     /** Обмен кода из бота на токен устройства. Токен виден один раз — сохранить сразу. */
     suspend fun link(server: String, code: String, device: String): String {
+        ping(server)
         val body = JSONObject().put("code", code.filter { it.isDigit() })
-            .put("device", device).put("app", "hydravpn").toString()
+            .put("device", device.take(40)).put("app", "hydravpn").toString()
         val req = Request.Builder().url("$server/api/v1/app/link")
             .post(body.toRequestBody(json)).build()
         return BotAccountJson.token(call(req))

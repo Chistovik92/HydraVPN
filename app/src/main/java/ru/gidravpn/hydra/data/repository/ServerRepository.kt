@@ -62,7 +62,7 @@ class ServerRepository(context: Context) {
                     subs.update(step.sub.copy(autoUpdate = false, lastError = BotSyncPlanner.DISABLED_MARK))
                 is BotSyncPlanner.Step.Add -> runCatching {
                     val id = subs.upsert(Subscription(name = step.item.title, url = step.item.url, botPanel = step.item.panel))
-                    refreshSubscription(id)
+                    refreshSubscription(id).also { applyBotQuota(id, step.item) }
                 }.fold(onSuccess = { subscriptions++; servers += it }, onFailure = { failed++ })
                 is BotSyncPlanner.Step.Update -> runCatching {
                     val sub = step.sub
@@ -73,13 +73,20 @@ class ServerRepository(context: Context) {
                             autoUpdate = sub.autoUpdate || sub.lastError == BotSyncPlanner.DISABLED_MARK,
                         )
                     )
-                    refreshSubscription(sub.id)
+                    refreshSubscription(sub.id).also { applyBotQuota(sub.id, step.item) }
                 }.fold(onSuccess = { subscriptions++; servers += it }, onFailure = { failed++ })
             }
         }
         return BotSyncResult(subscriptions, servers, failed)
     }
 
+
+    /** Срок и трафик из ответа бота — запасной источник: заголовки панели при обновлении подписки главнее. */
+    private suspend fun applyBotQuota(subId: Long, item: BotSubscription) {
+        val s = subs.byId(subId) ?: return
+        if (s.expireAt != 0L || s.totalBytes != 0L) return
+        subs.update(s.copy(expireAt = item.expire, totalBytes = item.trafficLimit, downloadBytes = item.trafficUsed, uploadBytes = 0))
+    }
     data class RefreshResult(val total: Int, val added: Int, val removed: Int)
 
     /**

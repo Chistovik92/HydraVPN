@@ -53,6 +53,7 @@ enum BotSync {
 
     static func text(_ e: BotError) -> String {
         switch e.code {
+        case -1: L("bot_err_not_radar")
         case 0: L("bot_err_network")
         case 401: L("bot_err_auth")
         case 404: L("bot_err_off")
@@ -126,7 +127,7 @@ enum BotSync {
                     id = s.nextSubscriptionId()
                     s.subscriptions.append(Subscription(id: id, name: item.title, url: item.url, botPanel: item.panel))
                 }
-                if await refreshed(app, id) { subs += 1 } else { failed += 1 }
+                if await refreshed(app, id, item) { subs += 1 } else { failed += 1 }
             case .update(let id, let item):
                 app.mutate { s in
                     if let i = s.subscriptions.firstIndex(where: { $0.id == id }) {
@@ -135,7 +136,7 @@ enum BotSync {
                         s.subscriptions[i].botPanel = item.panel
                     }
                 }
-                if await refreshed(app, id) { subs += 1 } else { failed += 1 }
+                if await refreshed(app, id, item) { subs += 1 } else { failed += 1 }
             }
         }
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastSyncKey)
@@ -143,9 +144,20 @@ enum BotSync {
         return failed > 0 ? L("bot_sync_partial", subs, 0, failed) : L("bot_sync_ok", subs, app.state.servers.count)
     }
 
-    private static func refreshed(_ app: AppModel, _ id: Int64) async -> Bool {
+    private static func refreshed(_ app: AppModel, _ id: Int64, _ item: BotSubscription) async -> Bool {
         await app.refreshNow(id)
-        return app.state.subscriptions.first { $0.id == id }?.lastError.isEmpty == true
+        guard app.state.subscriptions.first(where: { $0.id == id })?.lastError.isEmpty == true else { return false }
+        // Срок и трафик из ответа бота — запасной источник: заголовки панели при обновлении главнее.
+        if app.state.subscriptions.first(where: { $0.id == id }).map({ $0.expireAt == 0 && $0.totalBytes == 0 }) == true {
+            app.mutate { s in
+                if let i = s.subscriptions.firstIndex(where: { $0.id == id }) {
+                    s.subscriptions[i].expireAt = item.expire
+                    s.subscriptions[i].totalBytes = item.trafficLimit
+                    s.subscriptions[i].downloadBytes = item.trafficUsed
+                }
+            }
+        }
+        return true
     }
 
     /// Отключить устройство в боте и забыть токен. Уже заведённые подписки остаются.
