@@ -45,6 +45,7 @@ fun main(args: Array<String>) {
 
         LaunchedEffect(Unit) {
             Runtime.getRuntime().addShutdownHook(Thread { controller.shutdown() })
+            controller.quitHandler = ::quit
             controller.onStartup()
         }
 

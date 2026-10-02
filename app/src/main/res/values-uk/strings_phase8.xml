@@ -61,6 +61,12 @@
     <string name="upd_auto">Перевіряти автоматично</string>
     <string name="upd_auto_desc">Раз на добу під час запуску. Запит іде на api.github.com напряму, не через VPN.</string>
     <string name="upd_banner">Доступна Hydra %1$s — торкніться, щоб відкрити</string>
+    <string name="upd_banner_install">Доступна Hydra %1$s — торкніться, щоб оновити</string>
+    <string name="upd_install">Завантажити й встановити</string>
+    <string name="upd_downloading">Завантаження оновлення… %1$d%%</string>
+    <string name="upd_need_permission">Дозвольте Hydra встановлювати застосунки на екрані, що відкрився, і натисніть «Оновити» ще раз.</string>
+    <string name="upd_no_file">У цьому релізі немає файла для цієї збірки — відкрийте сторінку релізу.</string>
+    <string name="upd_install_failed">Не вдалося оновити: %1$s</string>
 
     <string name="a11y_dismiss">Закрити</string>
     <string name="a11y_more_actions">Інші дії</string>

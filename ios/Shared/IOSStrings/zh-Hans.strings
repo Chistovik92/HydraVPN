@@ -9,3 +9,7 @@
 "ios_lang_hint" = "界面语言跟随 iOS 设置中为 Hydra 选择的语言。";
 "ios_open_settings" = "打开 Hydra 设置 →";
 "ios_import_file" = "从文件导入";
+"upd_ios_banner" = "Hydra %1$@ 已发布 — 点按下载";
+"upd_ios_downloading" = "正在下载更新… %1$ld%%";
+"upd_ios_hint" = "iOS 不允许应用自行安装。下载后请用侧载工具（AltStore、Sideloadly 等）打开该文件。";
+"upd_ios_bad_hash" = "校验和不匹配 — 文件未打开。";

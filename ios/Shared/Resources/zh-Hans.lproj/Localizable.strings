@@ -91,6 +91,12 @@
 "upd_auto" = "自动检查";
 "upd_auto_desc" = "每天启动时检查一次。请求直接发往 api.github.com，不经过 VPN。";
 "upd_banner" = "Hydra %1$@ 已发布 — 点按打开";
+"upd_banner_install" = "Hydra %1$@ 已发布 — 点按更新";
+"upd_install" = "下载并安装";
+"upd_downloading" = "正在下载更新… %1$ld%%";
+"upd_need_permission" = "请在刚打开的界面中允许 Hydra 安装应用，然后再次点按「更新」。";
+"upd_no_file" = "此版本没有适用于当前构建的文件 — 请打开发布页面。";
+"upd_install_failed" = "更新失败：%1$@";
 "a11y_dismiss" = "关闭";
 "a11y_more_actions" = "更多操作";
 "a11y_selected" = "已选择";
@@ -465,3 +471,7 @@
 "ios_lang_hint" = "界面语言跟随 iOS 设置中为 Hydra 选择的语言。";
 "ios_open_settings" = "打开 Hydra 设置 →";
 "ios_import_file" = "从文件导入";
+"upd_ios_banner" = "Hydra %1$@ 已发布 — 点按下载";
+"upd_ios_downloading" = "正在下载更新… %1$ld%%";
+"upd_ios_hint" = "iOS 不允许应用自行安装。下载后请用侧载工具（AltStore、Sideloadly 等）打开该文件。";
+"upd_ios_bad_hash" = "校验和不匹配 — 文件未打开。";

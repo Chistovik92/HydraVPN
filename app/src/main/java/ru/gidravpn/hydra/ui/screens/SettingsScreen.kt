@@ -1023,6 +1023,14 @@ private fun AboutContent(vm: MainViewModel) {
                 is MainViewModel.UpdateUi.Available -> {
                     Text(stringResource(R.string.upd_available, u.release.version), color = AccentCyan,
                         fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    val progress by vm.updateProgress.collectAsState()
+                    if (u.release.apk != null) {
+                        Text(
+                            progress?.let { stringResource(R.string.upd_downloading, (it * 100).toInt()) } ?: stringResource(R.string.upd_install),
+                            color = AccentCyan, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.clickableNoRipple { if (progress == null) vm.installUpdate(u.release) }.padding(vertical = 6.dp)
+                        )
+                    }
                     Text(
                         stringResource(R.string.upd_open), color = AccentCyan, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.clickableNoRipple {

@@ -174,12 +174,12 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
                 Text("Данные: ${Platform.dataDir.absolutePath}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("На ПК поддерживаются: VLESS (в т.ч. REALITY), VMess, Trojan, Shadowsocks (sing-box или Xray), Hysteria2, TUIC, WireGuard (sing-box). " +
                     "AmneziaWG, SSTP, L2TP, olcRTC и OpenFlux пока только в Android.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                ToggleRow("Проверять обновления при запуске", s.checkUpdates, "Запрос к GitHub: есть ли релиз новее. Ничего не скачивается.") {
+                ToggleRow("Проверять обновления при запуске", s.checkUpdates, "Запрос к GitHub: есть ли релиз новее. Скачивание — только по кнопке «Обновить».") {
                     v -> c.updateSettings { it.copy(checkUpdates = v) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { c.checkForUpdates(manual = true) }) { Text("Проверить сейчас") }
-                    ui.update?.let { u -> TextButton(onClick = { openUrl(u.pageUrl) }) { Text("Скачать ${u.version}", color = Accent) } }
+                    ui.update?.let { u -> UpdateBanner(c, ui, u) }
                 }
             }
         }

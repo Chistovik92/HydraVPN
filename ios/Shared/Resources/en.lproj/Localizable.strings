@@ -91,6 +91,12 @@
 "upd_auto" = "Check automatically";
 "upd_auto_desc" = "Once a day on app start. The request goes to api.github.com directly, not through the VPN.";
 "upd_banner" = "Hydra %1$@ is available — tap to open";
+"upd_banner_install" = "Hydra %1$@ is available — tap to update";
+"upd_install" = "Download and install";
+"upd_downloading" = "Downloading update… %1$ld%%";
+"upd_need_permission" = "Allow Hydra to install apps on the screen that just opened, then tap «Update» again.";
+"upd_no_file" = "This release has no file for this build — open the release page.";
+"upd_install_failed" = "Update failed: %1$@";
 "a11y_dismiss" = "Dismiss";
 "a11y_more_actions" = "More actions";
 "a11y_selected" = "Selected";
@@ -465,3 +471,7 @@
 "ios_lang_hint" = "The interface language follows the language set for Hydra in iOS Settings.";
 "ios_open_settings" = "Open Hydra settings →";
 "ios_import_file" = "Import from file";
+"upd_ios_banner" = "Hydra %1$@ is available — tap to download";
+"upd_ios_downloading" = "Downloading update… %1$ld%%";
+"upd_ios_hint" = "iOS does not let an app install itself. After downloading, open the file in your sideloading tool (AltStore, Sideloadly…).";
+"upd_ios_bad_hash" = "The checksum does not match — the file was not opened.";

@@ -5,6 +5,7 @@ import SwiftUI
 /// Главная — большая кнопка подключения, локация, время и трафик (как MainScreen на Android).
 struct HomeView: View {
     @EnvironmentObject var model: AppModel
+    @StateObject private var updates = UpdateModel()
     let goServers: () -> Void
     var theme: HydraTheme { HydraTheme(rawValue: model.state.app.theme) ?? .ambient }
 
@@ -17,6 +18,7 @@ struct HomeView: View {
                         Text(model.selected?.serverProtocol?.displayName ?? "—").font(.body)
                     }
 
+                    UpdateBanner(model: updates)
                     AccountStatusCard()
 
                     ConnectButton(status: model.status, accent: theme.accent) { model.toggle() }
@@ -41,6 +43,7 @@ struct HomeView: View {
             .background(theme.bg.ignoresSafeArea())
             .navigationTitle("HYDRA VPN")
             .navigationBarTitleDisplayMode(.inline)
+            .task { await updates.checkIfDue() }
         }
     }
 

@@ -146,8 +146,10 @@ private fun RouterDetails(c: AppController, ui: UiState, link: RouterLink, r: Ro
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { StatusCard(link, r) }
         item { NodesCard(r, m) }
-        item { SectionsCard(r.sections) }
+        item { EditableSectionsCard(r, m) { t, x, a -> ask(Pending(t, x, a)) } }
         item { SubscriptionsCard(c, ui, r, m, ask) }
+        item { RouterRadarCard(r, m, r.sections.map { it.name }) }
+        item { RouterChecksCard(r, m) }
         item { RouterLog(r) }
     }
 }
@@ -206,17 +208,6 @@ private fun NodesCard(r: RouterUi, m: RouterManager) = RCard("Узлы") {
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { m.testNode(name) }, enabled = !r.busy) { Text("Проверить") }
             }
-        }
-    }
-}
-
-@Composable
-private fun SectionsCard(sections: List<RouterSection>) = RCard("Секции") {
-    if (sections.isEmpty()) Muted("Секций нет.")
-    sections.forEach { s ->
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(s.title, fontSize = 13.sp)
-            Muted("${s.action} · ${s.provider}" + if (s.enabled) "" else " · выключена")
         }
     }
 }

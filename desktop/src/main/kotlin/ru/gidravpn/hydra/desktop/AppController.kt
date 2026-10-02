@@ -70,6 +70,8 @@ data class UiState(
     /** Kill switch сработал: системный прокси оставлен на мёртвый порт, трафик не утекает. */
     val blocked: Boolean = false,
     val update: Updates.Release? = null,
+    /** Идёт загрузка обновления: 0..1; null — не идёт. */
+    val updateProgress: Float? = null,
     /** Идёт вход или синхронизация с ботом «Радар». */
     val botBusy: Boolean = false,
 ) {
@@ -525,6 +527,31 @@ class AppController(
                 mutate { cur -> state.copy(settings = state.settings.copy(launchAtLogin = cur.settings.launchAtLogin), bot = cur.bot) }
                 toast("Восстановлено: серверов ${state.servers.size}, подписок ${state.subscriptions.size}")
             }.onFailure { toast("Не удалось восстановить: ${it.message}") }
+        }
+    }
+
+    /** Выставляется из Main: корректный выход (отключить VPN, снять блокировку одного экземпляра, закрыть окно). */
+    @Volatile var quitHandler: (() -> Unit)? = null
+
+    /** Скачать обновление напрямую (SHA-256 сверяется) и запустить установщик ОС. */
+    fun installUpdate() {
+        val r = _ui.value.update ?: return
+        if (_ui.value.updateProgress != null) return
+        _ui.update { it.copy(updateProgress = 0f) }
+        scope.launch(Dispatchers.IO) {
+            try {
+                val file = Updates.download(r) { done, total ->
+                    if (total > 0) _ui.update { it.copy(updateProgress = (done.toFloat() / total).coerceIn(0f, 1f)) }
+                    true
+                }
+                val (quit, text) = Updates.install(file)
+                toast(text)
+                if (quit) { shutdown(); quitHandler?.invoke() }
+            } catch (e: Exception) {
+                toast("Не удалось обновить: ${e.message}")
+            } finally {
+                _ui.update { it.copy(updateProgress = null) }
+            }
         }
     }
 
