@@ -43,10 +43,17 @@ android {
         // языков: APK толще, а на, скажем, немецком телефоне системные диалоги библиотек
         // были бы по-немецки посреди английского интерфейса.
         resourceConfigurations += listOf("en", "ru", "uk", "fa", "zh-rCN")
+    }
 
-        // ABI, под которые собраны нативные ядра (libbox / libXray)
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+    // 0.7.2: релизная сборка — отдельный APK на каждую архитектуру (ядра libbox/AmneziaWG/olcRTC занимают почти весь
+    // вес). Телефону нужен один: arm64-v8a ~ втрое легче универсального. Отладочные сборки и IDE — одним APK.
+    // Приложение само выбирает свой файл при обновлении (data/update/UpdateChecker, UpdateFeed.pickAndroid).
+    splits {
+        abi {
+            isEnable = gradle.startParameter.taskNames.any { it.contains("Release") }
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = false
         }
     }
 

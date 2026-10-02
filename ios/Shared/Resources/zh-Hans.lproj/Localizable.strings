@@ -332,6 +332,7 @@
 "bot_sync_none" = "机器人中暂无可用的订阅。访问权限由管理员分配。";
 "bot_err_server" = "请输入机器人服务器地址，例如 radar.example.org。普通 http 仅限本地网络。";
 "bot_err_network" = "无法连接到机器人服务器。";
+"bot_err_not_radar" = "这不是「Radar」机器人服务器 — 请检查地址。";
 "bot_err_auth" = "代码错误或已过期，或此设备已在机器人中断开。请获取新代码。";
 "bot_err_off" = "此服务器已关闭应用 API。";
 "bot_err_rate" = "尝试次数过多，请等待几分钟。";

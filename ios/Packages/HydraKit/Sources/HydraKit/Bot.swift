@@ -27,8 +27,14 @@ public struct BotSubscription: Hashable, Sendable {
     public var state: String
     public var enabled: Bool
     public var url: String
+    /// Из ответа бота: unix-время окончания (0 — бессрочно), лимит и использованный трафик в байтах.
+    public var expire: Int64 = 0
+    public var trafficLimit: Int64 = 0
+    public var trafficUsed: Int64 = 0
 
-    public init(panel: String, title: String, linkKind: String = "subscription", state: String = "ok", enabled: Bool = true, url: String) {
+    public init(panel: String, title: String, linkKind: String = "subscription", state: String = "ok", enabled: Bool = true, url: String,
+                expire: Int64 = 0, trafficLimit: Int64 = 0, trafficUsed: Int64 = 0) {
+        self.expire = expire; self.trafficLimit = trafficLimit; self.trafficUsed = trafficUsed
         self.panel = panel; self.title = title; self.linkKind = linkKind; self.state = state; self.enabled = enabled; self.url = url
     }
 
@@ -82,7 +88,10 @@ public enum BotJSON {
                 linkKind: e["link_kind"] as? String ?? "subscription",
                 state: e["state"] as? String ?? "ok",
                 enabled: e["enabled"] as? Bool ?? false,
-                url: e["url"] as? String ?? "")
+                url: e["url"] as? String ?? "",
+                expire: (e["expire"] as? NSNumber)?.int64Value ?? 0,
+                trafficLimit: (e["traffic_limit"] as? NSNumber)?.int64Value ?? 0,
+                trafficUsed: (e["traffic_used"] as? NSNumber)?.int64Value ?? 0)
         }
     }
 
@@ -130,8 +139,21 @@ public final class BotClient: NSObject, URLSessionTaskDelegate, @unchecked Senda
         completionHandler(nil)
     }
 
+    /// Проверка адреса без токена (`GET /app/ping`): понятная ошибка вместо «неверный код».
+    public func ping(server: String) async throws {
+        let data: Data
+        do { data = try await call("GET", "\(server)/api/v1/app/ping", token: nil, body: nil) } catch let e as BotError {
+            if e.code == 404 || e.code == 0 { throw e }
+            throw BotError(code: -1, text: "")
+        }
+        guard let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any], o["service"] as? String == "radar" else {
+            throw BotError(code: -1, text: "")
+        }
+    }
+
     public func link(server: String, code: String, device: String) async throws -> String {
-        let body = try JSONSerialization.data(withJSONObject: ["code": code.filter(\.isNumber), "device": device, "app": "hydravpn"])
+        try await ping(server: server)
+        let body = try JSONSerialization.data(withJSONObject: ["code": code.filter(\.isNumber), "device": String(device.prefix(40)), "app": "hydravpn"])
         return try BotJSON.token(try await call("POST", "\(server)/api/v1/app/link", token: nil, body: body))
     }
 

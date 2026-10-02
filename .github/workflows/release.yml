@@ -79,7 +79,7 @@ jobs:
           echo "$have" | sed 's/^/  /'
           missing=0
           for f in \
-            "Hydra-full-$VERSION.apk" "Hydra-stub-$VERSION.apk" \
+            "Hydra-full-$VERSION-arm64-v8a.apk" "Hydra-full-$VERSION-armeabi-v7a.apk" "Hydra-full-$VERSION-x86_64.apk" "Hydra-stub-$VERSION.apk" \
             "Hydra-desktop-$VERSION-windows-x64.msi" "Hydra-desktop-$VERSION-windows-x64.exe" "Hydra-desktop-$VERSION-windows-x64-portable.zip" \
             "Hydra-desktop-$VERSION-linux-x64.deb" "Hydra-desktop-$VERSION-linux-x64.rpm" "Hydra-desktop-$VERSION-linux-x64.AppImage" "Hydra-desktop-$VERSION-linux-x64.tar.gz" \
             "Hydra-desktop-$VERSION-linux-arm64.deb" "Hydra-desktop-$VERSION-linux-arm64.rpm" "Hydra-desktop-$VERSION-linux-arm64.AppImage" "Hydra-desktop-$VERSION-linux-arm64.tar.gz" \
@@ -89,10 +89,10 @@ jobs:
           done
           [ $missing -eq 0 ] || exit 1
 
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "Hydra-full-$VERSION.apk" --dir /tmp/apk
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "Hydra-full-$VERSION-arm64-v8a.apk" --dir /tmp/apk
           # Список — в переменную: `unzip | grep -q` под pipefail падает от SIGPIPE,
           # когда grep выходит на первом совпадении (так сорвалась публикация 0.6.25).
-          so="$(unzip -Z1 "/tmp/apk/Hydra-full-$VERSION.apk" | grep -E '^lib/[^/]+/libbox\.so$' || true)"
+          so="$(unzip -Z1 "/tmp/apk/Hydra-full-$VERSION-arm64-v8a.apk" | grep -E '^lib/[^/]+/libbox\.so$' || true)"
           [ -n "$so" ] || { echo "::error::в full-APK нет lib/*/libbox.so"; exit 1; }
           echo "$so" | sed 's/^/  ядро: /'
           echo "Все платформы на месте, ядро в full-APK есть."

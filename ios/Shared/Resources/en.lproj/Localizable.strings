@@ -456,6 +456,7 @@
 "bot_sync_none" = "The bot has no working subscriptions for you yet. Access is issued by the administrator.";
 "bot_err_server" = "Enter the bot server address, for example radar.example.org. Plain http works only in a local network.";
 "bot_err_network" = "No connection to the bot server.";
+"bot_err_not_radar" = "This is not a Radar bot server — check the address.";
 "bot_err_auth" = "The code is wrong or expired, or this device was disconnected in the bot. Get a new code.";
 "bot_err_off" = "The API for apps is off on this server.";
 "bot_err_rate" = "Too many attempts. Wait a few minutes.";

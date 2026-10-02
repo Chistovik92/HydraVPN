@@ -331,6 +331,7 @@
     <string name="bot_sync_none">В боте пока нет рабочих подписок для вас. Доступ выдаёт администратор.</string>
     <string name="bot_err_server">Укажите адрес сервера бота, например radar.example.org. Обычный http — только в своей сети.</string>
     <string name="bot_err_network">Нет связи с сервером бота.</string>
+    <string name="bot_err_not_radar">Это не сервер бота «Радар» — проверьте адрес.</string>
     <string name="bot_err_auth">Код неверен или устарел, либо это устройство отключили в боте. Возьмите новый код.</string>
     <string name="bot_err_off">На этом сервере API для приложений выключен.</string>
     <string name="bot_err_rate">Слишком много попыток. Подождите несколько минут.</string>

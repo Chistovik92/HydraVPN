@@ -22,10 +22,10 @@ object UpdateChecker {
         parse(UpdateFeed.latest("Hydra-VPN-update-check"), stub = ru.gidravpn.hydra.BuildConfig.FLAVOR == "stub")
     }
 
-    internal fun parse(json: String, stub: Boolean = false): Release = parse(UpdateFeed.parse(json), stub)
+    internal fun parse(json: String, stub: Boolean = false, abis: List<String> = emptyList()): Release = parse(UpdateFeed.parse(json), stub, abis)
 
-    private fun parse(info: ru.gidravpn.hydra.update.ReleaseInfo, stub: Boolean) =
-        Release(info.version, info.pageUrl, UpdateFeed.pickAndroid(info, stub))
+    private fun parse(info: ru.gidravpn.hydra.update.ReleaseInfo, stub: Boolean, abis: List<String> = android.os.Build.SUPPORTED_ABIS.toList()) =
+        Release(info.version, info.pageUrl, UpdateFeed.pickAndroid(info, stub, abis))
 
     /** true, если [remote] новее [current] («0.6.23» > «0.6.22.2»); суффикс «-stub» не мешает. */
     fun isNewer(remote: String, current: String): Boolean = UpdateFeed.isNewer(remote, current)

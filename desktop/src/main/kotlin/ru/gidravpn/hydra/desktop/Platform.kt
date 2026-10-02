@@ -22,7 +22,7 @@ object Platform {
         val host = runCatching { java.net.InetAddress.getLocalHost().hostName }.getOrNull()?.takeIf { it.isNotBlank() }
             ?: System.getenv("COMPUTERNAME") ?: System.getenv("HOSTNAME") ?: ""
         val name = when (os) { Os.WINDOWS -> "Windows"; Os.MACOS -> "macOS"; Os.LINUX -> "Linux" }
-        return ("Hydra $name" + if (host.isNotEmpty()) " · $host" else "").take(60)
+        return ("Hydra $name" + if (host.isNotEmpty()) " · $host" else "").take(40)
     }
 
     /** %APPDATA%\Hydra, ~/Library/Application Support/Hydra, $XDG_CONFIG_HOME/hydra. */
