@@ -27,9 +27,9 @@ step() { printf '\n==> %s\n' "$*"; }
 err() { echo "::error::$*" >&2; exit 1; }
 
 case "$TARGET" in
-  windows-*) CORE="sing-box.exe"; XRAY="xray.exe"; APP_DIR="$BIN/app/Hydra"; LAUNCHER="$APP_DIR/Hydra.exe"; RES="$APP_DIR/app/resources" ;;
-  linux-*)   CORE="sing-box";     XRAY="xray"; APP_DIR="$BIN/app/Hydra"; LAUNCHER="$APP_DIR/bin/Hydra";  RES="$APP_DIR/lib/app/resources" ;;
-  macos-*)   CORE="sing-box";     XRAY="xray"; APP_DIR="$BIN/app/Hydra.app"; LAUNCHER="$APP_DIR/Contents/MacOS/Hydra"; RES="$APP_DIR/Contents/app/resources" ;;
+  windows-*) CORE="sing-box.exe"; XRAY="xray.exe"; OPENFLUX="openflux.exe"; OLCRTC="olcrtc.exe"; APP_DIR="$BIN/app/Hydra"; LAUNCHER="$APP_DIR/Hydra.exe"; RES="$APP_DIR/app/resources" ;;
+  linux-*)   CORE="sing-box";     XRAY="xray"; OPENFLUX="openflux"; OLCRTC="olcrtc"; APP_DIR="$BIN/app/Hydra"; LAUNCHER="$APP_DIR/bin/Hydra";  RES="$APP_DIR/lib/app/resources" ;;
+  macos-*)   CORE="sing-box";     XRAY="xray"; OPENFLUX="openflux"; OLCRTC="olcrtc"; APP_DIR="$BIN/app/Hydra.app"; LAUNCHER="$APP_DIR/Contents/MacOS/Hydra"; RES="$APP_DIR/Contents/app/resources" ;;
   *) err "неизвестная цель $TARGET" ;;
 esac
 
@@ -58,6 +58,9 @@ esac
 step "Проверка: ядра и geo-базы внутри пакета"
 [[ -f "$RES/$CORE" ]] || err "в пакете нет ядра: $RES/$CORE"
 [[ -f "$RES/$XRAY" ]] || err "в пакете нет ядра Xray: $RES/$XRAY"
+# 0.7.4: клиенты olcRTC (собран из закреплённого коммита, нужен Go) и OpenFlux (бинарь из релиза апстрима).
+[[ -f "$RES/$OPENFLUX" ]] || err "в пакете нет клиента OpenFlux: $RES/$OPENFLUX"
+[[ -f "$RES/$OLCRTC" ]] || err "в пакете нет клиента olcRTC: $RES/$OLCRTC (на сборочной машине нужен go)"
 [[ -d "$RES/geo/geoip" ]] || err "в пакете нет geo-баз: $RES/geo/geoip"
 "$RES/$CORE" version | head -1
 "$RES/$XRAY" version | head -1
@@ -95,12 +98,12 @@ case "$TARGET" in
     cp "$BIN"/deb/*.deb "$DIST/$NAME.deb"
     dpkg-deb -c "$DIST/$NAME.deb" | grep 'resources/sing-box' | sed 's/^/    deb: /'
     # Без grep -q в конвейере: под pipefail его ранний выход даёт SIGPIPE и ложную ошибку.
-    for bin in sing-box xray; do
+    for bin in sing-box xray openflux olcrtc; do
       line="$(dpkg-deb -c "$DIST/$NAME.deb" | grep "resources/$bin\$" || true)"
       [[ "$line" == -rwx* ]] || err "в DEB $bin без бита исполнения"
     done
     cp "$BIN"/rpm/*.rpm "$DIST/$NAME.rpm"
-    for bin in sing-box xray; do
+    for bin in sing-box xray openflux olcrtc; do
       line="$(rpm -qplv "$DIST/$NAME.rpm" | grep "resources/$bin\$" || true)"
       [[ "$line" == -rwx* ]] || err "в RPM $bin без бита исполнения"
     done

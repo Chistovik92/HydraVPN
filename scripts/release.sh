@@ -245,7 +245,7 @@ if [[ -z "$NOTES_FILE" ]]; then
 
 Приложение не нотаризовано Apple (нужен платный Developer ID). При первом запуске: «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть», либо \`xattr -dr com.apple.quarantine /Applications/Hydra.app\`. В режиме TUN macOS спрашивает пароль администратора при подключении и отключении.
 
-**Протоколы на ПК:** VLESS (в т.ч. REALITY), VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard; подписки. AmneziaWG, SSTP, L2TP, olcRTC, OpenFlux, WDTT — пока только Android.
+**Протоколы на ПК:** VLESS (в т.ч. REALITY), VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard; подписки. AmneziaWG, SSTP, L2TP, WDTT — пока только Android (olcRTC и OpenFlux — BETA с 0.7.4).
 
 ### iOS
 \`Hydra-ios-$VERSION-unsigned.ipa\` — **без подписи**. Установить на iPhone можно только после переподписи сертификатом платного аккаунта Apple Developer Program (Network Extension не выдаётся бесплатным аккаунтам), в App Store приложения пока нет.

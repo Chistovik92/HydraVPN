@@ -27,10 +27,14 @@ import ru.gidravpn.hydra.data.model.SplitTunnelMode
 import ru.gidravpn.hydra.data.model.Subscription
 import ru.gidravpn.hydra.data.subscription.LinkBuilder
 import ru.gidravpn.hydra.data.subscription.LinkParser
+import ru.gidravpn.hydra.data.subscription.OlcRtcConfigBuilder
+import ru.gidravpn.hydra.data.subscription.OpenFluxArgs
 import ru.gidravpn.hydra.data.subscription.XrayConfigBuilder
 import ru.gidravpn.hydra.desktop.core.Autostart
 import ru.gidravpn.hydra.desktop.core.ClashApi
 import ru.gidravpn.hydra.desktop.core.CoreRunner
+import ru.gidravpn.hydra.desktop.core.Sidecar
+import ru.gidravpn.hydra.desktop.core.hasValidEndpoint
 import ru.gidravpn.hydra.desktop.core.DesktopConfig
 import ru.gidravpn.hydra.desktop.core.NeedsElevation
 import ru.gidravpn.hydra.desktop.core.Ping
@@ -117,6 +121,9 @@ class AppController(
 
     /** Ядро Xray есть в пакете (проверяется один раз: UI спрашивает на каждой перерисовке). */
     val xrayAvailable: Boolean by lazy { Platform.bundledXray() != null }
+    /** Клиенты olcRTC и OpenFlux есть в пакете (0.7.4). */
+    val olcRtcAvailable: Boolean by lazy { Platform.bundledOlcRtc() != null }
+    val openFluxAvailable: Boolean by lazy { Platform.bundledOpenFlux() != null }
 
     private val runner = CoreRunner(
         onLog = { line -> appendLog(line) },
@@ -183,9 +190,14 @@ class AppController(
         if (t.startsWith("http://", true) || t.startsWith("https://", true)) {
             return addSubscription(t.lineSequence().first().trim(), "")
         }
+        // olcbox://add?url=<ссылка подписки> — «поделиться» из клиента olcBox: это обычная подписка.
+        if (t.startsWith("olcbox://", true)) {
+            val u = Regex("[?&]url=([^&#]+)").find(t)?.groupValues?.get(1)?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }
+            if (u != null && (u.startsWith("https://", true) || u.startsWith("http://", true))) return addSubscription(u, "olcBox")
+        }
         val parsed = if ("[Interface]" in t) listOfNotNull(runCatching { LinkParser.parseLine(t) }.getOrNull())
         else LinkParser.parseSubscription(t)
-        val valid = parsed.filter { it.address.isNotBlank() && it.port in 1..65535 }
+        val valid = parsed.filter { it.hasValidEndpoint }
         if (valid.isEmpty()) return toast("Не найдено ни одной поддерживаемой ссылки")
         mutate { s ->
             var id = nextId(s.servers.map { it.id })
@@ -392,7 +404,7 @@ class AppController(
         var next = nextId(s.servers.map { it.id })
         // Сохраняем id совпадающих серверов — выбор, пинг и текущее подключение переживают обновление.
         val used = mutableSetOf<Long>()
-        val fresh = f.servers.filter { it.address.isNotBlank() && it.port in 1..65535 }.map { n ->
+        val fresh = f.servers.filter { it.hasValidEndpoint }.map { n ->
             val same = old.firstOrNull { it.id !in used && it.address == n.address && it.port == n.port && it.name == n.name }
             same?.let { used += it.id }
             n.copy(id = same?.id ?: next++, subscriptionId = id, pingMs = same?.pingMs ?: -1)
@@ -500,6 +512,8 @@ class AppController(
         when (kind) {
             EngineToggles.Kind.SINGBOX -> it.copy(singBoxEnabled = enabled)
             EngineToggles.Kind.XRAY -> it.copy(xrayEnabled = enabled)
+            EngineToggles.Kind.OLCRTC -> it.copy(olcRtcEnabled = enabled)
+            EngineToggles.Kind.OPENFLUX -> it.copy(openFluxEnabled = enabled)
             else -> it
         }
     }
@@ -615,17 +629,24 @@ class AppController(
             if (settings.mode == ConnectionMode.PROXY) ensurePortFree(settings.proxyPort, "прокси")
             if (settings.lanShare.isUsable) ensurePortFree(settings.lanShare.port, "раздачи в сеть", any = true)
             val api = DesktopConfig.Api(freePort(), randomSecret())
-            val bridge = if (engine == EngineToggles.Kind.XRAY) {
-                DesktopConfig.XrayBridge(freePort(), XrayConfigBuilder.SocksAuth("hydra", randomSecret()))
-            } else null
-            val xrayConfig = bridge?.let {
+            val sidecar: Sidecar? = when (engine) {
+                EngineToggles.Kind.OLCRTC -> olcRtcSidecar(profile)
+                EngineToggles.Kind.OPENFLUX -> openFluxSidecar(profile)
+                else -> null
+            }
+            val bridge = when {
+                engine == EngineToggles.Kind.XRAY -> DesktopConfig.XrayBridge(freePort(), XrayConfigBuilder.SocksAuth("hydra", randomSecret()))
+                sidecar != null -> DesktopConfig.XrayBridge(sidecar.socksPort, null)   // клиент olcRTC/OpenFlux — SOCKS5 без пароля на 127.0.0.1
+                else -> null
+            }
+            val xrayConfig = bridge?.takeIf { engine == EngineToggles.Kind.XRAY }?.let {
                 // В TUN адрес сервера — заранее, пока туннеля нет (см. DesktopConfig.xray).
                 val ip = if (settings.mode == ConnectionMode.TUN) resolve(profile.address) else null
                 DesktopConfig.xray(profile, settings, it, ip).toString(2)
             }
-            val bypass = listOfNotNull(Platform.selfExecutable, bridge?.let { Platform.bundledXray()?.absolutePath })
+            val bypass = listOfNotNull(Platform.selfExecutable, bridge?.takeIf { engine == EngineToggles.Kind.XRAY }?.let { Platform.bundledXray()?.absolutePath }, sidecar?.exe?.absolutePath)
             val config = DesktopConfig.build(profile, settings, Platform.os, api, Platform.geoDir(), bridge, bypass)
-            runner.start(sessionId, config.toString(2), settings.mode, xrayConfig, bridge?.port ?: 0)
+            runner.start(sessionId, config.toString(2), settings.mode, xrayConfig, bridge?.port ?: 0, sidecar)
             if (session != sessionId) {   // пока ядро поднималось, нажали «Отключить»
                 runner.stop()
                 return
@@ -660,7 +681,7 @@ class AppController(
     private suspend fun verify(clash: ClashApi, sessionId: Int, settings: DesktopSettings, engine: EngineToggles.Kind) {
         var lastError = ""
         val how = (if (settings.mode == ConnectionMode.TUN) "TUN, весь трафик" else "прокси 127.0.0.1:${settings.proxyPort}") +
-            if (engine == EngineToggles.Kind.XRAY) " · Xray" else " · sing-box"
+            when (engine) { EngineToggles.Kind.XRAY -> " · Xray"; EngineToggles.Kind.OLCRTC -> " · olcRTC"; EngineToggles.Kind.OPENFLUX -> " · OpenFlux"; else -> " · sing-box" }
         repeat(4) { attempt ->
             delay(if (attempt == 0) 1200 else 2000)
             if (session != sessionId || !runner.isAlive) return
@@ -762,6 +783,23 @@ class AppController(
         val all = InetAddress.getAllByName(host)
         (all.firstOrNull { it is Inet4Address } ?: all.first()).hostAddress
     }.getOrNull()
+
+    /** Клиент olcRTC: YAML с ключом комнаты лежит только на время работы (0600) и удаляется при остановке. */
+    private fun olcRtcSidecar(profile: ServerProfile): Sidecar {
+        val exe = Platform.bundledOlcRtc() ?: error("olcRTC не входит в эту сборку Hydra (нужен Go при сборке) — выберите другой сервер")
+        val port = freePort()
+        val cfg = File(Platform.runDir, "olcrtc-client.yaml")
+        Store.writePrivateAtomic(cfg, OlcRtcConfigBuilder.build(profile, port))
+        return Sidecar("olcRTC", exe, listOf(cfg.absolutePath), port, secrets = listOf(cfg))
+    }
+
+    /** Клиент OpenFlux: ключ шифрования — файл 0600 на время работы. */
+    private fun openFluxSidecar(profile: ServerProfile): Sidecar {
+        val exe = Platform.bundledOpenFlux() ?: error("OpenFlux не входит в эту сборку Hydra — выберите другой сервер")
+        val port = freePort()
+        val key = if (profile.uuidOrPassword.isNotEmpty()) File(Platform.runDir, "openflux.key").also { Store.writePrivateAtomic(it, profile.uuidOrPassword) } else null
+        return Sidecar("OpenFlux", exe, OpenFluxArgs.build(profile, port, key?.absolutePath), port, secrets = listOfNotNull(key))
+    }
 
     private fun freePort(): Int = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { it.localPort }
 

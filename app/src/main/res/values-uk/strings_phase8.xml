@@ -51,7 +51,7 @@
     <string name="profiles_delete_q">Видалити профіль «%1$s»?</string>
 
     <string name="upd_title">Оновлення</string>
-    <string name="upd_desc">Hydra перевіряє останній реліз на GitHub. Застосунок сам нічого не завантажує й не встановлює — відкриває сторінку релізу.</string>
+    <string name="upd_desc">Hydra перевіряє останній реліз на GitHub. Кнопка «Завантажити й встановити» отримує файл (контрольну суму перевіряють) і відкриває системний інсталятор; сторінка релізу теж завжди доступна.</string>
     <string name="upd_checking">Перевіряю…</string>
     <string name="upd_latest">У вас остання версія</string>
     <string name="upd_failed">Не вдалося перевірити: %1$s</string>

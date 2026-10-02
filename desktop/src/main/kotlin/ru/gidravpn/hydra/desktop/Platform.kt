@@ -62,6 +62,10 @@ object Platform {
     /** Ядро Xray-core из пакета; HYDRA_XRAY — ручное переопределение (разработка). */
     fun bundledXray(): File? = bundled("xray", "HYDRA_XRAY")
 
+    /** Клиент OpenFlux (готовый бинарь из релиза апстрима) и клиент olcRTC (собран из закреплённого коммита) — 0.7.4. */
+    fun bundledOpenFlux(): File? = bundled("openflux", "HYDRA_OPENFLUX")
+    fun bundledOlcRtc(): File? = bundled("olcrtc", "HYDRA_OLCRTC")
+
     private fun bundled(name: String, env: String): File? {
         System.getenv(env)?.let { File(it) }?.takeIf { it.isFile }?.let { return it }
         val file = exe(name)

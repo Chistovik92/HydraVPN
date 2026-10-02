@@ -13,7 +13,7 @@
 | Преемник | [owenewans/snolc](https://github.com/owenewans/snolc) — «в существенно другом виде»; готового olcrtc-модуля в `snolc-modules` пока нет |
 | Клиенты | [alananisimov/olcbox](https://github.com/alananisimov/olcbox) (KMP/Compose, MIT, alpha; встраивает olcrtc; deeplink `olcbox://add?url=<URL>`; провайдеры Jazz, Telemost, WB Stream, Jitsi) · [owenewans/owenclave](https://github.com/owenewans/owenclave) (Android, форк exclave: olcrtc + подписки) |
 | Формат ссылки | `olcrtc://<Provider>?<Transport>[<k=v&…>]@<RoomID>#<Key>$<MIMO>` (docs/uri.md апстрима, «URI v1») |
-| В Hydra | `OlcRtcCore`: клиент `cmd/olcrtc` собран в `libolcrtc.so` (`scripts/build-olcrtc.sh`), запуск подпроцессом, SOCKS5 → sing-box → tun. Ссылки `olcrtc://` импортируются (в т.ч. QR), `olcbox://add?url=` — как подписка |
+| В Hydra | **ПК (0.7.4):** тот же клиент, собранный из закреплённого коммита, запуск подпроцессом (`Sidecar` в `CoreRunner`). Android — `OlcRtcCore`: клиент `cmd/olcrtc` собран в `libolcrtc.so` (`scripts/build-olcrtc.sh`), запуск подпроцессом, SOCKS5 → sing-box → tun. Ссылки `olcrtc://` импортируются (в т.ч. QR), `olcbox://add?url=` — как подписка |
 | Риск | Апстрим заморожен: чинить его нельзя, а Jitsi/Телемост/WB могут менять протоколы. Собираем из последнего состояния; следим за snolc |
 
 ## snolc — модульный сетевой движок (Rust)
@@ -36,7 +36,7 @@ policy-local/dummy), установщик `snolpkg`, клиент `snolcNG` (д�
 | Опции | кодек `batched` (zstd) / `legacy` (LZ4), шифрование AES-256-GCM (`--encryption-key-file`) |
 | Клиенты | [p1neappleXpress/OpenFluxAndroid](https://github.com/p1neappleXpress/OpenFluxAndroid) — запускает тот же бинарь подпроцессом (`--role client --inbound socks5`) — именно так сделано у нас · macOS (utun) · iOS (Network Extension, TestFlight) · Linux/Windows (SOCKS5) |
 | Формат ссылки | у апстрима нет. В Hydra — **своё соглашение** `openflux://<transport>?url=…&maxToken=…&maxUid=…&codec=…&key=…#имя` (`OpenFluxLink`) |
-| В Hydra | `OpenFluxCore` (`libopenflux.so`, `scripts/build-openflux.sh`), BETA |
+| В Hydra | Android — `OpenFluxCore` (`libopenflux.so`, `scripts/build-openflux.sh`), BETA. **ПК (0.7.4)** — готовый бинарь релиза v0.3.0, подпроцесс + SOCKS5 → sing-box; транспорт `direct` (свой exit-узел) проверен вживую |
 | Риск | Транспорты — чужие сервисы, которые не задумывались как канал данных: могут в любой момент закрыть такой доступ. Автор снимает с себя ответственность за применение — у пользователя ответственность за соблюдение правил сервисов |
 
 ## AmneziaWG
