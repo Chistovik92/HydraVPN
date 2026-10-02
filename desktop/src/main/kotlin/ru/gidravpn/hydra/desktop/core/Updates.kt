@@ -73,6 +73,11 @@ object Updates {
      */
     fun install(file: File): Pair<Boolean, String> {
         val n = file.name.lowercase()
+        // 0.7.3: portable-ZIP, tar.gz и .app подменяются сами (SelfUpdate); не вышло — обычный путь ниже.
+        if (n.endsWith(".zip") || n.endsWith(".tar.gz") || (n.endsWith(".dmg") && Platform.os == Os.MACOS)) {
+            val replaced = try { SelfUpdate.apply(file) } catch (e: Exception) { return false to "Не удалось подготовить обновление: ${e.message}. Файл: ${file.absolutePath}" }
+            if (replaced) return true to "Обновление скачано: Hydra перезапустится сама через несколько секунд."
+        }
         return when {
             n.endsWith(".msi") -> { ProcessBuilder("msiexec", "/i", file.absolutePath).start(); true to "Запущен установщик — Hydra закроется." }
             n.endsWith(".exe") -> { ProcessBuilder(file.absolutePath).start(); true to "Запущен установщик — Hydra закроется." }

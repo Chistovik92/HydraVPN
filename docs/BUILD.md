@@ -74,6 +74,17 @@ python3 build/main.py android
 cp libXray.aar /path/to/Hydra/app/libs/
 ```
 
+> **Windows и три нужных ABI.** Если `build/main.py` падает на `go mod tidy` («missing module declaration»),
+> то же самое делает прямой вызов из корня libXray (подойдёт и на Linux/macOS) — собираются ровно те три ABI,
+> что есть в релизных APK (arm64-v8a, armeabi-v7a, x86_64), без лишнего x86 (~73 МБ вместо ~100):
+> ```bash
+> export ANDROID_HOME=… ANDROID_NDK_HOME="$ANDROID_HOME/ndk/<версия>"
+> gomobile bind -target android/arm64,android/arm,android/amd64 -androidapi 21 \
+>   -ldflags="-checklinkname=0 -extldflags=-Wl,-z,max-page-size=16384"
+> ```
+> Начиная с 0.7.3 `scripts/release.sh` не выпускает релиз без `libXray.aar` и без `assets/libxray.dex` внутри каждого
+> full-APK: так Xray не пропадёт из сборки молча (в 0.6.x–0.7.2 переключатель «Xray Core» был неактивен).
+
 > Xray-core сам tun не обслуживает — но **отдельный tun2socks-мост
 > (hev-socks5-tunnel) не нужен**: Xray поднимается headless с локальным
 > socks5-inbound (`127.0.0.1:10808`, см. `XrayConfigBuilder`), а роль моста

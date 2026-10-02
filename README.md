@@ -5,7 +5,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.7.2** · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md)
+- Статус: **0.7.3** · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md)
 
 ## Скачать
 
@@ -20,7 +20,7 @@
 | **iOS 17+** | `Hydra-ios-<версия>-unsigned.ipa` — без подписи, ставится через переподпись (AltStore, Sideloadly) |
 
 **Обновления** приложение скачивает само: кнопка «Обновить» грузит файл под вашу систему (SHA-256 из релиза
-проверяется) и запускает установку — на Android через системный установщик, на ПК через установщик ОС.
+проверяется) и запускает установку: на Android — системный установщик, на ПК — установщик ОС, а **portable-версии (Windows ZIP, Linux tar.gz, macOS .app) заменяют свои файлы сами** и перезапускаются.
 iOS не даёт приложению поставить себя само: оно скачивает `.ipa` и отдаёт его в «Поделиться».
 
 ## Скриншоты
@@ -82,7 +82,7 @@ iOS не даёт приложению поставить себя само: о�
 | Протокол | Android | Windows / Linux / macOS | iOS |
 |---|:---:|:---:|:---:|
 | VLESS (+REALITY/Vision), VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard (sing-box) | ✅ | ✅ | ✅ |
-| Xray как второе ядро | ✅ | ✅ | — |
+| Xray как второе ядро (не BETA) | ✅ | ✅ | — |
 | AmneziaWG 1.0–3.x | ✅ | — | ✅ |
 | SSTP, L2TP (без IPsec) | ✅ нужен тест на сервере | — | PPP-стек есть, транспорт ждёт проверки |
 | olcRTC, OpenFlux (BETA) | ✅ | — | — |
@@ -136,7 +136,7 @@ HydraVPN/
 - [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md) — olcRTC / OpenFlux / snolc / AmneziaWG: апстримы, статус, клиенты
 - [docs/HANDOFF_ROUTERS.md](docs/HANDOFF_ROUTERS.md) — управление роутером: контракт API и что проверено
 - [desktop/README.md](desktop/README.md) · [ios/README.md](ios/README.md) — клиенты для ПК и iOS
-- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.7.2
+- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.7.3
 
 ## Лицензия
 

@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.7.2** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.7.3** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -52,7 +52,7 @@
 |---|---|---|
 | VLESS/VMess/Trojan/SS/Hysteria2/TUIC/WireGuard | sing-box | нужен `libbox.aar`; конфиг под схему 1.12+; `HydraPlatformInterface` расширен |
 | AmneziaWG 1.0/1.5/2.0 | amneziawg-go | нужен `amneziawg-go.aar`; генерация `.conf`/uapi готова |
-| Xray (альт. ядро) | Xray-core | нужен `libXray.aar` + tun2socks (`hev-socks5-tunnel`); `XrayCore` — каркас, streamSettings готовы |
+| Xray (альт. ядро) | Xray-core | `libXray.aar` (отдельный процесс `:xray`, мост — sing-box); с 0.7.3 встроен в каждый релизный full-APK, не BETA |
 | **SSTP** | userspace PPP/TLS | **готово на Kotlin** (LCP/PAP/MS-CHAPv2/IPCP + crypto-binding); нужен on-device тест |
 | **L2TP** | userspace PPP/UDP | **готово на Kotlin** (без IPsec/ESP); нужен on-device тест |
 | PPTP | — | честно недоступно (данные в GRE → нужен root; стек удалён из Android 12/13) |
@@ -79,7 +79,7 @@
    готово в 0.5.3: `getInterfaces`/`startDefaultInterfaceMonitor`/`systemCertificates`
    проверены живым подключением на реальном устройстве (см. CHANGELOG 0.5.3).
    `readWIFIState` осознанно `null` (policy-based routing не используется).
-4. ~~Xray~~ — **сделано и подтверждено живьём (0.6.6/0.6.7, BETA)**.
+4. ~~Xray~~ — **сделано и подтверждено живьём (0.6.6/0.6.7); с 0.7.3 — штатное ядро, не BETA**.
    `libXray.aar` собран (Go 1.27, официальный `python3 build/main.py android`).
    Xray-core в отдельном процессе (`:xray`, `XrayEngineService`) — классы
    грузятся ИЗОЛИРОВАННЫМ `DexClassLoader` (`parent = null`, свой

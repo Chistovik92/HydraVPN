@@ -1,6 +1,7 @@
 package ru.gidravpn.hydra.vpn.core.xray
 
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
@@ -35,65 +36,64 @@ import java.lang.reflect.Proxy
  */
 class XrayEngineService : Service() {
 
-    private var protector: IXraySocketProtector? = null
-    private var controllerRegistered = false
-
-    // Не "classLoader" — коллидирует по JVM-сигнатуре с Context.getClassLoader().
-    private val xrayClassLoader: ClassLoader by lazy {
-        val dexFile = File(codeCacheDir, "libxray.dex")
-        if (!dexFile.exists() || dexFile.length() == 0L) {
-            dexFile.setWritable(true, true)
-            assets.open("libxray.dex").use { input ->
-                dexFile.outputStream().use { output -> input.copyTo(output) }
-            }
-        }
-        // ART отказывается грузить dex, который сам процесс ещё может
-        // записать ("Writable dex file ... is not allowed" — защита от
-        // подмены кода в рантайме): без этого DexClassLoader ниже падает
-        // именно с этой ошибкой сразу при первом обращении к его классам.
-        dexFile.setReadOnly()
-        // parent = null (только boot-classloader), а НЕ javaClass.classLoader:
-        // обычный classloader процесса :xray всё равно видит libbox.aar'ный
-        // go.Seq (тот тоже зависимость этого модуля, просто добавлен иначе) —
-        // а Java-делегация классов всегда сначала спрашивает родителя, так что
-        // с обычным parent'ом изоляция была фиктивной: `go.Seq.touch()` внутри
-        // LibXray.<clinit> резолвился в libbox'овскую версию (та грузит
-        // "box", а не "gojni") — LibXray._init() после этого не находит
-        // нужных JNI-символов (UnsatisfiedLinkError). С parent=null достать
-        // чужой go.Seq неоткуда — свой classes.dex остаётся единственным
-        // источником.
-        DexClassLoader(
-            dexFile.absolutePath,
-            codeCacheDir.absolutePath,
-            applicationInfo.nativeLibraryDir,
-            null,
-        )
-    }
-
-    private val libXrayClass by lazy { xrayClassLoader.loadClass("libXray.LibXray") }
-    private val dialerControllerClass by lazy { xrayClassLoader.loadClass("libXray.DialerController") }
-    private val apiVersion by lazy { libXrayClass.getField("LibXrayAPIVersion").get(null) as Long }
-    private val invokeMethod by lazy { libXrayClass.getMethod("invoke", String::class.java) }
-    private val registerDialerControllerMethod by lazy {
-        libXrayClass.getMethod("registerDialerController", dialerControllerClass)
-    }
-
     private val binder = object : IXrayEngine.Stub() {
         override fun setProtector(p: IXraySocketProtector?) {
-            protector = p
-            if (!controllerRegistered) {
-                val proxy = Proxy.newProxyInstance(xrayClassLoader, arrayOf(dialerControllerClass), Protector())
-                registerDialerControllerMethod.invoke(null, proxy)
-                controllerRegistered = true
-            }
+            val rt = XrayRuntime.get(applicationContext)
+            rt.protector = p
+            rt.registerControllerOnce()
         }
 
         override fun runXray(xrayJson: String): String =
-            invokeMethod.invoke(null, invokeRequest("runXray", JSONObject().put("xrayJson", xrayJson))) as String
+            XrayRuntime.get(applicationContext).invoke("runXray", JSONObject().put("xrayJson", xrayJson))
 
         override fun stopXray(): String =
-            invokeMethod.invoke(null, invokeRequest("stopXray", JSONObject())) as String
+            XrayRuntime.get(applicationContext).invoke("stopXray", JSONObject())
     }
+
+    override fun onBind(intent: Intent?): IBinder = binder
+}
+
+/**
+ * Загруженный libXray — ОДИН на процесс `:xray`. Это принципиально (исправлено в 0.7.3): сервис пересоздаётся при каждом
+ * переподключении (unbind → bind), а процесс живёт дальше; classloader и `libgojni.so` в нём можно загрузить только раз
+ * (`UnsatisfiedLinkError: Shared library … already opened by ClassLoader`, из-за чего процесс падал и Xray не поднимался
+ * со второго подключения). Поэтому classloader, рефлексия и регистрация защиты сокетов живут здесь, а не в экземпляре сервиса.
+ */
+private class XrayRuntime private constructor(context: android.content.Context) {
+
+    @Volatile var protector: IXraySocketProtector? = null
+    private var controllerRegistered = false
+
+    // Не "classLoader" — коллидирует по JVM-сигнатуре с Context.getClassLoader().
+    private val xrayClassLoader: ClassLoader = run {
+        val dexFile = File(context.codeCacheDir, "libxray.dex")
+        if (!dexFile.exists() || dexFile.length() == 0L) {
+            dexFile.setWritable(true, true)
+            context.assets.open("libxray.dex").use { input ->
+                dexFile.outputStream().use { output -> input.copyTo(output) }
+            }
+        }
+        // ART отказывается грузить dex, который сам процесс ещё может записать («Writable dex file … is not allowed»).
+        dexFile.setReadOnly()
+        // parent = null (только boot-classloader): иначе go.Seq резолвился бы в libbox'овский (см. описание класса выше).
+        DexClassLoader(dexFile.absolutePath, context.codeCacheDir.absolutePath, context.applicationInfo.nativeLibraryDir, null)
+    }
+
+    private val libXrayClass = xrayClassLoader.loadClass("libXray.LibXray")
+    private val dialerControllerClass = xrayClassLoader.loadClass("libXray.DialerController")
+    private val apiVersion = libXrayClass.getField("LibXrayAPIVersion").get(null) as Long
+    private val invokeMethod = libXrayClass.getMethod("invoke", String::class.java)
+    private val registerDialerControllerMethod = libXrayClass.getMethod("registerDialerController", dialerControllerClass)
+
+    @Synchronized fun registerControllerOnce() {
+        if (controllerRegistered) return
+        val proxy = Proxy.newProxyInstance(xrayClassLoader, arrayOf(dialerControllerClass), Protector())
+        registerDialerControllerMethod.invoke(null, proxy)
+        controllerRegistered = true
+    }
+
+    fun invoke(method: String, payload: JSONObject): String =
+        invokeMethod.invoke(null, JSONObject().put("apiVersion", apiVersion).put("method", method).put("payload", payload).toString()) as String
 
     /** Реализация `libXray.DialerController` через динамический прокси — интерфейс сам загружен изолированным classloader'ом. */
     private inner class Protector : InvocationHandler {
@@ -112,8 +112,9 @@ class XrayEngineService : Service() {
         }
     }
 
-    override fun onBind(intent: Intent?): IBinder = binder
-
-    private fun invokeRequest(method: String, payload: JSONObject): String =
-        JSONObject().put("apiVersion", apiVersion).put("method", method).put("payload", payload).toString()
+    companion object {
+        @Volatile private var instance: XrayRuntime? = null
+        fun get(context: android.content.Context): XrayRuntime =
+            instance ?: synchronized(this) { instance ?: XrayRuntime(context.applicationContext).also { instance = it } }
+    }
 }
