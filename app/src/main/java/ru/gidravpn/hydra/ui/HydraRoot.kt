@@ -14,6 +14,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,7 +49,10 @@ fun HydraRoot(
     openServers: Boolean = false,
     onOpenServersHandled: () -> Unit = {},
 ) {
-    var tab by remember { mutableStateOf(Tab.MAIN) }
+    // rememberSaveable: вкладка переживает поворот экрана и пересоздание процесса.
+    var tab by rememberSaveable { mutableStateOf(Tab.MAIN) }
+    // «Назад» с любой вкладки возвращает на Главную, а не закрывает приложение.
+    androidx.activity.compose.BackHandler(enabled = tab != Tab.MAIN) { tab = Tab.MAIN }
     val themeMode by vm.themeMode.collectAsState()
 
     // Переход по кнопке «Серверы» из уведомления.
@@ -103,11 +112,11 @@ private fun NavRail(current: Tab, onSelect: (Tab) -> Unit) {
             val color = if (active) AccentCyan else TextMuted
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickableNoRipple { onSelect(t) }.padding(horizontal = 12.dp, vertical = 10.dp)
+                modifier = Modifier.tabItem(active) { onSelect(t) }.padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
                 Icon(t.icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.height(4.dp))
-                Text(stringResource(t.label), color = color, fontSize = 11.sp,
+                Text(stringResource(t.label), color = color, fontSize = 11.sp, maxLines = 1, softWrap = false,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
             }
         }
@@ -138,14 +147,14 @@ private fun TopBrandBar(themeMode: ThemeMode) {
 private fun NavBar(current: Tab, onSelect: (Tab) -> Unit) {
     Row(
         Modifier.fillMaxWidth().background(SurfaceDim).navigationBarsPadding().padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceAround
     ) {
         Tab.entries.forEach { t ->
             val active = t == current
             val color = if (active) AccentCyan else TextMuted
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickableNoRipple { onSelect(t) }.padding(horizontal = 16.dp, vertical = 4.dp)
+                // Пункты равной ширины: раньше отступы 16dp не оставляли «Настройкам» места и подпись рвалась на две строки.
+                modifier = Modifier.weight(1f).tabItem(active) { onSelect(t) }.heightIn(min = 48.dp).padding(horizontal = 2.dp, vertical = 4.dp)
             ) {
                 // Подпись ниже уже читается TalkBack — у иконки описание не дублируем.
                 Icon(t.icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
@@ -155,8 +164,20 @@ private fun NavBar(current: Tab, onSelect: (Tab) -> Unit) {
                     color = color,
                     fontSize = 10.sp,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1, softWrap = false, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
             }
         }
     }
+}
+
+/** Пункт навигации: для TalkBack — вкладка с признаком «выбрано», для пульта (TV) — рамка фокуса. */
+@Composable
+private fun Modifier.tabItem(selected: Boolean, onClick: () -> Unit): Modifier {
+    val src = remember { MutableInteractionSource() }
+    val focused by src.collectIsFocusedAsState()
+    return this
+        .then(if (focused) Modifier.border(2.dp, AccentCyan, RoundedCornerShape(12.dp)) else Modifier)
+        .selectable(selected = selected, interactionSource = src, indication = null, role = Role.Tab, onClick = onClick)
 }

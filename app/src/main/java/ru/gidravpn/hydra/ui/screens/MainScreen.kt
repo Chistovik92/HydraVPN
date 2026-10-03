@@ -111,7 +111,12 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
         }
         Spacer(Modifier.height(32.dp))
 
-        ConnectButton(state) { vm.toggle() }
+        // Сервера нет — «Подключить» раньше молча ничего не делало (ошибка шла только в журнал);
+        // теперь ведёт туда, где его берут.
+        ConnectButton(state) {
+            if (server == null && state != ConnectionState.CONNECTED && state != ConnectionState.CONNECTING &&
+                state != ConnectionState.RECONNECTING) onGoServers() else vm.toggle()
+        }
         Spacer(Modifier.height(32.dp))
 
         ConnectionInfo(state, server?.name, stats, since)
@@ -121,8 +126,11 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
         Card(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(stringResource(R.string.main_current_config), color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                Text(stringResource(R.string.main_change), color = AccentCyan, fontSize = 11.sp,
-                    modifier = Modifier.clickableNoRipple(onGoServers))
+                // Раньше — 11sp без полей: попасть пальцем было трудно. Теперь область нажатия ≥ 48dp.
+                Text(stringResource(R.string.main_change), color = AccentCyan, fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickableNoRipple(onGoServers)
+                        .heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically).padding(horizontal = 8.dp))
             }
             Spacer(Modifier.height(8.dp))
             val cfg = server?.let {

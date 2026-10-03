@@ -23,7 +23,9 @@ internal class SubsPanel(private val c: AppController) : JPanel(BorderLayout()),
     private val name = Field(14, quiet)
     private val refreshOne = button("Обновить") { chosen()?.let { c.refreshSubscription(it.id) } }
     private val refreshAll = button("Обновить все") { c.refreshAll() }
-    private val delete = button("Удалить") { chosen()?.let { c.deleteSubscription(it.id) } }
+    private val delete = button("Удалить") {
+        chosen()?.let { s -> if (confirmDelete("Удалить подписку «${s.displayName}» вместе с её серверами?")) c.deleteSubscription(s.id) }
+    }
     private val auto = Check("Обновлять автоматически (раз в 12 ч)", quiet) { on -> chosen()?.let { c.setSubscriptionAutoUpdate(it.id, if (on) 12 else 0) } }
     private var last: UiState? = null
     private var ui: UiState? = null

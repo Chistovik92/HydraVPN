@@ -16,6 +16,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -109,7 +118,8 @@ fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTa
     MaterialTheme(colorScheme = HydraColors) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Row(Modifier.fillMaxSize()) {
-                NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
+                // Семь пунктов не помещаются в окно минимальной высоты (560) — рельсу можно прокрутить.
+                NavigationRail(Modifier.verticalScroll(rememberScrollState()), containerColor = MaterialTheme.colorScheme.surface) {
                     Spacer(Modifier.height(12.dp))
                     Tab.entries.forEach { t ->
                         NavigationRailItem(
@@ -157,7 +167,8 @@ fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTa
 @Composable
 private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, openServers: () -> Unit) {
     val settings = ui.data.settings
-    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+    // Прокрутка: в окне минимальной высоты кольцо, карточки и счётчики раньше обрезались.
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(24.dp))
         val ringColor = when (ui.status) {
             Status.CONNECTED -> if (ui.delayMs != null) Accent else Warn
@@ -169,7 +180,10 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
             Modifier.size(180.dp).clip(CircleShape)
                 .border(6.dp, ringColor, CircleShape)
                 .background(MaterialTheme.colorScheme.surface)
-                .clickable(enabled = ui.status != Status.STOPPING) { c.toggle() },
+                .clickable(enabled = ui.status != Status.STOPPING) {
+                    // Сервера нет — ведём туда, где его берут, а не показываем «Выберите сервер».
+                    if (ui.selected == null && !ui.active) openServers() else c.toggle()
+                },
             contentAlignment = Alignment.Center,
         ) {
             if (ui.status == Status.CONNECTING || ui.status == Status.STOPPING) {
@@ -191,7 +205,7 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
         }
         Spacer(Modifier.height(20.dp))
 
-        Card(Modifier.width(520.dp).clickable(enabled = !ui.active) { openServers() },
+        Card(Modifier.widthIn(max = 520.dp).fillMaxWidth().clickable(enabled = !ui.active) { openServers() },
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
             Column(Modifier.padding(16.dp)) {
                 Text("Сервер", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -229,7 +243,7 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
         }
         if (ui.needsElevation) {
             Spacer(Modifier.height(16.dp))
-            Card(Modifier.width(520.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Card(Modifier.widthIn(max = 520.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(Modifier.padding(16.dp)) {
                     Text("Для режима TUN Hydra нужно запустить от имени администратора (так Windows разрешает создать сетевой адаптер).")
                     Spacer(Modifier.height(8.dp))
@@ -240,6 +254,7 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
                 }
             }
         }
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -253,8 +268,15 @@ private fun Stat(big: String, small: String) = Column(horizontalAlignment = Alig
 @Composable
 private fun ServersScreen(c: AppController, ui: UiState) {
     var input by remember { mutableStateOf("") }
+    var query by remember { mutableStateOf("") }
+    var sortByPing by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf<ServerProfile?>(null) }
+    confirmDelete?.let { s ->
+        ConfirmDelete("Удалить сервер?", "«${s.name}» будет удалён из списка.", { c.deleteServer(s.id) }) { confirmDelete = null }
+    }
     Column(Modifier.fillMaxSize()) {
         Header("Серверы") {
+            FilterChip(selected = sortByPing, onClick = { sortByPing = !sortByPing }, label = { Text("По пингу") })
             OutlinedButton(onClick = { c.import(clipboard()) }) { Text("Вставить из буфера") }
             OutlinedButton(onClick = { c.pingAll() }, enabled = !ui.pinging && ui.data.servers.isNotEmpty()) {
                 Text(if (ui.pinging) "Пинг…" else "Пинг всех")
@@ -262,6 +284,9 @@ private fun ServersScreen(c: AppController, ui: UiState) {
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(input, { input = it }, Modifier.weight(1f), singleLine = true,
+                // Enter добавляет — раньше приходилось тянуться к кнопке «+».
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (input.isNotBlank()) { c.import(input); input = "" } }),
                 placeholder = { Text("vless://…, trojan://…, ss://…, hysteria2://…, tuic://…, wireguard://… или адрес подписки") })
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = { c.import(input); input = "" }, enabled = input.isNotBlank()) { Icon(Icons.Default.Add, "Добавить") }
@@ -271,7 +296,20 @@ private fun ServersScreen(c: AppController, ui: UiState) {
             Empty("Серверов пока нет. Скопируйте ссылку-конфиг или адрес подписки и нажмите «Вставить из буфера».")
             return
         }
-        val groups = ui.data.servers.groupBy { it.subscriptionId }
+        if (ui.data.servers.size > 5) {
+            OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Сбросить поиск") } },
+                placeholder = { Text("Поиск по названию, адресу, протоколу") })
+            Spacer(Modifier.height(8.dp))
+        }
+        val q = query.trim()
+        val shown = ui.data.servers.filter {
+            q.isEmpty() || it.name.contains(q, true) || it.address.contains(q, true) ||
+                (it.protocol?.displayName ?: it.protocolId).contains(q, true)
+        }
+        if (shown.isEmpty()) { Empty("Ничего не найдено по «$q»."); return }
+        val groups = shown.groupBy { it.subscriptionId }
         val subNames = ui.data.subscriptions.associate { it.id to it.displayName }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             groups.forEach { (subId, list) ->
@@ -279,14 +317,15 @@ private fun ServersScreen(c: AppController, ui: UiState) {
                     Text(subId?.let { subNames[it] ?: "Подписка" } ?: "Добавлены вручную",
                         fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
                 }
-                items(list, key = { it.id }) { s -> ServerRow(c, ui, s) }
+                val ordered = if (sortByPing) list.sortedBy { if (it.pingMs >= 0) it.pingMs else Int.MAX_VALUE } else list
+                items(ordered, key = { it.id }) { s -> ServerRow(c, ui, s) { confirmDelete = s } }
             }
         }
     }
 }
 
 @Composable
-private fun ServerRow(c: AppController, ui: UiState, s: ServerProfile) {
+private fun ServerRow(c: AppController, ui: UiState, s: ServerProfile, onDelete: () -> Unit) {
     val supported = DesktopConfig.isSupported(s)
     val engine = DesktopConfig.engineFor(s, ui.data.settings, c.xrayAvailable)
     val selected = ui.data.settings.selectedServerId == s.id
@@ -331,10 +370,21 @@ private fun ServerRow(c: AppController, ui: UiState, s: ServerProfile) {
         }) {
             Icon(Icons.Default.Share, "Поделиться", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        IconButton(onClick = { c.deleteServer(s.id) }, enabled = !(ui.active && ui.connectedId == s.id)) {
+        IconButton(onClick = onDelete, enabled = !(ui.active && ui.connectedId == s.id)) {
             Icon(Icons.Default.Delete, "Удалить", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+}
+
+@Composable
+private fun ConfirmDelete(title: String, text: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(text) },
+        confirmButton = { TextButton(onClick = { onConfirm(); onDismiss() }) { Text("Удалить", color = Danger) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+    )
 }
 
 // ============================================================== Подписки
@@ -342,12 +392,19 @@ private fun ServerRow(c: AppController, ui: UiState, s: ServerProfile) {
 private fun SubscriptionsScreen(c: AppController, ui: UiState) {
     var url by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
+    var confirmDelete by remember { mutableStateOf<ru.gidravpn.hydra.data.model.Subscription?>(null) }
+    confirmDelete?.let { sub ->
+        val count = ui.data.servers.count { it.subscriptionId == sub.id }
+        ConfirmDelete("Удалить подписку?", "«${sub.displayName}» и её серверы ($count) будут удалены.", { c.deleteSubscription(sub.id) }) { confirmDelete = null }
+    }
     Column(Modifier.fillMaxSize()) {
         Header("Подписки") {
             OutlinedButton(onClick = { c.refreshAll() }, enabled = ui.data.subscriptions.isNotEmpty()) { Text("Обновить все") }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(url, { url = it }, Modifier.weight(2f), singleLine = true, label = { Text("Адрес подписки (https://…)") })
+            OutlinedTextField(url, { url = it }, Modifier.weight(2f), singleLine = true, label = { Text("Адрес подписки (https://…)") },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (url.isNotBlank()) { c.addSubscription(url, name); url = ""; name = "" } }))
             OutlinedTextField(name, { name = it }, Modifier.weight(1f), singleLine = true, label = { Text("Название") })
             Button(onClick = { c.addSubscription(url, name); url = ""; name = "" }, enabled = url.isNotBlank()) { Text("Добавить") }
         }
@@ -380,7 +437,7 @@ private fun SubscriptionsScreen(c: AppController, ui: UiState) {
                         }
                         if (s.id in ui.updatingSubs) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                         else IconButton(onClick = { c.refreshSubscription(s.id) }) { Icon(Icons.Default.Refresh, "Обновить") }
-                        IconButton(onClick = { c.deleteSubscription(s.id) }, enabled = !ui.active) { Icon(Icons.Default.Delete, "Удалить") }
+                        IconButton(onClick = { confirmDelete = s }, enabled = !ui.active) { Icon(Icons.Default.Delete, "Удалить") }
                     }
                 }
             }
@@ -431,7 +488,7 @@ internal fun Section(title: String, content: @Composable () -> Unit) {
 
 @Composable
 internal fun Empty(text: String) = Box(Modifier.fillMaxWidth().fillMaxHeight(0.6f), contentAlignment = Alignment.Center) {
-    Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 520.dp))
 }
 
 internal fun clipboard(): String = runCatching {

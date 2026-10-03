@@ -36,7 +36,9 @@ internal class ServersPanel(private val c: AppController) : JPanel(BorderLayout(
             }
         }
     }
-    private val delete = button("Удалить") { chosen()?.let { c.deleteServer(it.id) } }
+    private val delete = button("Удалить") {
+        chosen()?.let { s -> if (confirmDelete("Удалить сервер «${s.name}»?")) c.deleteServer(s.id) }
+    }
     private var last: UiState? = null
     private var subNames: Map<Long, String> = emptyMap()
     private var selectedId: Long? = null
