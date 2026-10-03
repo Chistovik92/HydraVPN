@@ -209,57 +209,33 @@ if [[ -z "$NOTES_FILE" ]]; then
 
 Что изменилось — см. [CHANGELOG.md](https://github.com/Chistovik92/HydraVPN/blob/master/CHANGELOG.md).
 
-### Android
-| Файл | Что внутри |
+### Скачать
+| Процессор | Windows | macOS | Debian, Ubuntu, Mint | Fedora, RHEL, openSUSE | Любой Linux | Android | iPhone, iPad |
+|---|---|---|---|---|---|---|---|
+| x86-64 — Intel, AMD | [MSI](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-windows-x64.msi) · [EXE](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-windows-x64.exe) · [ZIP](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-windows-x64-portable.zip) | [DMG](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-macos-x64.dmg) | [DEB](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-linux-x64.deb) | [RPM](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-linux-x64.rpm) | [AppImage](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-linux-x64.AppImage) · [tar.gz](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-linux-x64.tar.gz) | [APK](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-full-$VERSION-x86_64.apk) (эмуляторы, Chromebook) | |
+| ARM64 — Snapdragon, Apple Silicon, телефоны | | [DMG](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-macos-arm64.dmg) | [DEB](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-linux-arm64.deb) | [RPM](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-linux-arm64.rpm) | [AppImage](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-linux-arm64.AppImage) · [tar.gz](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-linux-arm64.tar.gz) | [**APK**](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-full-$VERSION-arm64-v8a.apk) (почти все телефоны) | [IPA](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-ios-$VERSION-unsigned.ipa) ¹ |
+| x86 — 32-бит Intel, AMD | [ZIP Classic](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-windows-x86-classic.zip) ² | | | | [tar.gz Classic](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-linux-x86-classic.tar.gz) ² | [APK](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-full-$VERSION-x86.apk) (старые планшеты, приставки) | |
+| ARM32 — приставки Android TV, Raspberry Pi | | | | | [tar.gz Classic](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-linux-armv7-classic.tar.gz) ² | [APK](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-full-$VERSION-armeabi-v7a.apk) | |
+
+**Какой у меня процессор.** Windows: «Параметры» → «Система» → «О системе», строка «Тип системы». Mac: меню Apple → «Об этом Mac» — «Чип Apple M…» значит Apple Silicon, «Процессор Intel» — Intel. Телефоны на Android почти все ARM64; приставки Android TV и старые телефоны — чаще ARM32 (`armeabi-v7a`).
+**Windows 7 и 64-бит:** `Hydra-desktop-$VERSION-windows-x64-classic.zip` — Hydra Classic для Windows 7 SP1 x64.
+
+¹ Без подписи Apple: установить можно только после переподписи сертификатом платного Apple Developer Program, в App Store приложения пока нет.
+² Hydra Classic — упрощённая оболочка на Swing для Windows 7, 32-битных систем и Raspberry Pi OS 32-бит: те же ядра и настройки, без раздела «Роутеры». В Windows-архиве Java внутри (запуск `Hydra.vbs`); на Linux нужна Java 11+ (`./Hydra/hydra.sh`). Windows XP не поддерживается — обходные пути в [docs/LEGACY.md](https://github.com/Chistovik92/HydraVPN/blob/master/docs/LEGACY.md).
+
+Что проверено на настоящих системах, а что только собрано — в CHANGELOG, раздел «Известные ограничения». `Hydra-stub-$VERSION.apk` — только для разработки: соединение там симулируется.
+
+### Как ставить
+| Система | Что делать |
 |---|---|
-| **\`Hydra-full-$VERSION-arm64-v8a.apk\`** | **Рабочее приложение** для большинства телефонов (64-бит ARM) — с реальным ядром sing-box. |
-| \`Hydra-full-$VERSION-armeabi-v7a.apk\` | То же для 32-битных ARM-устройств: старые телефоны, приставки Android TV. |
-| \`Hydra-full-$VERSION-x86_64.apk\` | То же для эмуляторов и 64-битных устройств на Intel/AMD. |
-| \`Hydra-full-$VERSION-x86.apk\` | То же для 32-битных устройств на Intel (x86): планшеты, приставки, Chromebook. |
-| \`$STUB_APK\` | Только для разработки/CI: соединение **симулируется**. |
+| Windows 10/11 | MSI или EXE — установка для текущего пользователя; ZIP — без установки, запустить `Hydra.exe`. SmartScreen может показать «Неизвестный издатель» → «Подробнее» → «Выполнить в любом случае» (установщик не подписан). Режим «Системный прокси» работает без прав администратора; для TUN Hydra предложит перезапуститься от администратора. |
+| macOS 12+ | Открыть DMG, перетащить Hydra в «Программы». Приложение не нотаризовано: «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть», либо `xattr -dr com.apple.quarantine /Applications/Hydra.app`. В режиме TUN macOS спрашивает пароль администратора. |
+| Debian, Ubuntu, Mint | `sudo apt install ./Hydra-desktop-…deb` |
+| Fedora, RHEL, openSUSE | `sudo dnf install ./Hydra-desktop-…rpm` |
+| Любой Linux | AppImage: `chmod +x` и запустить; tar.gz: `Hydra/bin/Hydra`. Системный прокси ставится в GNOME и KDE; для TUN система один раз спросит пароль (pkexec). |
+| Android | Установить APK; если не встал — другая архитектура, см. таблицу. Режим VPN система подтверждает сама. |
 
-### Windows 10/11 (x64)
-| Файл | |
-|---|---|
-| \`Hydra-desktop-$VERSION-windows-x64.msi\` | Установщик (для текущего пользователя) |
-| \`Hydra-desktop-$VERSION-windows-x64.exe\` | Установщик (EXE) |
-| \`Hydra-desktop-$VERSION-windows-x64-portable.zip\` | Без установки: распаковать, запустить \`Hydra.exe\` |
-
-Режим «Системный прокси» работает без прав администратора. Для режима TUN (весь трафик) Hydra предложит перезапуститься от имени администратора.
-Установщик не подписан сертификатом издателя — SmartScreen может показать «Неизвестный издатель» → «Подробнее» → «Выполнить в любом случае».
-
-### Linux (x64 и arm64)
-| Файл | |
-|---|---|
-| \`…-linux-<arch>.deb\` | Debian / Ubuntu / Mint: \`sudo apt install ./Hydra-desktop-…deb\` |
-| \`…-linux-<arch>.rpm\` | Fedora / RHEL / openSUSE: \`sudo dnf install ./Hydra-desktop-…rpm\` |
-| \`…-linux-<arch>.AppImage\` | Любой дистрибутив: \`chmod +x\` и запустить |
-| \`…-linux-<arch>.tar.gz\` | Портативная версия: \`Hydra/bin/Hydra\` |
-
-Системный прокси выставляется в GNOME и KDE. Для режима TUN при первом включении система один раз спросит пароль (права CAP_NET_ADMIN для ядра через pkexec).
-
-### Windows 7 и 32-битные системы (Hydra Classic)
-| Файл | |
-|---|---|
-| \`…-windows-x86-classic.zip\` | Windows 7 SP1 / 8.1 / 10, 32-бит. Распаковать, запустить \`Hydra.vbs\` (Java внутри) |
-| \`…-windows-x64-classic.zip\` | Windows 7 SP1 x64 |
-| \`…-linux-x86-classic.tar.gz\` | Linux 32-бит Intel: \`./Hydra/hydra.sh\`, нужна Java 11+ |
-| \`…-linux-armv7-classic.tar.gz\` | Linux 32-бит ARM (Raspberry Pi OS 32-бит): \`./Hydra/hydra.sh\`, нужна Java 11+ |
-
-Упрощённая оболочка на Swing: те же ядра и настройки, без раздела «Роутеры». Windows XP не поддерживается — обходные пути в docs/LEGACY.md.
-
-### macOS 12+ (Apple Silicon и Intel)
-| Файл | |
-|---|---|
-| \`Hydra-desktop-$VERSION-macos-arm64.dmg\` | M1/M2/M3/M4 |
-| \`Hydra-desktop-$VERSION-macos-x64.dmg\` | Intel |
-
-Приложение не нотаризовано Apple (нужен платный Developer ID). При первом запуске: «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть», либо \`xattr -dr com.apple.quarantine /Applications/Hydra.app\`. В режиме TUN macOS спрашивает пароль администратора при подключении и отключении.
-
-**Протоколы на ПК:** VLESS (в т.ч. REALITY), VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard; подписки. AmneziaWG, SSTP, L2TP, WDTT — пока только Android (olcRTC и OpenFlux — BETA с 0.7.4).
-
-### iOS
-\`Hydra-ios-$VERSION-unsigned.ipa\` — **без подписи**. Установить на iPhone можно только после переподписи сертификатом платного аккаунта Apple Developer Program (Network Extension не выдаётся бесплатным аккаунтам), в App Store приложения пока нет.
+**Протоколы на ПК:** VLESS (в т.ч. REALITY), VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard; подписки; olcRTC и OpenFlux — BETA. AmneziaWG, SSTP, L2TP, WDTT — пока только Android.
 EOF
 fi
 

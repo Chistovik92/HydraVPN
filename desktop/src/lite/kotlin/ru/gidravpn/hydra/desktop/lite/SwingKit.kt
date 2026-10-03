@@ -140,3 +140,12 @@ internal class Field(columns: Int, private val quiet: Quiet, private val onText:
     /** Не трогаем поле, пока в нём курсор: пользователь печатает, состояние эхом вернулось бы с задержкой. */
     fun sync(value: String) { if (!isFocusOwner && text != value) quiet.run { text = value } }
 }
+
+/** Подтверждение необратимого удаления (по умолчанию выбрана «Отмена»). */
+internal fun confirmDelete(text: String): Boolean {
+    val options = arrayOf<Any>("Удалить", "Отмена")
+    return javax.swing.JOptionPane.showOptionDialog(
+        null, text, "Hydra", javax.swing.JOptionPane.DEFAULT_OPTION,
+        javax.swing.JOptionPane.WARNING_MESSAGE, null, options, options[1],
+    ) == 0
+}
