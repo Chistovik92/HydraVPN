@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="no_system_picker">این دستگاه پنجرهٔ انتخاب فایل سیستم را ندارد (در Android TV رایج است). پیوند را کپی کنید و از کلیپ‌بورد جای‌گذاری کنید.</string>
+    <string name="no_camera">این دستگاه دوربین ندارد. پیوند را کپی کنید و از کلیپ‌بورد جای‌گذاری کنید.</string>
+</resources>

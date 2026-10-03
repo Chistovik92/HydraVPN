@@ -81,3 +81,39 @@ class AndroidAbiPickTest {
         assertNull(UpdateFeed.pickAndroid(info("Hydra-full-0.7.2-x86_64.apk"), false, listOf("arm64-v8a")))
     }
 }
+
+/** 0.7.5: 32-битные системы — x86-APK и сборки Classic выбираются, не путаясь с 64-битными. */
+class Legacy32PickTest {
+    private fun info(vararg names: String) = ru.gidravpn.hydra.update.ReleaseInfo(
+        "0.7.5", "https://github.com/x",
+        names.map { ru.gidravpn.hydra.update.ReleaseAsset(it, "https://github.com/x/$it", 1, null) },
+    )
+
+    @Test fun x86ApkIsNotConfusedWithX86_64() {
+        val i = info("Hydra-full-0.7.5-x86_64.apk", "Hydra-full-0.7.5-x86.apk", "Hydra-full-0.7.5-armeabi-v7a.apk", "Hydra-stub-0.7.5.apk")
+        assertEquals("Hydra-full-0.7.5-x86.apk", UpdateFeed.pickAndroid(i, false, listOf("x86"))?.name)
+        assertEquals("Hydra-full-0.7.5-x86_64.apk", UpdateFeed.pickAndroid(i, false, listOf("x86_64", "x86"))?.name)
+        // 64-битное Intel-устройство без x86_64-файла получает 32-битный: оно умеет оба
+        assertEquals("Hydra-full-0.7.5-x86.apk", UpdateFeed.pickAndroid(info("Hydra-full-0.7.5-x86.apk"), false, listOf("x86_64", "x86"))?.name)
+    }
+
+    @Test fun classicAndRegularDesktopFilesDoNotMix() {
+        val i = info(
+            "Hydra-desktop-0.7.5-windows-x64-portable.zip", "Hydra-desktop-0.7.5-windows-x64-classic.zip",
+            "Hydra-desktop-0.7.5-windows-x86-classic.zip", "Hydra-desktop-0.7.5-linux-armv7-classic.tar.gz",
+            "Hydra-desktop-0.7.5-linux-x64.tar.gz",
+        )
+        assertEquals("Hydra-desktop-0.7.5-windows-x64-portable.zip", Updates.pick(i, Os.WINDOWS, "x64", Updates.InstallKind.PORTABLE)?.name)
+        assertEquals("Hydra-desktop-0.7.5-windows-x64-classic.zip", Updates.pick(i, Os.WINDOWS, "x64", Updates.InstallKind.PORTABLE, classic = true)?.name)
+        assertEquals("Hydra-desktop-0.7.5-windows-x86-classic.zip", Updates.pick(i, Os.WINDOWS, "x86", Updates.InstallKind.PORTABLE, classic = true)?.name)
+        assertEquals("Hydra-desktop-0.7.5-linux-armv7-classic.tar.gz", Updates.pick(i, Os.LINUX, "armv7", Updates.InstallKind.ARCHIVE, classic = true)?.name)
+        assertNull(Updates.pick(i, Os.WINDOWS, "x86", Updates.InstallKind.PORTABLE))          // обычной сборки для x86 нет
+        assertNull(Updates.pick(i, Os.LINUX, "x64", Updates.InstallKind.ARCHIVE, classic = true))
+    }
+
+    @Test fun archNames() {
+        assertEquals("x86", Platform.archOf("x86")); assertEquals("x86", Platform.archOf("i386")); assertEquals("x86", Platform.archOf("i686"))
+        assertEquals("armv7", Platform.archOf("arm")); assertEquals("armv7", Platform.archOf("armv7l"))
+        assertEquals("arm64", Platform.archOf("aarch64")); assertEquals("x64", Platform.archOf("amd64")); assertEquals("x64", Platform.archOf("x86_64"))
+    }
+}

@@ -52,7 +52,8 @@ android {
         abi {
             isEnable = gradle.startParameter.taskNames.any { it.contains("Release") }
             reset()
-            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            // 0.7.5: 32-битные — armeabi-v7a (ARM) и x86 (Intel: старые планшеты, ТВ-приставки, Chromebook).
+            include("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
             isUniversalApk = false
         }
     }

@@ -19,19 +19,22 @@ object Updates {
 
     fun latest(): Release {
         val info = UpdateFeed.latest("Hydra-desktop-update-check")
-        return Release(info.version, info.pageUrl, pick(info, Platform.os, arch(), installKind()))
+        return Release(info.version, info.pageUrl, pick(info, Platform.os, arch(), installKind(), Platform.classic))
     }
 
     fun isNewer(remote: String, current: String): Boolean = UpdateFeed.isNewer(remote, current)
 
     /** Что скачивать: [kind] — как Hydra установлена на этой машине. */
-    fun pick(info: ReleaseInfo, os: Os, arch: String, kind: InstallKind): ReleaseAsset? = when (os) {
-        Os.WINDOWS -> UpdateFeed.pickDesktop(info, "windows", arch, when (kind) {
+    fun pick(info: ReleaseInfo, os: Os, arch: String, kind: InstallKind, classic: Boolean = false): ReleaseAsset? = when {
+        // Classic (Swing, 32-бит и Windows 7) — только архив: zip на Windows, tar.gz на Linux.
+        classic -> UpdateFeed.pickDesktop(info, if (os == Os.WINDOWS) "windows" else "linux", arch,
+            listOf(if (os == Os.WINDOWS) "zip" else "tar.gz"), classic = true)
+        os == Os.WINDOWS -> UpdateFeed.pickDesktop(info, "windows", arch, when (kind) {
             InstallKind.PORTABLE -> listOf("zip")
             else -> listOf("msi", "exe")
         })
-        Os.MACOS -> UpdateFeed.pickDesktop(info, "macos", arch, listOf("dmg"))
-        Os.LINUX -> UpdateFeed.pickDesktop(info, "linux", arch, when (kind) {
+        os == Os.MACOS -> UpdateFeed.pickDesktop(info, "macos", arch, listOf("dmg"))
+        else -> UpdateFeed.pickDesktop(info, "linux", arch, when (kind) {
             InstallKind.APPIMAGE -> listOf("AppImage")
             InstallKind.DEB -> listOf("deb")
             InstallKind.RPM -> listOf("rpm")
@@ -41,7 +44,7 @@ object Updates {
 
     enum class InstallKind { INSTALLED, PORTABLE, APPIMAGE, DEB, RPM, ARCHIVE }
 
-    fun arch(): String = System.getProperty("os.arch").lowercase().let { if (it == "aarch64" || it == "arm64") "arm64" else "x64" }
+    fun arch(): String = Platform.arch
 
     /** Как запущена эта копия Hydra: от этого зависит, какой файл релиза ей подходит. */
     fun installKind(): InstallKind = when (Platform.os) {

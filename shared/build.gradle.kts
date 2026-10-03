@@ -10,7 +10,8 @@ kotlin {
     androidTarget()
     jvm("desktop") {
         compilations.all {
-            kotlinOptions.jvmTarget = "17"
+            // 11, а не 17: из этого модуля собирается и Hydra Classic, которая работает на Java 11 (Windows 7, 32-бит).
+            kotlinOptions.jvmTarget = "11"
         }
     }
 

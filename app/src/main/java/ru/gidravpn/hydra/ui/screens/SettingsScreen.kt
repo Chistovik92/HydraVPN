@@ -1,5 +1,7 @@
 package ru.gidravpn.hydra.ui.screens
 
+import ru.gidravpn.hydra.ui.launchSafe
+import ru.gidravpn.hydra.ui.launchScan
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
@@ -901,6 +903,7 @@ private fun LanguageContent() {
 @Composable
 private fun BackupContent(vm: MainViewModel) {
     val message by vm.backupMessage.collectAsState()
+    val context = LocalContext.current
     var confirmImport by remember { mutableStateOf<android.net.Uri?>(null) }
     var confirmReset by remember { mutableStateOf(false) }
 
@@ -932,7 +935,7 @@ stringResource(R.string.backup_save_desc),
             Spacer(Modifier.height(12.dp))
             BackupActionButton(stringResource(R.string.backup_save_btn), AccentCyan) {
                 val date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
-                exportLauncher.launch("hydra-backup-$date.json")
+                exportLauncher.launchSafe(context, "hydra-backup-$date.json")
             }
         }
 
@@ -943,7 +946,7 @@ stringResource(R.string.backup_restore_desc),
             )
             Spacer(Modifier.height(12.dp))
             BackupActionButton(stringResource(R.string.backup_restore_btn), AccentViolet) {
-                importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+                importLauncher.launchSafe(context, arrayOf("application/json", "text/plain", "application/octet-stream"))
             }
         }
 

@@ -30,7 +30,9 @@ object Autostart {
         val exe = launcher() ?: error("автозапуск доступен только в установленной Hydra")
         when (Platform.os) {
             Os.WINDOWS ->
-                if (enabled) Advapi32Util.registrySetStringValue(WinReg.HKEY_CURRENT_USER, RUN_KEY, NAME, "\"$exe\" $MINIMIZED_ARG")
+                // Classic запускается сценарием Hydra.vbs — через Windows Script Host (есть и в Windows 7).
+                if (enabled) Advapi32Util.registrySetStringValue(WinReg.HKEY_CURRENT_USER, RUN_KEY, NAME,
+                    (if (Platform.classic) "wscript.exe " else "") + "\"$exe\" $MINIMIZED_ARG")
                 else if (Advapi32Util.registryValueExists(WinReg.HKEY_CURRENT_USER, RUN_KEY, NAME))
                     Advapi32Util.registryDeleteValue(WinReg.HKEY_CURRENT_USER, RUN_KEY, NAME)
             Os.LINUX -> {

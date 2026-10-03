@@ -118,8 +118,8 @@ step "Сборка stub-варианта"
 step "Сборка full-варианта (native, с ядром sing-box)"
 "$GRADLE" :app:assembleNativeRelease
 
-# 0.7.2: full-APK — отдельный файл на каждую архитектуру (arm64-v8a, armeabi-v7a, x86_64); stub — один (без ядра).
-ABIS=(arm64-v8a armeabi-v7a x86_64)
+# 0.7.2: full-APK — отдельный файл на каждую архитектуру (arm64-v8a, armeabi-v7a, x86_64, x86); stub — один (без ядра).
+ABIS=(arm64-v8a armeabi-v7a x86_64 x86)
 SRC_STUB="app/build/outputs/apk/stub/release/app-stub-arm64-v8a-release.apk"
 SRC_FULLS=()
 FULL_APKS=()
@@ -213,8 +213,9 @@ if [[ -z "$NOTES_FILE" ]]; then
 | Файл | Что внутри |
 |---|---|
 | **\`Hydra-full-$VERSION-arm64-v8a.apk\`** | **Рабочее приложение** для большинства телефонов (64-бит ARM) — с реальным ядром sing-box. |
-| \`Hydra-full-$VERSION-armeabi-v7a.apk\` | То же для старых 32-битных телефонов (ARM). |
-| \`Hydra-full-$VERSION-x86_64.apk\` | То же для эмуляторов и устройств на x86. |
+| \`Hydra-full-$VERSION-armeabi-v7a.apk\` | То же для 32-битных ARM-устройств: старые телефоны, приставки Android TV. |
+| \`Hydra-full-$VERSION-x86_64.apk\` | То же для эмуляторов и 64-битных устройств на Intel/AMD. |
+| \`Hydra-full-$VERSION-x86.apk\` | То же для 32-битных устройств на Intel (x86): планшеты, приставки, Chromebook. |
 | \`$STUB_APK\` | Только для разработки/CI: соединение **симулируется**. |
 
 ### Windows 10/11 (x64)

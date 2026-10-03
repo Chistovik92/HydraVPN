@@ -19,6 +19,8 @@ object SelfUpdate {
     /** Корень установки по пути запущенного файла; null — Hydra запущена не из упакованного приложения (например, `gradle run`). */
     fun appRoot(os: Os = Platform.os, exe: String? = Platform.selfExecutable): File? {
         val f = exe?.let(::File) ?: return null
+        // Classic: корень — каталог со сценарием запуска (Hydra.vbs / hydra.sh), рядом lib/ и jre/.
+        if (Platform.classic) return if (f.name == classicLauncherName(os)) f.absoluteFile.parentFile else null
         return when (os) {
             Os.WINDOWS -> if (f.name.equals("Hydra.exe", true)) f.parentFile else null
             // …/Hydra/bin/Hydra → …/Hydra
@@ -54,7 +56,11 @@ object SelfUpdate {
         return payload
     }
 
-    private fun launcherPath(os: Os) = when (os) { Os.WINDOWS -> "Hydra.exe"; Os.LINUX -> "bin/Hydra"; Os.MACOS -> "Contents/MacOS/Hydra" }
+    private fun classicLauncherName(os: Os) = if (os == Os.WINDOWS) "Hydra.vbs" else "hydra.sh"
+
+    private fun launcherPath(os: Os) =
+        if (Platform.classic) classicLauncherName(os)
+        else when (os) { Os.WINDOWS -> "Hydra.exe"; Os.LINUX -> "bin/Hydra"; Os.MACOS -> "Contents/MacOS/Hydra" }
 
     private fun unzip(zip: File, dest: File) {
         val base = dest.canonicalFile.toPath()
@@ -166,7 +172,9 @@ object SelfUpdate {
         if (!canReplace(root)) return false
         val stage = stageDir(root)
         val payload = extract(archive, stage)
-        launch(Platform.os, root, payload, stage)
+        // Classic после подмены стартует своим сценарием (в скрипте подмены $ROOT уже указывает на новую папку).
+        val launcher = if (!Platform.classic) null else if (Platform.os == Os.WINDOWS) "Hydra.vbs" else "\"${'$'}ROOT/hydra.sh\""
+        launch(Platform.os, root, payload, stage, launcher)
         return true
     }
 }

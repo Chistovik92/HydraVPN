@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Сборка клиента OpenFlux (github.com/p1neappleXpress/OpenFlux, GPL-3.0) под три ABI →
+# Сборка клиента OpenFlux (github.com/p1neappleXpress/OpenFlux, GPL-3.0) под четыре ABI (arm64-v8a, armeabi-v7a, x86_64, x86) →
 # app/libs/openflux/<abi>/libopenflux.so.
 #
 # Это ИСПОЛНЯЕМЫЙ файл (как и в официальном OpenFluxAndroid): приложение запускает его
@@ -38,4 +38,5 @@ build() { # abi goarch cc
 build arm64-v8a   arm64 aarch64-linux-android26-clang
 build armeabi-v7a arm   armv7a-linux-androideabi26-clang
 build x86_64      amd64 x86_64-linux-android26-clang
+build x86           386   i686-linux-android26-clang
 echo "Готово: app/libs/openflux/*/libopenflux.so"
