@@ -238,6 +238,16 @@ if [[ -z "$NOTES_FILE" ]]; then
 
 Системный прокси выставляется в GNOME и KDE. Для режима TUN при первом включении система один раз спросит пароль (права CAP_NET_ADMIN для ядра через pkexec).
 
+### Windows 7 и 32-битные системы (Hydra Classic)
+| Файл | |
+|---|---|
+| \`…-windows-x86-classic.zip\` | Windows 7 SP1 / 8.1 / 10, 32-бит. Распаковать, запустить \`Hydra.vbs\` (Java внутри) |
+| \`…-windows-x64-classic.zip\` | Windows 7 SP1 x64 |
+| \`…-linux-x86-classic.tar.gz\` | Linux 32-бит Intel: \`./Hydra/hydra.sh\`, нужна Java 11+ |
+| \`…-linux-armv7-classic.tar.gz\` | Linux 32-бит ARM (Raspberry Pi OS 32-бит): \`./Hydra/hydra.sh\`, нужна Java 11+ |
+
+Упрощённая оболочка на Swing: те же ядра и настройки, без раздела «Роутеры». Windows XP не поддерживается — обходные пути в docs/LEGACY.md.
+
 ### macOS 12+ (Apple Silicon и Intel)
 | Файл | |
 |---|---|

@@ -5,7 +5,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.7.4** · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md)
+- Статус: **0.7.5** · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md)
 
 ## Скачать
 
@@ -13,9 +13,11 @@
 
 | Платформа | Файл в релизе |
 |---|---|
-| **Android 8+** | `Hydra-full-<версия>-arm64-v8a.apk` — большинство телефонов; `…-armeabi-v7a.apk` — старые 32-битные; `…-x86_64.apk` — эмуляторы. `Hydra-stub-…apk` — без ядра, только для разработки |
+| **Android 8+** (телефоны, планшеты, **Android TV / Google TV**) | `Hydra-full-<версия>-arm64-v8a.apk` — большинство; 32-битные: `…-armeabi-v7a.apk` (ARM) и `…-x86.apk` (Intel); `…-x86_64.apk` — Intel/AMD 64-бит и эмуляторы. `Hydra-stub-…apk` — без ядра, только для разработки |
 | **Windows 10/11 x64** | `…-windows-x64.msi` / `.exe` (установщик) или `…-portable.zip` |
 | **Linux x64 / arm64** | `.deb`, `.rpm`, `.AppImage`, `.tar.gz` |
+| **Windows 7 SP1 и 32-бит (Hydra Classic)** | `…-windows-x86-classic.zip` (32-бит), `…-windows-x64-classic.zip` (Windows 7 x64): распаковать, запустить `Hydra.vbs`. Windows XP — не поддерживается, обходные пути в [docs/LEGACY.md](docs/LEGACY.md) |
+| **Linux 32-бит (Hydra Classic)** | `…-linux-x86-classic.tar.gz`, `…-linux-armv7-classic.tar.gz` (Raspberry Pi OS 32-бит); нужна Java 11+ |
 | **macOS 12+** | `…-macos-arm64.dmg` (Apple Silicon), `…-macos-x64.dmg` (Intel) |
 | **iOS 17+** | `Hydra-ios-<версия>-unsigned.ipa` — без подписи, ставится через переподпись (AltStore, Sideloadly) |
 
@@ -136,7 +138,8 @@ HydraVPN/
 - [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md) — olcRTC / OpenFlux / snolc / AmneziaWG: апстримы, статус, клиенты
 - [docs/HANDOFF_ROUTERS.md](docs/HANDOFF_ROUTERS.md) — управление роутером: контракт API и что проверено
 - [desktop/README.md](desktop/README.md) · [ios/README.md](ios/README.md) — клиенты для ПК и iOS
-- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.7.4
+- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.7.5
+- [docs/LEGACY.md](docs/LEGACY.md) — 32-битные и старые системы: Android x86/TV, Hydra Classic (Windows 7, 32-бит), Windows XP
 
 ## Лицензия
 
