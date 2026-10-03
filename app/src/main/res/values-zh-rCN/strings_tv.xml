@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="no_system_picker">此设备没有系统文件选择器（Android TV 上常见）。请复制链接后从剪贴板粘贴。</string>
+    <string name="no_camera">此设备没有摄像头。请复制链接后从剪贴板粘贴。</string>
+</resources>

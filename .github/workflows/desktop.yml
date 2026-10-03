@@ -110,3 +110,100 @@ jobs:
           name: hydra-desktop-${{ matrix.target }}
           path: dist/*
           if-no-files-found: error
+
+  # Hydra Classic (0.7.5): Swing-оболочка для 32-битных систем и Windows 7 — Windows x86/x64, Linux x86/armv7.
+  # Архивы собираются на любой ОС (jpackage не нужен), поэтому — один раннер. Проверяется состав архивов и
+  # то, что приложение реально запускается (Linux x86, под Xvfb).
+  classic:
+    name: classic (Windows 7, 32-бит)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.9'
+
+      # Нужен для olcRTC (кросс-сборка из закреплённого коммита; чистый Go).
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - run: sudo apt-get update -q && sudo apt-get install -y -q xvfb file
+
+      - name: Сборка архивов Classic
+        run: gradle :desktop:classicDist --stacktrace
+
+      - name: Состав архивов
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts | sed -n 1p)"
+          D=desktop/build/classic/dist
+          check() { # архив, обязательные записи (через пробел)
+            local f="$D/Hydra-desktop-$VERSION-$1-classic.$2" list
+            [ -f "$f" ] || { echo "::error::нет $f"; exit 1; }
+            if [ "$2" = zip ]; then list="$(unzip -Z1 "$f")"; else list="$(tar -tzf "$f")"; fi
+            for want in ${@:3}; do
+              grep -qE "$want" <<<"$list" || { echo "::error::в $1 нет $want"; exit 1; }
+            done
+            echo "  $1: OK ($(du -h "$f" | cut -f1))"
+          }
+          check windows-x86 zip 'Hydra/Hydra\.vbs' 'Hydra/jre/bin/javaw\.exe' 'Hydra/resources/sing-box\.exe' 'Hydra/resources/xray\.exe' 'Hydra/lib/hydra-classic\.jar' 'Hydra/resources/geo/geoip/'
+          check windows-x64 zip 'Hydra/Hydra\.vbs' 'Hydra/jre/bin/javaw\.exe' 'Hydra/resources/sing-box\.exe' 'Hydra/resources/xray\.exe' 'Hydra/lib/hydra-classic\.jar'
+          check linux-x86 tar.gz 'Hydra/hydra\.sh' 'Hydra/resources/sing-box$' 'Hydra/resources/xray$' 'Hydra/resources/olcrtc$' 'Hydra/lib/hydra-classic\.jar'
+          check linux-armv7 tar.gz 'Hydra/hydra\.sh' 'Hydra/resources/sing-box$' 'Hydra/resources/xray$' 'Hydra/resources/olcrtc$' 'Hydra/resources/openflux$' 'Hydra/lib/hydra-classic\.jar'
+
+      - name: Архитектура ядер внутри архивов
+        run: |
+          set -euo pipefail
+          B=desktop/build/classic
+          expect() { # файл, шаблон вывода file
+            out="$(file -b "$1")"; echo "  $1: $out"
+            grep -qE "$2" <<<"$out" || { echo "::error::$1: ожидалось $2"; exit 1; }
+          }
+          expect $B/windows-x86/Hydra/resources/sing-box.exe 'PE32 executable.*Intel 80386'
+          expect $B/windows-x86/Hydra/resources/xray.exe 'PE32 executable.*Intel 80386'
+          expect $B/windows-x64/Hydra/resources/sing-box.exe 'PE32\+ executable'
+          expect $B/linux-x86/Hydra/resources/sing-box 'ELF 32-bit.*Intel 80386'
+          expect $B/linux-x86/Hydra/resources/xray 'ELF 32-bit.*Intel 80386'
+          expect $B/linux-x86/Hydra/resources/olcrtc 'ELF 32-bit.*Intel 80386'
+          expect $B/linux-armv7/Hydra/resources/sing-box 'ELF 32-bit.*ARM'
+          expect $B/linux-armv7/Hydra/resources/xray 'ELF 32-bit.*ARM'
+          expect $B/linux-armv7/Hydra/resources/olcrtc 'ELF 32-bit.*ARM'
+          expect $B/linux-armv7/Hydra/resources/openflux 'ELF 32-bit.*ARM'
+          # JRE в Windows-архивах: x86 — 32-битная
+          expect $B/windows-x86/Hydra/jre/bin/javaw.exe 'PE32 executable'
+
+      - name: Дымовой запуск Linux x86 (ядро 32-бит, Swing под Xvfb)
+        run: |
+          set -euo pipefail
+          B=desktop/build/classic/linux-x86/Hydra
+          "$B/resources/sing-box" version | sed -n 1p      # 32-битный бинарь запускается и на x64-ядре
+          "$B/resources/xray" version | sed -n 1p
+          home="$(mktemp -d)"; log="$(mktemp)"
+          HOME="$home" XDG_CONFIG_HOME="$home/.config" xvfb-run -a "$B/hydra.sh" >"$log" 2>&1 &
+          pid=$!
+          sleep 20
+          if ! kill -0 "$pid" 2>/dev/null; then cat "$log"; echo "::error::Classic завершилась в первые 20 секунд"; exit 1; fi
+          pkill -f hydra-classic 2>/dev/null || kill "$pid" 2>/dev/null || true
+          grep -iE 'exception|error' "$log" | head -5 || true
+          echo "    запуск OK"
+
+      - name: Собрать в dist/
+        if: inputs.package
+        run: mkdir -p dist && cp desktop/build/classic/dist/* dist/ && ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        if: inputs.package
+        with:
+          name: hydra-desktop-classic
+          path: dist/*
+          if-no-files-found: error

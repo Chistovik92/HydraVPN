@@ -1,5 +1,7 @@
 package ru.gidravpn.hydra.ui.screens
 
+import ru.gidravpn.hydra.ui.launchSafe
+import ru.gidravpn.hydra.ui.launchScan
 import androidx.compose.ui.res.stringResource
 import ru.gidravpn.hydra.R
 
@@ -47,6 +49,7 @@ fun LogsScreen(vm: MainViewModel) {
     val listState = rememberLazyListState()
     LaunchedEffect(shown.size) { if (shown.isNotEmpty()) listState.animateScrollToItem(shown.size - 1) }
 
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         uri?.let { vm.exportLogs(it) }
     }
@@ -62,7 +65,7 @@ fun LogsScreen(vm: MainViewModel) {
             LogFilter.entries.forEach { f -> SmallButton(stringResource(f.label), if (filter == f) AccentCyan else TextSecondary) { filter = f } }
             SmallButton(stringResource(R.string.log_to_file), AccentViolet) {
                 val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm", java.util.Locale.US).format(java.util.Date())
-                exportLauncher.launch("hydra-log-$stamp.txt")
+                exportLauncher.launchSafe(ctx, "hydra-log-$stamp.txt")
             }
             SmallButton(stringResource(if (showStorage) R.string.log_storage_open else R.string.log_storage_closed), TextSecondary) {
                 showStorage = !showStorage

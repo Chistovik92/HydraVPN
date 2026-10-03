@@ -86,13 +86,16 @@ object UpdateFeed {
     }
 
     /**
-     * ПК: `Hydra-desktop-X-<os>-<arch>[-portable].<ext>`. [os] — windows/linux/macos, [arch] — x64/arm64,
+     * ПК: `Hydra-desktop-X-<os>-<arch>[-portable|-classic].<ext>`. [os] — windows/linux/macos, [arch] — x64/arm64/x86/armv7,
      * [exts] — подходящие расширения по убыванию предпочтения («msi», «exe», «zip» …).
+     * [classic] — сборка Classic (Swing; 32-бит и Windows 7): `…-classic.<ext>`. Обычная Hydra её файлы не берёт,
+     * а Classic — только их (у x64 есть и обычные, и classic-файлы с одним префиксом).
      */
-    fun pickDesktop(info: ReleaseInfo, os: String, arch: String, exts: List<String>): ReleaseAsset? {
+    fun pickDesktop(info: ReleaseInfo, os: String, arch: String, exts: List<String>, classic: Boolean = false): ReleaseAsset? {
         for (ext in exts) {
             info.assets.firstOrNull { a ->
-                a.name.startsWith("Hydra-desktop-") && a.name.contains("-$os-$arch") && a.name.endsWith(".$ext", ignoreCase = true)
+                a.name.startsWith("Hydra-desktop-") && a.name.contains("-$os-$arch") && a.name.endsWith(".$ext", ignoreCase = true) &&
+                    a.name.contains("-classic") == classic
             }?.let { return it }
         }
         return null

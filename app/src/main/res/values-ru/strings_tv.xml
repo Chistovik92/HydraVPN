@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="no_system_picker">На этом устройстве нет системного окна выбора файла (так бывает на Android TV). Скопируйте ссылку и вставьте её из буфера обмена.</string>
+    <string name="no_camera">На этом устройстве нет камеры. Скопируйте ссылку и вставьте её из буфера обмена.</string>
+</resources>

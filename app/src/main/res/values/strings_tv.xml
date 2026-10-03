@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="no_system_picker">This device has no system file picker (common on Android TV). Copy the link and use paste from clipboard instead.</string>
+    <string name="no_camera">No camera on this device. Copy the link and use paste from clipboard instead.</string>
+</resources>

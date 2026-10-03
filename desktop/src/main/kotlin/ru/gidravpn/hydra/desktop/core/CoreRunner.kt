@@ -253,8 +253,10 @@ object Elevation {
     /** Запускает эту же программу с запросом UAC. true — запрос ушёл, текущий экземпляр можно закрыть. */
     fun relaunchAsAdmin(): Boolean {
         val info = ProcessHandle.current().info()
-        val cmd = info.command().orElse(null) ?: return false
-        val args = info.arguments().orElse(emptyArray())
+        // Classic (java -cp … по сценарию Hydra.vbs): повторно запускается сценарий, а не голая java без аргументов.
+        val launcher = Platform.classicLauncher
+        val cmd = if (launcher != null) "wscript.exe" else info.command().orElse(null) ?: return false
+        val args = if (launcher != null) arrayOf(launcher.absolutePath) else info.arguments().orElse(emptyArray())
         fun ps(s: String) = "'" + s.replace("'", "''") + "'"
         val argList = if (args.isEmpty()) "" else " -ArgumentList " + args.joinToString(",") { ps(if (' ' in it) "\"$it\"" else it) }
         val script = "Start-Process -FilePath ${ps(cmd)}$argList -Verb RunAs"

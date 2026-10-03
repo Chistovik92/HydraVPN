@@ -17,6 +17,22 @@ object Platform {
 
     val version: String = System.getProperty("hydra.version") ?: "dev"
 
+    /**
+     * Архитектура процессора в терминах имён файлов релиза: x64, arm64, x86 (32-бит Intel/AMD), armv7 (32-бит ARM).
+     * 32-битная JVM на 64-битной ОС даёт x86 — для неё ядра берутся 32-битные, как и сама Hydra.
+     */
+    val arch: String = archOf(System.getProperty("os.arch") ?: "")
+
+    /** Classic — сборка на Swing для систем, где Compose не работает (32-бит, Windows 7); флаг ставит скрипт запуска. */
+    val classic: Boolean = System.getProperty("hydra.classic") == "true"
+
+    fun archOf(osArch: String): String = when (osArch.lowercase()) {
+        "aarch64", "arm64" -> "arm64"
+        "arm", "armv7", "armv7l", "armv8l", "armhf", "aarch32" -> "armv7"
+        "x86", "i386", "i486", "i586", "i686" -> "x86"
+        else -> "x64"
+    }
+
     /** Как устройство называется в боте при подключении: «Hydra Windows · имя-компьютера». */
     fun deviceName(): String {
         val host = runCatching { java.net.InetAddress.getLocalHost().hostName }.getOrNull()?.takeIf { it.isNotBlank() }
@@ -79,8 +95,14 @@ object Platform {
         return copy
     }
 
-    /** Путь к исполняемому файлу самого Hydra (лаунчер jpackage или java в `gradle run`). */
-    val selfExecutable: String? by lazy { ProcessHandle.current().info().command().orElse(null) }
+    /** Настоящий исполняемый файл процесса: лаунчер jpackage, а в `gradle run` и в Classic — java. */
+    val processExecutable: String? by lazy { ProcessHandle.current().info().command().orElse(null) }
+
+    /** Classic: сценарий запуска (Hydra.vbs / hydra.sh) — его передаёт скрипт запуска; по нему Hydra перезапускает сама себя. */
+    val classicLauncher: File? = System.getProperty("hydra.launcher")?.takeIf { it.isNotBlank() }?.let(::File)?.takeIf { classic && it.isFile }
+
+    /** Путь к тому, чем Hydra запускается: лаунчер jpackage, сценарий Classic или java в `gradle run`. */
+    val selfExecutable: String? by lazy { classicLauncher?.absolutePath ?: processExecutable }
 
     /** Каталог с geoip/ и geosite/ (*.srs); null — баз нет, geo-маршрутизация недоступна. */
     fun geoDir(): File? {

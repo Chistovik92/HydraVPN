@@ -79,11 +79,13 @@ jobs:
           echo "$have" | sed 's/^/  /'
           missing=0
           for f in \
-            "Hydra-full-$VERSION-arm64-v8a.apk" "Hydra-full-$VERSION-armeabi-v7a.apk" "Hydra-full-$VERSION-x86_64.apk" "Hydra-stub-$VERSION.apk" \
+            "Hydra-full-$VERSION-arm64-v8a.apk" "Hydra-full-$VERSION-armeabi-v7a.apk" "Hydra-full-$VERSION-x86_64.apk" "Hydra-full-$VERSION-x86.apk" "Hydra-stub-$VERSION.apk" \
             "Hydra-desktop-$VERSION-windows-x64.msi" "Hydra-desktop-$VERSION-windows-x64.exe" "Hydra-desktop-$VERSION-windows-x64-portable.zip" \
             "Hydra-desktop-$VERSION-linux-x64.deb" "Hydra-desktop-$VERSION-linux-x64.rpm" "Hydra-desktop-$VERSION-linux-x64.AppImage" "Hydra-desktop-$VERSION-linux-x64.tar.gz" \
             "Hydra-desktop-$VERSION-linux-arm64.deb" "Hydra-desktop-$VERSION-linux-arm64.rpm" "Hydra-desktop-$VERSION-linux-arm64.AppImage" "Hydra-desktop-$VERSION-linux-arm64.tar.gz" \
             "Hydra-desktop-$VERSION-macos-arm64.dmg" "Hydra-desktop-$VERSION-macos-x64.dmg" \
+            "Hydra-desktop-$VERSION-windows-x86-classic.zip" "Hydra-desktop-$VERSION-windows-x64-classic.zip" \
+            "Hydra-desktop-$VERSION-linux-x86-classic.tar.gz" "Hydra-desktop-$VERSION-linux-armv7-classic.tar.gz" \
             "Hydra-ios-$VERSION-unsigned.ipa"; do
             if ! grep -qxF "$f" <<<"$have"; then echo "::error::нет $f"; missing=1; fi
           done

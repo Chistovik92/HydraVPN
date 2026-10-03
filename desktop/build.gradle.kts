@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget as KJvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
@@ -411,4 +414,297 @@ tasks.matching { it.name == "createDistributable" || it.name == "createReleaseDi
     doLast {
         outputs.files.asFileTree.matching { include("**/resources/sing-box", "**/resources/xray", "**/resources/openflux", "**/resources/olcrtc") }.forEach { it.setExecutable(true, false) }
     }
+}
+
+// Hydra Classic (0.7.5) — оболочка на Swing для систем, где Compose Desktop не работает:
+//   • 32-битные Windows и Linux (x86, armv7) — у Skiko (графика Compose) нет 32-битных библиотек;
+//   • Windows 7 (в том числе 64-битная) — Compose и Java 17 требуют новее.
+// Это тот же AppController и те же ядра, что у обычной Hydra, только окно другое (src/lite/kotlin).
+// Подключается из build.gradle.kts: apply(from = "classic.gradle.kts").
+//
+// Архивы собираются на любой ОС (Gradle сам скачивает ядра и JRE, jpackage не нужен):
+//   gradle :desktop:classicDist            — все четыре
+//   gradle :desktop:classicDistWindowsX86  — один
+// Результат — build/classic/dist/Hydra-desktop-<версия>-<os>-<arch>-classic.(zip|tar.gz).
+
+
+// ---- Исходники: весь код приложения, кроме Compose-интерфейса, плюс Swing-оболочка ----------------------------
+val javaSourceSets = extensions.getByType<SourceSetContainer>()
+val lite = javaSourceSets.create("lite")
+extensions.getByType<KotlinJvmProjectExtension>().sourceSets.getByName("lite").kotlin.apply {
+    srcDir("src/main/kotlin")
+    srcDir(layout.buildDirectory.dir("generated/secrets"))
+    exclude("ru/gidravpn/hydra/desktop/Main.kt", "ru/gidravpn/hydra/desktop/ui/**")
+}
+dependencies {
+    add("liteImplementation", project(":shared"))
+    add("liteImplementation", "org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.1")
+    add("liteImplementation", "com.squareup.okhttp3:okhttp:4.12.0")
+    add("liteImplementation", "org.json:json:20240303")
+    add("liteImplementation", "net.java.dev.jna:jna-platform:5.14.0")
+}
+// Java 11 — самая новая, которая работает на Windows 7 и есть в 32-битной сборке Windows.
+tasks.named<KotlinCompile>("compileLiteKotlin") {
+    compilerOptions.jvmTarget.set(KJvmTarget.JVM_11)
+    dependsOn("generateSecrets")
+    // Плагин Compose-компилятора подключается ко всем компиляциям, а в Classic Compose нет вовсе — отключаем его здесь.
+    pluginClasspath.setFrom(pluginClasspath.filter { !it.name.contains("compose", ignoreCase = true) })
+}
+tasks.named<JavaCompile>("compileLiteJava") {
+    sourceCompatibility = "11"
+    targetCompatibility = "11"
+}
+tasks.named<ProcessResources>("processLiteResources") {
+    from(rootProject.file("ios/Hydra/Assets.xcassets/AppIcon.appiconset/icon-1024.png")) { rename { "hydra-icon.png" } }
+}
+
+// ---- Загрузки ------------------------------------------------------------------------------------------------
+val cacheDir = layout.buildDirectory.dir("classic-cache")
+
+fun sha256(f: File): String = MessageDigest.getInstance("SHA-256").digest(f.readBytes()).joinToString("") { "%02x".format(it) }
+
+/** Скачивает [url] в кэш и сверяет SHA-256; уже скачанный и совпавший файл не трогает. */
+fun fetch(url: String, sha: String, name: String): File {
+    val dir = cacheDir.get().asFile.apply { mkdirs() }
+    val file = File(dir, name)
+    if (!file.exists() || sha256(file) != sha) {
+        logger.lifecycle("Скачиваю $url")
+        var attempt = 0
+        while (true) {
+            try {
+                URI(url).toURL().openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+                break
+            } catch (e: java.io.IOException) {
+                // GitHub иногда отвечает 503/5xx на скачивание релизов — повторяем с паузой.
+                if (++attempt >= 4) throw e
+                logger.lifecycle("  не вышло (${e.message}), повтор $attempt…")
+                Thread.sleep(3000L * attempt)
+            }
+        }
+    }
+    val actual = sha256(file)
+    check(actual == sha) { "SHA-256 $name не совпал: $actual (ожидался $sha)" }
+    return file
+}
+
+
+/** Один вид сборки Classic: какие ядра и какой JRE в неё входят. */
+data class Classic(
+    val id: String,                  // windows-x86
+    val taskSuffix: String,
+    val os: String,                  // windows | linux
+    val arch: String,                // x86 | x64 | armv7 (так называется файл релиза)
+    val singBoxAsset: String, val singBoxSha: String,
+    val xrayAsset: String, val xraySha: String,
+    /** Готовый клиент OpenFlux из релиза апстрима; null — для этой цели его нет (или он не запустится). */
+    val openFlux: Pair<String, String>? = null,
+    /** Сборка olcRTC из исходников: GOOS/GOARCH/GOARM; null — не входит. */
+    val olcRtc: Triple<String, String, String>? = null,
+    /** JRE, которая кладётся в архив (Windows). Linux берёт Java системы. */
+    val jre: Triple<String, String, String>? = null,   // url, имя файла, sha256
+)
+
+val classicTargets = listOf(
+    // Windows: ядра «legacy-windows-7» собраны патченым Go, который ещё работает на Windows 7; на новых системах тоже.
+    // olcRTC и OpenFlux собираются обычным Go (Windows 10+) — на Windows 7 не запустятся, поэтому в эти архивы не входят.
+    Classic("windows-x86", "WindowsX86", "windows", "x86",
+        "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "d6135be80f7d507bd5d7ebe32a66fc6c658771cfae37306d284933e8f75e73a2",
+        "Xray-win7-32.zip", "33bc2686a77f6fe438616982b347f852eb7f9572dbe97adc1459f8fb639aea13",
+        jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.29%2B7/OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip",
+            "OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip", "b747698a05a39391a58b9caac30310275e4e6bd9fef92d6c149cba310d91d2be")),
+    Classic("windows-x64", "WindowsX64", "windows", "x64",
+        "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "a7ce8ae8e12328874fd69890f330b8e48f1eb4ee05ca3eec9cbb4f6c79856eff",
+        "Xray-win7-64.zip", "02a4798854975435981a5c6fb4aaf7059f58d22d73d2762363cd56788d92d758",
+        jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.32.1%2B1/OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip",
+            "OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip", "f8c7da672f5dba36b6f870608820b6b598cfae91296929f1b8f21ef2f1e8a0dd")),
+    Classic("linux-x86", "LinuxX86", "linux", "x86",
+        "sing-box-$singBoxVersion-linux-386.tar.gz", "52d203d5b368d6ef7bf8c73abd1087a1daccbf4d064a7e78532de44ea26d7c96",
+        "Xray-linux-32.zip", "d1eeb0d9a9106eefd286fbb73595c2dfe1c48c56aa91ba1c9aefe04f188d0927",
+        olcRtc = Triple("linux", "386", "")),
+    Classic("linux-armv7", "LinuxArmv7", "linux", "armv7",
+        "sing-box-$singBoxVersion-linux-armv7.tar.gz", "ff9805b85ea61dd7700a76f9f11b1783b44b59c5a2a0f4f9e2ac161fd862b890",
+        "Xray-linux-arm32-v7a.zip", "c7265ae13c63ca0241a037df4ef960ad37938c8a67d984cc08834b2cfdf5654b",
+        openFlux = "openflux-linux-arm" to "d950b6f69757c769f462828671db20a56a332c9b5f890ce6d4ec70e25818c930",
+        olcRtc = Triple("linux", "arm", "7")),
+)
+
+// ---- olcRTC: кросс-сборка (чистый Go, без cgo) -----------------------------------------------------------------
+fun buildOlcRtc(goos: String, goarch: String, goarm: String, dest: File) {
+    fun run(dir: File, vararg cmd: String, env: Map<String, String> = emptyMap()) {
+        val pb = ProcessBuilder(*cmd).directory(dir).redirectErrorStream(true)
+        pb.environment().putAll(env)
+        val p = pb.start()
+        val out = p.inputStream.bufferedReader().readText()
+        check(p.waitFor() == 0) { "${cmd.joinToString(" ")}: $out" }
+    }
+    val src = layout.buildDirectory.dir("olcrtc-src").get().asFile.apply { mkdirs() }
+    val haveTools = runCatching { run(src, "go", "version"); run(src, "git", "--version") }.isSuccess
+    if (!haveTools) { logger.warn("classic: нет go или git — клиент olcRTC в архив не войдёт"); return }
+    if (!src.resolve(".git").isDirectory) {
+        run(src, "git", "init", "-q")
+        run(src, "git", "remote", "add", "origin", "https://github.com/openlibrecommunity/olcrtc.git")
+    }
+    run(src, "git", "fetch", "-q", "--depth", "1", "origin", olcRtcCommit)
+    run(src, "git", "checkout", "-q", "--force", "FETCH_HEAD")
+    val env = mutableMapOf("CGO_ENABLED" to "0", "GOOS" to goos, "GOARCH" to goarch)
+    if (goarm.isNotEmpty()) env["GOARM"] = goarm
+    run(src, "go", "build", "-trimpath", "-ldflags=-s -w", "-o", dest.absolutePath, "./cmd/olcrtc", env = env)
+}
+
+// ---- Сборка архива ---------------------------------------------------------------------------------------------
+fun launcherVbs(): String = """
+' Hydra Classic: запуск без окна консоли. Параметры (например, --minimized) передаются дальше.
+Set sh = CreateObject("WScript.Shell")
+Set fso = CreateObject("Scripting.FileSystemObject")
+root = fso.GetParentFolderName(WScript.ScriptFullName)
+q = Chr(34)
+java = root & "\jre\bin\javaw.exe"
+If Not fso.FileExists(java) Then java = "javaw"
+cmd = q & java & q & " -XX:+UseSerialGC -Xms16m -Xmx256m -Dfile.encoding=UTF-8" & _
+  " -Dhydra.version=$appVersion -Dhydra.classic=true" & _
+  " -Dhydra.launcher=" & q & WScript.ScriptFullName & q & _
+  " -Dcompose.application.resources.dir=" & q & root & "\resources" & q & _
+  " -cp " & q & root & "\lib\*" & q & " ru.gidravpn.hydra.desktop.lite.LiteMainKt"
+For Each a In WScript.Arguments
+  cmd = cmd & " " & a
+Next
+sh.Run cmd, 0, False
+""".trimIndent().replace("\n", "\r\n") + "\r\n"
+
+fun launcherSh(): String = """
+#!/bin/sh
+# Hydra Classic: запуск. Нужна Java 11 или новее (sudo apt install default-jre); HYDRA_JAVA — путь к своей java.
+SELF="${'$'}(readlink -f "${'$'}0")"
+HERE="${'$'}(dirname "${'$'}SELF")"
+JAVA="${'$'}{HYDRA_JAVA:-java}"
+[ -x "${'$'}HERE/jre/bin/java" ] && JAVA="${'$'}HERE/jre/bin/java"
+if ! command -v "${'$'}JAVA" >/dev/null 2>&1; then
+  echo "Hydra: не найдена Java. Установите Java 11 или новее (например, sudo apt install default-jre)." >&2
+  command -v zenity >/dev/null 2>&1 && zenity --error --text="Hydra: не найдена Java 11+. Установите default-jre." 2>/dev/null
+  exit 1
+fi
+exec "${'$'}JAVA" -XX:+UseSerialGC -Xms16m -Xmx256m -Dfile.encoding=UTF-8 \
+  -Dhydra.version=$appVersion -Dhydra.classic=true -Dhydra.launcher="${'$'}SELF" \
+  -Dcompose.application.resources.dir="${'$'}HERE/resources" \
+  -cp "${'$'}HERE/lib/*" ru.gidravpn.hydra.desktop.lite.LiteMainKt "${'$'}@"
+""".trimIndent() + "\n"
+
+fun readme(t: Classic): String = """
+Hydra Classic $appVersion (${t.os}, ${t.arch})
+=====================================
+Упрощённая оболочка Hydra для 32-битных систем и Windows 7. Те же ядра sing-box и Xray, те же настройки,
+подписки и маршрутизация, что у обычной Hydra; отличается только окно.
+
+Запуск: ${if (t.os == "windows") "Hydra.vbs (двойной щелчок)" else "./hydra.sh"}
+${if (t.os == "windows") "Требуется Windows 7 SP1 или новее. Java уже внутри (папка jre)."
+else "Требуется Java 11 или новее: sudo apt install default-jre (или свой путь в HYDRA_JAVA)."}
+
+Обновление: Hydra сама скачивает и ставит новую версию (Настройки → «Проверить обновления сейчас»).
+Данные (серверы, настройки) лежат вне этой папки и при обновлении сохраняются.
+Подробности: docs/LEGACY.md в репозитории проекта.
+""".trimIndent().replace("\n", if (t.os == "windows") "\r\n" else "\n") + "\n"
+
+val classicDistTasks = classicTargets.map { t ->
+    val root = layout.buildDirectory.dir("classic/${t.id}/Hydra")
+    val prepare = tasks.register("classicPrepare${t.taskSuffix}") {
+        group = "hydra classic"
+        description = "Раскладка Hydra Classic для ${t.id}"
+        dependsOn("liteJar")
+        val liteRuntime = configurations.getByName("liteRuntimeClasspath")
+        inputs.files(liteRuntime)
+        inputs.files(tasks.named("liteJar").map { it.outputs.files })
+        inputs.property("t", t.toString() + singBoxVersion + xrayVersion + olcRtcCommit)
+        outputs.dir(root)
+        doLast {
+            val out = root.get().asFile
+            out.deleteRecursively()
+            val res = File(out, "resources").apply { mkdirs() }
+            val lib = File(out, "lib").apply { mkdirs() }
+
+            // Код: собранный jar оболочки и все его зависимости.
+            (liteRuntime.files + tasks.getByName("liteJar").outputs.files.files).forEach { it.copyTo(File(lib, it.name), overwrite = true) }
+
+            val exe = if (t.os == "windows") ".exe" else ""
+            fun extract(archive: File, wanted: String, outName: String, license: String? = null) {
+                val tree = if (archive.name.endsWith(".zip")) zipTree(archive) else tarTree(resources.gzip(archive))
+                copy {
+                    from(tree)
+                    include("**/$wanted", "**/LICENSE")
+                    eachFile { path = if (name == "LICENSE") (license ?: "LICENSE") else outName }
+                    includeEmptyDirs = false
+                    into(res)
+                }
+            }
+            extract(fetch("https://github.com/SagerNet/sing-box/releases/download/v$singBoxVersion/${t.singBoxAsset}", t.singBoxSha, t.singBoxAsset),
+                "sing-box$exe", "sing-box$exe", "LICENSE-sing-box")
+            val xrayFile = fetch("https://github.com/XTLS/Xray-core/releases/download/v$xrayVersion/${t.xrayAsset}", t.xraySha, t.xrayAsset)
+            extract(xrayFile, "xray$exe", "xray$exe", "LICENSE-xray")
+            t.openFlux?.let { (asset, sha) ->
+                val f = fetch("https://github.com/p1neappleXpress/OpenFlux/releases/download/v$openFluxVersion/$asset", sha, "OpenFlux-$openFluxVersion-$asset")
+                f.copyTo(File(res, "openflux$exe"), overwrite = true)
+            }
+            t.olcRtc?.let { (goos, goarch, goarm) -> buildOlcRtc(goos, goarch, goarm, File(res, "olcrtc$exe")) }
+
+            // Geo-базы — те же, что в Android и в обычной Hydra.
+            copy { from(rootProject.file("app/src/main/assets")) { include("geoip/*.srs", "geosite/*.srs") }; into(File(res, "geo")) }
+
+            t.jre?.let { (url, name, sha) ->
+                val zip = fetch(url, sha, name)
+                copy { from(zipTree(zip)) { eachFile { path = path.substringAfter('/') } }; includeEmptyDirs = false; into(File(out, "jre")) }
+            }
+
+            if (t.os == "windows") File(out, "Hydra.vbs").writeText(launcherVbs())
+            else File(out, "hydra.sh").apply { writeText(launcherSh()); setExecutable(true, false) }
+            File(out, "README.txt").writeText(readme(t))
+            File(rootProject.projectDir, "LICENSE").copyTo(File(out, "LICENSE"), overwrite = true)
+
+            // Бит исполнения: Gradle-архив берёт его из файла.
+            res.listFiles()?.filter { it.isFile && !it.name.startsWith("LICENSE") }?.forEach { it.setExecutable(true, false) }
+            check(File(res, "sing-box$exe").isFile && File(res, "xray$exe").isFile) { "в раскладке нет ядер" }
+        }
+    }
+    val name = "classicDist${t.taskSuffix}"
+    val fileName = "Hydra-desktop-$appVersion-${t.os}-${t.arch}-classic.${if (t.os == "windows") "zip" else "tar.gz"}"
+    fun AbstractArchiveTask.configureCommon() {
+        group = "hydra classic"
+        description = "Архив Hydra Classic для ${t.id}"
+        dependsOn(prepare)
+        from(layout.buildDirectory.dir("classic/${t.id}")) { include("Hydra/**") }
+        destinationDirectory.set(layout.buildDirectory.dir("classic/dist"))
+        archiveFileName.set(fileName)
+        isReproducibleFileOrder = true
+    }
+    if (t.os == "windows") tasks.register<Zip>(name) { configureCommon() }
+    else tasks.register<Tar>(name) {
+        configureCommon()
+        compression = Compression.GZIP
+        // Бит исполнения задаём явно: на Windows-машине сборки файловая система его не хранит.
+        filesMatching(listOf("**/hydra.sh", "**/resources/sing-box", "**/resources/xray", "**/resources/openflux", "**/resources/olcrtc")) {
+            permissions { unix("rwxr-xr-x") }
+        }
+    }
+}
+
+tasks.register("classicDist") {
+    group = "hydra classic"
+    description = "Все архивы Hydra Classic (Windows x86/x64, Linux x86/armv7)"
+    dependsOn(classicDistTasks)
+}
+
+// Jar оболочки: код приложения без Compose + Swing-окно. Зависимости кладутся рядом, в lib/.
+tasks.register<Jar>("liteJar") {
+    group = "hydra classic"
+    archiveBaseName.set("hydra-classic")
+    from(lite.output)
+    manifest { attributes("Main-Class" to "ru.gidravpn.hydra.desktop.lite.LiteMainKt") }
+}
+
+
+tasks.register<JavaExec>("runClassic") {
+    group = "hydra classic"
+    description = "Запуск Hydra Classic из исходников (для проверки на этой машине)"
+    classpath = lite.runtimeClasspath
+    mainClass.set("ru.gidravpn.hydra.desktop.lite.LiteMainKt")
+    systemProperty("hydra.version", appVersion)
+    systemProperty("hydra.classic", "true")
 }

@@ -11,12 +11,12 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Tray
+import androidx.compose.runtime.DisposableEffect
+import ru.gidravpn.hydra.desktop.tray.TrayController
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import ru.gidravpn.hydra.desktop.ui.HydraApp
-import java.awt.SystemTray
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
@@ -29,13 +29,10 @@ fun main(args: Array<String>) {
         val scope = rememberCoroutineScope()
         val controller = remember { AppController(scope) }
         val ui by controller.ui.collectAsState()
-        val trayOk = remember { runCatching { SystemTray.isSupported() }.getOrDefault(false) }
+        val iconBytes = remember { AppController::class.java.getResourceAsStream("/hydra-icon.png")!!.use { it.readBytes() } }
+        val icon = remember { BitmapPainter(org.jetbrains.skia.Image.makeFromEncoded(iconBytes).toComposeImageBitmap()) }
         // Автозапуск при входе в систему — сразу в трей (если трей есть).
-        var visible by remember { mutableStateOf(!(trayOk && ru.gidravpn.hydra.desktop.core.Autostart.MINIMIZED_ARG in args)) }
-        val icon = remember {
-            val bytes = AppController::class.java.getResourceAsStream("/hydra-icon.png")!!.use { it.readBytes() }
-            BitmapPainter(org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap())
-        }
+        var visible by remember { mutableStateOf(!(runCatching { java.awt.SystemTray.isSupported() }.getOrDefault(false) && ru.gidravpn.hydra.desktop.core.Autostart.MINIMIZED_ARG in args)) }
 
         fun quit() {
             controller.shutdown()
@@ -43,24 +40,17 @@ fun main(args: Array<String>) {
             exitApplication()
         }
 
+        // Значок в трее и плашка со сведениями о подключении (0.7.5): общая с Classic, на AWT.
+        val tray = remember {
+            TrayController(controller, scope, javax.imageio.ImageIO.read(iconBytes.inputStream()), onOpen = { visible = true }, onQuit = ::quit)
+        }
+        val trayOk = remember { tray.install() }
+        DisposableEffect(Unit) { onDispose { tray.remove() } }
+
         LaunchedEffect(Unit) {
             Runtime.getRuntime().addShutdownHook(Thread { controller.shutdown() })
             controller.quitHandler = ::quit
             controller.onStartup()
-        }
-
-        if (trayOk) {
-            Tray(
-                icon = icon,
-                tooltip = "Hydra — ${ui.statusText}",
-                onAction = { visible = true },
-                menu = {
-                    Item("Открыть Hydra", onClick = { visible = true })
-                    Item(if (ui.active || ui.blocked) "Отключить" else "Подключить", onClick = { if (ui.blocked && !ui.active) controller.disconnect() else controller.toggle() })
-                    Separator()
-                    Item("Выход", onClick = { quit() })
-                },
-            )
         }
 
         Window(
@@ -87,28 +77,3 @@ fun main(args: Array<String>) {
     }
 }
 
-/** Файловая блокировка в каталоге данных — один экземпляр на пользователя. */
-private object SingleInstance {
-    private var channel: java.nio.channels.FileChannel? = null
-    private var lock: java.nio.channels.FileLock? = null
-
-    fun acquire(): Boolean = runCatching {
-        val f = java.io.File(Platform.runDir, "hydra.lock")
-        val ch = java.io.RandomAccessFile(f, "rw").channel
-        // Несколько секунд ожидания: при перезапуске от администратора старый
-        // экземпляр ещё закрывается, когда стартует новый.
-        var l = ch.tryLock()
-        val deadline = System.currentTimeMillis() + 4000
-        while (l == null && System.currentTimeMillis() < deadline) {
-            Thread.sleep(200)
-            l = ch.tryLock()
-        }
-        if (l == null) { ch.close(); return false }
-        channel = ch; lock = l
-        true
-    }.getOrDefault(true)
-
-    fun release() {
-        runCatching { lock?.release(); channel?.close() }
-    }
-}

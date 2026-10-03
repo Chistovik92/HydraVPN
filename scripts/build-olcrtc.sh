@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Сборка клиента olcRTC (`cmd/olcrtc`) под три ABI → app/libs/olcrtc/<abi>/libolcrtc.so.
+# Сборка клиента olcRTC (`cmd/olcrtc`) под четыре ABI (arm64-v8a, armeabi-v7a, x86_64, x86) → app/libs/olcrtc/<abi>/libolcrtc.so.
 #
 # Это ИСПОЛНЯЕМЫЙ файл, а не gomobile-библиотека: приложение запускает его подпроцессом
 # из nativeLibraryDir (режим cnc → локальный SOCKS5), поэтому свой Go-рантайм живёт в
@@ -37,4 +37,5 @@ build() { # abi goarch cc
 build arm64-v8a   arm64 aarch64-linux-android26-clang
 build armeabi-v7a arm   armv7a-linux-androideabi26-clang
 build x86_64      amd64 x86_64-linux-android26-clang
+build x86           386   i686-linux-android26-clang
 echo "Готово: app/libs/olcrtc/*/libolcrtc.so"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Сборка libwg-go.so (amneziawg-go) под три ABI → app/libs/awg/<abi>/libwg-go.so.
+# Сборка libwg-go.so (amneziawg-go) под четыре ABI (arm64-v8a, armeabi-v7a, x86_64, x86) → app/libs/awg/<abi>/libwg-go.so.
 #
 # Это НЕ gomobile: библиотека — обычная C-shared, собирается из
 # github.com/amnezia-vpn/amneziawg-android (tunnel/tools/libwg-go), поэтому не
@@ -49,4 +49,5 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 build arm64-v8a   arm64 aarch64-linux-android26-clang
 build armeabi-v7a arm   armv7a-linux-androideabi26-clang 7
 build x86_64      amd64 x86_64-linux-android26-clang
+build x86           386   i686-linux-android26-clang
 echo "Готово: app/libs/awg/*/libwg-go.so"

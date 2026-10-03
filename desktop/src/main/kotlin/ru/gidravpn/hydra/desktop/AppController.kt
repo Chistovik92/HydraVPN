@@ -644,7 +644,7 @@ class AppController(
                 val ip = if (settings.mode == ConnectionMode.TUN) resolve(profile.address) else null
                 DesktopConfig.xray(profile, settings, it, ip).toString(2)
             }
-            val bypass = listOfNotNull(Platform.selfExecutable, bridge?.takeIf { engine == EngineToggles.Kind.XRAY }?.let { Platform.bundledXray()?.absolutePath }, sidecar?.exe?.absolutePath)
+            val bypass = listOfNotNull(Platform.processExecutable, bridge?.takeIf { engine == EngineToggles.Kind.XRAY }?.let { Platform.bundledXray()?.absolutePath }, sidecar?.exe?.absolutePath)
             val config = DesktopConfig.build(profile, settings, Platform.os, api, Platform.geoDir(), bridge, bypass)
             runner.start(sessionId, config.toString(2), settings.mode, xrayConfig, bridge?.port ?: 0, sidecar)
             if (session != sessionId) {   // пока ядро поднималось, нажали «Отключить»

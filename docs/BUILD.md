@@ -75,11 +75,11 @@ cp libXray.aar /path/to/Hydra/app/libs/
 ```
 
 > **Windows и три нужных ABI.** Если `build/main.py` падает на `go mod tidy` («missing module declaration»),
-> то же самое делает прямой вызов из корня libXray (подойдёт и на Linux/macOS) — собираются ровно те три ABI,
-> что есть в релизных APK (arm64-v8a, armeabi-v7a, x86_64), без лишнего x86 (~73 МБ вместо ~100):
+> то же самое делает прямой вызов из корня libXray (подойдёт и на Linux/macOS) — собираются все четыре ABI релиза
+> (arm64-v8a, armeabi-v7a, x86_64 и x86 — с 0.7.5 в релизе есть 32-битный Intel-APK; ~100 МБ):
 > ```bash
 > export ANDROID_HOME=… ANDROID_NDK_HOME="$ANDROID_HOME/ndk/<версия>"
-> gomobile bind -target android/arm64,android/arm,android/amd64 -androidapi 21 \
+> gomobile bind -target android/arm64,android/arm,android/amd64,android/386 -androidapi 21 \
 >   -ldflags="-checklinkname=0 -extldflags=-Wl,-z,max-page-size=16384"
 > ```
 > Начиная с 0.7.3 `scripts/release.sh` не выпускает релиз без `libXray.aar` и без `assets/libxray.dex` внутри каждого
@@ -288,5 +288,5 @@ keyPassword=...
 
 ## 5. ABI
 
-Ядра собираются под `arm64-v8a`, `armeabi-v7a`, `x86_64` (см. `abiFilters`).
+Ядра собираются под `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86` (см. `splits.abi`). 32-битные системы ПК и Windows 7 — Hydra Classic, см. [LEGACY.md](LEGACY.md).
 `.aar` от gomobile обычно содержит нужные ABI; при рассинхроне уменьшите список.

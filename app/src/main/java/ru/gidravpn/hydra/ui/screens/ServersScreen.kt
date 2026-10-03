@@ -1,5 +1,7 @@
 package ru.gidravpn.hydra.ui.screens
 
+import ru.gidravpn.hydra.ui.launchSafe
+import ru.gidravpn.hydra.ui.launchScan
 import androidx.compose.ui.res.stringResource
 import ru.gidravpn.hydra.R
 
@@ -85,14 +87,14 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
         androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { vm.importFromImage(it) } }
     val startScan = {
-        scanLauncher.launch(
+        scanLauncher.launchScan(ctx,
             com.journeyapps.barcodescanner.ScanOptions()
                 .setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE)
                 .setPrompt(scanPrompt).setBeepEnabled(false).setOrientationLocked(false)
         )
     }
     val startPhoto = {
-        photoLauncher.launch(androidx.activity.result.PickVisualMediaRequest(
+        photoLauncher.launchSafe(ctx, androidx.activity.result.PickVisualMediaRequest(
             androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
     val pasteClipboard: () -> Unit = {

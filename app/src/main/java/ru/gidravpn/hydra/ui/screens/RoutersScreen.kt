@@ -1,5 +1,7 @@
 package ru.gidravpn.hydra.ui.screens
 
+import ru.gidravpn.hydra.ui.launchSafe
+import ru.gidravpn.hydra.ui.launchScan
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -130,6 +132,7 @@ private fun AddRouter(m: RouterManager) {
     var token by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     val prompt = stringResource(R.string.rt_scan_prompt)
+    val ctxAdd = LocalContext.current
     val scan = androidx.activity.compose.rememberLauncherForActivityResult(com.journeyapps.barcodescanner.ScanContract()) { res ->
         res.contents?.let { link = it }
     }
@@ -142,7 +145,7 @@ private fun AddRouter(m: RouterManager) {
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Chip(stringResource(R.string.rt_scan), AccentViolet) {
-                scan.launch(
+                scan.launchScan(ctxAdd,
                     com.journeyapps.barcodescanner.ScanOptions()
                         .setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE)
                         .setPrompt(prompt).setBeepEnabled(false).setOrientationLocked(false)
