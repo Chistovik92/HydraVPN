@@ -217,22 +217,22 @@ if [[ -z "$NOTES_FILE" ]]; then
 | x86 — 32-бит Intel, AMD | [ZIP Classic](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-windows-x86-classic.zip) ² | | | | [tar.gz Classic](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-linux-x86-classic.tar.gz) ² | [APK](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-full-$VERSION-x86.apk) (старые планшеты, приставки) | |
 | ARM32 — приставки Android TV, Raspberry Pi | | | | | [tar.gz Classic](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-desktop-$VERSION-linux-armv7-classic.tar.gz) ² | [APK](https://github.com/Chistovik92/HydraVPN/releases/download/$TAG/Hydra-full-$VERSION-armeabi-v7a.apk) | |
 
-**Какой у меня процессор.** Windows: «Параметры» → «Система» → «О системе», строка «Тип системы». Mac: меню Apple → «Об этом Mac» — «Чип Apple M…» значит Apple Silicon, «Процессор Intel» — Intel. Телефоны на Android почти все ARM64; приставки Android TV и старые телефоны — чаще ARM32 (`armeabi-v7a`).
-**Windows 7 и 64-бит:** `Hydra-desktop-$VERSION-windows-x64-classic.zip` — Hydra Classic для Windows 7 SP1 x64.
+**Какой у меня процессор.** Windows: «Параметры» → «Система» → «О системе», строка «Тип системы». Mac: меню Apple → «Об этом Mac» — «Чип Apple M…» значит Apple Silicon, «Процессор Intel» — Intel. Телефоны на Android почти все ARM64; приставки Android TV и старые телефоны — чаще ARM32 (\`armeabi-v7a\`).
+**Windows 7 и 64-бит:** \`Hydra-desktop-$VERSION-windows-x64-classic.zip\` — Hydra Classic для Windows 7 SP1 x64.
 
 ¹ Без подписи Apple: установить можно только после переподписи сертификатом платного Apple Developer Program, в App Store приложения пока нет.
-² Hydra Classic — упрощённая оболочка на Swing для Windows 7, 32-битных систем и Raspberry Pi OS 32-бит: те же ядра и настройки, без раздела «Роутеры». В Windows-архиве Java внутри (запуск `Hydra.vbs`); на Linux нужна Java 11+ (`./Hydra/hydra.sh`). Windows XP не поддерживается — обходные пути в [docs/LEGACY.md](https://github.com/Chistovik92/HydraVPN/blob/master/docs/LEGACY.md).
+² Hydra Classic — упрощённая оболочка на Swing для Windows 7, 32-битных систем и Raspberry Pi OS 32-бит: те же ядра и настройки, без раздела «Роутеры». В Windows-архиве Java внутри (запуск \`Hydra.vbs\`); на Linux нужна Java 11+ (\`./Hydra/hydra.sh\`). Windows XP не поддерживается — обходные пути в [docs/LEGACY.md](https://github.com/Chistovik92/HydraVPN/blob/master/docs/LEGACY.md).
 
-Что проверено на настоящих системах, а что только собрано — в CHANGELOG, раздел «Известные ограничения». `Hydra-stub-$VERSION.apk` — только для разработки: соединение там симулируется.
+Что проверено на настоящих системах, а что только собрано — в CHANGELOG, раздел «Известные ограничения». \`Hydra-stub-$VERSION.apk\` — только для разработки: соединение там симулируется.
 
 ### Как ставить
 | Система | Что делать |
 |---|---|
-| Windows 10/11 | MSI или EXE — установка для текущего пользователя; ZIP — без установки, запустить `Hydra.exe`. SmartScreen может показать «Неизвестный издатель» → «Подробнее» → «Выполнить в любом случае» (установщик не подписан). Режим «Системный прокси» работает без прав администратора; для TUN Hydra предложит перезапуститься от администратора. |
-| macOS 12+ | Открыть DMG, перетащить Hydra в «Программы». Приложение не нотаризовано: «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть», либо `xattr -dr com.apple.quarantine /Applications/Hydra.app`. В режиме TUN macOS спрашивает пароль администратора. |
-| Debian, Ubuntu, Mint | `sudo apt install ./Hydra-desktop-…deb` |
-| Fedora, RHEL, openSUSE | `sudo dnf install ./Hydra-desktop-…rpm` |
-| Любой Linux | AppImage: `chmod +x` и запустить; tar.gz: `Hydra/bin/Hydra`. Системный прокси ставится в GNOME и KDE; для TUN система один раз спросит пароль (pkexec). |
+| Windows 10/11 | MSI или EXE — установка для текущего пользователя; ZIP — без установки, запустить \`Hydra.exe\`. SmartScreen может показать «Неизвестный издатель» → «Подробнее» → «Выполнить в любом случае» (установщик не подписан). Режим «Системный прокси» работает без прав администратора; для TUN Hydra предложит перезапуститься от администратора. |
+| macOS 12+ | Открыть DMG, перетащить Hydra в «Программы». Приложение не нотаризовано: «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть», либо \`xattr -dr com.apple.quarantine /Applications/Hydra.app\`. В режиме TUN macOS спрашивает пароль администратора. |
+| Debian, Ubuntu, Mint | \`sudo apt install ./Hydra-desktop-…deb\` |
+| Fedora, RHEL, openSUSE | \`sudo dnf install ./Hydra-desktop-…rpm\` |
+| Любой Linux | AppImage: \`chmod +x\` и запустить; tar.gz: \`Hydra/bin/Hydra\`. Системный прокси ставится в GNOME и KDE; для TUN система один раз спросит пароль (pkexec). |
 | Android | Установить APK; если не встал — другая архитектура, см. таблицу. Режим VPN система подтверждает сама. |
 
 **Протоколы на ПК:** VLESS (в т.ч. REALITY), VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard; подписки; olcRTC и OpenFlux — BETA. AmneziaWG, SSTP, L2TP, WDTT — пока только Android.
