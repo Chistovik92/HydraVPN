@@ -66,7 +66,11 @@ struct HomeView: View {
     }
 
     func row(_ k: String, _ v: String) -> some View {
-        HStack { Text(k).foregroundStyle(Color.hydraMuted); Spacer(); Text(v).multilineTextAlignment(.trailing) }.font(.subheadline)
+        HStack(alignment: .firstTextBaseline) {
+            Text(k).foregroundStyle(Color.hydraMuted).layoutPriority(1)
+            Spacer(minLength: 12)
+            Text(v).multilineTextAlignment(.trailing)
+        }.font(.subheadline)
     }
 }
 

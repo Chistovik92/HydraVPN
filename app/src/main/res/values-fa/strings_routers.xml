@@ -58,4 +58,6 @@
     <string name="rt_msg_reloaded">پیکربندی روتر دوباره بارگیری شد</string>
     <string name="rt_unreachable">روتر %1$s پاسخ نمی‌دهد</string>
     <string name="rt_pin_failed">گواهی روتر با گواهی جفت‌شده مطابقت ندارد — احتمال جعل</string>
+    <string name="rt_forget_q">روتر فراموش شود؟</string>
+    <string name="rt_forget_msg">«%1$s» از برنامه حذف می‌شود. خود روتر تغییری نمی‌کند؛ می‌توانید دوباره با پیوند آن را جفت کنید.</string>
 </resources>

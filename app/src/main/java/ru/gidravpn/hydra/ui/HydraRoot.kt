@@ -16,6 +16,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.selection.selectable
@@ -101,8 +103,10 @@ fun HydraRoot(
 /** Боковая навигация для широких экранов (планшет, TV). */
 @Composable
 private fun NavRail(current: Tab, onSelect: (Tab) -> Unit) {
+    // Прокрутка: в альбомной ориентации телефона (≈360 dp высоты) пять пунктов не помещаются.
     Column(
         Modifier.fillMaxHeight().background(SurfaceDim).statusBarsPadding().navigationBarsPadding()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 8.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

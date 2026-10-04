@@ -141,8 +141,10 @@ struct ServersView: View {
         .listRowBackground(selected ? theme.accent.opacity(0.1) : theme.card)
         .swipeActions {
             Button(role: .destructive) { model.deleteServer(p) } label: { Label(L("action_delete"), systemImage: "trash") }
-            Button { share = (p.name, LinkBuilder.link(p) ?? "") } label: { Label(L("share_action"), systemImage: "square.and.arrow.up") }
-                .tint(.blue)
+            if let link = LinkBuilder.link(p) {
+                Button { share = (p.name, link) } label: { Label(L("share_action"), systemImage: "square.and.arrow.up") }
+                    .tint(.blue)
+            }
             Button { model.ping(p) } label: { Label(L("sub_ping"), systemImage: "gauge.with.dots.needle.33percent") }.tint(.gray)
         }
     }

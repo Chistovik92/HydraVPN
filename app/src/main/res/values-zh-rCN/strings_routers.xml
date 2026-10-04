@@ -58,4 +58,6 @@
     <string name="rt_msg_reloaded">路由器配置已重新读取</string>
     <string name="rt_unreachable">路由器 %1$s 无响应</string>
     <string name="rt_pin_failed">路由器证书与配对时不一致——可能被冒充</string>
+    <string name="rt_forget_q">忘记此路由器？</string>
+    <string name="rt_forget_msg">将从应用中移除“%1$s”。路由器本身不会改变，可通过其链接重新配对。</string>
 </resources>

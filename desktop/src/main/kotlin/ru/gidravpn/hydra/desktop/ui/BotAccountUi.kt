@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
@@ -43,7 +44,7 @@ internal fun BotAccountSection(c: AppController, ui: UiState) {
             Text(if (link.username.isNotBlank()) "Подключено как @${link.username}" else "Подключено к боту", fontWeight = FontWeight.Medium)
             Text(link.server, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             link.panels?.let { Text("Панелей с доступом в боте: $it", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            ChipRow {
                 OutlinedButton(onClick = { c.syncBot() }, enabled = !ui.botBusy) { Text("Получить подписки") }
                 TextButton(onClick = { c.unlinkBot() }, enabled = !ui.botBusy) { Text("Отключить") }
             }
@@ -69,7 +70,7 @@ internal fun BotAccountSection(c: AppController, ui: UiState) {
 internal fun AccountStatus(ui: UiState) {
     val subs = ui.data.subscriptions.filter { it.botPanel.isNotEmpty() }
     if (subs.isEmpty()) return
-    Card(Modifier.width(520.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+    Card(Modifier.widthIn(max = 520.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Аккаунт", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             subs.forEach { sub ->

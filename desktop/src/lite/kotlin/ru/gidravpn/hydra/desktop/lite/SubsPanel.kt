@@ -19,7 +19,7 @@ internal class SubsPanel(private val c: AppController) : JPanel(BorderLayout()),
     private val quiet = Quiet()
     private val model = DefaultListModel<Subscription>()
     private val list = JList(model)
-    private val url = Field(36, quiet)
+    private val url = Field(30, quiet)
     private val name = Field(14, quiet)
     private val refreshOne = button("Обновить") { chosen()?.let { c.refreshSubscription(it.id) } }
     private val refreshAll = button("Обновить все") { c.refreshAll() }

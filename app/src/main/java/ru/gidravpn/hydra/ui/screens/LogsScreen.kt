@@ -93,6 +93,7 @@ fun LogsScreen(vm: MainViewModel) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LogStorageSettings(vm: MainViewModel) {
     val mode by vm.logPersistMode.collectAsState()
@@ -113,16 +114,16 @@ private fun LogStorageSettings(vm: MainViewModel) {
             }
         }
         if (mode != LogPersistMode.OFF) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.log_keep), color = TextMuted, fontSize = 12.sp)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(stringResource(R.string.log_keep), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                 LogRetention.entries.forEach { r ->
                     SmallButton(stringResource(r.labelRes), if (r == retention) AccentCyan else TextSecondary) { vm.setLogRetention(r) }
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.log_saved, humanBytes(bytes)), color = TextMuted, fontSize = 12.sp)
+            Text(stringResource(R.string.log_saved, humanBytes(bytes)), color = TextMuted, fontSize = 12.sp, modifier = Modifier.weight(1f))
             SmallButton(stringResource(R.string.log_delete_saved), Danger) { vm.clearStoredLogs() }
         }
     }
@@ -134,8 +135,8 @@ private fun SmallButton(text: String, color: Color, onClick: () -> Unit) {
         .background(color.copy(alpha = 0.12f))
         .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
         .clickableNoRipple(onClick)
-        .padding(horizontal = 12.dp, vertical = 6.dp)) {
-        Text(text, color = color, fontSize = 11.sp)
+        .defaultMinSize(minHeight = 36.dp).padding(horizontal = 12.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+        Text(text, color = color, fontSize = 12.sp, maxLines = 1)
     }
 }
 

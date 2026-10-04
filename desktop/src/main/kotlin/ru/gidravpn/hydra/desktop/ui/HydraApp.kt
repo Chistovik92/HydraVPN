@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -119,7 +121,8 @@ fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTa
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Row(Modifier.fillMaxSize()) {
                 // Семь пунктов не помещаются в окно минимальной высоты (560) — рельсу можно прокрутить.
-                NavigationRail(Modifier.verticalScroll(rememberScrollState()), containerColor = MaterialTheme.colorScheme.surface) {
+                Box(Modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surface)) {
+                NavigationRail(Modifier.verticalScroll(rememberScrollState()), containerColor = Color.Transparent) {
                     Spacer(Modifier.height(12.dp))
                     Tab.entries.forEach { t ->
                         NavigationRailItem(
@@ -139,6 +142,7 @@ fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTa
                             label = { Text(t.title, fontSize = 12.sp) },
                         )
                     }
+                }
                 }
                 Box(Modifier.fillMaxSize().padding(24.dp)) {
                     when (tab) {
@@ -224,7 +228,7 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
             AccountStatus(ui)
         }
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow(center = true) {
             ConnectionMode.entries.forEach { m ->
                 FilterChip(
                     selected = settings.mode == m,
@@ -247,7 +251,7 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
                 Column(Modifier.padding(16.dp)) {
                     Text("Для режима TUN Hydra нужно запустить от имени администратора (так Windows разрешает создать сетевой адаптер).")
                     Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChipRow {
                         Button(onClick = onRelaunchAdmin) { Text("Перезапустить от администратора") }
                         OutlinedButton(onClick = { c.updateSettings { it.copy(mode = ConnectionMode.PROXY) }; c.connect() }) { Text("Подключить как прокси") }
                     }
@@ -287,7 +291,7 @@ private fun ServersScreen(c: AppController, ui: UiState) {
                 // Enter добавляет — раньше приходилось тянуться к кнопке «+».
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { if (input.isNotBlank()) { c.import(input); input = "" } }),
-                placeholder = { Text("vless://…, trojan://…, ss://…, hysteria2://…, tuic://…, wireguard://… или адрес подписки") })
+                placeholder = { Text("vless://…, trojan://…, ss://… или адрес подписки", maxLines = 1, overflow = TextOverflow.Ellipsis) })
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = { c.import(input); input = "" }, enabled = input.isNotBlank()) { Icon(Icons.Default.Add, "Добавить") }
         }
@@ -467,12 +471,26 @@ private fun LogScreen(c: AppController, ui: UiState) {
 }
 
 // ============================================================== общее
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun Header(title: String, actions: @Composable () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
+    // Не помещается в одну строку — кнопки переходят под заголовок, а не сжимают его в столбик.
+    FlowRow(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.height(40.dp).padding(end = 16.dp), contentAlignment = Alignment.CenterStart) {
+            Text(title, style = MaterialTheme.typography.headlineSmall)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) { actions() }
     }
+}
+
+/** Ряд чипов/кнопок, который переносится на новую строку, если не помещается в окно. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ChipRow(center: Boolean = false, content: @Composable () -> Unit) {
+    FlowRow(Modifier.fillMaxWidth(),
+        horizontalArrangement = if (center) Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally) else Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)) { content() }
 }
 
 @Composable

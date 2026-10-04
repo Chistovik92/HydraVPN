@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -114,7 +115,7 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
             Section("DNS") {
                 var dns by remember(r.dns) { mutableStateOf(r.dns) }
                 var invalid by remember { mutableStateOf(false) }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipRow {
                     (listOf("1.1.1.1" to "Cloudflare", "8.8.8.8" to "Google", "9.9.9.9" to "Quad9", "94.140.14.14" to "AdGuard", "system" to "Системный") +
                         // Приватный DNS проекта — только вошедшим через бота (адрес с токеном в настройки не пишется).
                         if (c.hydraDnsAvailable) listOf(ru.gidravpn.hydra.desktop.HYDRA_DNS to "Hydra VPN (приватный)") else emptyList())
@@ -138,12 +139,12 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
         item {
             Section("Туннель") {
                 Text("Фрагментация TLS ClientHello (обход DPI; только движок sing-box, VLESS/VMess/Trojan с TLS)", fontSize = 13.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipRow {
                     listOf(TlsFragmentMode.OFF to "Выключено", TlsFragmentMode.RECORD to "TLS-записи", TlsFragmentMode.TCP to "TCP-сегменты")
                         .forEach { (m, label) -> FilterChip(selected = r.tlsFragment == m, onClick = { c.updateRouting { it.copy(tlsFragment = m) } }, label = { Text(label) }) }
                 }
                 Text("MTU адаптера TUN (меньше — если сайты «висят» на загрузке: туннель поверх туннеля, мобильный интернет)", fontSize = 13.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipRow {
                     MtuPreset.entries.forEach { m ->
                         FilterChip(selected = r.mtu == m, onClick = { c.updateRouting { it.copy(mtu = m) } },
                             label = { Text(if (m == MtuPreset.AUTO) "Авто (9000)" else "${m.value}") })
@@ -159,7 +160,7 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
             Section("Проверка утечек") {
                 Text("Подключитесь и откройте проверку в браузере: в режиме TUN — любым браузером, в режиме прокси — браузером, использующим системный прокси.",
                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipRow {
                     OutlinedButton(onClick = { openUrl("https://ipleak.net/") }) { Text("ipleak.net") }
                     OutlinedButton(onClick = { openUrl("https://browserleaks.com/dns") }) { Text("browserleaks.com") }
                 }
@@ -177,7 +178,7 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
                 ToggleRow("Проверять обновления при запуске", s.checkUpdates, "Запрос к GitHub: есть ли релиз новее. Скачивание — только по кнопке «Обновить».") {
                     v -> c.updateSettings { it.copy(checkUpdates = v) }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipRow {
                     OutlinedButton(onClick = { c.checkForUpdates(manual = true) }) { Text("Проверить сейчас") }
                     ui.update?.let { u -> UpdateBanner(c, ui, u) }
                 }
@@ -230,7 +231,7 @@ private fun LanSection(c: AppController, ui: UiState) {
         var port by remember(lan.port) { mutableStateOf(lan.port.toString()) }
         var user by remember(lan.username) { mutableStateOf(lan.username) }
         var pass by remember(lan.password) { mutableStateOf(lan.password) }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        ChipRow {
             OutlinedTextField(port, { v ->
                 port = v.filter(Char::isDigit).take(5)
                 port.toIntOrNull()?.takeIf { it in HotspotSettings.PORT_RANGE }?.let { p -> c.updateLanShare { it.copy(port = p) } }
@@ -238,7 +239,7 @@ private fun LanSection(c: AppController, ui: UiState) {
             OutlinedTextField(user, { v -> user = v.take(64); if (user.isNotBlank()) c.updateLanShare { it.copy(username = user.trim()) } },
                 Modifier.width(160.dp), singleLine = true, label = { Text("Логин") })
             OutlinedTextField(pass, { v -> pass = v.take(128); c.updateLanShare { it.copy(password = pass) } },
-                Modifier.weight(1f), singleLine = true, label = { Text("Пароль (от ${HotspotSettings.MIN_PASSWORD} символов)") },
+                Modifier.widthIn(min = 220.dp), singleLine = true, label = { Text("Пароль (от ${HotspotSettings.MIN_PASSWORD} символов)") },
                 isError = pass.length < HotspotSettings.MIN_PASSWORD)
             OutlinedButton(onClick = { c.regenerateLanPassword() }) { Text("Новый пароль") }
         }
@@ -260,7 +261,7 @@ private fun BackupSection(c: AppController, ui: UiState) {
     Section("Резервная копия") {
         Text("Серверы, подписки, настройки и профили в одном файле. В файле пароли серверов — храните его в надёжном месте.",
             fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow {
             OutlinedButton(onClick = { chooseFile(save = true)?.let { c.exportBackup(it) } }) { Text("Сохранить в файл…") }
             OutlinedButton(onClick = { chooseFile(save = false)?.let { confirmFile = it } }, enabled = !ui.active) { Text("Восстановить из файла…") }
         }

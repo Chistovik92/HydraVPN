@@ -301,6 +301,7 @@ private fun SheetItem(icon: ImageVector, title: String, subtitle: String, onClic
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun EmptyServers(onPaste: () -> Unit, onScan: () -> Unit, onAdd: () -> Unit) {
     Column(
@@ -310,7 +311,7 @@ private fun EmptyServers(onPaste: () -> Unit, onScan: () -> Unit, onAdd: () -> U
     ) {
         Text(stringResource(R.string.srv_empty_title), color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         Text(stringResource(R.string.srv_empty_desc), color = TextMuted, fontSize = 12.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
             TextButton(onClick = onPaste) { Text(stringResource(R.string.srv_add_paste), color = AccentCyan) }
             TextButton(onClick = onScan) { Text(stringResource(R.string.srv_add_scan), color = AccentCyan) }
             TextButton(onClick = onAdd) { Text(stringResource(R.string.srv_more), color = AccentCyan) }
@@ -394,7 +395,7 @@ private fun SubscriptionCard(
                     modifier = Modifier.weight(1f))
                 if (sub.expireAt > 0) Text(stringResource(R.string.sub_until,
                     java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(sub.expireAt * 1000))),
-                    color = TextSecondary, fontSize = 11.sp)
+                    color = TextSecondary, fontSize = 11.sp, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = 8.dp))
             }
         }
         if (sub.lastError.isNotBlank()) Text(sub.lastError, color = Danger, fontSize = 11.sp)
@@ -610,6 +611,7 @@ private fun AddServerDialog(onDismiss: () -> Unit, onSave: (String, String, Int,
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ImportDialog(
     onDismiss: () -> Unit,
@@ -629,18 +631,18 @@ private fun ImportDialog(
                 Text(stringResource(R.string.import_hint),
                     color = TextMuted, fontSize = 12.sp)
                 Field(stringResource(R.string.import_link_field), value) { value = it }
-                Text(stringResource(R.string.import_paste), color = AccentCyan, fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clickableNoRipple {
-                        val cm = context.getSystemService(android.content.ClipboardManager::class.java)
-                        cm?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
-                            ?.let { value = it }
-                    })
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(stringResource(R.string.servers_scan_qr), color = AccentCyan, fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold, modifier = Modifier.clickableNoRipple(onScan))
-                    Text(stringResource(R.string.servers_qr_photo), color = AccentCyan, fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold, modifier = Modifier.clickableNoRipple(onPhoto))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(stringResource(R.string.import_paste), color = AccentCyan, fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickableNoRipple {
+                            val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+                            cm?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+                                ?.let { value = it }
+                        }.padding(vertical = 10.dp))
+                    Text(stringResource(R.string.servers_scan_qr), color = AccentCyan, fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold, modifier = Modifier.clickableNoRipple(onScan).padding(vertical = 10.dp))
+                    Text(stringResource(R.string.servers_qr_photo), color = AccentCyan, fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold, modifier = Modifier.clickableNoRipple(onPhoto).padding(vertical = 10.dp))
                 }
                 Field(stringResource(R.string.import_sub_name_field), name) { name = it }
             }
