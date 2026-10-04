@@ -106,7 +106,7 @@ private fun Chip(text: String, color: Color, selected: Boolean = false, onClick:
             .background(c.copy(alpha = if (selected) 0.18f else 0.10f))
             .border(1.dp, c.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
             .clickableNoRipple(onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .defaultMinSize(minHeight = 40.dp).padding(horizontal = 12.dp, vertical = 10.dp)
     ) { Text(text, color = c, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
 }
 
@@ -172,11 +172,13 @@ private fun RouterPicker(links: List<RouterLink>, selected: String?, m: RouterMa
 private fun Actions(current: RouterLink, r: RouterUi, m: RouterManager, ask: (Pending) -> Unit) {
     val restartQ = stringResource(R.string.rt_restart_q)
     val restartMsg = stringResource(R.string.rt_restart_msg, current.name)
+    val forgetQ = stringResource(R.string.rt_forget_q)
+    val forgetMsg = stringResource(R.string.rt_forget_msg, current.name)
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Chip(stringResource(R.string.rt_refresh), TextSecondary) { if (!r.busy) m.refresh() }
         Chip(stringResource(R.string.rt_reload), TextSecondary) { if (!r.busy) m.reloadConfig() }
         Chip(stringResource(R.string.rt_restart), Danger) { if (!r.busy) ask(Pending(restartQ, restartMsg) { m.restart() }) }
-        Chip(stringResource(R.string.rt_forget), Danger) { m.remove(current.baseUrl) }
+        Chip(stringResource(R.string.rt_forget), Danger) { ask(Pending(forgetQ, forgetMsg) { m.remove(current.baseUrl) }) }
     }
 }
 

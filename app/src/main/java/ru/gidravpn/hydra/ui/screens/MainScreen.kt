@@ -79,8 +79,9 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
                             }
                         }
                     )
-                    Text("×", color = TextMuted, fontSize = 18.sp,
-                        modifier = Modifier.clickableNoRipple { vm.dismissUpdate() }.padding(horizontal = 8.dp)
+                    Text("×", color = TextMuted, fontSize = 20.sp, textAlign = TextAlign.Center,
+                        modifier = Modifier.clickableNoRipple { vm.dismissUpdate() }
+                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).wrapContentSize(Alignment.Center)
                             .semantics { contentDescription = dismissLabel })
                 }
             }
@@ -254,7 +255,7 @@ private fun ConnectionInfo(
     }
 
     Card(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             InfoCell(stringResource(R.string.info_status),
                 when (state) {
                     ConnectionState.CONNECTED -> stringResource(R.string.connected)
@@ -266,26 +267,27 @@ private fun ConnectionInfo(
                     ConnectionState.CONNECTED -> Success
                     ConnectionState.ERROR -> Danger
                     else -> TextMuted
-                })
-            InfoCell(stringResource(R.string.info_server), serverName ?: "—", TextPrimary)
-            InfoCell(stringResource(R.string.info_time), elapsed, TextPrimary)
+                }, Modifier.weight(1f))
+            InfoCell(stringResource(R.string.info_server), serverName ?: "—", TextPrimary, Modifier.weight(1f))
+            InfoCell(stringResource(R.string.info_time), elapsed, TextPrimary, Modifier.weight(1f))
         }
         if (connected) {
             Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                InfoCell(stringResource(R.string.info_down), humanBytes(stats.downBytes), AccentCyan)
-                InfoCell(stringResource(R.string.info_up), humanBytes(stats.upBytes), AccentIndigo)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                InfoCell(stringResource(R.string.info_down), humanBytes(stats.downBytes), AccentCyan, Modifier.weight(1f))
+                InfoCell(stringResource(R.string.info_up), humanBytes(stats.upBytes), AccentIndigo, Modifier.weight(1f))
             }
         }
     }
 }
 
+// Ячейки равной ширины: длинное имя сервера обрезается многоточием, а не сжимает соседей в столбик.
 @Composable
-private fun InfoCell(title: String, value: String, valueColor: androidx.compose.ui.graphics.Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(title, color = TextMuted, fontSize = 11.sp)
+private fun InfoCell(title: String, value: String, valueColor: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(title, color = TextMuted, fontSize = 11.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         Text(value, color = valueColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center)
+            textAlign = TextAlign.Center, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
 }
 

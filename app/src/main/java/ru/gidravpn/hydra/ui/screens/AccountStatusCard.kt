@@ -33,7 +33,7 @@ fun AccountStatusCard(subscriptions: List<Subscription>) {
             if (i > 0) Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth()) {
                 Text(sub.displayName, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                    maxLines = 1, modifier = Modifier.weight(1f))
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 if (sub.expireAt > 0) Text(
                     stringResource(R.string.sub_until,
                         java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(sub.expireAt * 1000))),

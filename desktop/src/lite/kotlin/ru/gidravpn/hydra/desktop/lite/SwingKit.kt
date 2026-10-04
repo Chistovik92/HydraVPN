@@ -84,6 +84,13 @@ internal fun page(vararg parts: Component): JScrollPane {
     }
 }
 
+/** Обычная панель в прокрутке — чтобы на низком окне (ТВ-приставки, 1024×600) ничего не обрезалось. */
+internal fun scrolled(content: Component): JScrollPane = JScrollPane(content).apply {
+    border = BorderFactory.createEmptyBorder()
+    verticalScrollBar.unitIncrement = 16
+    horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
+}
+
 internal fun clipboard(): String = runCatching {
     Toolkit.getDefaultToolkit().systemClipboard.getData(DataFlavor.stringFlavor) as String
 }.getOrDefault("")

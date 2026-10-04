@@ -45,7 +45,7 @@ internal class LiteWindow(
         val settings = SettingsPanel(c)
         val log = LogPanel(c)
         fun tab(title: String, comp: java.awt.Component, r: Renderable) { tabs.addTab(title, comp); renderables += r }
-        tab("Главная", home, home)
+        tab("Главная", scrolled(home), home)
         tab("Серверы", servers, servers)
         tab("Подписки", subs, subs)
         tab("Маршруты", routing.component, routing)

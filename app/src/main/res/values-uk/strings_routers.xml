@@ -58,4 +58,6 @@
     <string name="rt_msg_reloaded">Конфігурацію роутера перечитано</string>
     <string name="rt_unreachable">Роутер %1$s не відповідає</string>
     <string name="rt_pin_failed">Сертифікат роутера не збігається зі сполученим — можлива підміна</string>
+    <string name="rt_forget_q">Забути роутер?</string>
+    <string name="rt_forget_msg">«%1$s» буде прибрано із застосунку. Сам роутер не змінюється — його можна сполучити знову за посиланням.</string>
 </resources>

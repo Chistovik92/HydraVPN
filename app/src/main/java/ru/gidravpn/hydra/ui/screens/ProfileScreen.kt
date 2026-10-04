@@ -94,10 +94,10 @@ fun ProfileScreen(vm: MainViewModel) {
 
         Card(Modifier.fillMaxWidth()) {
             Label(stringResource(R.string.profile_stats))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                StatCell(stringResource(R.string.info_status), if (connected) stringResource(R.string.connected) else stringResource(R.string.disconnected), if (connected) Success else TextMuted)
-                StatCell(stringResource(R.string.info_server), server?.name ?: "—", TextPrimary)
-                StatCell(stringResource(R.string.profile_session), elapsed, TextPrimary)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatCell(stringResource(R.string.info_status), if (connected) stringResource(R.string.connected) else stringResource(R.string.disconnected), if (connected) Success else TextMuted, Modifier.weight(1f))
+                StatCell(stringResource(R.string.info_server), server?.name ?: "—", TextPrimary, Modifier.weight(1f))
+                StatCell(stringResource(R.string.profile_session), elapsed, TextPrimary, Modifier.weight(1f))
             }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -135,10 +135,11 @@ fun ProfileScreen(vm: MainViewModel) {
 }
 
 @Composable
-private fun StatCell(title: String, value: String, valueColor: androidx.compose.ui.graphics.Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(title, color = TextMuted, fontSize = 11.sp)
-        Text(value, color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+private fun StatCell(title: String, value: String, valueColor: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(title, color = TextMuted, fontSize = 11.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        Text(value, color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
 }
 

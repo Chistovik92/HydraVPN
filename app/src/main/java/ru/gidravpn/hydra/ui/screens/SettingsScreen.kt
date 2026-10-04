@@ -98,14 +98,15 @@ private fun HubRow(icon: String, title: String, subtitle: String, accent: Color,
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 Text(icon, fontSize = 20.sp)
                 Spacer(Modifier.width(12.dp))
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text(title, color = accent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Text(subtitle, color = TextMuted, fontSize = 11.sp)
                 }
             }
+            Spacer(Modifier.width(8.dp))
             Text("→", color = TextMuted, fontSize = 16.sp)
         }
     }
@@ -552,6 +553,7 @@ private fun RoutingProfilesCard(vm: MainViewModel) {
         var name by remember { mutableStateOf("") }
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { naming = false },
+            containerColor = Surface, titleContentColor = TextPrimary, textContentColor = TextSecondary,
             title = { Text(stringResource(R.string.profiles_name_title)) },
             text = {
                 androidx.compose.material3.OutlinedTextField(
@@ -573,6 +575,7 @@ private fun RoutingProfilesCard(vm: MainViewModel) {
     toDelete?.let { n ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { toDelete = null },
+            containerColor = Surface, titleContentColor = TextPrimary, textContentColor = TextSecondary,
             title = { Text(stringResource(R.string.profiles_delete_q, n)) },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { vm.deleteRoutingProfile(n); toDelete = null }) {
@@ -654,7 +657,7 @@ private fun RoutingOptionCard(title: String, subtitle: String, selected: Boolean
         ) {
             Column(Modifier.weight(1f)) {
                 Text(title, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, color = TextMuted, fontSize = 11.sp)
+                if (subtitle.isNotEmpty()) Text(subtitle, color = TextMuted, fontSize = 11.sp)
             }
             if (selected) {
                 Spacer(Modifier.width(8.dp))
@@ -758,6 +761,7 @@ private fun localAddresses(): List<Pair<String, String>> = runCatching {
         .filter { it.second.isNotBlank() }
 }.getOrDefault(emptyList())
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HotspotContent(vm: MainViewModel) {
     val context = LocalContext.current
@@ -794,7 +798,8 @@ private fun HotspotContent(vm: MainViewModel) {
             androidx.compose.material3.OutlinedTextField(
                 value = portText, onValueChange = { portText = it.filter(Char::isDigit).take(5); invalid = false },
                 label = { Text(stringResource(R.string.hotspot_port), color = TextMuted, fontSize = 12.sp) },
-                singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth()
+                singleLine = true, colors = fieldColors, modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
             )
             androidx.compose.material3.OutlinedTextField(
                 value = userText, onValueChange = { userText = it; invalid = false },
@@ -814,7 +819,7 @@ private fun HotspotContent(vm: MainViewModel) {
                 } } else null,
             )
             if (invalid) Text(stringResource(R.string.hotspot_invalid), color = Danger, fontSize = 11.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 RoutingSaveButton {
                     val port = portText.toIntOrNull()
                     if (port != null && port in ru.gidravpn.hydra.data.model.HotspotSettings.PORT_RANGE &&
@@ -963,8 +968,9 @@ stringResource(R.string.backup_reset_desc),
     confirmImport?.let { uri ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { confirmImport = null },
+            containerColor = Surface, titleContentColor = TextPrimary, textContentColor = TextSecondary,
             title = { Text(stringResource(R.string.backup_restore_q)) },
-text = { Text(stringResource(R.string.backup_restore_q_desc)) },
+            text = { Text(stringResource(R.string.backup_restore_q_desc)) },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { vm.importBackup(uri); confirmImport = null }) {
                     Text(stringResource(R.string.backup_replace), color = Danger)
@@ -978,6 +984,7 @@ text = { Text(stringResource(R.string.backup_restore_q_desc)) },
     if (confirmReset) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { confirmReset = false },
+            containerColor = Surface, titleContentColor = TextPrimary, textContentColor = TextSecondary,
             title = { Text(stringResource(R.string.backup_reset_q)) },
             text = { Text(stringResource(R.string.backup_reset_q_desc)) },
             confirmButton = {
@@ -995,7 +1002,7 @@ text = { Text(stringResource(R.string.backup_restore_q_desc)) },
 @Composable
 private fun BackupActionButton(text: String, color: Color, onClick: () -> Unit) {
     Text(text, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.clickableNoRipple(onClick).padding(vertical = 4.dp))
+        modifier = Modifier.clickableNoRipple(onClick).heightIn(min = 40.dp).wrapContentHeight(Alignment.CenterVertically))
 }
 
 @Composable

@@ -58,4 +58,6 @@
     <string name="rt_msg_reloaded">Router configuration reloaded</string>
     <string name="rt_unreachable">Router %1$s is not responding</string>
     <string name="rt_pin_failed">The router certificate does not match the paired one — possible spoofing</string>
+    <string name="rt_forget_q">Forget this router?</string>
+    <string name="rt_forget_msg">“%1$s” will be removed from this app. The router itself is not changed; you can pair it again with its link.</string>
 </resources>

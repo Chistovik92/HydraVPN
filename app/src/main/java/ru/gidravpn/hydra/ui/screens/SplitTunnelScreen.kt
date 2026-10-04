@@ -41,6 +41,7 @@ data class AppEntry(val packageName: String, val label: String, val isSystem: Bo
 
 private enum class SplitSection { APPS, NET }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SplitTunnelScreen(vm: MainViewModel) {
     val split by vm.splitTunnel.collectAsState()
@@ -51,7 +52,7 @@ fun SplitTunnelScreen(vm: MainViewModel) {
             fontWeight = FontWeight.SemiBold, color = TextPrimary)
         Spacer(Modifier.height(12.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ModeChip(stringResource(R.string.split_by_apps), section == SplitSection.APPS) { section = SplitSection.APPS }
             ModeChip(stringResource(R.string.split_by_net), section == SplitSection.NET) { section = SplitSection.NET }
         }
@@ -64,6 +65,7 @@ fun SplitTunnelScreen(vm: MainViewModel) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AppsSection(vm: MainViewModel, split: SplitTunnel) {
     val context = LocalContext.current
@@ -90,7 +92,7 @@ private fun AppsSection(vm: MainViewModel, split: SplitTunnel) {
     Spacer(Modifier.height(16.dp))
 
     // Режим
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ModeChip(stringResource(R.string.split_all_traffic), split.mode == SplitTunnelMode.OFF) { vm.setSplitMode(SplitTunnelMode.OFF) }
         ModeChip(stringResource(R.string.split_only_selected), split.mode == SplitTunnelMode.INCLUDE) { vm.setSplitMode(SplitTunnelMode.INCLUDE) }
         ModeChip(stringResource(R.string.split_except_selected), split.mode == SplitTunnelMode.EXCLUDE) { vm.setSplitMode(SplitTunnelMode.EXCLUDE) }
@@ -151,6 +153,7 @@ private fun normalizeNetRuleValue(type: NetRuleType, raw: String): String? {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NetRulesSection(vm: MainViewModel, split: SplitTunnel) {
     var type by remember { mutableStateOf(NetRuleType.DOMAIN) }
@@ -159,7 +162,7 @@ private fun NetRulesSection(vm: MainViewModel, split: SplitTunnel) {
     Text(split.netSummary(LocalContext.current), color = TextMuted, fontSize = 12.sp)
     Spacer(Modifier.height(16.dp))
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ModeChip(stringResource(R.string.split_all_traffic), split.netMode == SplitTunnelMode.OFF) { vm.setNetMode(SplitTunnelMode.OFF) }
         ModeChip(stringResource(R.string.split_only_selected), split.netMode == SplitTunnelMode.INCLUDE) { vm.setNetMode(SplitTunnelMode.INCLUDE) }
         ModeChip(stringResource(R.string.split_except_selected), split.netMode == SplitTunnelMode.EXCLUDE) { vm.setNetMode(SplitTunnelMode.EXCLUDE) }
@@ -256,7 +259,7 @@ private fun ModeChip(text: String, active: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Text(text, color = if (active) AccentCyan else TextSecondary,
-            fontSize = 11.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
+            fontSize = 12.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
 

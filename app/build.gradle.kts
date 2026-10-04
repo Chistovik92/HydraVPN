@@ -31,8 +31,8 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 49
-        versionName = "0.7.6"
+        versionCode = 50
+        versionName = "0.7.7"
         // Приватный DNS (DoH с токеном в пути) для вошедших через бота: секрет, в репозитории его нет.
         // Свойство Gradle `hydraPrivateDns` или переменная окружения HYDRA_PRIVATE_DNS; пусто — пункт скрыт.
         val privateDns = ((project.findProperty("hydraPrivateDns") as String?) ?: System.getenv("HYDRA_PRIVATE_DNS") ?: "")

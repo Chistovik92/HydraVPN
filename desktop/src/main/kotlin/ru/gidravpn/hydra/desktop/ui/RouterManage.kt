@@ -93,11 +93,11 @@ private fun SectionDialog(existing: RouterSection?, m: RouterManager, busy: Bool
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Switch(enabled, { enabled = it }); Text("Включён")
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                ChipRow {
                     Hint("Действие:")
                     ACTIONS.forEach { (v, t) -> FilterChip(selected = action == v, onClick = { action = v }, label = { Text(t) }) }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                ChipRow {
                     Hint("Движок:")
                     PROVIDERS.forEach { p -> FilterChip(selected = provider == p, onClick = { provider = p }, label = { Text(p) }) }
                 }
@@ -152,7 +152,7 @@ internal fun RouterRadarCard(r: RouterUi, m: RouterManager, sectionNames: List<S
         Text(if (radar.username.isNotBlank()) "Подключён как @${radar.username}" else "Подключён к боту", fontWeight = FontWeight.Medium, fontSize = 13.sp)
         if (radar.server.isNotBlank()) Hint(radar.server)
         Hint("Роутер сам раз в 12 часов забирает выданные в боте подписки; удалённые в боте с роутера не убираются.")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow {
             OutlinedButton(onClick = { m.radarSync(null) }, enabled = !r.busy) { Text("Получить подписки сейчас") }
             TextButton(onClick = { m.radarUnlink() }, enabled = !r.busy) { Text("Отключить роутер от бота") }
         }
@@ -166,7 +166,7 @@ internal fun RouterRadarCard(r: RouterUi, m: RouterManager, sectionNames: List<S
             OutlinedTextField(code, { code = it.filter(Char::isDigit).take(8) }, Modifier.width(170.dp), singleLine = true, label = { Text("Код (8 цифр)") })
         }
         if (sectionNames.size > 1) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            ChipRow {
                 Hint("Раздел для подписок:")
                 sectionNames.forEach { n -> FilterChip(selected = section == n, onClick = { section = n }, label = { Text(n) }) }
             }
@@ -180,7 +180,7 @@ internal fun RouterRadarCard(r: RouterUi, m: RouterManager, sectionNames: List<S
 
 @Composable
 internal fun RouterChecksCard(r: RouterUi, m: RouterManager) = MCard("Диагностика роутера") {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    ChipRow {
         listOf("global" to "Общая", "dns" to "DNS", "singbox" to "sing-box", "nft" to "Файрвол", "proxy" to "Прокси").forEach { (id, t) ->
             OutlinedButton(onClick = { m.runCheck(id) }, enabled = !r.busy) { Text(t) }
         }

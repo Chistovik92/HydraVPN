@@ -23,7 +23,7 @@ internal class ServersPanel(private val c: AppController) : JPanel(BorderLayout(
     private val quiet = Quiet()
     private val model = DefaultListModel<ServerProfile>()
     private val list = JList(model)
-    private val input = Field(40, quiet)
+    private val input = Field(26, quiet)
     private val ping = button("Пинг всех") { c.pingAll() }
     private val select = button("Выбрать") { chosen()?.let { c.select(it.id) } }
     private val share = button("Скопировать ссылку") {

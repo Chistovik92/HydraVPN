@@ -94,7 +94,7 @@ internal fun RoutingScreen(c: AppController, ui: UiState) {
 
 @Composable
 private fun SplitModeChips(mode: SplitTunnelMode, off: String, include: String, exclude: String, onChange: (SplitTunnelMode) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    ChipRow {
         listOf(SplitTunnelMode.OFF to off, SplitTunnelMode.INCLUDE to include, SplitTunnelMode.EXCLUDE to exclude).forEach { (m, label) ->
             FilterChip(selected = mode == m, onClick = { onChange(m) }, label = { Text(label) })
         }
@@ -109,7 +109,7 @@ private fun AppsEditor(c: AppController, apps: List<String>) {
         OutlinedTextField(input, { input = it }, Modifier.weight(1f), singleLine = true,
             label = { Text(if (Platform.os == Os.WINDOWS) "chrome.exe или C:\\Program Files\\…\\app.exe" else "firefox или /usr/bin/app") })
         Button(onClick = { c.addApps(listOf(input)); input = "" }, enabled = input.isNotBlank()) { Text("Добавить") }
-        OutlinedButton(onClick = { picking = true }) { Text("Выбрать из запущенных…") }
+        OutlinedButton(onClick = { picking = true }) { Text("Из запущенных…") }
     }
     apps.forEach { a ->
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -171,7 +171,7 @@ private fun NetRulesEditor(c: AppController, ui: UiState) {
     var type by remember { mutableStateOf<NetRuleType?>(null) }
     val types = listOf(null to "Авто", NetRuleType.DOMAIN_SUFFIX to "Домен + поддомены", NetRuleType.DOMAIN to "Точный домен",
         NetRuleType.DOMAIN_KEYWORD to "Слово в домене", NetRuleType.IP_CIDR to "IP / подсеть")
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    ChipRow {
         types.forEach { (t, label) -> FilterChip(selected = type == t, onClick = { type = t }, label = { Text(label, fontSize = 12.sp) }) }
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -208,7 +208,7 @@ private fun GeoSection(c: AppController, ui: UiState) {
     }
     Section("По странам (geoip/geosite)") {
         if (geoDir == null) { Text("Базы geo не найдены в пакете — функция недоступна.", color = Warn, fontSize = 13.sp); return@Section }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow {
             listOf(GeoRoutingMode.OFF to "Выключено", GeoRoutingMode.DIRECT to "Эти страны — мимо VPN", GeoRoutingMode.VIA_PROXY to "Только эти страны — через VPN")
                 .forEach { (m, label) -> FilterChip(selected = r.geoMode == m, onClick = { c.updateRouting { it.copy(geoMode = m) } }, label = { Text(label) }) }
         }

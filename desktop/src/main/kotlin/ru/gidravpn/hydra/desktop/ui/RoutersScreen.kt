@@ -112,19 +112,21 @@ private fun AddRouterForm(m: RouterManager) {
     var link by remember { mutableStateOf("") }
     var token by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(link, { link = it }, Modifier.weight(2f), singleLine = true,
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(link, { link = it }, Modifier.fillMaxWidth(), singleLine = true,
             label = { Text("Ссылка hydravpn-router://… или адрес[:порт]") })
-        OutlinedTextField(token, { token = it }, Modifier.weight(1f), singleLine = true,
-            visualTransformation = PasswordVisualTransformation(), label = { Text("Токен (если не в ссылке)") })
-        OutlinedTextField(name, { name = it }, Modifier.width(150.dp), singleLine = true, label = { Text("Название") })
-        Button(onClick = { if (m.add(link, token, name)) { link = ""; token = ""; name = "" } }, enabled = link.isNotBlank()) { Text("Добавить") }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(token, { token = it }, Modifier.weight(1f), singleLine = true,
+                visualTransformation = PasswordVisualTransformation(), label = { Text("Токен (если не в ссылке)", maxLines = 1) })
+            OutlinedTextField(name, { name = it }, Modifier.width(200.dp), singleLine = true, label = { Text("Название") })
+            Button(onClick = { if (m.add(link, token, name)) { link = ""; token = ""; name = "" } }, enabled = link.isNotBlank()) { Text("Добавить") }
+        }
     }
 }
 
 @Composable
 private fun RouterChips(links: List<RouterLink>, selected: String?, m: RouterManager) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    ChipRow {
         links.forEach { l ->
             FilterChip(
                 selected = l.baseUrl == selected,
@@ -132,11 +134,12 @@ private fun RouterChips(links: List<RouterLink>, selected: String?, m: RouterMan
                 label = { Text(l.name + if (l.insecure) " · без TLS" else "") },
             )
         }
-        Spacer(Modifier.weight(1f))
         val cur = links.firstOrNull { it.baseUrl == selected }
         if (cur != null) {
-            Text("${cur.host}:${cur.port}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            IconButton(onClick = { m.remove(cur.baseUrl) }) { Icon(Icons.Default.Delete, "Забыть роутер") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${cur.host}:${cur.port}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                IconButton(onClick = { m.remove(cur.baseUrl) }) { Icon(Icons.Default.Delete, "Забыть роутер") }
+            }
         }
     }
 }
@@ -236,7 +239,7 @@ private fun SubscriptionsCard(c: AppController, ui: UiState, r: RouterUi, m: Rou
         Muted("Чтобы добавить подписку, на роутере должна быть хотя бы одна секция.")
         return@RCard
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    ChipRow {
         Muted("Секция:")
         r.sections.forEach { s -> FilterChip(selected = section == s.name, onClick = { section = s.name }, label = { Text(s.title) }) }
     }
@@ -247,7 +250,7 @@ private fun SubscriptionsCard(c: AppController, ui: UiState, r: RouterUi, m: Rou
     val own = ui.data.subscriptions.filter { it.url.startsWith("http", true) }
     if (own.isNotEmpty()) {
         Muted("Отправить на роутер подписку из Hydra:")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ChipRow {
             own.forEach { s ->
                 OutlinedButton(
                     onClick = { m.addSubscription(section, s.url) },

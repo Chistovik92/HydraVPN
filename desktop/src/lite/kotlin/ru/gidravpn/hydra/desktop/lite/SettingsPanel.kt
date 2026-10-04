@@ -104,9 +104,9 @@ internal class SettingsPanel(private val c: AppController) : Renderable {
                 "Порт открывается на всех сетевых адаптерах — брандмауэр ОС может спросить разрешение."),
             lan, lanBox),
         section("Аккаунт Hydra VPN (бот «Радар»)", botBox),
-        section("DNS", row(*dnsRadios.toTypedArray()),
-            row(JLabel("Свой DNS (IP, https://…/dns-query, tls://…, udp://…):"), dnsOwn,
-                button("Сохранить") { if (!c.setDns(dnsOwn.text)) dnsBad.isVisible = true else dnsBad.isVisible = false }), dnsBad),
+        section("DNS", row(*dnsRadios.take(3).toTypedArray()), row(*dnsRadios.drop(3).toTypedArray()),
+            JLabel("Свой DNS (IP, https://…/dns-query, tls://…, udp://…):"),
+            row(dnsOwn, button("Сохранить") { if (!c.setDns(dnsOwn.text)) dnsBad.isVisible = true else dnsBad.isVisible = false }), dnsBad),
         section("Туннель",
             JLabel("Фрагментация TLS ClientHello (обход DPI; только sing-box, VLESS/VMess/Trojan с TLS):"), row(*frag.toTypedArray()),
             JLabel("MTU адаптера TUN (меньше — если сайты «висят» на загрузке):"), row(*mtu.toTypedArray()), ipv6),
@@ -139,8 +139,8 @@ internal class SettingsPanel(private val c: AppController) : Renderable {
         ButtonGroup().also { g -> frag.forEach { g.add(it) } }
         ButtonGroup().also { g -> mtu.forEach { g.add(it) } }
         dnsBad.isVisible = false
-        lanBox.add(row(JLabel("Порт:"), lanPort, JLabel("Логин:"), lanUser, JLabel("Пароль:"), lanPass,
-            button("Новый пароль") { c.regenerateLanPassword() }))
+        lanBox.add(row(JLabel("Порт:"), lanPort, JLabel("Логин:"), lanUser))
+        lanBox.add(row(JLabel("Пароль:"), lanPass, button("Новый пароль") { c.regenerateLanPassword() }))
         lanBox.add(lanInfo)
     }
 
