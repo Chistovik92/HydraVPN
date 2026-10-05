@@ -45,11 +45,19 @@ SB_BRANCH_LATEST="$(latest_in_branch SagerNet/sing-box "$SB_BRANCH")"
 row "sing-box (ветка $SB_BRANCH)" "$SINGBOX" "$SB_BRANCH_LATEST"
 row "sing-box (последняя)" "$SINGBOX" "$SB_LATEST_STABLE" "← смена ветки = перенос libbox, см. ROADMAP 0.8.4"
 [[ "$CI_SINGBOX" == "$SINGBOX" ]] || echo "  !! CI (android.yml) закрепил sing-box $CI_SINGBOX, а ПК — $SINGBOX"
-row "Xray-core" "$XRAY" "$(latest_release XTLS/Xray-core | sed 's/^v//')"
-XRAY_PRE="$("$GH" release list -R XTLS/Xray-core --limit 1 --json tagName,isPrerelease --jq '.[0]|select(.isPrerelease)|.tagName' 2>/dev/null | tr -d '')"
-[[ -n "$XRAY_PRE" ]] && echo "  (у Xray-core есть более новый ПРЕ-релиз $XRAY_PRE — на стабильную ветку не переходим, пока он не станет релизом)"
+XRAY_ANY="$("$GH" release list -R XTLS/Xray-core --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null | tr -d '' | sed 's/^v//')"
+XRAY_STABLE="$(latest_release XTLS/Xray-core | sed 's/^v//')"
+# Метка «pre-release» у Xray-core стоит на всех релизах с июня; берём последний, стабильный — для справки.
+row "Xray-core" "$XRAY" "$XRAY_ANY" "(стабильная метка: $XRAY_STABLE)"
 row "amneziawg-go" "$AWG" "$(latest_tag amnezia-vpn/amneziawg-go)"
 row "OpenFlux (клиент)" "v$OPENFLUX" "$(latest_release p1neappleXpress/OpenFlux)"
+# Метки апстрима изменяемы: 04.10.2026 OpenFlux перезалил v0.3.0 с другими бинарями — сверяем хеши ассетов с закреплёнными.
+OF_ASSETS="$("$GH" api "repos/p1neappleXpress/OpenFlux/releases/tags/v$OPENFLUX" --jq '.assets[]|"\(.name) \(.digest)"' 2>/dev/null | tr -d '\r')"
+while read -r name pinned; do
+  [[ -z "$name" ]] && continue
+  cur="$(grep -F "$name " <<<"$OF_ASSETS" | head -1 | sed 's/.*sha256://')"
+  [[ -n "$cur" && "$cur" != "$pinned" ]] && echo "  !! OpenFlux $name: хеш в релизе изменился (закреплён ${pinned:0:12}…, сейчас ${cur:0:12}…) — апстрим перезалил ассет"
+done < <(grep -oE '"openflux-[^"]+" to "[0-9a-f]{64}"|"openflux-linux-arm" to "[0-9a-f]{64}"' desktop/build.gradle.kts | sed -E 's/"([^"]+)" to "([0-9a-f]+)"/\1 \2/')
 OLC_LATEST="$(latest_commit openlibrecommunity/olcrtc)"
 row "olcRTC (коммит)" "${OLCRTC:0:12}" "${OLC_LATEST:0:12}" "(апстрим заархивирован)"
 

@@ -24,7 +24,15 @@ HOST="$(ls "$NDK/toolchains/llvm/prebuilt" | head -1)"
 BIN="$NDK/toolchains/llvm/prebuilt/$HOST/bin"
 EXT=""; [[ "$HOST" == windows* ]] && EXT=".cmd"
 
-[[ -d "$WORK/.git" ]] || git clone --depth 1 https://github.com/openlibrecommunity/olcrtc.git "$WORK"
+# Коммит закреплён — тот же, что у сборки для ПК (olcRtcCommit в desktop/build.gradle.kts); апстрим заархивирован.
+OLCRTC_REF="${OLCRTC_REF:-f3ad8fb7c0d0fa981423f83269526fa94077c23d}"
+if [[ ! -d "$WORK/.git" ]]; then
+  git init -q "$WORK"
+  git -C "$WORK" remote add origin https://github.com/openlibrecommunity/olcrtc.git
+fi
+git -C "$WORK" fetch -q --depth 1 origin "$OLCRTC_REF"
+git -C "$WORK" checkout -q FETCH_HEAD
+echo "    olcRTC: $OLCRTC_REF"
 cd "$WORK"
 
 export CGO_ENABLED=1 GOOS=android CGO_LDFLAGS="-Wl,-z,max-page-size=16384"

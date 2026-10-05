@@ -168,14 +168,16 @@ val syncGeoAssets by tasks.registering(Sync::class) {
 
 // ---- olcRTC и OpenFlux (0.7.4, BETA): клиенты-подпроцессы -------------------------
 // OpenFlux — готовые бинари из релиза апстрима (GPL-3.0), SHA-256 закреплены (SHA256SUMS.txt релиза v0.3.0).
+// 04.10.2026 апстрим переставил метку v0.3.0 на новый коммит bb55dc3 («Boards, mailru and yandex: the new native transports»)
+// и перезалил все бинари — хеши обновлены; Android собирается из того же коммита (scripts/build-openflux.sh).
 val openFluxVersion = "0.3.0"
 val openFluxBinaries = mapOf(
-    "windows-x64" to ("openflux-windows-amd64.exe" to "0399506ee56381dc140e67a47e4e3c3bb8e7d5af102cccdb0d27c0e50060e70a"),
-    "windows-arm64" to ("openflux-windows-arm64.exe" to "ea3c8535c676f56d3c46e72e5f7d39231b45369aece3d4fa91581c954b58a127"),
-    "linux-x64" to ("openflux-linux-amd64" to "429bd9545c7ec52998ed98f9f06947cc4724239aa1dd2cc024c82c1a948a5883"),
-    "linux-arm64" to ("openflux-linux-arm64" to "41f0c8acb98487949b3697482d5e314f7ee72cb7c82bc517636688d9338bd771"),
-    "macos-x64" to ("openflux-darwin-amd64" to "726012d80fed1be8e3e39a64079b6d788cba83f3df58cbaaf89768e61e9764fc"),
-    "macos-arm64" to ("openflux-darwin-arm64" to "0be53af3567ef9e11c8ee8ff57df3e27d5948c8e99e3f828d2825dde00c441dc"),
+    "windows-x64" to ("openflux-windows-amd64.exe" to "56bfc44fd897d3d5b8adbec90919d25feefd8169cd5a316240febb8ded05eb77"),
+    "windows-arm64" to ("openflux-windows-arm64.exe" to "d1762cdfb50942ece61a69f29d1d9cd9c484623e36b6bbd4436b98ebc8627f48"),
+    "linux-x64" to ("openflux-linux-amd64" to "fdc30ccd12f65bc88db080da600a5fb2e5bbb22fe886648b67583ed77282c622"),
+    "linux-arm64" to ("openflux-linux-arm64" to "35708a36e43c870fa4a1fdc6838e5d624e8ca48ad1364a3178d7af7e07f26940"),
+    "macos-x64" to ("openflux-darwin-amd64" to "b708bc6e9297f7b6ded7110a9cc39b7d305f4812f4714f920df636f7c3da3612"),
+    "macos-arm64" to ("openflux-darwin-arm64" to "614cd151b68de8f88dc32800d6ba884e3b9194fae78b8522f0062dab46c2c19f"),
 )
 
 val downloadOpenFlux by tasks.registering {
@@ -526,7 +528,7 @@ val classicTargets = listOf(
     Classic("linux-armv7", "LinuxArmv7", "linux", "armv7",
         "sing-box-$singBoxVersion-linux-armv7.tar.gz", "9eedd8eb2d3ea66a48794359d1cc1e32ce618b6e1b105c9cd314da6408c9fc87",
         "Xray-linux-arm32-v7a.zip", "0b9719471c7c69752857714e9711d4da57cf38a6beb75dcddfb21425f7919908",
-        openFlux = "openflux-linux-arm" to "d950b6f69757c769f462828671db20a56a332c9b5f890ce6d4ec70e25818c930",
+        openFlux = "openflux-linux-arm" to "e026e591deb9fcf467911ab6a509633ec0919ad858ef47939f27b84d9a575f4b",
         olcRtc = Triple("linux", "arm", "7")),
 )
 
