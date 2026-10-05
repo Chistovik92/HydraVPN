@@ -39,8 +39,8 @@ val macPkgVersion: String = pkgVersion.split('.').let { (a, b, c) -> "${a.toInt(
 
 // ---- Ядро sing-box -------------------------------------------------------------
 // Та же версия, что libbox в Android и Libbox.xcframework в iOS (ios.yml).
-// SHA-256 архивов с https://github.com/SagerNet/sing-box/releases/tag/v1.12.9 .
-val singBoxVersion = "1.12.9"
+// SHA-256 архивов с https://github.com/SagerNet/sing-box/releases/tag/v1.12.25 .
+val singBoxVersion = "1.12.25"
 
 data class CoreArchive(val target: String, val archive: String, val sha256: String) {
     val isZip get() = archive.endsWith(".zip")
@@ -48,12 +48,12 @@ data class CoreArchive(val target: String, val archive: String, val sha256: Stri
 }
 
 val coreArchives = listOf(
-    CoreArchive("windows-x64", "windows-amd64.zip", "f9f9b55d394fe08a8afe1fd3bb1c037e687a12fbe701f16481be6941d1766840"),
-    CoreArchive("windows-arm64", "windows-arm64.zip", "4a490b0d114e0ae4c7e154232860cad7b9897bfcd9324d40b07a48dae90eb1d0"),
-    CoreArchive("linux-x64", "linux-amd64.tar.gz", "519bc521e6b25f779b37738c5fca0fa3f68175b3d8e434fcacd8ea42da9e70ef"),
-    CoreArchive("linux-arm64", "linux-arm64.tar.gz", "0d571bf961c651cc5a4eaffe9715d7759edb484b90473f3fa25aaab87fa11961"),
-    CoreArchive("macos-x64", "darwin-amd64.tar.gz", "1657fb9fd356bc17d4b657052db93a0741547348070e605ed2553a067281fd8b"),
-    CoreArchive("macos-arm64", "darwin-arm64.tar.gz", "d37141302f0c9e1ea5a2f071e78146961a7b4f9045feaafee51d8b3535c6ff0b"),
+    CoreArchive("windows-x64", "windows-amd64.zip", "492df6eb97c4c749d45350d792ecece71278d83c4979149ba6a142765b8fc1d4"),
+    CoreArchive("windows-arm64", "windows-arm64.zip", "5c722c7e3ff23fbb0f09a49dce10726b3e4f39e4bc4bf17d2826fbb6b990ef7a"),
+    CoreArchive("linux-x64", "linux-amd64.tar.gz", "a1ec76e2b6b139eb747a1b1ebee7d14b8d4be5a833596cad8070a31ef960301f"),
+    CoreArchive("linux-arm64", "linux-arm64.tar.gz", "719b76196c8b31efa636b2d8f669e314547e0da0a5ab38a75e1882d307bbd154"),
+    CoreArchive("macos-x64", "darwin-amd64.tar.gz", "fb9cb2a1d3160b9ef4a288818286ad27711907228232b8d84410cad7e42726d8"),
+    CoreArchive("macos-arm64", "darwin-arm64.tar.gz", "a4a06d507f3f4d951490168d1372fce4c02db7211e88af9da13f93ed98068d5e"),
 )
 
 /** Цель текущей машины в терминах каталогов ресурсов Compose (<os>-<arch>). */
@@ -110,17 +110,19 @@ val downloadSingBox by tasks.registering {
 }
 
 // ---- Ядро Xray-core (второй движок, как на Android) ------------------------------
-// Последний стабильный (не pre-release) релиз XTLS/Xray-core. SHA-256 — дайджесты
-// ассетов релиза https://github.com/XTLS/Xray-core/releases/tag/v26.3.27 .
-val xrayVersion = "26.3.27"
+// 26.9.30 — пре-релиз по меткам апстрима, но тот же коммит (b26a91d), что собран в libXray.aar на Android,
+// так что на всех платформах один и тот же Xray. Стабильный 26.9.30 отстаёт на полгода, а панели (3x-ui 3.9,
+// PasarGuard и др.) выдают настройки под свежий Xray. SHA-256 — дайджесты ассетов релиза
+// https://github.com/XTLS/Xray-core/releases/tag/v26.9.30 .
+val xrayVersion = "26.9.30"
 
 val xrayArchives = mapOf(
-    "windows-x64" to ("windows-64" to "d004c39288ce9ada487c6f398c7c545f7d749e44bdfdd59dbc9f865afba4e1ad"),
-    "windows-arm64" to ("windows-arm64-v8a" to "35d4ed6ec21224fb22b07c2c3f672e2350cd536f2c74d309150175a76365ea88"),
-    "linux-x64" to ("linux-64" to "23cd9af937744d97776ee35ecad4972cf4b2109d1e0fe6be9930467608f7c8ae"),
-    "linux-arm64" to ("linux-arm64-v8a" to "4d30283ae614e3057f730f67cd088a42be6fdf91f8639d82cb69e48cde80413c"),
-    "macos-x64" to ("macos-64" to "f5b0471d3459eff1b82e48af0aeac186abcc3298210070afbbbd8437a4e8b203"),
-    "macos-arm64" to ("macos-arm64-v8a" to "2e93a67e8aa1936ecefb307e120830fcbd4c643ab9b1c46a2d0838d5f8409eaf"),
+    "windows-x64" to ("windows-64" to "b17a619343c11b89d8faf36278298856749b15c52277d875d32051b33dcda617"),
+    "windows-arm64" to ("windows-arm64-v8a" to "5cf7ad4fd9aac5aa248ae7e598f3f0a0d0f79a6195089d611ddef9653830f1b0"),
+    "linux-x64" to ("linux-64" to "f851110beaff16e78d643f0ccfd9524b4a44dfd59bae3e34bb52bba378f7690e"),
+    "linux-arm64" to ("linux-arm64-v8a" to "9886f077f9fd8e6713b84c377c1c7db4e53b9bfa8c276a5bd12561139522b473"),
+    "macos-x64" to ("macos-64" to "1f366aaf21d3c3003d1556d066c4e08f9dd62d1f96555ecedde85b397df0f684"),
+    "macos-arm64" to ("macos-arm64-v8a" to "4b363bd924df5bf09f87bd445755ff8e5742b9a8a0480cda261061416c3c7dce"),
 )
 
 /** Xray-core своей платформы в тот же каталог ресурсов, что и sing-box. */
@@ -508,22 +510,22 @@ val classicTargets = listOf(
     // Windows: ядра «legacy-windows-7» собраны патченым Go, который ещё работает на Windows 7; на новых системах тоже.
     // olcRTC и OpenFlux собираются обычным Go (Windows 10+) — на Windows 7 не запустятся, поэтому в эти архивы не входят.
     Classic("windows-x86", "WindowsX86", "windows", "x86",
-        "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "d6135be80f7d507bd5d7ebe32a66fc6c658771cfae37306d284933e8f75e73a2",
-        "Xray-win7-32.zip", "33bc2686a77f6fe438616982b347f852eb7f9572dbe97adc1459f8fb639aea13",
+        "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "e4024508be5616015353c893b0d3f2dd3c080617a750ef6bd64f8183107611c8",
+        "Xray-win7-32.zip", "3d73134f74e119589cc117c8f45b4564a14417f9b74508cc48599f142ac3aa81",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.29%2B7/OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip",
             "OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip", "b747698a05a39391a58b9caac30310275e4e6bd9fef92d6c149cba310d91d2be")),
     Classic("windows-x64", "WindowsX64", "windows", "x64",
-        "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "a7ce8ae8e12328874fd69890f330b8e48f1eb4ee05ca3eec9cbb4f6c79856eff",
-        "Xray-win7-64.zip", "02a4798854975435981a5c6fb4aaf7059f58d22d73d2762363cd56788d92d758",
+        "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "4f27f807f99198b2681a59c1f12564b3683331e68215344e75761ee9199a9b90",
+        "Xray-win7-64.zip", "75e67c738fdfafb9649f1a81a7ab6b3ba97a0f2e09a44254bff03c5b077547d3",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.32.1%2B1/OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip",
             "OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip", "f8c7da672f5dba36b6f870608820b6b598cfae91296929f1b8f21ef2f1e8a0dd")),
     Classic("linux-x86", "LinuxX86", "linux", "x86",
-        "sing-box-$singBoxVersion-linux-386.tar.gz", "52d203d5b368d6ef7bf8c73abd1087a1daccbf4d064a7e78532de44ea26d7c96",
-        "Xray-linux-32.zip", "d1eeb0d9a9106eefd286fbb73595c2dfe1c48c56aa91ba1c9aefe04f188d0927",
+        "sing-box-$singBoxVersion-linux-386.tar.gz", "b2361b5eb0ef6da8f068d9bba762b9edbb3a8637515e30251ee8d5d78b30d846",
+        "Xray-linux-32.zip", "277ffde84d86cb593ae9c3d144b11a5e4c80ba579fdfe6fe09830e04c85d04aa",
         olcRtc = Triple("linux", "386", "")),
     Classic("linux-armv7", "LinuxArmv7", "linux", "armv7",
-        "sing-box-$singBoxVersion-linux-armv7.tar.gz", "ff9805b85ea61dd7700a76f9f11b1783b44b59c5a2a0f4f9e2ac161fd862b890",
-        "Xray-linux-arm32-v7a.zip", "c7265ae13c63ca0241a037df4ef960ad37938c8a67d984cc08834b2cfdf5654b",
+        "sing-box-$singBoxVersion-linux-armv7.tar.gz", "9eedd8eb2d3ea66a48794359d1cc1e32ce618b6e1b105c9cd314da6408c9fc87",
+        "Xray-linux-arm32-v7a.zip", "0b9719471c7c69752857714e9711d4da57cf38a6beb75dcddfb21425f7919908",
         openFlux = "openflux-linux-arm" to "d950b6f69757c769f462828671db20a56a332c9b5f890ce6d4ec70e25818c930",
         olcRtc = Triple("linux", "arm", "7")),
 )

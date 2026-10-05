@@ -48,8 +48,8 @@
 Нужен Mac с Xcode 16+ (CI: `.github/workflows/ios.yml`, собирает без подписи на каждом push).
 
 ```bash
-# 1. Libbox.xcframework из исходников sing-box той же версии, что на Android (1.12.9)
-git clone --depth 1 --branch v1.12.9 https://github.com/SagerNet/sing-box && cd sing-box
+# 1. Libbox.xcframework из исходников sing-box той же версии, что на Android (1.12.25)
+git clone --depth 1 --branch v1.12.25 https://github.com/SagerNet/sing-box && cd sing-box
 go install github.com/sagernet/gomobile/cmd/gomobile@latest github.com/sagernet/gomobile/cmd/gobind@latest
 gomobile init && go run ./cmd/internal/build_libbox -target apple -platform ios
 mv Libbox.xcframework ../Hydra/ios/Frameworks/

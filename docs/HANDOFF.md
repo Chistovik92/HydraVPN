@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.7.7** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.7.8** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -68,7 +68,7 @@
 
 ## Открытые задачи (TODO)
 
-1. **Нативные ядра** (`docs/BUILD.md`). `libbox.aar` (sing-box 1.12.9) —
+1. **Нативные ядра** (`docs/BUILD.md`). `libbox.aar` (sing-box 1.12.25) —
    ✅ собран и лежит в `app/libs/`, full-APK на нём проверен вживую.
    Остальные пока не собирались: `libXray.aar` (Xray), `amneziawg-go.aar` (AWG),
    `olcrtc.aar` (gomobile), `libclient.so` (WDTT) — но само по себе их наличие

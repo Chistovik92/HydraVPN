@@ -67,6 +67,7 @@
     <string name="upd_need_permission">Дозвольте Hydra встановлювати застосунки на екрані, що відкрився, і натисніть «Оновити» ще раз.</string>
     <string name="upd_no_file">У цьому релізі немає файла для цієї збірки — відкрийте сторінку релізу.</string>
     <string name="upd_install_failed">Не вдалося оновити: %1$s</string>
+    <string name="upd_sig_mismatch">Завантажений файл підписано іншим ключем, ніж установлена Hydra, тому поверх вона не встане. Файл видалено — завантажуйте Hydra лише зі сторінки офіційних релізів.</string>
 
     <string name="a11y_dismiss">Закрити</string>
     <string name="a11y_more_actions">Інші дії</string>

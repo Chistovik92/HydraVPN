@@ -64,7 +64,7 @@ jobs:
   build-native:
     runs-on: ubuntu-latest
     env:
-      SING_BOX_VERSION: "1.12.9"
+      SING_BOX_VERSION: "1.12.25"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

@@ -40,9 +40,35 @@ object AppUpdater {
                 if (total > 0) onProgress((done.toFloat() / total).coerceIn(0f, 1f)); true
             }
         }
-        withContext(Dispatchers.IO) { commit(app, file) }
+        withContext(Dispatchers.IO) {
+            if (!sameSigner(app, file)) {
+                file.delete()
+                throw IllegalStateException(app.getString(ru.gidravpn.hydra.R.string.upd_sig_mismatch))
+            }
+            commit(app, file)
+        }
         return Result.INSTALLER_OPENED
     }
+
+    /**
+     * Сертификат загруженного APK совпадает с сертификатом установленной Hydra. Система всё равно откажет при другой
+     * подписи, но её ответ — «приложение не установлено (код 1)»; здесь пользователь получает понятную причину
+     * ещё до установщика. Если сверить не удалось (старая прошивка, нет данных) — решает система, как раньше.
+     */
+    private fun sameSigner(context: Context, apk: File): Boolean = runCatching {
+        if (Build.VERSION.SDK_INT < 28) return true
+        val pm = context.packageManager
+        val flags = android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
+        val downloaded = pm.getPackageArchiveInfo(apk.absolutePath, flags)?.signingInfo ?: return true
+        val installed = pm.getPackageInfo(context.packageName, flags).signingInfo ?: return true
+        fun digests(info: android.content.pm.SigningInfo) =
+            (if (info.hasMultipleSigners()) info.apkContentsSigners else info.signingCertificateHistory)
+                .map { java.security.MessageDigest.getInstance("SHA-256").digest(it.toByteArray()).toList() }.toSet()
+        val have = digests(installed)
+        val got = digests(downloaded)
+        // Подходит, если хоть один сертификат загруженного файла есть среди установленных (ротация ключей).
+        got.isEmpty() || have.isEmpty() || got.any { it in have }
+    }.getOrDefault(true)
 
     private fun commit(context: Context, apk: File) {
         val installer = context.packageManager.packageInstaller

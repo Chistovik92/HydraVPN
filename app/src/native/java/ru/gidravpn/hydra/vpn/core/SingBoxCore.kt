@@ -35,7 +35,7 @@ import java.io.File
 /**
  * Интеграция sing-box через libbox.aar (gomobile-биндинг experimental/libbox).
  *
- * Собрано и проверено против **libbox 1.12.9** (сигнатуры PlatformInterface
+ * Собрано и проверено против **libbox 1.12.25** (сигнатуры PlatformInterface
  * сверены с фактическим .aar). При обновлении .aar компилятор укажет
  * расхождения — реф. SagerNet/sing-box-for-android → PlatformInterfaceWrapper.
  */

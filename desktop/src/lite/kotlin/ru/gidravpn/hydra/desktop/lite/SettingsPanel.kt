@@ -117,7 +117,7 @@ internal class SettingsPanel(private val c: AppController) : Renderable {
             row(button("Сохранить в файл…") { chooseFile(save = true)?.let { c.exportBackup(it) } },
                 restoreButton())),
         section("О программе",
-            JLabel("Hydra ${Platform.version} (Classic) · sing-box 1.12.9 · Xray-core 26.3.27 · ${System.getProperty("os.name")} ${System.getProperty("os.arch")}"),
+            JLabel("Hydra ${Platform.version} (Classic) · sing-box 1.12.25 · Xray-core 26.9.30 · ${System.getProperty("os.name")} ${System.getProperty("os.arch")}"),
             note("Данные: ${Platform.dataDir.absolutePath}"),
             note("Classic — упрощённая оболочка для 32-битных систем и Windows 7: те же ядра и настройки, что у обычной Hydra. " +
                 "Нет управления роутерами HydraVPN for Router (оно есть в обычной Hydra и на Android). " +
