@@ -77,6 +77,9 @@ object WireGuardParser {
         val host = endpoint.substringBeforeLast(":").removePrefix("[").removeSuffix("]")
         val port = endpoint.substringAfterLast(":").toIntOrNull() ?: 51820
 
+        // Открытый ключ пира читают и WireGuardConfigBuilder (uapi), и sing-box; без него подключение невозможно.
+        // Раньше он попадал только в meta и в профиль не сохранялся — импорт .conf/awg:// не мог подключиться.
+        extra.put("public_key", pubKey)
         iface["privatekey"]?.let { extra.put("private_key", it) }
         iface["address"]?.let { extra.put("local_address", it) }
         iface["dns"]?.let { extra.put("dns", it) }

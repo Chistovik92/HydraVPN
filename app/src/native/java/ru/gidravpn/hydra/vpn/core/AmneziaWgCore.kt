@@ -48,8 +48,11 @@ class AmneziaWgCore : VpnCore {
         onLog("AmneziaWG: amneziawg-go ${runCatching { GoBackend.awgVersion() }.getOrDefault("?")}, профиль $version")
         onLog("AmneziaWG: uapi — ${uapi.lineSequence().count()} строк, ключи скрыты")
 
-        // Go получает tun во владение (detachFd), как sing-box; закрытие — в awgTurnOff.
-        val h = GoBackend.awgTurnOn("hydra-awg", tun.detachFd(), uapi)
+        // Go получает ДУБЛИКАТ tun и закрывает его сам (и при ошибке запуска, и в awgTurnOff); исходный дескриптор
+        // остаётся у сервиса и закрывается там же. Раньше Go забирал сам fd, а при ошибке запуска сервис закрывал
+        // его ещё раз — на уже переиспользованном номере fdsan убивал процесс (SIGABRT) вместо понятной ошибки.
+        val goFd = ParcelFileDescriptor.dup(tun.fileDescriptor)
+        val h = GoBackend.awgTurnOn("hydra-awg", goFd.detachFd(), uapi)
         check(h >= 0) { "AmneziaWG: не удалось поднять туннель (смотрите logcat, тег AmneziaWG/hydra-awg)" }
         handle = h
         running = true

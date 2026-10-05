@@ -443,12 +443,11 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
         liveAttempt = null
         runCatching { core?.stop() }
         core = null
-        runCatching { tun?.close() }
+        // Один раз и одним способом: PFD, если он ещё владеет fd, иначе сырой fd (его отдал ядру detachFd()).
+        // Раньше шли оба подряд — второе закрытие попадало на уже закрытый или переиспользованный номер.
+        closeTun(tun, tunFd)
         tun = null
-        if (tunFd >= 0) {
-            runCatching { ParcelFileDescriptor.adoptFd(tunFd).close() }
-            tunFd = -1
-        }
+        tunFd = -1
     }
 
     private suspend fun establishTun(profile: ServerProfile): ParcelFileDescriptor {
