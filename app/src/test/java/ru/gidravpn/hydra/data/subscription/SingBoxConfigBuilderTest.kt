@@ -18,7 +18,7 @@ import java.io.File
 /**
  * Структура конфига sing-box. Каждый сгенерированный конфиг дополнительно
  * пишется в app/build/singbox-configs/ — его можно прогнать настоящим
- * `sing-box check -c <file>` той же версии, что в libbox.aar (1.12.9).
+ * `sing-box check -c <file>` той же версии, что в libbox.aar (1.12.25).
  */
 class SingBoxConfigBuilderTest {
 

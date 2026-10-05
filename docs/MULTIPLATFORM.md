@@ -5,10 +5,10 @@
 
 | Платформа | Клиент | Ядро | Сборка / проверка |
 |---|---|---|---|
-| Android | `app/` (Jetpack Compose) | libbox (sing-box 1.12.9), Xray, AWG, olcRTC, OpenFlux, SSTP/L2TP | локально `scripts/release.sh` (подпись) + `android.yml` |
-| Windows 10/11 x64 | `desktop/` (Compose Desktop) | sing-box 1.12.9 + Xray-core 26.3.27 процессами | `desktop.yml` на `windows-latest`: MSI, EXE, portable ZIP |
-| Linux x64 / arm64 | `desktop/` | sing-box 1.12.9 + Xray-core 26.3.27 процессами | `ubuntu-24.04`, `ubuntu-24.04-arm`: DEB, RPM, AppImage, tar.gz |
-| macOS 12+ arm64 / x64 | `desktop/` | sing-box 1.12.9 + Xray-core 26.3.27 процессами | `macos-15`, `macos-15-intel`: DMG (ad-hoc подпись) |
+| Android | `app/` (Jetpack Compose) | libbox (sing-box 1.12.25), Xray, AWG, olcRTC, OpenFlux, SSTP/L2TP | локально `scripts/release.sh` (подпись) + `android.yml` |
+| Windows 10/11 x64 | `desktop/` (Compose Desktop) | sing-box 1.12.25 + Xray-core 26.9.30 процессами | `desktop.yml` на `windows-latest`: MSI, EXE, portable ZIP |
+| Linux x64 / arm64 | `desktop/` | sing-box 1.12.25 + Xray-core 26.9.30 процессами | `ubuntu-24.04`, `ubuntu-24.04-arm`: DEB, RPM, AppImage, tar.gz |
+| macOS 12+ arm64 / x64 | `desktop/` | sing-box 1.12.25 + Xray-core 26.9.30 процессами | `macos-15`, `macos-15-intel`: DMG (ad-hoc подпись) |
 | iOS | `ios/` (SwiftUI + Network Extension) | Libbox.xcframework, WireGuardKit (AWG) | `ios.yml`: неподписанный `.ipa` |
 
 ## Архитектура

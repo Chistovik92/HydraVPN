@@ -25,7 +25,16 @@ HOST="$(ls "$NDK/toolchains/llvm/prebuilt" | head -1)"
 BIN="$NDK/toolchains/llvm/prebuilt/$HOST/bin"
 EXT=""; [[ "$HOST" == windows* ]] && EXT=".cmd"
 
-[[ -d "$WORK/.git" ]] || git clone --depth 1 https://github.com/p1neappleXpress/OpenFlux.git "$WORK"
+# Коммит закреплён (а не HEAD и не метка): 04.10.2026 апстрим переставил метку v0.3.0, а HEAD ушёл дальше.
+# Это тот же коммит, что и у готовых бинарей на ПК (desktop/build.gradle.kts). Сменить: OPENFLUX_REF=<sha> scripts/build-openflux.sh
+OPENFLUX_REF="${OPENFLUX_REF:-bb55dc35604ea11e3b611fda55dd6383f0c3c68d}"
+if [[ ! -d "$WORK/.git" ]]; then
+  git init -q "$WORK"
+  git -C "$WORK" remote add origin https://github.com/p1neappleXpress/OpenFlux.git
+fi
+git -C "$WORK" fetch -q --depth 1 origin "$OPENFLUX_REF"
+git -C "$WORK" checkout -q FETCH_HEAD
+echo "    OpenFlux: $OPENFLUX_REF"
 cd "$WORK"
 
 export CGO_ENABLED=1 GOOS=android CGO_LDFLAGS="-Wl,-z,max-page-size=16384"

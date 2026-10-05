@@ -25,7 +25,7 @@ gradle wrapper --gradle-version 8.9   # один раз, если нет gradlew
 ```bash
 git clone https://github.com/SagerNet/sing-box
 cd sing-box
-git checkout v1.12.9          # версия, против которой собран/проверен Hydra
+git checkout v1.12.25          # версия, против которой собран/проверен Hydra
 # инструмент gomobile от SagerNet
 go install github.com/sagernet/gomobile/cmd/gomobile@latest
 go install github.com/sagernet/gomobile/cmd/gobind@latest
@@ -36,7 +36,7 @@ gomobile init
 TAGS="with_gvisor,with_quic,with_utls,with_clash_api,with_wireguard,with_conntrack"
 gomobile bind -v -androidapi 21 -javapkg=io.nekohasekai -libname=box \
   -tags "$TAGS" -trimpath -buildvcs=false \
-  -ldflags="-X github.com/sagernet/sing-box/constant.Version=1.12.9 -s -w -buildid= -checklinkname=0" \
+  -ldflags="-X github.com/sagernet/sing-box/constant.Version=1.12.25 -s -w -buildid= -checklinkname=0" \
   -o libbox.aar ./experimental/libbox
 
 cp libbox.aar /path/to/Hydra/app/libs/
@@ -60,6 +60,7 @@ cp libbox.aar /path/to/Hydra/app/libs/
 ```bash
 git clone https://github.com/XTLS/libXray
 cd libXray
+git checkout v26.9.30   # метка = версия Xray-core внутри; на ПК закреплена та же (desktop/build.gradle.kts)
 export ANDROID_HOME=<путь к Android SDK>
 export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/<версия>"   # см. `ls "$ANDROID_HOME/ndk"`
 python3 build/main.py android

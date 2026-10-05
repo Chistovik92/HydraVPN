@@ -67,6 +67,7 @@
     <string name="upd_need_permission">请在刚打开的界面中允许 Hydra 安装应用，然后再次点按「更新」。</string>
     <string name="upd_no_file">此版本没有适用于当前构建的文件 — 请打开发布页面。</string>
     <string name="upd_install_failed">更新失败：%1$s</string>
+    <string name="upd_sig_mismatch">下载的文件与已安装的 Hydra 签名密钥不同，无法覆盖安装。文件已删除——请只从官方发布页下载 Hydra。</string>
 
     <string name="a11y_dismiss">关闭</string>
     <string name="a11y_more_actions">更多操作</string>

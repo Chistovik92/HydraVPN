@@ -76,6 +76,7 @@
     <string name="upd_need_permission">Allow Hydra to install apps on the screen that just opened, then tap «Update» again.</string>
     <string name="upd_no_file">This release has no file for this build — open the release page.</string>
     <string name="upd_install_failed">Update failed: %1$s</string>
+    <string name="upd_sig_mismatch">The downloaded file is signed with a different key than the installed Hydra, so it will not install over it. It was deleted — download Hydra only from the official releases page.</string>
 
     <!-- Accessibility -->
     <string name="a11y_dismiss">Dismiss</string>

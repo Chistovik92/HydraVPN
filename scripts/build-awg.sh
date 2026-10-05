@@ -11,6 +11,7 @@
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
+HYDRA_ROOT="$PWD"
 
 WORK="${1:-$(mktemp -d)/amneziawg-android}"
 PKG="ru.gidravpn.hydra"
@@ -30,6 +31,24 @@ if [[ ! -d "$WORK/.git" ]]; then
   git clone --depth 1 https://github.com/amnezia-vpn/amneziawg-android.git "$WORK"
 fi
 cd "$WORK/tunnel/tools/libwg-go"
+
+# Версия ядра amneziawg-go закреплена здесь, а не берётся из go.mod клиента: клиент отстаёт от ядра
+# (0.7.8: клиент тянул v3.1.20260814, а в v3.1.20260828 — исправление «underload при DisableCookies»).
+# Сменить: AWG_GO_VERSION=v3.1.2026XXXX scripts/build-awg.sh
+AWG_GO_VERSION="${AWG_GO_VERSION:-v3.1.20260828}"
+go get "github.com/amnezia-vpn/amneziawg-go/v3@$AWG_GO_VERSION"
+echo "    amneziawg-go: $AWG_GO_VERSION"
+
+# Исправление ошибки upstream (0.7.8): при сбое IpcSet libwg-go закрывал tun-fd вручную, а device.Close() закрывал его ещё раз —
+# на переиспользованном номере fdsan убивал процесс (воспроизведено на эмуляторе с некорректным ключом пира). См. патч.
+PATCH="$HYDRA_ROOT/scripts/awg-libwg-go-fd.patch"
+if git -C "$WORK" apply --ignore-whitespace --reverse --check "$PATCH" 2>/dev/null; then
+  echo "    патч libwg-go уже применён"
+else
+  git -C "$WORK" apply --ignore-whitespace "$PATCH" || {
+    echo "ОШИБКА: патч libwg-go не лёг — апстрим изменил api-android.go; обновите scripts/awg-libwg-go-fd.patch" >&2; exit 1; }
+  echo "    патч libwg-go применён"
+fi
 
 export CGO_ENABLED=1 GOOS=android
 export CGO_LDFLAGS="-Wl,-soname=libwg-go.so -Wl,-z,max-page-size=16384 -Wl,--build-id=none"
