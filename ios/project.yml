@@ -49,6 +49,8 @@ targets:
         HYDRA_PRIVATE_DNS: "${HYDRA_PRIVATE_DNS}"
         CODE_SIGN_ENTITLEMENTS: Hydra/Hydra.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Иконки на выбор (0.7.9, как на Android): Настройки → Тема → Иконка приложения.
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIcon-Stealth AppIcon-Ocean AppIcon-Amber"
         TARGETED_DEVICE_FAMILY: "1,2"
 
   HydraTunnel:

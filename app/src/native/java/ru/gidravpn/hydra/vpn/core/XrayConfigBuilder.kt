@@ -65,7 +65,10 @@ object XrayConfigBuilder {
         // которого нет (embedded-сборка без ассетов), с ним Xray падает:
         // "failed to open geoip.dat: stat ...: no such file or directory".
         root.put("routing", JSONObject().apply {
-            put("domainStrategy", "IPIfNonMatch")
+            // AsIs (0.7.9): sing-box-мост отдаёт Xray уже IP, а правила здесь только по IP.
+            // IPIfNonMatch заставлял Xray резолвить каждый доменный адрес своим DoH через
+            // тот же прокси — после смены сети этот DoH висел на мёртвом соединении.
+            put("domainStrategy", "AsIs")
             put("rules", JSONArray().apply {
                 put(JSONObject().apply {
                     put("type", "field")
@@ -137,6 +140,12 @@ object XrayConfigBuilder {
             else -> p.security.ifBlank { "none" }
         }
         stream.put("security", security)
+
+        // TCP keep-alive (0.7.9): после смены Wi-Fi ↔ мобильная или тихого обрыва у оператора
+        // соединение с сервером умирает без RST, и Xray ждал бы его минутами (системный таймаут
+        // ретрансмиссий) — приложения «висят». Пробы раз в 15 с после 30 с тишины находят такой
+        // обрыв меньше чем за минуту.
+        stream.put("sockopt", JSONObject().put("tcpKeepAliveIdle", 30).put("tcpKeepAliveInterval", 15))
 
         // --- tls / reality ---
         when (stream.optString("security")) {

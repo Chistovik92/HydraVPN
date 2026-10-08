@@ -29,7 +29,10 @@ import javax.swing.event.DocumentListener
  * Hydra Classic должна запускаться на Java 11 в 32-битной Windows 7 и на Linux armv7.
  */
 
-internal val Accent = Color(0x1F, 0x9E, 0x92)
+/** Тема из настроек (0.7.9): Classic светлая (системный вид Swing), от темы берётся акцент — изумрудный или багровый. */
+@Volatile internal var liteTheme: ru.gidravpn.hydra.desktop.AppTheme = ru.gidravpn.hydra.desktop.AppTheme.AMBIENT
+internal val Accent: Color
+    get() = if (liteTheme == ru.gidravpn.hydra.desktop.AppTheme.STEALTH) Color(0xC5, 0x16, 0x2E) else Color(0x00, 0x9E, 0x6B)
 internal val Danger = Color(0xC6, 0x28, 0x28)
 internal val Warn = Color(0xB7, 0x79, 0x1F)
 internal val Muted = Color(0x66, 0x70, 0x75)

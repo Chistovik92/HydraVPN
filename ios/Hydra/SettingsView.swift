@@ -1,5 +1,6 @@
 import HydraKit
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 /// Настройки — те же разделы, что на Android (SettingsScreen): туннель, безопасность,
@@ -347,20 +348,84 @@ struct LogsView: View {
     }
 }
 
+/// Иконка приложения — те же варианты, что на Android (0.7.9). Только в приложении: в расширениях
+/// (туннель, виджеты) UIApplication недоступен, поэтому не в Shared/Theme.swift.
+enum AppIconChoice: String, CaseIterable, Identifiable {
+    case followTheme = "FOLLOW_THEME", ambient = "AMBIENT", stealth = "STEALTH", ocean = "OCEAN", amber = "AMBER"
+    var id: String { rawValue }
+
+    var labelKey: String {
+        switch self {
+        case .followTheme: "icon_follow_theme"
+        case .ambient: "icon_ambient"
+        case .stealth: "icon_stealth"
+        case .ocean: "icon_ocean"
+        case .amber: "icon_amber"
+        }
+    }
+
+    var swatch: Color {
+        switch self {
+        case .followTheme, .ambient: Color(red: 0, green: 0.898, blue: 0.6)
+        case .stealth: Color(red: 0.86, green: 0.15, blue: 0.24)
+        case .ocean: Color(red: 0.22, green: 0.74, blue: 0.97)
+        case .amber: Color(red: 0.96, green: 0.62, blue: 0.04)
+        }
+    }
+
+    /// Имя набора в Assets.xcassets (ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES); nil — основная иконка.
+    func iconName(theme: String) -> String? {
+        switch self {
+        case .followTheme: theme == HydraTheme.stealth.rawValue ? "AppIcon-Stealth" : nil
+        case .ambient: nil
+        case .stealth: "AppIcon-Stealth"
+        case .ocean: "AppIcon-Ocean"
+        case .amber: "AppIcon-Amber"
+        }
+    }
+
+    /// Сменить иконку, если нужна другая (система показывает пользователю уведомление о смене).
+    @MainActor static func apply(_ raw: String?, theme: String) {
+        let want = (AppIconChoice(rawValue: raw ?? "") ?? .followTheme).iconName(theme: theme)
+        guard UIApplication.shared.supportsAlternateIcons, UIApplication.shared.alternateIconName != want else { return }
+        UIApplication.shared.setAlternateIconName(want) { _ in }
+    }
+}
+
 struct ThemeSettings: View {
     @EnvironmentObject var model: AppModel
     var body: some View {
         List {
-            ForEach(HydraTheme.allCases) { t in
-                Button { model.mutate { $0.app.theme = t.rawValue } } label: {
-                    HStack {
-                        Circle().fill(t.accent).frame(width: 24, height: 24).overlay(Circle().stroke(t.bg, lineWidth: 4))
-                        Text(L(t.labelKey))
-                        Spacer()
-                        if model.state.app.theme == t.rawValue { Image(systemName: "checkmark") }
-                    }
-                }.foregroundStyle(.primary)
+            Section {
+                ForEach(HydraTheme.allCases) { t in
+                    Button {
+                        model.mutate { $0.app.theme = t.rawValue }
+                        AppIconChoice.apply(model.state.app.appIcon, theme: t.rawValue)
+                    } label: {
+                        HStack {
+                            Circle().fill(t.accent).frame(width: 24, height: 24).overlay(Circle().stroke(t.bg, lineWidth: 4))
+                            Text(L(t.labelKey))
+                            Spacer()
+                            if model.state.app.theme == t.rawValue { Image(systemName: "checkmark") }
+                        }
+                    }.foregroundStyle(.primary)
+                }
             }
+            Section {
+                ForEach(AppIconChoice.allCases) { ic in
+                    Button {
+                        model.mutate { $0.app.appIcon = ic.rawValue }
+                        AppIconChoice.apply(ic.rawValue, theme: model.state.app.theme)
+                    } label: {
+                        HStack {
+                            RoundedRectangle(cornerRadius: 6).fill(ic.swatch).frame(width: 24, height: 24)
+                            Text(L(ic.labelKey))
+                            Spacer()
+                            if (model.state.app.appIcon ?? AppIconChoice.followTheme.rawValue) == ic.rawValue { Image(systemName: "checkmark") }
+                        }
+                    }.foregroundStyle(.primary)
+                }
+            } header: { Text(L("icon_title")) }
         }
         .navigationTitle(L("theme_title"))
     }

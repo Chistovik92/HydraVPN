@@ -460,6 +460,8 @@ tasks.named<JavaCompile>("compileLiteJava") {
 }
 tasks.named<ProcessResources>("processLiteResources") {
     from(rootProject.file("ios/Hydra/Assets.xcassets/AppIcon.appiconset/icon-1024.png")) { rename { "hydra-icon.png" } }
+    // Иконки тем (0.7.9) — общие с обычной Hydra.
+    from("src/main/resources/icons") { into("icons") }
 }
 
 // ---- Загрузки ------------------------------------------------------------------------------------------------

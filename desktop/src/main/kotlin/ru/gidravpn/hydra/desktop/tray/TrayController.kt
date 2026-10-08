@@ -51,6 +51,8 @@ class TrayController(
     private val onQuit: () -> Unit,
 ) {
     private var icon: TrayIcon? = null
+    /** Ресурс текущей картинки значка: выбор «Иконка» в настройках меняет её на лету (0.7.9). */
+    private var iconRes: String? = null
     private var plaque: Plaque? = null
     private var job: Job? = null
     private var connectedSince = 0L
@@ -81,6 +83,10 @@ class TrayController(
         return true
     }
 
+    private fun loadIcon(res: String): Image? = runCatching {
+        AppController::class.java.getResourceAsStream(res)?.use { javax.imageio.ImageIO.read(it) }
+    }.getOrNull()
+
     fun remove() {
         job?.cancel()
         plaque?.hide()
@@ -96,6 +102,11 @@ class TrayController(
     private fun render(ui: UiState) {
         val prev = last
         last = ui
+        val res = ui.data.settings.appIcon.resource(ui.data.settings.theme)
+        if (res != iconRes) {
+            iconRes = res
+            loadIcon(res)?.let { img -> icon?.image = img }
+        }
         if (ui.status == Status.CONNECTED && prev?.status != Status.CONNECTED) connectedSince = System.currentTimeMillis()
         icon?.toolTip = tooltip(ui)
         toggleItem.label = if (ui.active || ui.blocked) "Отключить" else "Подключить"

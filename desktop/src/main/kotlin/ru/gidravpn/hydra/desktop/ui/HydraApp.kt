@@ -82,7 +82,10 @@ import ru.gidravpn.hydra.data.model.GeoRoutingMode
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.TlsFragmentMode
 import ru.gidravpn.hydra.desktop.AppController
+import ru.gidravpn.hydra.desktop.AppTheme
 import ru.gidravpn.hydra.desktop.ConnectionMode
+import ru.gidravpn.hydra.desktop.colors
+import androidx.compose.ui.graphics.compositeOver
 import ru.gidravpn.hydra.desktop.Os
 import ru.gidravpn.hydra.desktop.Platform
 import ru.gidravpn.hydra.desktop.Status
@@ -94,30 +97,35 @@ import java.awt.datatransfer.StringSelection
 import java.text.SimpleDateFormat
 import java.util.Date
 
-internal val Accent = Color(0xFF2EC4B6)
-internal val Danger = Color(0xFFE5484D)
-internal val Warn = Color(0xFFF5A524)
+/** Акцент текущей темы (0.7.9: темы как на Android — см. [AppTheme]). */
+internal val Accent: Color @Composable get() = MaterialTheme.colorScheme.primary
+internal val Danger = Color(0xFFEF4444)
+internal val Warn = Color(0xFFEAB308)
 
-private val HydraColors = darkColorScheme(
-    primary = Accent,
-    onPrimary = Color(0xFF00201D),
-    secondary = Color(0xFF7DD3C8),
-    secondaryContainer = Color(0xFF1C4A45),
-    onSecondaryContainer = Color(0xFFCFF5EF),
-    background = Color(0xFF0F1417),
-    surface = Color(0xFF151B1F),
-    surfaceVariant = Color(0xFF1E262B),
-    onSurface = Color(0xFFE3E8EA),
-    onSurfaceVariant = Color(0xFF9FB0B6),
-    error = Danger,
-)
+private fun colorSchemeFor(theme: AppTheme) = theme.colors().let { c ->
+    darkColorScheme(
+        primary = Color(c.accent),
+        onPrimary = Color(c.onAccent),
+        secondary = Color(c.accentSecondary),
+        secondaryContainer = Color(c.accent).copy(alpha = 0.22f).compositeOver(Color(c.surface)),
+        onSecondaryContainer = Color(c.text),
+        background = Color(c.bg),
+        surface = Color(c.surface),
+        surfaceVariant = Color(c.surfaceVariant),
+        onSurface = Color(c.text),
+        onSurfaceVariant = Color(c.textSecondary),
+        error = Danger,
+    )
+}
 
 private enum class Tab(val title: String) { HOME("Главная"), SERVERS("Серверы"), SUBS("Подписки"), ROUTING("Маршруты"), ROUTERS("Роутеры"), SETTINGS("Настройки"), LOG("Журнал") }
 
 @Composable
 fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTab: Int = 0) {
     var tab by remember { mutableStateOf(Tab.entries[startTab]) }
-    MaterialTheme(colorScheme = HydraColors) {
+    val theme = ui.data.settings.theme
+    val colors = remember(theme) { colorSchemeFor(theme) }
+    MaterialTheme(colorScheme = colors) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Row(Modifier.fillMaxSize()) {
                 // Семь пунктов не помещаются в окно минимальной высоты (560) — рельсу можно прокрутить.
