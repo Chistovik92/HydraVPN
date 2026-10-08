@@ -79,8 +79,20 @@ object Platform {
     fun bundledXray(): File? = bundled("xray", "HYDRA_XRAY")
 
     /** Клиент OpenFlux (готовый бинарь из релиза апстрима) и клиент olcRTC (собран из закреплённого коммита) — 0.7.4. */
-    fun bundledOpenFlux(): File? = bundled("openflux", "HYDRA_OPENFLUX")
-    fun bundledOlcRtc(): File? = bundled("olcrtc", "HYDRA_OLCRTC")
+    fun bundledOpenFlux(): File? = if (goClientsSupported) bundled("openflux", "HYDRA_OPENFLUX") else null
+    fun bundledOlcRtc(): File? = if (goClientsSupported) bundled("olcrtc", "HYDRA_OLCRTC") else null
+
+    /**
+     * Клиенты olcRTC и OpenFlux собраны современным Go, а он не поддерживает Windows 7 / 8.0 (нужна 8.1+ — NT 6.3).
+     * В Hydra Classic для Windows они лежат в архиве (тот же архив и для Windows 10 x86), но на старой системе не предлагаются (0.7.10).
+     */
+    val goClientsSupported: Boolean by lazy {
+        if (os != Os.WINDOWS) return@lazy true
+        val v = System.getProperty("os.version").orEmpty().split('.').mapNotNull { it.toIntOrNull() }
+        val major = v.getOrNull(0) ?: 10
+        val minor = v.getOrNull(1) ?: 0
+        major > 6 || (major == 6 && minor >= 3)
+    }
 
     private fun bundled(name: String, env: String): File? {
         System.getenv(env)?.let { File(it) }?.takeIf { it.isFile }?.let { return it }

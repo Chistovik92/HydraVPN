@@ -2,7 +2,7 @@
 #
 # Сквозная проверка desktop-ядра: реальный трафик через конфиг, который строит Hydra.
 #
-#   scripts/desktop-e2e.sh <sing-box> <каталог-с-конфигами> <windows|linux|macos> [proxy|tun|all] [xray]
+#   scripts/desktop-e2e.sh <sing-box> <каталог-с-конфигами> <windows|linux|macos> [proxy|tun|all] [xray] [openflux]
 #
 # Поднимает локальный сервер sing-box (Shadowsocks 2022 на 127.0.0.1:18388) и клиент
 # из desktop/build/singbox-configs/desktop-ss-<os>-<mode>.json (их пишет DesktopConfigTest),
@@ -16,10 +16,14 @@
 # (xray-configs/e2e-xray-<os>-<mode>.json, socks 127.0.0.1:18090 с паролем) + sing-box-мост
 # (e2e-xray-<os>-<mode>.json) — трафик должен пройти tun/прокси → мост → Xray → сервер.
 #
+# С шестым аргументом (путь к openflux, 0.7.10) — движок OpenFlux: локальный exit-узел OpenFlux (транспорт direct,
+# 127.0.0.1:18500) + клиент OpenFlux с аргументами из приложения (openflux-e2e-client.args, SOCKS5 127.0.0.1:18091)
+# + sing-box-мост (e2e-openflux-<os>-<mode>.json): tun/прокси → мост → клиент → exit → интернет.
+#
 set -euo pipefail
 
-SB="$1"; CFG_DIR="$2"; OS="$3"; MODES="${4:-all}"; XRAY="${5:-}"
-ENGINE="sing-box"   # текущий прогон: sing-box | xray
+SB="$1"; CFG_DIR="$2"; OS="$3"; MODES="${4:-all}"; XRAY="${5:-}"; OPENFLUX="${6:-}"
+ENGINE="sing-box"   # текущий прогон: sing-box | xray | openflux
 WORK="$(mktemp -d)"
 trap 'kill_all; rm -rf "$WORK"' EXIT
 
@@ -36,12 +40,13 @@ kill_all() {
   if [[ "$OS" == "windows" ]]; then
     taskkill //F //IM "sing-box-server.exe" >/dev/null 2>&1 || true
     taskkill //F //IM "xray.exe" >/dev/null 2>&1 || true
+    taskkill //F //IM "openflux.exe" >/dev/null 2>&1 || true
   fi
   PIDS=()
   sleep 1
 }
 
-fail() { echo "::error::[$ENGINE] $*"; echo "--- client log"; tail -40 "$WORK/client.log" 2>/dev/null || true; echo "--- xray log"; tail -20 "$WORK/xray.log" 2>/dev/null || true; echo "--- server log"; tail -20 "$WORK/server.log" 2>/dev/null || true; exit 1; }
+fail() { echo "::error::[$ENGINE] $*"; echo "--- client log"; tail -40 "$WORK/client.log" 2>/dev/null || true; echo "--- xray/openflux log"; tail -20 "$WORK/xray.log" 2>/dev/null || true; tail -20 "$WORK/exit.log" 2>/dev/null || true; echo "--- server log"; tail -20 "$WORK/server.log" 2>/dev/null || true; exit 1; }
 
 cat > "$WORK/server.json" <<'EOF'
 {"log":{"level":"warn"},
@@ -53,7 +58,7 @@ EOF
 make_client() { # $1 = mode
   # e2e-<os>-<mode>.json пишет DesktopConfigTest («e2e configs»): тот же DesktopConfig,
   # сервер 127.0.0.1:18388, прокси :12080, clash_api :19090, в TUN — process_name → direct.
-  local prefix="e2e"; [[ "$ENGINE" == "xray" ]] && prefix="e2e-xray"
+  local prefix="e2e"; [[ "$ENGINE" == "xray" ]] && prefix="e2e-xray"; [[ "$ENGINE" == "openflux" ]] && prefix="e2e-openflux"
   local src="$CFG_DIR/$prefix-$OS-$1.json"
   [[ -f "$src" ]] || fail "нет $src — сначала gradle :desktop:test"
   cp "$src" "$WORK/client.json"
@@ -64,7 +69,26 @@ make_client() { # $1 = mode
   fi
 }
 
-start_xray() { # мост sing-box без Xray не работает — Xray первым
+wait_port() { # $1 = порт; ждём, пока на 127.0.0.1 начнут принимать соединения
+  for _ in $(seq 1 60); do (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && return 0; sleep 0.5; done
+  return 1
+}
+
+start_openflux() { # exit-узел, затем клиент с аргументами приложения
+  local key="$WORK/openflux.key"
+  printf '%s' 'e2e-key-0123456789abcdef' > "$key"
+  "$WORK/openflux$EXE" --role exit --transports direct:100 --direct-listen 127.0.0.1:18500 --mode l4 --encryption-key-file "$key" > "$WORK/exit.log" 2>&1 &
+  PIDS+=($!)
+  wait_port 18500 || fail "exit-узел OpenFlux не поднялся"
+  local args=()
+  while IFS= read -r a || [[ -n "$a" ]]; do a="${a%$'\r'}"; [[ "$a" == "@KEYFILE@" ]] && a="$key"; args+=("$a"); done < "$CFG_DIR/../openflux-e2e-client.args"
+  "$WORK/openflux$EXE" "${args[@]}" > "$WORK/xray.log" 2>&1 &
+  PIDS+=($!)
+  wait_port 18091 || fail "клиент OpenFlux не открыл SOCKS5"
+}
+
+start_xray() { # мост sing-box без Xray (или клиента OpenFlux) не работает — они первыми
+  [[ "$ENGINE" == "openflux" ]] && { start_openflux; return 0; }
   [[ "$ENGINE" == "xray" ]] || return 0
   "$WORK/xray$EXE" run -c "$WORK/xray.json" > "$WORK/xray.log" 2>&1 &
   PIDS+=($!)
@@ -73,7 +97,7 @@ start_xray() { # мост sing-box без Xray не работает — Xray п
   return 0
 }
 
-proxy_tag() { if [[ "$ENGINE" == "xray" ]]; then echo 'outbound/socks\[proxy\]'; else echo 'outbound/shadowsocks\[proxy\]'; fi; }
+proxy_tag() { if [[ "$ENGINE" == "xray" || "$ENGINE" == "openflux" ]]; then echo 'outbound/socks\[proxy\]'; else echo 'outbound/shadowsocks\[proxy\]'; fi; }
 
 start() { # $1 = sudo-or-empty, $2 = bin, $3 = config, $4 = log
   $1 "$2" run -c "$3" -D "$WORK" > "$4" 2>&1 &
@@ -134,6 +158,11 @@ run_modes
 if [[ -n "$XRAY" ]]; then
   ENGINE="xray"
   cp "$XRAY" "$WORK/xray$EXE"; chmod +x "$WORK/xray$EXE" 2>/dev/null || true
+  run_modes
+fi
+if [[ -n "$OPENFLUX" ]]; then
+  ENGINE="openflux"
+  cp "$OPENFLUX" "$WORK/openflux$EXE"; chmod +x "$WORK/openflux$EXE" 2>/dev/null || true
   run_modes
 fi
 echo "=== $OS: сквозная проверка пройдена"

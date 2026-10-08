@@ -109,6 +109,25 @@ class DesktopConfigTest {
             File(dir.parentFile, "xray-configs").apply { mkdirs() }
                 .resolve("e2e-xray-${os.name.lowercase()}-${mode.name.lowercase()}.json")
                 .writeText(DesktopConfig.xray(p, xs, bridge).toString(2))
+
+            // Движок OpenFlux (0.7.10): клиент OpenFlux на 127.0.0.1:18091 (SOCKS5 без пароля), транспорт direct до
+            // локального exit-узла 127.0.0.1:18500; sing-box — мост. Аргументы клиента — из того же OpenFluxArgs, что в приложении.
+            val of = ServerProfile(name = "e2e", protocolId = Protocol.OPENFLUX.id, address = "127.0.0.1:18500", port = 0,
+                transport = "direct", uuidOrPassword = "e2e-key-0123456789abcdef")
+            val ofBridged = DesktopConfig.build(of, DesktopSettings(mode = mode, proxyPort = 12080), os, DesktopConfig.Api(19090, "secret"), null,
+                DesktopConfig.XrayBridge(18091, null))
+            if (mode == ConnectionMode.TUN) {
+                val route = ofBridged.getJSONObject("route").put("find_process", true)
+                val rules = route.getJSONArray("rules")
+                val all = org.json.JSONArray().put(JSONObject()
+                    .put("process_name", org.json.JSONArray().put("sing-box-server$exe").put("openflux$exe"))
+                    .put("outbound", "direct"))
+                for (i in 0 until rules.length()) all.put(rules.get(i))
+                route.put("rules", all)
+            }
+            File(dir, "e2e-openflux-${os.name.lowercase()}-${mode.name.lowercase()}.json").writeText(ofBridged.toString(2))
+            File(dir.parentFile, "openflux-e2e-client.args").writeText(
+                ru.gidravpn.hydra.data.subscription.OpenFluxArgs.build(of, 18091, "@KEYFILE@").joinToString("\n"))
         }
     }
 

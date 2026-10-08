@@ -170,6 +170,13 @@ object DesktopConfig {
         val bypass = if (settings.mode == ConnectionMode.TUN) bypassPaths.filter { it.isNotBlank() }.distinct() else emptyList()
         if (bypass.isNotEmpty()) {
             front += JSONObject().put("process_path", JSONArray(bypass)).put("outbound", "direct")
+            // 0.7.10: DNS самих клиентов (Xray, olcRTC, OpenFlux) — тоже мимо туннеля. В TUN их запрос к DNS ОС
+            // перехватывается hijack-dns и уходил в DNS «remote» через прокси — то есть через этот же клиент: пока
+            // он переподключается к транспорту, имя транспорта не резолвится, и переподключение тянулось до таймаута.
+            val dns = root.getJSONObject("dns")
+            val dnsRules = dns.optJSONArray("rules") ?: JSONArray()
+            dns.put("rules", JSONArray().put(JSONObject().put("process_path", JSONArray(bypass)).put("server", "local"))
+                .apply { for (i in 0 until dnsRules.length()) put(dnsRules.get(i)) })
         }
         if (r.appsActive) {
             val match = processMatch(r.apps)

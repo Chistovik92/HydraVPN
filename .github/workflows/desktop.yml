@@ -98,7 +98,8 @@ jobs:
         run: |
           core="$(ls desktop/build/hydra-app-resources/${{ matrix.target }}/sing-box* | head -1)"
           xray="$(ls desktop/build/hydra-app-resources/${{ matrix.target }}/xray* | head -1)"
-          bash scripts/desktop-e2e.sh "$core" desktop/build/singbox-configs ${{ matrix.os }} all "$xray"
+          openflux="$(ls desktop/build/hydra-app-resources/${{ matrix.target }}/openflux* | head -1)"
+          bash scripts/desktop-e2e.sh "$core" desktop/build/singbox-configs ${{ matrix.os }} all "$xray" "$openflux"
 
       - name: Пакеты + дымовой запуск
         if: inputs.package
@@ -156,9 +157,9 @@ jobs:
             done
             echo "  $1: OK ($(du -h "$f" | cut -f1))"
           }
-          check windows-x86 zip 'Hydra/Hydra\.vbs' 'Hydra/jre/bin/javaw\.exe' 'Hydra/resources/sing-box\.exe' 'Hydra/resources/xray\.exe' 'Hydra/lib/hydra-classic\.jar' 'Hydra/resources/geo/geoip/'
-          check windows-x64 zip 'Hydra/Hydra\.vbs' 'Hydra/jre/bin/javaw\.exe' 'Hydra/resources/sing-box\.exe' 'Hydra/resources/xray\.exe' 'Hydra/lib/hydra-classic\.jar'
-          check linux-x86 tar.gz 'Hydra/hydra\.sh' 'Hydra/resources/sing-box$' 'Hydra/resources/xray$' 'Hydra/resources/olcrtc$' 'Hydra/lib/hydra-classic\.jar'
+          check windows-x86 zip 'Hydra/Hydra\.vbs' 'Hydra/jre/bin/javaw\.exe' 'Hydra/resources/sing-box\.exe' 'Hydra/resources/xray\.exe' 'Hydra/resources/olcrtc\.exe' 'Hydra/resources/openflux\.exe' 'Hydra/lib/hydra-classic\.jar' 'Hydra/resources/geo/geoip/'
+          check windows-x64 zip 'Hydra/Hydra\.vbs' 'Hydra/jre/bin/javaw\.exe' 'Hydra/resources/sing-box\.exe' 'Hydra/resources/xray\.exe' 'Hydra/resources/olcrtc\.exe' 'Hydra/resources/openflux\.exe' 'Hydra/lib/hydra-classic\.jar'
+          check linux-x86 tar.gz 'Hydra/hydra\.sh' 'Hydra/resources/sing-box$' 'Hydra/resources/xray$' 'Hydra/resources/olcrtc$' 'Hydra/resources/openflux$' 'Hydra/lib/hydra-classic\.jar'
           check linux-armv7 tar.gz 'Hydra/hydra\.sh' 'Hydra/resources/sing-box$' 'Hydra/resources/xray$' 'Hydra/resources/olcrtc$' 'Hydra/resources/openflux$' 'Hydra/lib/hydra-classic\.jar'
 
       - name: Архитектура ядер внутри архивов
@@ -175,6 +176,10 @@ jobs:
           expect $B/linux-x86/Hydra/resources/sing-box 'ELF 32-bit.*Intel 80386'
           expect $B/linux-x86/Hydra/resources/xray 'ELF 32-bit.*Intel 80386'
           expect $B/linux-x86/Hydra/resources/olcrtc 'ELF 32-bit.*Intel 80386'
+          expect $B/linux-x86/Hydra/resources/openflux 'ELF 32-bit.*Intel 80386'
+          expect $B/windows-x86/Hydra/resources/olcrtc.exe 'PE32 executable.*Intel 80386'
+          expect $B/windows-x86/Hydra/resources/openflux.exe 'PE32 executable.*Intel 80386'
+          expect $B/windows-x64/Hydra/resources/openflux.exe 'PE32\+ executable'
           expect $B/linux-armv7/Hydra/resources/sing-box 'ELF 32-bit.*ARM'
           expect $B/linux-armv7/Hydra/resources/xray 'ELF 32-bit.*ARM'
           expect $B/linux-armv7/Hydra/resources/olcrtc 'ELF 32-bit.*ARM'
