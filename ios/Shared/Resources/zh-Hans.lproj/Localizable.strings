@@ -81,7 +81,7 @@
 "profiles_name_hint" = "例如：家";
 "profiles_delete_q" = "删除配置方案“%1$@”？";
 "upd_title" = "更新";
-"upd_desc" = "Hydra 会检查 GitHub 上的最新版本。应用本身不会下载或安装任何内容，只会打开发布页面。";
+"upd_desc" = "Hydra 会检查 GitHub 上的最新版本。点按「下载并安装」会获取文件（校验其校验和）并打开系统安装程序；也始终可以打开发布页面。";
 "upd_checking" = "正在检查…";
 "upd_latest" = "已是最新版本";
 "upd_failed" = "检查失败：%1$@";
@@ -97,6 +97,7 @@
 "upd_need_permission" = "请在刚打开的界面中允许 Hydra 安装应用，然后再次点按「更新」。";
 "upd_no_file" = "此版本没有适用于当前构建的文件 — 请打开发布页面。";
 "upd_install_failed" = "更新失败：%1$@";
+"upd_sig_mismatch" = "下载的文件与已安装的 Hydra 签名密钥不同，无法覆盖安装。文件已删除——请只从官方发布页下载 Hydra。";
 "a11y_dismiss" = "关闭";
 "a11y_more_actions" = "更多操作";
 "a11y_selected" = "已选择";
@@ -157,6 +158,10 @@
 "rt_msg_reloaded" = "路由器配置已重新读取";
 "rt_unreachable" = "路由器 %1$@ 无响应";
 "rt_pin_failed" = "路由器证书与配对时不一致——可能被冒充";
+"rt_forget_q" = "忘记此路由器？";
+"rt_forget_msg" = "将从应用中移除“%1$@”。路由器本身不会改变，可通过其链接重新配对。";
+"no_system_picker" = "此设备没有系统文件选择器（Android TV 上常见）。请复制链接后从剪贴板粘贴。";
+"no_camera" = "此设备没有摄像头。请复制链接后从剪贴板粘贴。";
 "tab_main" = "首页";
 "tab_servers" = "服务器";
 "tab_profile" = "个人";
@@ -468,7 +473,7 @@
 "ios_widgets_title" = "小组件和控制中心";
 "ios_widgets_desc" = "将 Hydra 小组件添加到主屏幕或锁定屏幕，即可查看已连接的位置并一键连接；在 iOS 18 上可将 Hydra 控件添加到控制中心。快捷指令：“连接 Hydra”“断开 Hydra”。";
 "ios_limits_title" = "iOS 上没有的功能";
-"ios_limits_desc" = "按应用分流（iOS 仅允许通过设备管理实现）、Xray Core、olcRTC 和 OpenFlux（禁止独立进程）。SSTP/L2TP 和 AmneziaWG 在计划中。";
+"ios_limits_desc" = "iOS 上不可用：按应用分流（iOS 仅允许通过设备管理实现）和 Xray Core（禁止独立进程）。olcRTC 和 OpenFlux 在 VPN 扩展内运行（自 0.7.10 起，测试版）。SSTP/L2TP 在计划中。";
 "ios_lang_hint" = "界面语言跟随 iOS 设置中为 Hydra 选择的语言。";
 "ios_open_settings" = "打开 Hydra 设置 →";
 "ios_import_file" = "从文件导入";

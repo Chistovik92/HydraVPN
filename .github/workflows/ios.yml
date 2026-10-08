@@ -36,25 +36,21 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ios/Frameworks/Libbox.xcframework
-          key: libbox-ios-${{ env.SING_BOX_VERSION }}-v1
+          key: libbox-ios-${{ env.SING_BOX_VERSION }}-bridge-${{ hashFiles('ios/Bridge/go.sum', 'ios/Bridge/**/*.go', 'ios/Bridge/build.sh') }}
+      # 0.7.10: Go — по go.mod моста (olcRTC и OpenFlux требуют 1.26).
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.x'
+          go-version-file: ios/Bridge/go.mod
           cache: false
-      - name: Build Libbox.xcframework (sing-box, iOS)
+      # libbox sing-box + клиенты olcRTC и OpenFlux одной gomobile-сборкой: в расширении VPN два рантайма Go
+      # не уживаются, а подпроцессы iOS запрещает (ios/Bridge/build.sh).
+      - name: Build Libbox.xcframework (sing-box + olcRTC + OpenFlux, iOS)
         if: steps.libbox.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
-          git clone --depth 1 --branch "v${SING_BOX_VERSION}" https://github.com/SagerNet/sing-box /tmp/sing-box
-          go install github.com/sagernet/gomobile/cmd/gomobile@latest
-          go install github.com/sagernet/gomobile/cmd/gobind@latest
-          export PATH="$PATH:$(go env GOPATH)/bin"
-          gomobile init
-          cd /tmp/sing-box
-          go run ./cmd/internal/build_libbox -target apple -platform ios
           mkdir -p "$GITHUB_WORKSPACE/ios/Frameworks"
           rm -rf "$GITHUB_WORKSPACE/ios/Frameworks/Libbox.xcframework"
-          mv Libbox.xcframework "$GITHUB_WORKSPACE/ios/Frameworks/"
+          bash ios/Bridge/build.sh "$GITHUB_WORKSPACE/ios/Frameworks"
       # Сохраняем сразу после сборки (≈10 мин), а не в пост-шаге: иначе упавшая дальше
       # сборка приложения выбрасывала бы готовую xcframework.
       - name: Save Libbox.xcframework
@@ -62,7 +58,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ios/Frameworks/Libbox.xcframework
-          key: libbox-ios-${{ env.SING_BOX_VERSION }}-v1
+          key: libbox-ios-${{ env.SING_BOX_VERSION }}-bridge-${{ hashFiles('ios/Bridge/go.sum', 'ios/Bridge/**/*.go', 'ios/Bridge/build.sh') }}
       # AmneziaWG: WireGuardKit из amneziawg-apple на зафиксированном коммите + libwg-go.a (amneziawg-go).
       - name: Restore amneziawg-apple
         id: awg

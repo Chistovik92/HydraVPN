@@ -506,27 +506,32 @@ data class Classic(
     val openFlux: Pair<String, String>? = null,
     /** Сборка olcRTC из исходников: GOOS/GOARCH/GOARM; null — не входит. */
     val olcRtc: Triple<String, String, String>? = null,
+    /** Сборка OpenFlux из закреплённого коммита (0.7.10) — там, где апстрим готового бинаря не выпускает. */
+    val openFluxSrc: Triple<String, String, String>? = null,
     /** JRE, которая кладётся в архив (Windows). Linux берёт Java системы. */
     val jre: Triple<String, String, String>? = null,   // url, имя файла, sha256
 )
 
 val classicTargets = listOf(
     // Windows: ядра «legacy-windows-7» собраны патченым Go, который ещё работает на Windows 7; на новых системах тоже.
-    // olcRTC и OpenFlux собираются обычным Go (Windows 10+) — на Windows 7 не запустятся, поэтому в эти архивы не входят.
+    // olcRTC и OpenFlux (0.7.10) собраны обычным Go и работают только с Windows 8.1/10: на Windows 7 Hydra Classic их
+    // не предлагает (Platform.goClientsSupported), на 32-битной Windows 10 — работают.
     Classic("windows-x86", "WindowsX86", "windows", "x86",
         "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "e4024508be5616015353c893b0d3f2dd3c080617a750ef6bd64f8183107611c8",
         "Xray-win7-32.zip", "3d73134f74e119589cc117c8f45b4564a14417f9b74508cc48599f142ac3aa81",
+        olcRtc = Triple("windows", "386", ""), openFluxSrc = Triple("windows", "386", ""),
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.29%2B7/OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip",
             "OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip", "b747698a05a39391a58b9caac30310275e4e6bd9fef92d6c149cba310d91d2be")),
     Classic("windows-x64", "WindowsX64", "windows", "x64",
         "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "4f27f807f99198b2681a59c1f12564b3683331e68215344e75761ee9199a9b90",
         "Xray-win7-64.zip", "75e67c738fdfafb9649f1a81a7ab6b3ba97a0f2e09a44254bff03c5b077547d3",
+        olcRtc = Triple("windows", "amd64", ""), openFluxSrc = Triple("windows", "amd64", ""),
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.32.1%2B1/OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip",
             "OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip", "f8c7da672f5dba36b6f870608820b6b598cfae91296929f1b8f21ef2f1e8a0dd")),
     Classic("linux-x86", "LinuxX86", "linux", "x86",
         "sing-box-$singBoxVersion-linux-386.tar.gz", "b2361b5eb0ef6da8f068d9bba762b9edbb3a8637515e30251ee8d5d78b30d846",
         "Xray-linux-32.zip", "277ffde84d86cb593ae9c3d144b11a5e4c80ba579fdfe6fe09830e04c85d04aa",
-        olcRtc = Triple("linux", "386", "")),
+        olcRtc = Triple("linux", "386", ""), openFluxSrc = Triple("linux", "386", "")),
     Classic("linux-armv7", "LinuxArmv7", "linux", "armv7",
         "sing-box-$singBoxVersion-linux-armv7.tar.gz", "9eedd8eb2d3ea66a48794359d1cc1e32ce618b6e1b105c9cd314da6408c9fc87",
         "Xray-linux-arm32-v7a.zip", "0b9719471c7c69752857714e9711d4da57cf38a6beb75dcddfb21425f7919908",
@@ -534,8 +539,16 @@ val classicTargets = listOf(
         olcRtc = Triple("linux", "arm", "7")),
 )
 
-// ---- olcRTC: кросс-сборка (чистый Go, без cgo) -----------------------------------------------------------------
-fun buildOlcRtc(goos: String, goarch: String, goarm: String, dest: File) {
+// ---- olcRTC и OpenFlux: кросс-сборка из закреплённых коммитов (чистый Go, без cgo) ---------------------------------
+fun buildOlcRtc(goos: String, goarch: String, goarm: String, dest: File) =
+    buildGoClient("olcrtc-src", "https://github.com/openlibrecommunity/olcrtc.git", olcRtcCommit, "./cmd/olcrtc", goos, goarch, goarm, dest)
+
+/** Коммит OpenFlux — тот же, что у готовых бинарей (метка v0.3.0 после перезаливки апстримом) и у Android-сборки. */
+val openFluxCommit = "bb55dc35604ea11e3b611fda55dd6383f0c3c68d"
+fun buildOpenFlux(goos: String, goarch: String, goarm: String, dest: File) =
+    buildGoClient("openflux-src", "https://github.com/p1neappleXpress/OpenFlux.git", openFluxCommit, ".", goos, goarch, goarm, dest)
+
+fun buildGoClient(srcDir: String, repo: String, commit: String, pkg: String, goos: String, goarch: String, goarm: String, dest: File) {
     fun run(dir: File, vararg cmd: String, env: Map<String, String> = emptyMap()) {
         val pb = ProcessBuilder(*cmd).directory(dir).redirectErrorStream(true)
         pb.environment().putAll(env)
@@ -543,18 +556,19 @@ fun buildOlcRtc(goos: String, goarch: String, goarm: String, dest: File) {
         val out = p.inputStream.bufferedReader().readText()
         check(p.waitFor() == 0) { "${cmd.joinToString(" ")}: $out" }
     }
-    val src = layout.buildDirectory.dir("olcrtc-src").get().asFile.apply { mkdirs() }
+    val src = layout.buildDirectory.dir(srcDir).get().asFile.apply { mkdirs() }
     val haveTools = runCatching { run(src, "go", "version"); run(src, "git", "--version") }.isSuccess
-    if (!haveTools) { logger.warn("classic: нет go или git — клиент olcRTC в архив не войдёт"); return }
+    if (!haveTools) { logger.warn("classic: нет go или git — ${dest.name} в архив не войдёт"); return }
     if (!src.resolve(".git").isDirectory) {
         run(src, "git", "init", "-q")
-        run(src, "git", "remote", "add", "origin", "https://github.com/openlibrecommunity/olcrtc.git")
+        run(src, "git", "remote", "add", "origin", repo)
     }
-    run(src, "git", "fetch", "-q", "--depth", "1", "origin", olcRtcCommit)
+    run(src, "git", "fetch", "-q", "--depth", "1", "origin", commit)
     run(src, "git", "checkout", "-q", "--force", "FETCH_HEAD")
     val env = mutableMapOf("CGO_ENABLED" to "0", "GOOS" to goos, "GOARCH" to goarch)
     if (goarm.isNotEmpty()) env["GOARM"] = goarm
-    run(src, "go", "build", "-trimpath", "-ldflags=-s -w", "-o", dest.absolutePath, "./cmd/olcrtc", env = env)
+    // -checklinkname=0: обе программы через зависимости ссылаются на внутренности net (так же собирает апстрим).
+    run(src, "go", "build", "-trimpath", "-ldflags=-s -w -checklinkname=0", "-o", dest.absolutePath, pkg, env = env)
 }
 
 // ---- Сборка архива ---------------------------------------------------------------------------------------------
@@ -619,7 +633,7 @@ val classicDistTasks = classicTargets.map { t ->
         val liteRuntime = configurations.getByName("liteRuntimeClasspath")
         inputs.files(liteRuntime)
         inputs.files(tasks.named("liteJar").map { it.outputs.files })
-        inputs.property("t", t.toString() + singBoxVersion + xrayVersion + olcRtcCommit)
+        inputs.property("t", t.toString() + singBoxVersion + xrayVersion + olcRtcCommit + openFluxCommit)
         outputs.dir(root)
         doLast {
             val out = root.get().asFile
@@ -650,6 +664,7 @@ val classicDistTasks = classicTargets.map { t ->
                 f.copyTo(File(res, "openflux$exe"), overwrite = true)
             }
             t.olcRtc?.let { (goos, goarch, goarm) -> buildOlcRtc(goos, goarch, goarm, File(res, "olcrtc$exe")) }
+            t.openFluxSrc?.let { (goos, goarch, goarm) -> buildOpenFlux(goos, goarch, goarm, File(res, "openflux$exe")) }
 
             // Geo-базы — те же, что в Android и в обычной Hydra.
             copy { from(rootProject.file("app/src/main/assets")) { include("geoip/*.srs", "geosite/*.srs") }; into(File(res, "geo")) }

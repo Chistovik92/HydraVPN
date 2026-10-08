@@ -30,11 +30,17 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         guard let server = state.servers.first(where: { $0.id == serverId }) ?? state.selectedServer else {
             throw fail("сервер не выбран")
         }
-        guard server.serverProtocol?.engine == .singBox else {
+        let engine = server.serverProtocol?.engine
+        guard engine == .singBox || engine == .socksBridge else {
             throw fail("\(server.serverProtocol?.displayName ?? server.protocolId): протокол пока не поддерживается на iOS")
         }
 
         var o = SingBoxConfigBuilder.Options()
+        if engine == .socksBridge {
+            // 0.7.10: клиент olcRTC / OpenFlux — внутри этого же расширения, sing-box ходит к нему мостом.
+            try startBridgeClient(server, port: Self.bridgePort)
+            o.socksBridgePort = Self.bridgePort
+        }
         o.routing = state.routing
         o.geo = geoCountries(state.routing)
         if state.app.hotspotEnabled, !state.app.hotspotPassword.isEmpty {
@@ -62,6 +68,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         store.appendLog("Туннель: остановка (\(reason.rawValue))")
         try? boxService?.close()
         boxService = nil
+        HydraolcStop()
+        HydrafluxStop()
         commandServer?.setService(nil)
         try? commandServer?.close()
         commandServer = nil
@@ -80,6 +88,35 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         store.appendLog("Ошибка: ядро sing-box остановилось")
         boxService = nil
         cancelTunnelWithError(NSError(domain: "Hydra", code: 2, userInfo: [NSLocalizedDescriptionKey: "sing-box stopped"]))
+    }
+
+    /// Локальный SOCKS5 клиента olcRTC / OpenFlux (тот же, что у OlcRtcCore на Android).
+    private static let bridgePort = 10809
+
+    /// Поднимает клиент olcRTC или OpenFlux (Libbox.xcframework, пакеты hydraolc/hydraflux — ios/Bridge).
+    private func startBridgeClient(_ s: ServerProfile, port: Int) throws {
+        let extra = s.extraObject
+        func str(_ k: String) -> String { (extra[k] as? String) ?? "" }
+        var err: NSError?
+        switch s.serverProtocol {
+        case .olcrtc:
+            let provider = str("provider").isEmpty ? "telemost" : str("provider")
+            let transport = s.transport.isEmpty ? "datachannel" : s.transport
+            store.appendLog("olcRTC: подключение к комнате (\(provider), \(transport))…")
+            // Как на Android: явный резолвер — системного у Go-клиента в расширении может не оказаться.
+            _ = HydraolcStart(provider, transport, s.address, s.uuidOrPassword, "1.1.1.1:53", port, 30_000, &err)
+            if let err { throw fail("olcRTC: \(err.localizedDescription)") }
+        case .openflux:
+            store.appendLog("OpenFlux: запуск транспорта \(s.transport)…")
+            _ = HydrafluxStart(s.transport, s.address, s.uuidOrPassword, str("codec"), str("maxToken"), str("maxUid"), port, &err)
+            if let err {
+                let tail = HydrafluxLogs().split(separator: "\n").suffix(3).joined(separator: " · ")
+                throw fail("OpenFlux: \(err.localizedDescription)" + (tail.isEmpty ? "" : " (\(tail))"))
+            }
+        default:
+            throw fail("\(s.protocolId): нет клиента-моста")
+        }
+        store.appendLog("\(s.serverProtocol?.displayName ?? s.protocolId): клиент запущен, SOCKS5 127.0.0.1:\(port)")
     }
 
     private func fail(_ message: String) -> NSError {

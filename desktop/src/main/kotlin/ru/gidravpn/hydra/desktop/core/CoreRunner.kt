@@ -83,13 +83,19 @@ class CoreRunner(
         }
 
         if (sidecar != null) {
-            val h = spawn(session, sidecar.name, listOf(sidecar.exe.absolutePath) + sidecar.args, SIDECAR_PID, dir) { "[${sidecar.name}] $it" }
+            val lastLine = java.util.concurrent.atomic.AtomicReference("")   // пишет поток журнала клиента
+            val h = spawn(session, sidecar.name, listOf(sidecar.exe.absolutePath) + sidecar.args, SIDECAR_PID, dir) {
+                if (it.isNotBlank()) lastLine.set(it.trim())
+                "[${sidecar.name}] $it"
+            }
             xray = h
             sidecarSecrets = sidecar.secrets
             // Клиент сначала устанавливает сессию с транспортом, и лишь потом открывает SOCKS5 — ждём долго.
             if (!waitPort(sidecar.socksPort, h, sidecar.readyTimeoutMs)) {
                 stop()
-                error("${sidecar.name}: SOCKS5 не поднялся за ${sidecar.readyTimeoutMs / 1000} с — проверьте параметры и журнал")
+                // 0.7.10: причина — последней строкой самого клиента (ключ, комната, транспорт), а не только «не поднялся».
+                val why = lastLine.get().takeIf { it.isNotEmpty() }?.let { ": ${it.take(200)}" } ?: " — проверьте параметры и журнал"
+                error("${sidecar.name}: не подключился за ${sidecar.readyTimeoutMs / 1000} с$why")
             }
         }
 

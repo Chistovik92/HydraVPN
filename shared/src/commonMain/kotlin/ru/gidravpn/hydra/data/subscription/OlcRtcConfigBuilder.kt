@@ -66,7 +66,24 @@ object OlcRtcConfigBuilder {
         }
     }
 
-    private fun q(s: String) = JSONObject.quote(s)
+    /**
+     * Строка YAML в двойных кавычках. Не JSONObject.quote: тот экранирует «/» как «\\/», а такой
+     * последовательности в YAML нет — адрес комнаты вида `meet.jit.si/Room` ронял разбор конфига
+     * («found unknown escape character», найдено на эмуляторе в 0.7.10).
+     */
+    private fun q(s: String) = buildString {
+        append('"')
+        for (ch in s) when {
+            ch == '\\' -> append("\\\\")
+            ch == '"' -> append("\\\"")
+            ch == '\n' -> append("\\n")
+            ch == '\r' -> append("\\r")
+            ch == '\t' -> append("\\t")
+            ch < ' ' -> append("\\u%04x".format(ch.code))
+            else -> append(ch)
+        }
+        append('"')
+    }
 
     /** Число — как есть, иначе строка в кавычках. */
     private fun scalar(v: String) = if (v.toLongOrNull() != null) v else q(v)

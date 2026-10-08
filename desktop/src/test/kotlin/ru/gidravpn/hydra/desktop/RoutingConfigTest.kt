@@ -73,6 +73,9 @@ class RoutingConfigTest {
                 assertEquals("pw", proxy.getString("password"))
                 val bypass = rules(sb).firstOrNull { it.has("process_path") }
                 assertEquals(mode == ConnectionMode.TUN, bypass != null, "обход туннеля для Hydra/Xray — только в TUN")
+                // 0.7.10: DNS самих обходящих процессов — через «local», не через прокси (иначе петля при переподключении).
+                val dnsBypass = sb.getJSONObject("dns").optJSONArray("rules")?.optJSONObject(0)
+                assertEquals(mode == ConnectionMode.TUN, dnsBypass?.optString("server") == "local" && dnsBypass.has("process_path"), "DNS обходящих процессов — local, только в TUN")
 
                 val xr = DesktopConfig.xray(p, settings, bridge, resolvedIp = if (mode == ConnectionMode.TUN) "203.0.113.7" else null)
                 val inbound = xr.getJSONArray("inbounds").getJSONObject(0)

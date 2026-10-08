@@ -40,6 +40,11 @@ class OpenFluxLiveTest {
         val olc = LinkParser.parseLine("olcrtc://telemost?datachannel@room42#key123")!!
         val yaml = OlcRtcConfigBuilder.build(olc, 10809)
         assertTrue("mode: cnc" in yaml && "\"room42\"" in yaml && "port: 10809" in yaml)
+        // 0.7.10: комната со слешем — без «\/» (YAML такой последовательности не знает), имя после $ раскодировано.
+        val jitsi = LinkParser.parseLine("olcrtc://jitsi?datachannel@meet.jit.si/Room1#${"ab".repeat(32)}\$Мой%20узел")!!
+        assertEquals("Мой узел", jitsi.name)
+        val jy = OlcRtcConfigBuilder.build(jitsi, 10809)
+        assertTrue(jy, "id: \"meet.jit.si/Room1\"" in jy && "\\/" !in jy)
     }
 
 
