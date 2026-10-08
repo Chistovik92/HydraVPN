@@ -65,25 +65,41 @@ class OpenFluxLiveTest {
         val keyFile = File.createTempFile("ofkey", ".txt").apply { writeText("test-key-0123456789abcdef"); deleteOnExit() }
         val exit = ProcessBuilder(exe.absolutePath, "--role", "exit", "--transports", "direct:100", "--direct-listen", "127.0.0.1:$tunnel", "--mode", "l4", "--encryption-key-file", keyFile.absolutePath)
             .redirectErrorStream(true).start()
+        // Клиент — только после того, как exit-узел слушает: иначе на медленном раннере (linux-arm64, релиз 0.7.10)
+        // клиент уходил в классический режим, первый запрос висел, и тест падал по таймауту чтения.
+        val tEnd = System.currentTimeMillis() + 30_000
+        while (System.currentTimeMillis() < tEnd && runCatching { Socket("127.0.0.1", tunnel).close() }.isFailure) Thread.sleep(200)
         val profile = ServerProfile(name = "t", protocolId = Protocol.OPENFLUX.id, address = "127.0.0.1:$tunnel", port = 0, transport = "direct", uuidOrPassword = "test-key-0123456789abcdef")
         val client = ProcessBuilder(listOf(exe.absolutePath) + OpenFluxArgs.build(profile, socks, keyFile.absolutePath)).redirectErrorStream(true).start()
         try {
             val end = System.currentTimeMillis() + 30_000
             while (System.currentTimeMillis() < end && runCatching { Socket("127.0.0.1", socks).close() }.isFailure) Thread.sleep(200)
-            Socket("127.0.0.1", socks).use { s ->
+            val port = web.address.port
+            fun fetch(): String = Socket("127.0.0.1", socks).use { s ->
                 s.soTimeout = 15_000
                 val out = s.getOutputStream(); val inp = s.getInputStream()
                 out.write(byteArrayOf(5, 1, 0)); out.flush()
                 assertEquals(listOf<Byte>(5, 0), List(2) { inp.read().toByte() })
-                val port = web.address.port
                 out.write(byteArrayOf(5, 1, 0, 1, target[0], target[1], target[2], target[3], (port shr 8).toByte(), port.toByte())); out.flush()
                 val reply = ByteArray(10); var n = 0
                 while (n < 10) { val r = inp.read(reply, n, 10 - n); if (r < 0) break; n += r }
                 assertEquals("SOCKS5 CONNECT отклонён: ${reply.joinToString()}", 0, reply[1].toInt())
-                out.write("GET / HTTP/1.0\r\nHost: x\r\n\r\n".toByteArray()); out.flush()
-                val body = inp.readBytes().toString(Charsets.UTF_8)
-                assertTrue("ответ не дошёл через туннель: $body", "hello-through-openflux" in body)
+                out.write("GET / HTTP/1.0
+Host: x
+
+".toByteArray()); out.flush()
+                inp.readBytes().toString(Charsets.UTF_8)
             }
+            // Сессия с узлом согласуется не мгновенно — до трёх попыток, каждая на свежем соединении.
+            var last: Throwable? = null
+            var body = ""
+            for (attempt in 1..3) {
+                val r = runCatching { fetch() }
+                if (r.isSuccess && "hello-through-openflux" in r.getOrThrow()) { body = r.getOrThrow(); break }
+                last = r.exceptionOrNull(); body = r.getOrNull().orEmpty()
+                Thread.sleep(2_000)
+            }
+            assertTrue("ответ не дошёл через туннель: $body ${last ?: ""}", "hello-through-openflux" in body)
         } finally {
             client.destroyForcibly(); exit.destroyForcibly(); web.stop(0)
         }
