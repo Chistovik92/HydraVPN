@@ -42,6 +42,14 @@ internal class SettingsPanel(private val c: AppController) : Renderable {
     private val openFlux = Check("OpenFlux (BETA) — TCP-туннель через сервисы документов и чатов", quiet) { c.setEngine(EngineToggles.Kind.OPENFLUX, it) }
     private val enginesNote = note("")
 
+    // ---- оформление (0.7.9): темы и иконки как на Android
+    private val themeBox = javax.swing.JComboBox(ru.gidravpn.hydra.desktop.AppTheme.entries.map { it.title }.toTypedArray()).apply {
+        addActionListener { if (!quiet.on) c.updateSettings { it.copy(theme = ru.gidravpn.hydra.desktop.AppTheme.entries[selectedIndex]) } }
+    }
+    private val iconBox = javax.swing.JComboBox(ru.gidravpn.hydra.desktop.AppIcon.entries.map { it.title }.toTypedArray()).apply {
+        addActionListener { if (!quiet.on) c.updateSettings { it.copy(appIcon = ru.gidravpn.hydra.desktop.AppIcon.entries[selectedIndex]) } }
+    }
+
     // ---- безопасность
     private val kill = Check("Kill switch — не пускать трафик мимо VPN при обрыве (режим прокси: системный прокси остаётся включённым)", quiet) { v -> c.updateSettings { it.copy(killSwitch = v) } }
     private val reconnect = Check("Переподключаться автоматически (через 2, 4, 8, 16, 30 с… до 10 попыток)", quiet) { v -> c.updateSettings { it.copy(autoReconnect = v) } }
@@ -116,6 +124,8 @@ internal class SettingsPanel(private val c: AppController) : Renderable {
             note("Серверы, подписки, настройки и профили в одном файле. В файле пароли серверов — храните его в надёжном месте."),
             row(button("Сохранить в файл…") { chooseFile(save = true)?.let { c.exportBackup(it) } },
                 restoreButton())),
+        section("Оформление", row(JLabel("Тема:"), themeBox), row(JLabel("Иконка окна и трея:"), iconBox),
+            note("Иконка меняется сразу; цвет акцента темы в Classic — после перезапуска. Classic светлая: тёмный фон тем есть в обычной Hydra.")),
         section("О программе",
             JLabel("Hydra ${Platform.version} (Classic) · sing-box 1.12.25 · Xray-core 26.9.30 · ${System.getProperty("os.name")} ${System.getProperty("os.arch")}"),
             note("Данные: ${Platform.dataDir.absolutePath}"),
@@ -211,6 +221,10 @@ internal class SettingsPanel(private val c: AppController) : Renderable {
         MtuPreset.entries.forEachIndexed { i, m -> mtu[i].set(r.mtu == m) }
         ipv6.set(r.ipv6)
         checkUpdates.set(s.checkUpdates)
+        quiet.run {
+            themeBox.selectedIndex = s.theme.ordinal
+            iconBox.selectedIndex = s.appIcon.ordinal
+        }
     }
 
     private var botLinked: Any? = Unit

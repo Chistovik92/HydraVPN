@@ -275,6 +275,9 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var hideSecrets: Bool = true
     public var lastServerId: Int64?
     public var theme: String = "AMBIENT"
+    /// Иконка приложения (0.7.9, как на Android): FOLLOW_THEME/AMBIENT/STEALTH/OCEAN/AMBER. Optional — старое
+    /// сохранённое состояние без этого ключа должно читаться (синтезированный Codable не знает значений по умолчанию).
+    public var appIcon: String?
     public var hotspotEnabled: Bool = false
     public var hotspotPort: Int = 10808
     public var hotspotUser: String = "hydra"

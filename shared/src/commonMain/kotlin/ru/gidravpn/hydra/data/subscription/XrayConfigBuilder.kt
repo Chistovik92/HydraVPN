@@ -122,6 +122,11 @@ object XrayConfigBuilder {
         }
         stream.put("security", security)
 
+        // TCP keep-alive (0.7.9): после смены сети или тихого обрыва у провайдера соединение с сервером
+        // умирает без RST — пробы раз в 15 с после 30 с тишины находят это меньше чем за минуту
+        // (в режиме прокси на ПК; в TUN соединение Xray заканчивается в стеке sing-box, там помогает NetWatch).
+        stream.put("sockopt", JSONObject().put("tcpKeepAliveIdle", 30).put("tcpKeepAliveInterval", 15))
+
         when (security) {
             "tls" -> stream.put("tlsSettings", JSONObject().apply {
                 put("serverName", p.sni.ifBlank { p.address })

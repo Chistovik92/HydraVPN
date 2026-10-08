@@ -40,7 +40,7 @@ fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier {
         .clickable(interactionSource = src, indication = null, role = Role.Button, onClick = onClick)
 }
 
-/** Полупрозрачная карточка-контейнер, как в макете. */
+/** Карточка-контейнер: тональная поверхность Material You (0.7.9), скругление M3 «large» — 20 dp. */
 @Composable
 fun Card(
     modifier: Modifier = Modifier,
@@ -49,9 +49,9 @@ fun Card(
 ) {
     Column(
         modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(CardBg)
-            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
             .padding(16.dp),
         content = content
     )

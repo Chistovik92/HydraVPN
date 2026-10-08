@@ -37,6 +37,8 @@ import ru.gidravpn.hydra.data.model.HotspotSettings
 import ru.gidravpn.hydra.data.model.MtuPreset
 import ru.gidravpn.hydra.data.model.TlsFragmentMode
 import ru.gidravpn.hydra.desktop.AppController
+import ru.gidravpn.hydra.desktop.AppIcon
+import ru.gidravpn.hydra.desktop.AppTheme
 import ru.gidravpn.hydra.desktop.ConnectionMode
 import ru.gidravpn.hydra.desktop.Os
 import ru.gidravpn.hydra.desktop.Platform
@@ -168,6 +170,29 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
         }
 
         item { BackupSection(c, ui) }
+
+        item {
+            // 0.7.9: темы и иконки как в Android-приложении.
+            Section("Оформление") {
+                Text("Тема", fontSize = 13.sp)
+                ChipRow {
+                    AppTheme.entries.forEach { t ->
+                        FilterChip(selected = s.theme == t, onClick = { c.updateSettings { it.copy(theme = t) } },
+                            label = { Text(t.title) })
+                    }
+                }
+                Text(s.theme.description, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Иконка окна, панели задач и трея", fontSize = 13.sp)
+                ChipRow {
+                    AppIcon.entries.forEach { i ->
+                        FilterChip(selected = s.appIcon == i, onClick = { c.updateSettings { it.copy(appIcon = i) } },
+                            label = { Text(i.title) })
+                    }
+                }
+                Text("Ярлык установщика и меню «Пуск» остаётся изумрудным — его рисует система при установке.",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
 
         item {
             Section("О программе") {

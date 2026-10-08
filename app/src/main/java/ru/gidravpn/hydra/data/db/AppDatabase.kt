@@ -34,7 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        /** 0.6.28: привязка подписки к панели бота «Радар». */
+        /** 0.6.27.2: привязка подписки к панели бота «Радар». */
         val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE subscriptions ADD COLUMN botPanel TEXT NOT NULL DEFAULT ''")

@@ -30,7 +30,12 @@ fun main(args: Array<String>) {
         val controller = remember { AppController(scope) }
         val ui by controller.ui.collectAsState()
         val iconBytes = remember { AppController::class.java.getResourceAsStream("/hydra-icon.png")!!.use { it.readBytes() } }
-        val icon = remember { BitmapPainter(org.jetbrains.skia.Image.makeFromEncoded(iconBytes).toComposeImageBitmap()) }
+        // Иконка окна и панели задач — по выбору в «Оформлении» (0.7.9), как на Android.
+        val iconRes = ui.data.settings.appIcon.resource(ui.data.settings.theme)
+        val icon = remember(iconRes) {
+            val bytes = AppController::class.java.getResourceAsStream(iconRes)?.use { it.readBytes() } ?: iconBytes
+            BitmapPainter(org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap())
+        }
         // Автозапуск при входе в систему — сразу в трей (если трей есть).
         var visible by remember { mutableStateOf(!(runCatching { java.awt.SystemTray.isSupported() }.getOrDefault(false) && ru.gidravpn.hydra.desktop.core.Autostart.MINIMIZED_ARG in args)) }
 

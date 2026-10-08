@@ -37,6 +37,7 @@ import ru.gidravpn.hydra.desktop.core.Sidecar
 import ru.gidravpn.hydra.desktop.core.hasValidEndpoint
 import ru.gidravpn.hydra.desktop.core.DesktopConfig
 import ru.gidravpn.hydra.desktop.core.NeedsElevation
+import ru.gidravpn.hydra.desktop.core.NetWatch
 import ru.gidravpn.hydra.desktop.core.Ping
 import ru.gidravpn.hydra.desktop.core.Rules
 import ru.gidravpn.hydra.desktop.core.Subscriptions
@@ -662,6 +663,7 @@ class AppController(
             }
             _ui.update { it.copy(blocked = false) }
             verify(clash, sessionId, settings, engine)
+            if (session == sessionId && runner.isAlive) watchNetwork(sessionId, profile, engine)
         } catch (e: NeedsElevation) {
             runner.stop()
             if (session == sessionId) {
@@ -694,6 +696,35 @@ class AppController(
         if (session == sessionId && runner.isAlive) {
             // Ядро живо, но сервер не отвечает: держим соединение, но честно показываем проблему.
             _ui.update { it.copy(status = Status.CONNECTED, delayMs = null, statusText = "Ядро запущено ($how), но сервер не отвечает: $lastError") }
+        }
+    }
+
+    /**
+     * Смена физической сети (0.7.9, см. [NetWatch]): соединения ядер к серверу остались на прежнем
+     * интерфейсе и умирают молча — переподключаемся сами, как раньше приходилось пользователю.
+     * Только при включённом «Переподключаться автоматически».
+     */
+    private fun watchNetwork(sessionId: Int, profile: ServerProfile, engine: EngineToggles.Kind) = scope.launch(Dispatchers.IO) {
+        var base = NetWatch.fingerprint()
+        while (isActive && session == sessionId && !userStopped && runner.isAlive) {
+            delay(3_000)
+            val now = NetWatch.fingerprint()
+            if (now == base) continue
+            delay(3_000)   // переход Wi-Fi ↔ кабель идёт в несколько шагов — ждём, пока сеть устоится
+            val settled = NetWatch.fingerprint()
+            if (settled == base) continue
+            base = settled
+            if (settled.isEmpty()) continue   // сети нет совсем — переподключимся, когда появится
+            if (session != sessionId || userStopped || !_ui.value.data.settings.autoReconnect) continue
+            appendLog("Hydra: сеть сменилась — переподключение")
+            connLock.withLock {
+                if (session != sessionId || userStopped) return@launch
+                session++   // выход ядер прежнего сеанса — не авария и не повод для второго переподключения
+                runner.stop()
+            }
+            val cur = _ui.value
+            launchSession(profile, cur.data.settings, engine, "Сеть сменилась — переподключение…")
+            return@launch
         }
     }
 

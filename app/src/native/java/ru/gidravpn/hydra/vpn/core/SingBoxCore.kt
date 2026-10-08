@@ -243,10 +243,23 @@ class HydraPlatformInterface(
         val thread = HandlerThread("Hydra-NetMonitor").apply { start() }
         monitorThread = thread
         val handler = android.os.Handler(thread.looper)
+        // 0.7.9: на любое событие заново выбираем лучшую физическую сеть, а не берём ту, о
+        // которой колбэк. Раньше обрабатывались только onAvailable/onLinkPropertiesChanged
+        // конкретной сети: при уходе из Wi-Fi, когда мобильная уже была поднята («мобильный
+        // интернет всегда активен»), onAvailable не приходил вовсе — sing-box оставался
+        // привязан к исчезнувшему wlan0, и все новые соединения (в т.ч. мост к Xray) висели
+        // до ручного переподключения. Плюс onLinkPropertiesChanged мобильной сети уводил
+        // ядро с Wi-Fi на мобильную.
+        // В момент onLost система ещё отдаёт уходящую сеть как основную, а следующего события
+        // может и не быть (мобильная давно поднята) — поэтому потерянную сеть исключаем явно и
+        // после каждого события перепроверяем выбор ещё дважды, когда состояние устоится.
         val cb = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) = notify(network, listener)
+            override fun onAvailable(network: Network) = onEvent(cm, listener, handler, null)
+            override fun onLost(network: Network) = onEvent(cm, listener, handler, network)
+            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) =
+                onEvent(cm, listener, handler, null)
             override fun onLinkPropertiesChanged(network: Network, lp: LinkProperties) =
-                notify(network, listener)
+                onEvent(cm, listener, handler, null)
         }
         networkCallback = cb
         // registerDefaultNetworkCallback() у владельца VPN воспроизводимо репортит
@@ -264,7 +277,43 @@ class HydraPlatformInterface(
         // №9: registerNetworkCallback сообщает о сети лишь асинхронно, и первые доли
         // секунды sing-box работал без интерфейса ("no available network interface").
         // Отдаём текущую физическую сеть сразу, не дожидаясь колбэка.
-        PhysicalNetwork.pick(cm)?.let { runCatching { notify(it, listener) } }
+        reevaluate(cm, listener)
+    }
+
+    /** Перепроверка выбора сети после события (см. [onEvent]); один токен — повторные события её переносят. */
+    private val recheckToken = Any()
+
+    private fun onEvent(cm: ConnectivityManager, listener: InterfaceUpdateListener, handler: android.os.Handler, lost: Network?) {
+        reevaluate(cm, listener, lost)
+        handler.removeCallbacksAndMessages(recheckToken)
+        for (delayMs in longArrayOf(1_000, 3_000)) {
+            handler.postAtTime({ reevaluate(cm, listener, lost) }, recheckToken, android.os.SystemClock.uptimeMillis() + delayMs)
+        }
+    }
+
+    /** Последний интерфейс, о котором сообщили ядру: повторы не шлём (каждое сообщение сбрасывает соединения). */
+    private var lastIface: String? = null
+    private var lastIndex = -2
+
+    /**
+     * Выбрать лучшую физическую сеть и, если интерфейс сменился, сообщить ядру. Зовётся с потока
+     * монитора и один раз синхронно при старте (№9) — отсюда @Synchronized.
+     */
+    @Synchronized
+    private fun reevaluate(cm: ConnectivityManager, listener: InterfaceUpdateListener, lost: Network? = null) {
+        val best = PhysicalNetwork.pick(cm, exclude = lost)
+        if (best == null) {
+            underlyingNetwork = null
+            if (lastIface != "") {
+                lastIface = ""; lastIndex = -1
+                onLogLine("sing-box: физической сети нет — ждём появления")
+                // Так же поступает SagerNet/sing-box-for-android: пустой интерфейс = «сети нет».
+                runCatching { listener.updateDefaultInterface("", -1, false, false) }
+                    .onFailure { onLogLine("sing-box: notify: исключение: $it") }
+            }
+            return
+        }
+        notify(best, listener)
     }
 
     override fun closeDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
@@ -275,9 +324,11 @@ class HydraPlatformInterface(
             }
             networkCallback = null
         }
+        monitorThread?.let { android.os.Handler(it.looper).removeCallbacksAndMessages(recheckToken) }
         monitorThread?.quitSafely()
         monitorThread = null
         underlyingNetwork = null
+        synchronized(this) { lastIface = null; lastIndex = -2 }
     }
 
     private fun notify(network: Network, listener: InterfaceUpdateListener) {
@@ -293,6 +344,10 @@ class HydraPlatformInterface(
             val index = java.net.NetworkInterface.getByName(name)?.index ?: 0
             val isMetered = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) == false
             underlyingNetwork = network
+            if (name == lastIface && index == lastIndex) return
+            if (lastIface != null) onLogLine("sing-box: сеть сменилась → $name")
+            lastIface = name
+            lastIndex = index
             listener.updateDefaultInterface(name, index, isMetered, false)
         }.onFailure { onLogLine("sing-box: notify: исключение: ${it}") }
     }

@@ -3,6 +3,7 @@ package ru.gidravpn.hydra.desktop.lite
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.swing.Swing
 import ru.gidravpn.hydra.desktop.AppController
 import ru.gidravpn.hydra.desktop.SingleInstance
@@ -37,6 +38,7 @@ private fun start(args: Array<String>) {
     val controller = AppController(scope)
     val iconBytes = AppController::class.java.getResourceAsStream("/hydra-icon.png")!!.use { it.readBytes() }
     val image = ImageIO.read(iconBytes.inputStream())
+    liteTheme = controller.ui.value.data.settings.theme
 
     lateinit var window: LiteWindow
     lateinit var tray: TrayController
@@ -68,6 +70,19 @@ private fun start(args: Array<String>) {
         // С активным VPN окно уходит в трей; без трея или без VPN — выход.
         if (trayOk && controller.ui.value.active) window.isVisible = false else quit()
     })
+
+    // Иконка окна — по выбору в «Оформлении» (0.7.9); значок трея меняет сам TrayController.
+    scope.launch {
+        var last: String? = null
+        controller.ui.collect { u ->
+            val res = u.data.settings.appIcon.resource(u.data.settings.theme)
+            if (res != last) {
+                last = res
+                runCatching { AppController::class.java.getResourceAsStream(res)?.use { ImageIO.read(it) } }
+                    .getOrNull()?.let { window.iconImage = it }
+            }
+        }
+    }
 
     Runtime.getRuntime().addShutdownHook(Thread { controller.shutdown() })
     controller.quitHandler = ::quit

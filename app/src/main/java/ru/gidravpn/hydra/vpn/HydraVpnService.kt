@@ -591,7 +591,7 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
                 networkSignal.trySend(Unit)
                 updateUnderlyingNetwork()
             }
-            override fun onLost(network: android.net.Network) = updateUnderlyingNetwork()
+            override fun onLost(network: android.net.Network) = updateUnderlyingNetwork(exclude = network)
             override fun onCapabilitiesChanged(network: android.net.Network, caps: android.net.NetworkCapabilities) =
                 updateUnderlyingNetwork()
         }
@@ -610,10 +610,11 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
     }
 
     /** Подложка VPN = лучшая физическая сеть сейчас; зовётся из колбэка и после `establish()`. */
-    private fun updateUnderlyingNetwork() {
+    private fun updateUnderlyingNetwork(exclude: android.net.Network? = null) {
         if (tun == null) return
         val cm = getSystemService(android.net.ConnectivityManager::class.java) ?: return
-        val best = PhysicalNetwork.pick(cm)
+        // exclude: в onLost уходящая сеть ещё числится среди живых (см. PhysicalNetwork.pick).
+        val best = PhysicalNetwork.pick(cm, exclude)
         runCatching { setUnderlyingNetworks(best?.let { arrayOf(it) }) }
         if (best != lastUnderlying) {
             lastUnderlying = best
