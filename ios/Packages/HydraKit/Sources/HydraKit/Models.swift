@@ -2,11 +2,15 @@ import Foundation
 
 /// Движок, который обслуживает протокол на iOS. В отличие от Android, всё, что работает,
 /// идёт через одно ядро sing-box в Network Extension: второй Go-рантайм (Xray, amneziawg-go)
-/// в том же процессе не уживается, а подпроцессы (olcRTC, OpenFlux) iOS запрещает.
+/// в том же процессе не уживается, а подпроцессы iOS запрещает. Поэтому olcRTC и OpenFlux (0.7.10)
+/// собраны вместе с libbox одной gomobile-библиотекой и работают в том же расширении.
 public enum Engine: String, Codable, Sendable {
     case singBox
     /// AmneziaWG — отдельное расширение на amneziawg-go (второй Go-рантайм с Libbox не уживается).
     case amneziaWG
+    /// olcRTC и OpenFlux (0.7.10): клиент внутри расширения sing-box открывает SOCKS5 на 127.0.0.1,
+    /// sing-box — мост (tun → socks), как на Android и ПК.
+    case socksBridge
     /// Есть на Android, на iOS пока нет — показываем честно, с причиной.
     case notYetOnIOS
     /// Невозможно на iOS в принципе (подпроцессы, GRE и т. п.).
@@ -57,7 +61,7 @@ public enum ServerProtocol: String, Codable, CaseIterable, Sendable {
     }
 
     /// Протокол можно поднять на iOS (sing-box или AmneziaWG).
-    public var supportedOnIOS: Bool { engine == .singBox || engine == .amneziaWG }
+    public var supportedOnIOS: Bool { engine == .singBox || engine == .amneziaWG || engine == .socksBridge }
 
     public var engine: Engine {
         switch self {
@@ -66,7 +70,8 @@ public enum ServerProtocol: String, Codable, CaseIterable, Sendable {
         // SSTP/L2TP: PPP-стек перенесён (HydraKit/PPP), транспорт MS-SSTP ждёт исправления и проверки на
         // живом сервере — Android-реализация расходится со спецификацией (см. docs/ROADMAP.md, 0.6.25).
         case .sstp, .l2tp: .notYetOnIOS
-        case .pptp, .wdtt, .olcrtc, .openflux: .unavailable
+        case .olcrtc, .openflux: .socksBridge
+        case .pptp, .wdtt: .unavailable
         }
     }
 

@@ -19,6 +19,8 @@ public enum SingBoxConfigBuilder {
         public var routing = RoutingSettings()
         public var geo: [GeoCountry] = []
         public var hotspot: (port: Int, user: String, password: String)?
+        /// olcRTC / OpenFlux (0.7.10): порт SOCKS5 клиента на 127.0.0.1 — единственный outbound «proxy».
+        public var socksBridgePort: Int?
         public init() {}
     }
 
@@ -61,7 +63,10 @@ public enum SingBoxConfigBuilder {
             ])
         }
         root["inbounds"] = inbounds
-        root["outbounds"] = [try outbound(profile, o.routing.tlsFragment), ["type": "direct", "tag": "direct"]]
+        let proxy: [String: Any] = try o.socksBridgePort.map {
+            ["type": "socks", "tag": "proxy", "server": "127.0.0.1", "server_port": $0]
+        } ?? outbound(profile, o.routing.tlsFragment)
+        root["outbounds"] = [proxy, ["type": "direct", "tag": "direct"]]
 
         let netRules = o.routing.netActive ? o.routing.netRules : []
         let geoActive = o.routing.geoMode != .off && !o.geo.isEmpty

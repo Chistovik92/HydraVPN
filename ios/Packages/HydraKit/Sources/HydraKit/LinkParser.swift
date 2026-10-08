@@ -28,6 +28,8 @@ public enum LinkParser {
         case "sstp": return parseUserPass(link, .sstp, 443)
         case "l2tp": return parseUserPass(link, .l2tp, 1701)
         case "pptp": return parseUserPass(link, .pptp, 1723)
+        case "olcrtc": return parseOlcRtc(link)
+        case "openflux": return parseOpenFlux(link)
         default:
             // вставленный целиком .conf: AWG-параметры → AmneziaWG, иначе WireGuard
             guard link.contains("[Interface]") else { return nil }
@@ -37,6 +39,72 @@ public enum LinkParser {
     }
 
     // MARK: - протоколы
+
+    /// olcRTC (порт `OlcRtcLink` с Android): `olcrtc://<Provider>?<Transport>[<k=v&…>]@<RoomID>#<Key>$<Имя>`.
+    /// address = комната, uuidOrPassword = ключ (64 hex), transport, extra = {provider, params}; порт 0.
+    static func parseOlcRtc(_ link: String) -> ServerProfile? {
+        guard link.lowercased().hasPrefix("olcrtc://") else { return nil }
+        let body = String(link.dropFirst("olcrtc://".count)).trimmingCharacters(in: .whitespaces)
+        let parts = body.split(separator: "$", maxSplits: 1, omittingEmptySubsequences: false)
+        let main = String(parts[0])
+        let mimo = parts.count > 1 ? String(parts[1]).trimmingCharacters(in: .whitespaces) : ""
+        guard let hash = main.lastIndex(of: "#") else { return nil }
+        let key = String(main[main.index(after: hash)...]).trimmingCharacters(in: .whitespaces)
+        let withoutKey = String(main[..<hash])
+        guard let at = withoutKey.firstIndex(of: "@") else { return nil }
+        let head = String(withoutKey[..<at])
+        let room = String(withoutKey[withoutKey.index(after: at)...]).trimmingCharacters(in: .whitespaces)
+        let provider = (head.split(separator: "?", maxSplits: 1).first.map(String.init) ?? "")
+            .trimmingCharacters(in: .whitespaces).lowercased()
+        guard !provider.isEmpty, !room.isEmpty, !key.isEmpty else { return nil }
+        let transportPart = head.contains("?") ? String(head[head.index(after: head.firstIndex(of: "?")!)...]) : "datachannel"
+        var transport = (transportPart.split(separator: "<", maxSplits: 1).first.map(String.init) ?? "")
+            .trimmingCharacters(in: .whitespaces)
+        if transport.isEmpty { transport = "datachannel" }
+        var params: [String: String] = [:]
+        if let lt = transportPart.firstIndex(of: "<"), let gt = transportPart.lastIndex(of: ">"), lt < gt {
+            for kv in transportPart[transportPart.index(after: lt)..<gt].split(separator: "&") where kv.contains("=") {
+                let pair = kv.split(separator: "=", maxSplits: 1)
+                params[String(pair[0])] = String(pair[1])
+            }
+        }
+        return ServerProfile(
+            name: mimo.isEmpty ? "olcRTC \(provider)" : mimo, protocolId: ServerProtocol.olcrtc.rawValue,
+            address: room, port: 0, uuidOrPassword: key, transport: transport,
+            extra: json(["provider": provider, "params": params]))
+    }
+
+    /// OpenFlux — соглашение Hydra (порт `OpenFluxLink`):
+    /// `openflux://<transport>?url=<url>&maxToken=<t>&maxUid=<u>&codec=<batched|legacy>&key=<секрет>#<имя>`.
+    static func parseOpenFlux(_ link: String) -> ServerProfile? {
+        guard link.lowercased().hasPrefix("openflux://") else { return nil }
+        let body = String(link.dropFirst("openflux://".count))
+        let hashSplit = body.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
+        let name = hashSplit.count > 1 ? urlDecode(String(hashSplit[1])).trimmingCharacters(in: .whitespaces) : ""
+        let main = String(hashSplit[0])
+        let qSplit = main.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        let transport = String(qSplit[0]).trimmingCharacters(in: .whitespaces).lowercased()
+        guard ["yandex", "vyandex", "oneme", "cupsonline", "mailru", "direct"].contains(transport) else { return nil }
+        var q: [String: String] = [:]
+        if qSplit.count > 1 {
+            for kv in qSplit[1].split(separator: "&") where kv.contains("=") {
+                let pair = kv.split(separator: "=", maxSplits: 1)
+                q[String(pair[0])] = urlDecode(String(pair[1]))
+            }
+        }
+        let url = q["url"] ?? "", token = q["maxToken"] ?? "", uid = q["maxUid"] ?? "", key = q["key"] ?? ""
+        if transport == "direct" && (url.isEmpty || key.isEmpty) { return nil }
+        if transport == "oneme" {
+            if token.isEmpty || uid.isEmpty { return nil }
+        } else if transport != "cupsonline" && url.isEmpty {
+            return nil
+        }
+        let codec = (q["codec"] ?? "").isEmpty ? "batched" : q["codec"]!
+        return ServerProfile(
+            name: name.isEmpty ? "OpenFlux \(transport)" : name, protocolId: ServerProtocol.openflux.rawValue,
+            address: url, port: 0, uuidOrPassword: key, transport: transport,
+            extra: json(["maxToken": token, "maxUid": uid, "codec": codec]))
+    }
 
     private static func parseUserPass(_ link: String, _ proto: ServerProtocol, _ defaultPort: Int) -> ServerProfile? {
         guard let u = URLParts(link) else { return nil }

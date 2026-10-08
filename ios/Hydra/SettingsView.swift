@@ -52,8 +52,8 @@ struct TunnelSettings: View {
                 engine("eng_xray", "eng_xray_desc", on: false)
                 engine("eng_awg", "eng_awg_desc", on: false)
                 engine("eng_ppp", "eng_ppp_desc", on: false)
-                engine("eng_olcrtc", "eng_olcrtc_desc", on: false)
-                engine("eng_openflux", "eng_openflux_desc", on: false)
+                engine("eng_olcrtc", "eng_olcrtc_desc", on: true)
+                engine("eng_openflux", "eng_openflux_desc", on: true)
             }
         }
         .navigationTitle(L("set_tunnel"))
