@@ -19,7 +19,8 @@ object OlcRtcLink {
     fun parse(link: String): ServerProfile? {
         if (!link.startsWith("olcrtc://", ignoreCase = true)) return null
         val body = link.substring("olcrtc://".length).trim()
-        val mimo = body.substringAfter('$', "").trim()
+        // Имя после «$» часто приходит URL-кодированным (`Мой%20узел`) — раскодируем, как имя после «#» у остальных ссылок.
+        val mimo = body.substringAfter('$', "").trim().let { runCatching { java.net.URLDecoder.decode(it.replace("+", "%2B"), "UTF-8") }.getOrDefault(it) }
         val main = body.substringBefore('$')
 
         val key = main.substringAfterLast('#', "").trim()

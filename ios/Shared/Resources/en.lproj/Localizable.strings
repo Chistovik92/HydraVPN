@@ -81,7 +81,7 @@
 "profiles_name_hint" = "For example, Home";
 "profiles_delete_q" = "Delete profile “%1$@”?";
 "upd_title" = "Updates";
-"upd_desc" = "Hydra checks the latest release on GitHub. The app does not download or install anything by itself: it opens the release page.";
+"upd_desc" = "Hydra checks the latest release on GitHub. The «Download and install» button fetches the file (its checksum is verified) and opens the system installer; the release page is always available too.";
 "upd_checking" = "Checking…";
 "upd_latest" = "You have the latest version";
 "upd_failed" = "Could not check: %1$@";
@@ -97,6 +97,7 @@
 "upd_need_permission" = "Allow Hydra to install apps on the screen that just opened, then tap «Update» again.";
 "upd_no_file" = "This release has no file for this build — open the release page.";
 "upd_install_failed" = "Update failed: %1$@";
+"upd_sig_mismatch" = "The downloaded file is signed with a different key than the installed Hydra, so it will not install over it. It was deleted — download Hydra only from the official releases page.";
 "a11y_dismiss" = "Dismiss";
 "a11y_more_actions" = "More actions";
 "a11y_selected" = "Selected";
@@ -157,6 +158,10 @@
 "rt_msg_reloaded" = "Router configuration reloaded";
 "rt_unreachable" = "Router %1$@ is not responding";
 "rt_pin_failed" = "The router certificate does not match the paired one — possible spoofing";
+"rt_forget_q" = "Forget this router?";
+"rt_forget_msg" = "“%1$@” will be removed from this app. The router itself is not changed; you can pair it again with its link.";
+"no_system_picker" = "This device has no system file picker (common on Android TV). Copy the link and use paste from clipboard instead.";
+"no_camera" = "No camera on this device. Copy the link and use paste from clipboard instead.";
 "tab_main" = "Home";
 "tab_servers" = "Servers";
 "tab_profile" = "Profile";
@@ -468,7 +473,7 @@
 "ios_widgets_title" = "Widget and Control Center";
 "ios_widgets_desc" = "Add the Hydra widget to the Home or Lock Screen to see the connected location and connect in one tap; on iOS 18 add the Hydra control to Control Center. Shortcuts: “Connect Hydra”, “Disconnect Hydra”.";
 "ios_limits_title" = "Not on iOS";
-"ios_limits_desc" = "Split tunneling by app (iOS allows it only via device management), Xray Core, olcRTC and OpenFlux (separate processes are forbidden). SSTP/L2TP and AmneziaWG are planned.";
+"ios_limits_desc" = "Not on iOS: split tunneling by app (iOS allows it only via device management) and Xray Core (separate processes are forbidden). olcRTC and OpenFlux run inside the VPN extension (since 0.7.10, beta). SSTP/L2TP are planned.";
 "ios_lang_hint" = "The interface language follows the language set for Hydra in iOS Settings.";
 "ios_open_settings" = "Open Hydra settings →";
 "ios_import_file" = "Import from file";

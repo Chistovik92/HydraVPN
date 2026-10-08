@@ -47,7 +47,7 @@ public enum LinkParser {
         let body = String(link.dropFirst("olcrtc://".count)).trimmingCharacters(in: .whitespaces)
         let parts = body.split(separator: "$", maxSplits: 1, omittingEmptySubsequences: false)
         let main = String(parts[0])
-        let mimo = parts.count > 1 ? String(parts[1]).trimmingCharacters(in: .whitespaces) : ""
+        let mimo = parts.count > 1 ? urlDecode(String(parts[1])).trimmingCharacters(in: .whitespaces) : ""
         guard let hash = main.lastIndex(of: "#") else { return nil }
         let key = String(main[main.index(after: hash)...]).trimmingCharacters(in: .whitespaces)
         let withoutKey = String(main[..<hash])

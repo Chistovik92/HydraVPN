@@ -131,6 +131,7 @@ internal class SettingsPanel(private val c: AppController) : Renderable {
             note("Данные: ${Platform.dataDir.absolutePath}"),
             note("Classic — упрощённая оболочка для 32-битных систем и Windows 7: те же ядра и настройки, что у обычной Hydra. " +
                 "Нет управления роутерами HydraVPN for Router (оно есть в обычной Hydra и на Android). " +
+                "olcRTC и OpenFlux (бета) — кроме Windows 7: их клиенты требуют Windows 8.1 или новее. " +
                 "AmneziaWG, SSTP и L2TP — только на Android."),
             checkUpdates, row(button("Проверить обновления сейчас") { c.checkForUpdates(manual = true) })),
     )

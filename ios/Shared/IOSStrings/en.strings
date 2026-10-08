@@ -5,7 +5,7 @@
 "ios_widgets_title" = "Widget and Control Center";
 "ios_widgets_desc" = "Add the Hydra widget to the Home or Lock Screen to see the connected location and connect in one tap; on iOS 18 add the Hydra control to Control Center. Shortcuts: “Connect Hydra”, “Disconnect Hydra”.";
 "ios_limits_title" = "Not on iOS";
-"ios_limits_desc" = "Split tunneling by app (iOS allows it only via device management), Xray Core, olcRTC and OpenFlux (separate processes are forbidden). SSTP/L2TP and AmneziaWG are planned.";
+"ios_limits_desc" = "Not on iOS: split tunneling by app (iOS allows it only via device management) and Xray Core (separate processes are forbidden). olcRTC and OpenFlux run inside the VPN extension (since 0.7.10, beta). SSTP/L2TP are planned.";
 "ios_lang_hint" = "The interface language follows the language set for Hydra in iOS Settings.";
 "ios_open_settings" = "Open Hydra settings →";
 "ios_import_file" = "Import from file";

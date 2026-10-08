@@ -198,8 +198,8 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
             Section("О программе") {
                 Text("Hydra ${Platform.version} · sing-box 1.12.25 · Xray-core 26.9.30 · ${System.getProperty("os.name")} ${System.getProperty("os.arch")}", fontSize = 13.sp)
                 Text("Данные: ${Platform.dataDir.absolutePath}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("На ПК поддерживаются: VLESS (в т.ч. REALITY), VMess, Trojan, Shadowsocks (sing-box или Xray), Hysteria2, TUIC, WireGuard (sing-box). " +
-                    "AmneziaWG, SSTP, L2TP, olcRTC и OpenFlux пока только в Android.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("На ПК поддерживаются: VLESS (в т.ч. REALITY), VMess, Trojan, Shadowsocks (sing-box или Xray), Hysteria2, TUIC, WireGuard (sing-box), " +
+                    "olcRTC и OpenFlux (бета). AmneziaWG, SSTP и L2TP пока только в Android.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 ToggleRow("Проверять обновления при запуске", s.checkUpdates, "Запрос к GitHub: есть ли релиз новее. Скачивание — только по кнопке «Обновить».") {
                     v -> c.updateSettings { it.copy(checkUpdates = v) }
                 }
