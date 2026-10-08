@@ -51,6 +51,8 @@ class ScreenshotsTest {
             bot = BotLink("https://radar.example.org", "demo", "ivan", 2),
             settings = DesktopSettings(selectedServerId = 1, killSwitch = true),
         ))
+        // То же демо-состояние для снимка Hydra Classic (Swing): её запускают отдельно с APPDATA/XDG_CONFIG_HOME на этот каталог.
+        System.getenv("HYDRA_CLASSIC_STATE")?.let { file.copyTo(File(it).apply { parentFile.mkdirs() }, overwrite = true) }
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val c = AppController(scope, Store(file), background = false)
         c.previewState { it.copy(status = Status.CONNECTED, statusText = "Подключено · sing-box", connectedId = 1, delayMs = 41,
@@ -80,6 +82,17 @@ class ScreenshotsTest {
             scene.render(0)
             val png = scene.render(1_000_000_000L).encodeToData(EncodedImageFormat.PNG)!!.bytes
             File(out, "desktop-$name.png").writeBytes(png)
+            scene.close()
+        }
+        // Темы как в Android (0.7.9): главная в Stealth и AMOLED.
+        for (t in listOf(AppTheme.STEALTH, AppTheme.AMOLED)) {
+            c.updateSettings { it.copy(theme = t) }
+            val scene = ImageComposeScene(1100, 720, Density(1f)) {
+                val ui by c.ui.collectAsState()
+                HydraApp(c, ui, onRelaunchAdmin = {}, startTab = 0)
+            }
+            scene.render(0)
+            File(out, "desktop-home-${t.name.lowercase()}.png").writeBytes(scene.render(1_000_000_000L).encodeToData(EncodedImageFormat.PNG)!!.bytes)
             scene.close()
         }
         scope.cancel()

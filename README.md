@@ -37,6 +37,10 @@ iOS не даёт приложению поставить себя само: о�
 |:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/phone-settings.png" width="200"> | <img src="docs/screenshots/phone-routing.png" width="200"> | <img src="docs/screenshots/phone-tunnel.png" width="200"> | <img src="docs/screenshots/phone-split.png" width="200"> |
 
+| Темы: Ambient · Stealth · Material You (0.7.9) | Выбор темы и иконки |
+|:---:|:---:|
+| <img src="docs/screenshots/phone-themes.png" width="560"> | <img src="docs/screenshots/phone-theme.png" width="200"> |
+
 **Компьютер** (Windows / Linux / macOS, один и тот же интерфейс; данные демонстрационные)
 
 | Главная (подключено, аккаунт) | Серверы |
@@ -50,6 +54,12 @@ iOS не даёт приложению поставить себя само: о�
 | Маршруты | Настройки |
 |:---:|:---:|
 | <img src="docs/screenshots/desktop-routing.png" width="420"> | <img src="docs/screenshots/desktop-settings.png" width="420"> |
+
+| Тема Monochrome Stealth | Тема AMOLED |
+|:---:|:---:|
+| <img src="docs/screenshots/desktop-home-stealth.png" width="420"> | <img src="docs/screenshots/desktop-home-amoled.png" width="420"> |
+
+Hydra Classic (Windows 7 / 32-бит) — тот же набор экранов на Swing; iOS собирается только в macOS-CI, снимков с устройства пока нет.
 
 ---
 
