@@ -21,7 +21,19 @@ import ru.gidravpn.hydra.data.repository.ServerRepository
 import ru.gidravpn.hydra.data.repository.SplitTunnelRepository
 import ru.gidravpn.hydra.data.repository.ThemeRepository
 import ru.gidravpn.hydra.data.repository.VpnSettingsRepository
+import ru.gidravpn.hydra.data.dpi.DpiProbe
+import ru.gidravpn.hydra.data.geo.GeoKind
+import ru.gidravpn.hydra.data.geo.GeoRuntime
+import ru.gidravpn.hydra.data.geo.GeoSettings
+import ru.gidravpn.hydra.data.geo.GeoStore
+import ru.gidravpn.hydra.data.subscription.GeoAssets
+import ru.gidravpn.hydra.data.dpi.DpiSettings
+import ru.gidravpn.hydra.data.dpi.DpiStrategies
+import ru.gidravpn.hydra.data.routing.RouteConfig
+import ru.gidravpn.hydra.data.routing.RouteRule
+import ru.gidravpn.hydra.data.routing.withVia
 import ru.gidravpn.hydra.ui.theme.ThemeMode
+import ru.gidravpn.hydra.vpn.core.ByeDpiSidecar
 import ru.gidravpn.hydra.vpn.HydraVpnService
 import ru.gidravpn.hydra.vpn.VpnState
 import ru.gidravpn.hydra.vpn.core.ConnectionState
@@ -288,6 +300,151 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             reapplySplitIfConnected()
         }
         onDone(found.size)
+    }
+
+    // ----- 0.7.13: обход DPI, правила «что → через какой выход», цепочки -----
+
+    val routeConfig: StateFlow<RouteConfig> = routingRepo.routeConfig
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), RouteConfig())
+
+    private fun updateRoutes(change: (RouteConfig) -> RouteConfig) = safeLaunch {
+        routingRepo.setRouteConfig(change(routeConfig.value))
+        reapplySplitIfConnected()
+    }
+
+    fun setDpi(change: (DpiSettings) -> DpiSettings) = updateRoutes { it.copy(dpi = change(it.dpi)) }
+    fun addRouteRule(rule: RouteRule) = updateRoutes { it.copy(rules = it.rules + rule) }
+    fun removeRouteRule(rule: RouteRule) = updateRoutes { it.copy(rules = it.rules - rule) }
+    fun addRouteGroup(g: ru.gidravpn.hydra.data.routing.RouteGroup) = updateRoutes { it.copy(groups = it.groups.filterNot { x -> x.tag == g.tag } + g) }
+    fun removeRouteGroup(g: ru.gidravpn.hydra.data.routing.RouteGroup) = updateRoutes { it.copy(groups = it.groups - g) }
+
+    /**
+     * Пресет «Заблокированное в РФ → обход DPI»: правила geosite/geoip набора ru-blocked на выход «dpi» и включённый обход DPI.
+     * Наборы берутся у runetfreedom (в других источниках их нет) — они добавляются как свои источники geo-баз и скачиваются сразу.
+     */
+    fun applyBlockedRuPreset() = safeLaunch {
+        val src = ru.gidravpn.hydra.data.geo.GeoSources.RUNETFREEDOM
+        routingRepo.setGeoSettings(geoSettings.value.let { g ->
+            g.copy(custom = g.custom.filterNot { it.name == "ru-blocked" } + listOf(
+                ru.gidravpn.hydra.data.geo.CustomGeoSource(GeoKind.SITE, "ru-blocked", src.site[0].replace("{name}", "ru-blocked")),
+                ru.gidravpn.hydra.data.geo.CustomGeoSource(GeoKind.IP, "ru-blocked", src.ip[0].replace("{name}", "ru-blocked")),
+            ))
+        })
+        routingRepo.setRouteConfig(routeConfig.value.let {
+            it.copy(
+                dpi = it.dpi.copy(enabled = true),
+                rules = (it.rules + listOf(
+                    RouteRule(ru.gidravpn.hydra.data.routing.RouteKind.GEOSITE, "ru-blocked", ru.gidravpn.hydra.data.routing.RouteTarget.DPI),
+                    RouteRule(ru.gidravpn.hydra.data.routing.RouteKind.GEOIP, "ru-blocked", ru.gidravpn.hydra.data.routing.RouteTarget.DPI),
+                )).distinct(),
+            )
+        })
+        updateGeoNow()
+    }
+
+    /** «Пустить этот сервер через …»: `dpi`, `node-<id>` или null. */
+    fun setServerVia(server: ServerProfile, via: String?) = safeLaunch {
+        repo.save(withVia(server, via))
+        reapplySplitIfConnected()
+    }
+
+    /** Профиль «Обход DPI» (без VPN): трафик выходит напрямую, но «порезанным» ByeDPI. */
+    fun addByeDpiProfile(strategy: String) = safeLaunch {
+        val extra = org.json.JSONObject().put("strategy", strategy).toString()
+        repo.save(ServerProfile(name = "Обход DPI", address = "127.0.0.1", port = DpiSettings.DEFAULT_PORT,
+            protocolId = Protocol.BYEDPI.id, extra = extra, flag = "🛡️"))
+        VpnState.log("Добавлен профиль «Обход DPI»")
+    }
+
+    /** Состояние мастера подбора: [baseline] — как открывается всё без обхода, [results] — лучшие на данный момент. */
+    data class DpiProbeUi(
+        val running: Boolean = false, val done: Int = 0, val total: Int = 0,
+        val baseline: DpiProbe.Result? = null, val results: List<DpiProbe.Result> = emptyList(),
+        val finished: Boolean = false, val error: String? = null,
+    )
+    private val _probe = MutableStateFlow(DpiProbeUi())
+    val dpiProbe = _probe.asStateFlow()
+    private var probeJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Мастер подбора обхода: [groups] — что разблокировать (ключи [DpiStrategies.SITES]), [extraSite] — свой сайт,
+     * [full] — все стратегии (иначе первые [DpiProbe.QUICK]). Лучшие результаты копятся в [dpiProbe].
+     */
+    fun probeDpi(groups: Set<String>, extraSite: String, full: Boolean) {
+        if (probeJob?.isActive == true) return
+        probeJob = safeLaunch {
+            val ctx = getApplication<Application>()
+            val sites = linkedMapOf<String, List<String>>()
+            groups.forEach { g -> DpiStrategies.SITES[g]?.let { sites[g] = it } }
+            extraSite.trim().takeIf { it.isNotEmpty() }?.let { sites["custom"] = listOf(it) }
+            if (sites.isEmpty()) sites["general"] = DpiStrategies.SITES.getValue("general")
+            val list = if (full) DpiStrategies.PRESETS else DpiStrategies.PRESETS.take(DpiProbe.QUICK)
+            _probe.value = DpiProbeUi(running = true, total = list.size)
+            val port = DpiSettings.DEFAULT_PORT + 1
+            try {
+                val res = DpiProbe.run(list, sites, port,
+                    start = { args -> ru.gidravpn.hydra.vpn.core.SocksProcess(ctx, "ByeDPI", ByeDpiSidecar.BINARY, args, port).also { it.start() } },
+                    onBaseline = { b -> _probe.value = _probe.value.copy(baseline = b) },
+                    onResult = { i, n, r ->
+                        val top = (_probe.value.results + r).sortedByDescending { it.ratio }.take(3)
+                        _probe.value = _probe.value.copy(done = i, total = n, results = top)
+                    })
+                _probe.value = _probe.value.copy(running = false, finished = true, results = res.take(3))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _probe.value = DpiProbeUi(error = e.message ?: e.javaClass.simpleName)
+            }
+        }
+    }
+
+    /** Применить найденную стратегию: она станет стратегией обхода «напрямую» и будет включён сам обход. */
+    fun useDpiStrategy(strategy: String) = setDpi { it.copy(enabled = true, strategy = strategy) }
+
+    fun cancelProbe() { probeJob?.cancel(); _probe.value = DpiProbeUi() }
+
+    // ----- 0.7.13: geo-базы как динамический слой -----
+
+    val geoSettings: StateFlow<GeoSettings> = routingRepo.geoSettings
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GeoSettings())
+
+    data class GeoUi(val busy: Boolean = false, val message: String? = null, val entries: List<GeoStore.Entry> = emptyList())
+    private val _geo = MutableStateFlow(GeoUi())
+    val geoUi = _geo.asStateFlow()
+
+    fun refreshGeoEntries() {
+        _geo.value = _geo.value.copy(entries = GeoAssets.store(getApplication()).entries())
+    }
+
+    fun setGeoSettings(change: (GeoSettings) -> GeoSettings) = safeLaunch {
+        routingRepo.setGeoSettings(change(geoSettings.value))
+    }
+
+    /** Обновить сейчас; при поднятом туннеле — переподключиться, чтобы sing-box прочитал новые файлы. */
+    fun updateGeoNow() {
+        if (_geo.value.busy) return
+        safeLaunch {
+            _geo.value = _geo.value.copy(busy = true, message = null)
+            val r = runCatching { GeoRuntime.update(getApplication(), onlyIfDue = false) }
+            val msg = r.fold(
+                onSuccess = { rep -> rep?.let { "+${it.installed} / =${it.unchanged} / ✕${it.failed}" } ?: "" },
+                onFailure = { it.message ?: it.javaClass.simpleName },
+            )
+            _geo.value = GeoUi(false, msg, GeoAssets.store(getApplication()).entries())
+            if (r.getOrNull()?.installed ?: 0 > 0) reapplySplitIfConnected()
+        }
+    }
+
+    fun rollbackGeo(kind: GeoKind, name: String) = safeLaunch {
+        GeoAssets.store(getApplication()).rollback(kind, name)
+        refreshGeoEntries()
+        reapplySplitIfConnected()
+    }
+
+    fun removeGeo(kind: GeoKind, name: String) = safeLaunch {
+        GeoAssets.store(getApplication()).remove(kind, name)
+        refreshGeoEntries()
+        reapplySplitIfConnected()
     }
 
     fun toggleSplitApp(pkg: String) = safeLaunch {

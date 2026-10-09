@@ -30,6 +30,7 @@ public enum LinkParser {
         case "pptp": return parseUserPass(link, .pptp, 1723)
         case "olcrtc": return parseOlcRtc(link)
         case "openflux": return parseOpenFlux(link)
+        case "byedpi": return ByeDpiLink.parse(link)
         default:
             // вставленный целиком .conf: AWG-параметры → AmneziaWG, иначе WireGuard
             guard link.contains("[Interface]") else { return nil }

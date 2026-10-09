@@ -43,6 +43,7 @@ class SingBoxCore : VpnCore {
 
     override val name = "sing-box ${Libbox.version()}"
     private var service: BoxService? = null
+    private var sidecars: PreparedRoute? = null
 
     /** Смерть сервиса sing-box у поднятого туннеля (Фаза 7a) — через postServiceClose() libbox. */
     override fun setDeathListener(listener: (reason: String) -> Unit) {
@@ -63,7 +64,7 @@ class SingBoxCore : VpnCore {
             mtu = opts.mtu, tlsFragment = opts.tlsFragment, hotspot = resolveHotspot(ctx), ipv6 = opts.ipv6,
         ).toString(2)
         onLog("sing-box: конфиг сгенерирован (${config.length} байт)")
-        runConfig(tun, config, onLog, onStats)
+        runConfig(tun, config, onLog, onStats, profile)
     }
 
     /**
@@ -77,7 +78,13 @@ class SingBoxCore : VpnCore {
         config: String,
         onLog: (String) -> Unit,
         onStats: (TrafficStats) -> Unit,
+        profile: ServerProfile? = null,
     ) {
+        // Правила «что → через какой выход», цепочки и обход DPI (0.7.12): ByeDPI поднимается до ядра, останавливается в stop().
+        val prepared = RoutePlanRuntime.prepare(AppCtx.appContext, config, profile, onLog)
+        sidecars = prepared
+        val config = prepared.config
+        try {
         // libbox.setup вызывается один раз за процесс (idempotent guard в SingBoxRuntime)
         SingBoxRuntime.ensureSetup()
 
@@ -93,6 +100,12 @@ class SingBoxCore : VpnCore {
 
         SingBoxRuntime.attachService(svc)
         SingBoxRuntime.startStatsPolling(onStats, onLog)
+        } catch (e: Throwable) {
+            // ByeDPI и клиенты узлов уже запущены: без ядра они бесполезны и держали бы порты.
+            prepared.stop()
+            sidecars = null
+            throw e
+        }
     }
 
 override fun stop() {
@@ -100,6 +113,8 @@ override fun stop() {
         SingBoxRuntime.onServiceClosed = null
         runCatching { service?.close() }
         service = null
+        sidecars?.stop()
+        sidecars = null
     }
 }
 

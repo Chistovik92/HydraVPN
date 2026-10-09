@@ -17,13 +17,18 @@ import java.io.File
  */
 object GeoAssets {
 
+    /** Скачанные базы (0.7.13): имеют приоритет над вшитыми. */
+    fun store(context: Context) = ru.gidravpn.hydra.data.geo.GeoStore(File(context.filesDir, "geo-dynamic"))
+
     /** Коды стран, для которых есть IP-база. */
     fun availableCountries(context: Context): List<String> =
-        context.assets.list("geoip").orEmpty().map { it.removeSuffix(".srs") }.sorted()
+        (context.assets.list("geoip").orEmpty().map { it.removeSuffix(".srs") } +
+            store(context).entries().filter { it.kind == ru.gidravpn.hydra.data.geo.GeoKind.IP && it.name.length == 2 }.map { it.name }).distinct().sorted()
 
     /** Коды стран, для которых есть ещё и доменная база. */
     fun countriesWithDomains(context: Context): Set<String> =
-        context.assets.list("geosite").orEmpty().map { it.removeSuffix(".srs") }.toSet()
+        (context.assets.list("geosite").orEmpty().map { it.removeSuffix(".srs") } +
+            store(context).entries().filter { it.kind == ru.gidravpn.hydra.data.geo.GeoKind.SITE && it.name.length == 2 }.map { it.name }).toSet()
 
     /**
      * Пути к базам выбранных стран; неизвестные коды пропускаются (например
@@ -35,10 +40,18 @@ object GeoAssets {
         return countries.filter { it in withIp }.sorted().map { cc ->
             SingBoxConfigBuilder.GeoCountry(
                 code = cc,
-                geoipPath = extract(context, "geoip", cc),
-                geositePath = if (cc in withDomains) extract(context, "geosite", cc) else null,
+                geoipPath = pathFor(context, false, cc)!!,
+                geositePath = if (cc in withDomains) pathFor(context, true, cc) else null,
             )
         }
+    }
+
+    /** Путь к одной базе (правила «страна → выход» из 0.7.12); null — такой базы нет. */
+    fun pathFor(context: Context, domains: Boolean, cc: String): String? {
+        val kind = if (domains) ru.gidravpn.hydra.data.geo.GeoKind.SITE else ru.gidravpn.hydra.data.geo.GeoKind.IP
+        store(context).resolve(kind, cc)?.let { return it.absolutePath }
+        val bundled = context.assets.list(kind.dir).orEmpty().contains("$cc.srs")
+        return if (bundled) extract(context, kind.dir, cc) else null
     }
 
     private fun extract(context: Context, dir: String, cc: String): String {

@@ -10,6 +10,7 @@ import ru.gidravpn.hydra.data.model.ServerProfile
 val ServerProfile.hasValidEndpoint: Boolean
     get() = when (protocol?.engine) {
         Engine.OLCRTC -> address.isNotBlank()
+        Engine.BYEDPI -> true   // локальный прокси: ни адреса, ни порта сервера нет
         Engine.OPENFLUX -> transport == "oneme" || transport == "cupsonline" || address.isNotBlank()
         else -> address.isNotBlank() && port in 1..65535
     }

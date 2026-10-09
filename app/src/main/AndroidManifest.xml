@@ -73,6 +73,7 @@
                 <data android:scheme="pptp" />
                 <data android:scheme="sing-box" />
                 <data android:scheme="olcrtc" />
+                <data android:scheme="byedpi" />
                 <data android:scheme="openflux" />
                 <data android:scheme="olcbox" />
             </intent-filter>

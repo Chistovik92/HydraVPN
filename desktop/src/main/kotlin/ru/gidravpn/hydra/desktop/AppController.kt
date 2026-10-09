@@ -18,7 +18,29 @@ import ru.gidravpn.hydra.bot.BotClient
 import ru.gidravpn.hydra.bot.BotException
 import ru.gidravpn.hydra.bot.BotJson
 import ru.gidravpn.hydra.bot.BotSyncPlanner
+import ru.gidravpn.hydra.data.dpi.DpiArgs
+import ru.gidravpn.hydra.data.dpi.DpiProbe
+import ru.gidravpn.hydra.data.dpi.DpiSettings
+import ru.gidravpn.hydra.data.dpi.DpiStrategies
+import ru.gidravpn.hydra.data.geo.CustomGeoSource
+import ru.gidravpn.hydra.data.geo.GeoSettings
+import ru.gidravpn.hydra.data.geo.GeoSources
+import ru.gidravpn.hydra.data.routing.RouteConfig
+import ru.gidravpn.hydra.data.routing.RouteGroup
+import ru.gidravpn.hydra.data.routing.RouteRule
+import ru.gidravpn.hydra.data.routing.RouteTarget
+import ru.gidravpn.hydra.data.routing.withVia
+import ru.gidravpn.hydra.data.geo.GeoKind
+import ru.gidravpn.hydra.data.geo.GeoUpdater
+import ru.gidravpn.hydra.data.geo.JvmGeoHttp
+import ru.gidravpn.hydra.data.model.Engine
 import ru.gidravpn.hydra.data.model.EngineToggles
+import ru.gidravpn.hydra.data.model.GeoRoutingMode
+import ru.gidravpn.hydra.data.routing.RouteKind
+import ru.gidravpn.hydra.data.routing.RoutePlan
+import ru.gidravpn.hydra.data.routing.RoutePlanFactory
+import ru.gidravpn.hydra.data.routing.viaOf
+import ru.gidravpn.hydra.data.subscription.SingBoxConfigBuilder
 import ru.gidravpn.hydra.data.model.HotspotSettings
 import ru.gidravpn.hydra.data.model.NetRuleType
 import ru.gidravpn.hydra.data.model.NetworkRule
@@ -56,6 +78,13 @@ const val HYDRA_DNS = "hydra"
 
 enum class Status { DISCONNECTED, CONNECTING, CONNECTED, STOPPING, ERROR }
 
+/** Состояние мастера подбора обхода DPI: [baseline] — как открывается всё без обхода, [results] — лучшие на данный момент. */
+data class DpiProbeUi(
+    val running: Boolean = false, val done: Int = 0, val total: Int = 0,
+    val baseline: DpiProbe.Result? = null, val results: List<DpiProbe.Result> = emptyList(),
+    val finished: Boolean = false, val error: String? = null,
+)
+
 data class UiState(
     val data: HydraState = HydraState(),
     val status: Status = Status.DISCONNECTED,
@@ -68,6 +97,8 @@ data class UiState(
     val upTotal: Long = 0,
     val downTotal: Long = 0,
     val delayMs: Int? = null,
+    /** Растёт после обновления geo-баз: экран «Geo-базы» перечитывает хранилище. */
+    val geoTick: Int = 0,
     val log: List<String> = emptyList(),
     val updatingSubs: Set<Long> = emptySet(),
     val pinging: Boolean = false,
@@ -142,6 +173,7 @@ class AppController(
                 while (isActive) {
                     autoUpdateSubscriptions()
                     autoSyncBot()
+                    updateGeo(manual = false)
                     delay(30 * 60_000L)
                 }
             }
@@ -530,6 +562,7 @@ class AppController(
             EngineToggles.Kind.XRAY -> it.copy(xrayEnabled = enabled)
             EngineToggles.Kind.OLCRTC -> it.copy(olcRtcEnabled = enabled)
             EngineToggles.Kind.OPENFLUX -> it.copy(openFluxEnabled = enabled)
+            EngineToggles.Kind.BYEDPI -> it   // тумблера нет
             else -> it
         }
     }
@@ -641,6 +674,8 @@ class AppController(
 
     private suspend fun startSession(sessionId: Int, profile: ServerProfile, settings: DesktopSettings, engine: EngineToggles.Kind) {
         if (session != sessionId) return
+        // Клиенты узлов пишут ключи в файлы 0600 ещё до запуска; если запуск сорвался раньше runner.start, чистим их сами.
+        var extras: MutableList<Sidecar> = mutableListOf()
         try {
             if (settings.mode == ConnectionMode.PROXY) ensurePortFree(settings.proxyPort, "прокси")
             if (settings.lanShare.isUsable) ensurePortFree(settings.lanShare.port, "раздачи в сеть", any = true)
@@ -648,6 +683,7 @@ class AppController(
             val sidecar: Sidecar? = when (engine) {
                 EngineToggles.Kind.OLCRTC -> olcRtcSidecar(profile)
                 EngineToggles.Kind.OPENFLUX -> openFluxSidecar(profile)
+                EngineToggles.Kind.BYEDPI -> byeDpiSidecar(profile)
                 else -> null
             }
             val bridge = when {
@@ -660,9 +696,13 @@ class AppController(
                 val ip = if (settings.mode == ConnectionMode.TUN) resolve(profile.address) else null
                 DesktopConfig.xray(profile, settings, it, ip).toString(2)
             }
-            val bypass = listOfNotNull(Platform.processExecutable, bridge?.takeIf { engine == EngineToggles.Kind.XRAY }?.let { Platform.bundledXray()?.absolutePath }, sidecar?.exe?.absolutePath)
-            val config = DesktopConfig.build(profile, settings, Platform.os, api, Platform.geoDir(), bridge, bypass)
-            runner.start(sessionId, config.toString(2), settings.mode, xrayConfig, bridge?.port ?: 0, sidecar)
+            // 0.7.13: правила, группы, цепочки, обход DPI — дополнительные клиенты (ByeDPI, узлы на OpenFlux/olcRTC) поднимаются до sing-box.
+            extras = mutableListOf()
+            val plan = buildPlan(profile, settings, extras)
+            val bypass = listOfNotNull(Platform.processExecutable, bridge?.takeIf { engine == EngineToggles.Kind.XRAY }?.let { Platform.bundledXray()?.absolutePath }, sidecar?.exe?.absolutePath) +
+                extras.map { it.exe.absolutePath }
+            val config = DesktopConfig.build(profile, settings, Platform.os, api, Platform.geoDir(), bridge, bypass, plan, Platform.geoStore) { appendLog("Маршрутизация: $it") }
+            runner.start(sessionId, config.toString(2), settings.mode, xrayConfig, bridge?.port ?: 0, sidecar, extras)
             if (session != sessionId) {   // пока ядро поднималось, нажали «Отключить»
                 runner.stop()
                 return
@@ -681,12 +721,14 @@ class AppController(
             if (session == sessionId && runner.isAlive) watchNetwork(sessionId, profile, engine)
         } catch (e: NeedsElevation) {
             runner.stop()
+            extras.forEach { sc -> sc.secrets.forEach { runCatching { it.delete() } } }
             if (session == sessionId) {
                 SystemProxy.restore()
                 _ui.update { it.copy(status = Status.DISCONNECTED, statusText = "Нужны права администратора", needsElevation = true, connectedId = null, blocked = false) }
             }
         } catch (e: Exception) {
             runner.stop()
+            extras.forEach { sc -> sc.secrets.forEach { runCatching { it.delete() } } }
             if (session == sessionId) {
                 if (!keepBlocked(settings)) SystemProxy.restore()
                 _ui.update { it.copy(status = Status.ERROR, statusText = e.message ?: e.toString(), connectedId = null) }
@@ -698,7 +740,7 @@ class AppController(
     private suspend fun verify(clash: ClashApi, sessionId: Int, settings: DesktopSettings, engine: EngineToggles.Kind) {
         var lastError = ""
         val how = (if (settings.mode == ConnectionMode.TUN) "TUN, весь трафик" else "прокси 127.0.0.1:${settings.proxyPort}") +
-            when (engine) { EngineToggles.Kind.XRAY -> " · Xray"; EngineToggles.Kind.OLCRTC -> " · olcRTC"; EngineToggles.Kind.OPENFLUX -> " · OpenFlux"; else -> " · sing-box" }
+            when (engine) { EngineToggles.Kind.XRAY -> " · Xray"; EngineToggles.Kind.OLCRTC -> " · olcRTC"; EngineToggles.Kind.OPENFLUX -> " · OpenFlux"; EngineToggles.Kind.BYEDPI -> " · ByeDPI"; else -> " · sing-box" }
         repeat(4) { attempt ->
             delay(if (attempt == 0) 1200 else 2000)
             if (session != sessionId || !runner.isAlive) return
@@ -740,6 +782,21 @@ class AppController(
             val cur = _ui.value
             launchSession(profile, cur.data.settings, engine, "Сеть сменилась — переподключение…")
             return@launch
+        }
+    }
+
+    /** Переподключиться тем же профилем (новые geo-базы, правила): ядро читает их только при запуске. */
+    private fun reconnectSoon(text: String) {
+        val st = _ui.value
+        val profile = st.data.servers.firstOrNull { it.id == st.connectedId } ?: return
+        val engine = DesktopConfig.engineFor(profile, st.data.settings, xrayAvailable) ?: return
+        scope.launch(Dispatchers.IO) {
+            connLock.withLock {
+                if (userStopped) return@launch
+                session++
+                runner.stop()
+            }
+            launchSession(profile, _ui.value.data.settings, engine, text)
         }
     }
 
@@ -845,6 +902,217 @@ class AppController(
         val port = freePort()
         val key = if (profile.uuidOrPassword.isNotEmpty()) File(Platform.runDir, "openflux.key").also { Store.writePrivateAtomic(it, profile.uuidOrPassword) } else null
         return Sidecar("OpenFlux", exe, OpenFluxArgs.build(profile, port, key?.absolutePath), port, secrets = listOfNotNull(key))
+    }
+
+    /** Профиль «Обход DPI»: ciadpi как основной клиент, sing-box — мост от tun/прокси к его SOCKS5. */
+    private fun byeDpiSidecar(profile: ServerProfile): Sidecar {
+        val exe = Platform.bundledByeDpi() ?: error("ByeDPI не входит в эту сборку Hydra — выберите другой сервер")
+        val port = freePort()
+        val strategy = runCatching { JSONObject(profile.extra).optString("strategy") }.getOrDefault("")
+        return Sidecar("ByeDPI", exe, DpiArgs.build(strategy, port), port, readyTimeoutMs = 8_000)
+    }
+
+    /** Узел маршрутизации на движке-подпроцессе (OpenFlux, olcRTC): свой клиент на свободном порту, выход — socks на него. */
+    private fun nodeSocks(p: ServerProfile, tag: String, extras: MutableList<Sidecar>): JSONObject? = runCatching {
+        val sc = when (p.protocol?.engine) {
+            Engine.OPENFLUX -> openFluxSidecar(p)
+            Engine.OLCRTC -> olcRtcSidecar(p)
+            else -> return null
+        }
+        extras += sc
+        JSONObject().put("type", "socks").put("tag", tag).put("server", "127.0.0.1").put("server_port", sc.socksPort).put("version", "5")
+    }.getOrElse { appendLog("Маршрутизация: узел $tag не подготовлен — ${it.message}"); null }
+
+    /** План маршрутизации для подключения: правила по программам, группы, цепочки, ByeDPI. null — настроек нет. */
+    private fun buildPlan(profile: ServerProfile, settings: DesktopSettings, extras: MutableList<Sidecar>): RoutePlan? {
+        val cfg = settings.routing.routes
+        if (cfg.rules.isEmpty() && cfg.groups.isEmpty() && !cfg.dpi.enabled && viaOf(profile) == null) return null
+        val servers = _ui.value.data.servers
+        val nodeOutbound = { p: ServerProfile, tag: String ->
+            if (p.protocol?.engine == Engine.SINGBOX) SingBoxConfigBuilder.nodeOutbound(p, tag) else nodeSocks(p, tag, extras)
+        }
+        var plan = RoutePlanFactory.build(cfg, profile, setOf(RouteKind.PROCESS), { id -> servers.firstOrNull { it.id == id } }, nodeOutbound)
+        if (plan.needsDpi) {
+            val exe = Platform.bundledByeDpi()
+            if (exe == null) {
+                appendLog("ByeDPI: в этой сборке нет ciadpi — продолжаем без обхода DPI")
+                plan = plan.withoutDpi()
+            } else if (runCatching { ServerSocket(plan.dpi.port, 1, InetAddress.getByName("127.0.0.1")).close() }.isFailure) {
+                // Порт занят (вторая копия Hydra, другая программа): подключение лучше, чем ошибка из-за необязательного обхода.
+                appendLog("ByeDPI: порт ${plan.dpi.port} занят — продолжаем без обхода DPI")
+                plan = plan.withoutDpi()
+            } else {
+                extras += Sidecar("ByeDPI", exe, DpiArgs.build(plan.dpi.strategy, plan.dpi.port), plan.dpi.port, readyTimeoutMs = 8_000)
+            }
+        }
+        return plan
+    }
+
+    // ------------------------------------------------------------------ обход DPI и маршрутизация (0.7.13)
+    fun updateRoutes(block: (RouteConfig) -> RouteConfig) = updateRouting { it.copy(routes = block(it.routes)) }
+    fun setDpi(block: (DpiSettings) -> DpiSettings) = updateRoutes { it.copy(dpi = block(it.dpi)) }
+    fun addRouteRule(r: RouteRule) = updateRoutes { it.copy(rules = (it.rules + r).distinct().take(Rules.MAX_RULES)) }
+    fun removeRouteRule(r: RouteRule) = updateRoutes { it.copy(rules = it.rules - r) }
+    fun addRouteGroup(g: RouteGroup) = updateRoutes { it.copy(groups = it.groups.filterNot { x -> x.tag == g.tag } + g) }
+    fun removeRouteGroup(g: RouteGroup) = updateRoutes { it.copy(groups = it.groups - g) }
+    fun setGeo(block: (GeoSettings) -> GeoSettings) = updateRouting { it.copy(geo = block(it.geo)) }
+
+    /** «Пустить этот сервер через …»: `dpi`, `node-<id>` или null. */
+    fun setServerVia(server: ServerProfile, via: String?) = mutate { s ->
+        s.copy(servers = s.servers.map { if (it.id == server.id) withVia(it, via) else it })
+    }
+
+    /** Профиль «Обход DPI» (без VPN): трафик выходит напрямую, но «порезанным» ByeDPI. */
+    fun addByeDpiProfile(strategy: String) {
+        mutate { s ->
+            val p = ServerProfile(id = nextId(s.servers.map { it.id }), name = "Обход DPI", protocolId = ru.gidravpn.hydra.data.model.Protocol.BYEDPI.id,
+                address = "127.0.0.1", port = DpiSettings.DEFAULT_PORT, extra = JSONObject().put("strategy", strategy).toString(), flag = "🛡️")
+            s.copy(servers = s.servers + p)
+        }
+        toast("Добавлен профиль «Обход DPI»")
+    }
+
+    /** Применить найденную стратегию: она станет стратегией обхода «напрямую», сам обход включится. */
+    fun useDpiStrategy(strategy: String) = setDpi { it.copy(enabled = true, strategy = strategy) }
+
+    /**
+     * Пресет «Заблокированное в РФ → обход DPI»: правила geosite/geoip набора ru-blocked на выход «dpi» и включённый обход.
+     * Наборы есть только у runetfreedom — добавляются как свои источники geo-баз и скачиваются сразу.
+     */
+    fun applyBlockedRuPreset() {
+        val src = GeoSources.RUNETFREEDOM
+        updateRouting { r ->
+            r.copy(
+                routes = r.routes.copy(
+                    dpi = r.routes.dpi.copy(enabled = true),
+                    rules = (r.routes.rules + listOf(
+                        RouteRule(RouteKind.GEOSITE, "ru-blocked", RouteTarget.DPI),
+                        RouteRule(RouteKind.GEOIP, "ru-blocked", RouteTarget.DPI),
+                    )).distinct(),
+                ),
+                geo = r.geo.copy(custom = r.geo.custom.filterNot { it.name == "ru-blocked" } + listOf(
+                    CustomGeoSource(GeoKind.SITE, "ru-blocked", src.site[0].replace("{name}", "ru-blocked")),
+                    CustomGeoSource(GeoKind.IP, "ru-blocked", src.ip[0].replace("{name}", "ru-blocked")),
+                )),
+            )
+        }
+        updateGeo(manual = true)
+    }
+
+    fun rollbackGeo(kind: GeoKind, name: String) {
+        Platform.geoStore.rollback(kind, name)
+        _ui.update { it.copy(geoTick = it.geoTick + 1) }
+        if (_ui.value.active) reconnectSoon("Geo-базы изменены — переподключение")
+    }
+
+    fun removeGeo(kind: GeoKind, name: String) {
+        Platform.geoStore.remove(kind, name)
+        _ui.update { it.copy(geoTick = it.geoTick + 1) }
+        if (_ui.value.active) reconnectSoon("Geo-базы изменены — переподключение")
+    }
+
+    val dpiProbe = MutableStateFlow(DpiProbeUi())
+    private var probeJob: kotlinx.coroutines.Job? = null
+
+    /** Запуск ciadpi с точными аргументами для проверки; бросает, если не поднялся. */
+    private fun startCiadpi(exe: File, args: List<String>, port: Int): AutoCloseable {
+        val p = ProcessBuilder(listOf(exe.absolutePath) + args).redirectErrorStream(true).start()
+        Thread { runCatching { p.inputStream.readAllBytes() } }.apply { isDaemon = true }.start()   // не даём заполниться буферу вывода
+        val deadline = System.currentTimeMillis() + 5_000
+        while (System.currentTimeMillis() < deadline) {
+            check(p.isAlive) { "ciadpi завершился при запуске" }
+            if (runCatching { java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", port), 200) } }.isSuccess) {
+                return AutoCloseable {
+                    p.destroy()
+                    if (!p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) p.destroyForcibly()
+                }
+            }
+            Thread.sleep(100)
+        }
+        p.destroyForcibly()
+        error("ciadpi: порт $port не открылся")
+    }
+
+    /**
+     * Мастер подбора обхода: [groups] — что разблокировать (ключи [DpiStrategies.SITES]), [extraSite] — свой сайт,
+     * [full] — все стратегии (иначе первые [DpiProbe.QUICK]).
+     */
+    fun probeDpi(groups: Set<String>, extraSite: String, full: Boolean) {
+        if (probeJob?.isActive == true) return
+        val exe = Platform.bundledByeDpi() ?: return toast("ByeDPI не входит в эту сборку Hydra")
+        probeJob = scope.launch(Dispatchers.IO) {
+            val sites = linkedMapOf<String, List<String>>()
+            groups.forEach { g -> DpiStrategies.SITES[g]?.let { sites[g] = it } }
+            extraSite.trim().takeIf { it.isNotEmpty() }?.let { sites["custom"] = listOf(it) }
+            if (sites.isEmpty()) sites["general"] = DpiStrategies.SITES.getValue("general")
+            val list = if (full) DpiStrategies.PRESETS else DpiStrategies.PRESETS.take(DpiProbe.QUICK)
+            dpiProbe.value = DpiProbeUi(running = true, total = list.size)
+            val port = freePort()
+            try {
+                val res = DpiProbe.run(list, sites, port,
+                    start = { args -> startCiadpi(exe, args, port) },
+                    onBaseline = { b -> dpiProbe.update { it.copy(baseline = b) } },
+                    onResult = { i, n, r -> dpiProbe.update { it.copy(done = i, total = n, results = (it.results + r).sortedByDescending { x -> x.ratio }.take(3)) } })
+                dpiProbe.update { it.copy(running = false, finished = true, results = res.take(3)) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                dpiProbe.value = DpiProbeUi(error = e.message ?: e.javaClass.simpleName)
+            }
+        }
+    }
+
+    fun cancelProbe() { probeJob?.cancel(); dpiProbe.value = DpiProbeUi() }
+
+    // ------------------------------------------------------------------ geo-базы (0.7.13)
+    @Volatile private var geoBusy = false
+
+    /** Какие базы нужны сейчас: страны режима geo, правила «страна → выход», дополнительные наборы и свои источники. */
+    fun geoWanted(r: RoutingSettings): List<Pair<GeoKind, String>> {
+        val out = linkedSetOf<Pair<GeoKind, String>>()
+        if (r.geoMode != GeoRoutingMode.OFF) r.geoCountries.forEach { cc ->
+            out += GeoKind.IP to cc
+            val bundledSite = Platform.geoDir()?.let { File(it, "geosite/$cc.srs").isFile } == true
+            if (bundledSite || Platform.geoStore.resolve(GeoKind.SITE, cc) != null) out += GeoKind.SITE to cc
+        }
+        r.routes.rules.forEach {
+            when (it.kind) {
+                RouteKind.GEOIP -> out += GeoKind.IP to it.value.trim().lowercase()
+                RouteKind.GEOSITE -> out += GeoKind.SITE to it.value.trim().lowercase()
+                else -> Unit
+            }
+        }
+        r.geo.extraIp.forEach { out += GeoKind.IP to it }
+        r.geo.extraSite.forEach { out += GeoKind.SITE to it }
+        r.geo.custom.forEach { out += it.kind to it.name }
+        return out.filter { it.second.isNotBlank() }
+    }
+
+    /**
+     * Обновить geo-базы. [manual] — по кнопке (всегда, с сообщением); иначе по расписанию (только если пора и включено).
+     * При включённом режиме «прокси» качает через локальный HTTP-вход — так работает и там, где GitHub закрыт, а сервер доступен.
+     */
+    fun updateGeo(manual: Boolean) {
+        if (geoBusy) return
+        val st = _ui.value.data.settings
+        val g = st.routing.geo
+        val store = Platform.geoStore
+        if (!manual && (!g.autoUpdate || System.currentTimeMillis() - store.lastChecked() < g.intervalHours * 3_600_000L)) return
+        val wanted = geoWanted(st.routing)
+        if (wanted.isEmpty()) { if (manual) toast("Нечего обновлять: включите geo-маршрутизацию или добавьте правила/наборы"); return }
+        geoBusy = true
+        scope.launch(Dispatchers.IO) {
+            try {
+                val viaProxy = if (_ui.value.status == Status.CONNECTED && st.mode == ConnectionMode.PROXY) st.proxyPort else 0
+                val rep = GeoUpdater(store, JvmGeoHttp(viaProxy)).update(g, wanted) { appendLog(it) }
+                appendLog("Geo-базы: обновлено ${rep.installed}, без изменений ${rep.unchanged}, ошибок ${rep.failed}")
+                if (manual) toast("Geo-базы: +${rep.installed} / =${rep.unchanged} / ✕${rep.failed}")
+                if (rep.installed > 0 && _ui.value.active) reconnectSoon("Geo-базы обновлены — переподключение")
+                _ui.update { it.copy(geoTick = it.geoTick + 1) }
+            } catch (e: Exception) {
+                if (manual) toast("Geo-базы: ${e.message}")
+            } finally { geoBusy = false }
+        }
     }
 
     private fun freePort(): Int = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { it.localPort }

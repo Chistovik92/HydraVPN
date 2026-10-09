@@ -1,0 +1,330 @@
+package ru.gidravpn.hydra.desktop.ui
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import ru.gidravpn.hydra.data.dpi.DpiArgs
+import ru.gidravpn.hydra.data.dpi.DpiStrategies
+import ru.gidravpn.hydra.data.geo.CustomGeoSource
+import ru.gidravpn.hydra.data.geo.GeoKind
+import ru.gidravpn.hydra.data.geo.GeoSources
+import ru.gidravpn.hydra.data.model.Engine
+import ru.gidravpn.hydra.data.model.ServerProfile
+import ru.gidravpn.hydra.data.routing.RouteGroup
+import ru.gidravpn.hydra.data.routing.RouteKind
+import ru.gidravpn.hydra.data.routing.RouteRule
+import ru.gidravpn.hydra.data.routing.RouteTarget
+import ru.gidravpn.hydra.data.routing.viaOf
+import ru.gidravpn.hydra.desktop.AppController
+import ru.gidravpn.hydra.desktop.Platform
+import ru.gidravpn.hydra.desktop.UiState
+import java.text.DateFormat
+import java.util.Date
+
+private val kindNames = mapOf(
+    RouteKind.APP to "Приложение (Android)", RouteKind.PROCESS to "Программа", RouteKind.DOMAIN to "Домен", RouteKind.SUFFIX to "Суффикс домена",
+    RouteKind.KEYWORD to "Ключевое слово", RouteKind.REGEX to "Regex", RouteKind.CIDR to "Диапазон IP", RouteKind.SRC_CIDR to "IP клиента",
+    RouteKind.PORT to "Порт", RouteKind.PROTOCOL to "Протокол (tls, http, quic…)", RouteKind.NETWORK to "Сеть (tcp/udp)",
+    RouteKind.GEOIP to "Страна (IP)", RouteKind.GEOSITE to "Страна (домены)",
+)
+
+private fun targetName(t: String, servers: List<ServerProfile>, groups: List<RouteGroup>): String = when (t) {
+    RouteTarget.PROXY -> "VPN"
+    RouteTarget.DIRECT -> "Напрямую"
+    RouteTarget.DPI -> "Обход DPI"
+    RouteTarget.BLOCK -> "Блок"
+    else -> RouteTarget.nodeId(t)?.let { id -> servers.firstOrNull { it.id == id }?.name }
+        ?: groups.firstOrNull { it.tag == t }?.let { "◎ ${it.name}" } ?: t
+}
+
+/** Обход DPI, полная маршрутизация и geo-базы (0.7.13) — разделы экрана «Маршрутизация». */
+internal fun androidx.compose.foundation.lazy.LazyListScope.dpiRoutesItems(c: AppController, ui: UiState) {
+    item { DpiWizardSection(c, ui) }
+    item { DpiSection(c, ui) }
+    item { RulesSection(c, ui) }
+    item { GroupsSection(c, ui) }
+    item { ChainsSection(c, ui) }
+    item { GeoLayerSection(c, ui) }
+}
+
+private val dpiAvailable get() = Platform.bundledByeDpi() != null
+
+@Composable
+private fun DpiWizardSection(c: AppController, ui: UiState) {
+    val probe by c.dpiProbe.collectAsState()
+    Section("Подобрать обход за меня") {
+        Text("Отметьте, что должно открываться. Hydra переберёт готовые стратегии ByeDPI на вашем подключении и покажет лучшие.",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (!dpiAvailable) {
+            Text("ByeDPI (ciadpi) не вошёл в эту сборку — подбор недоступен.", color = Warn, fontSize = 12.sp)
+            return@Section
+        }
+        var picked by remember { mutableStateOf(setOf("youtube", "discord", "telegram")) }
+        var extra by remember { mutableStateOf("") }
+        var full by remember { mutableStateOf(false) }
+        val labels = mapOf("youtube" to "YouTube", "discord" to "Discord", "telegram" to "Telegram", "general" to "Общие", "custom" to "Свой сайт")
+        ChipRow {
+            listOf("youtube", "discord", "telegram", "general").forEach { g ->
+                FilterChip(selected = g in picked, onClick = { picked = if (g in picked) picked - g else picked + g }, label = { Text(labels.getValue(g)) })
+            }
+        }
+        OutlinedTextField(extra, { extra = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Свой сайт (необязательно), например example.com") })
+        ChipRow {
+            FilterChip(selected = !full, onClick = { full = false }, label = { Text("Быстро (около минуты)") })
+            FilterChip(selected = full, onClick = { full = true }, label = { Text("Тщательно (все стратегии)") })
+        }
+        if (probe.running) OutlinedButton(onClick = { c.cancelProbe() }) { Text("Остановить") }
+        else Button(onClick = { c.probeDpi(picked, extra, full) }) { Text("Начать подбор") }
+        if (ui.active && ui.data.settings.mode == ru.gidravpn.hydra.desktop.ConnectionMode.TUN)
+            Text("Идёт подключение в режиме TUN: проверка пойдёт через VPN. Отключитесь для честного результата.", color = Warn, fontSize = 12.sp)
+        if (probe.running) {
+            LinearProgressIndicator(progress = { if (probe.total == 0) 0f else probe.done.toFloat() / probe.total }, Modifier.fillMaxWidth())
+            Text("Проверено ${probe.done} из ${probe.total}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        probe.error?.let { Text(it, color = Danger, fontSize = 12.sp) }
+        probe.baseline?.let { b ->
+            Text(if (b.percent >= 95) "Без обхода уже открывается ${b.percent}% сайтов — скорее всего, обход вам не нужен." else "Без обхода открывается только ${b.percent}% сайтов.",
+                fontSize = 12.sp, color = if (b.percent >= 95) Accent else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        probe.results.forEachIndexed { i, r ->
+            Section("Вариант ${i + 1} — открылось ${r.ok} из ${r.total} (${r.percent}%)") {
+                Text(r.groups.joinToString(" · ") { "${labels[it.name] ?: it.name} ${it.ok}/${it.total}" }, fontSize = 12.sp)
+                Text(r.strategy, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { c.useDpiStrategy(r.strategy) }) { Text("Использовать") }
+                    OutlinedButton(onClick = { c.addByeDpiProfile(r.strategy) }) { Text("Сохранить профилем") }
+                }
+            }
+        }
+        if (probe.finished) Text(
+            if (probe.results.firstOrNull()?.ok ?: 0 == 0) "Ничего не помогло. Попробуйте «Тщательно» или другое подключение."
+            else "Готово. «Использовать» включает обход для трафика напрямую; «Сохранить профилем» добавляет отдельный профиль «Обход DPI».",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun DpiSection(c: AppController, ui: UiState) {
+    val dpi = ui.data.settings.routing.routes.dpi
+    Section("Обход DPI для трафика напрямую") {
+        Text("ByeDPI — локальный прокси: режет и подделывает первые пакеты соединения, чтобы DPI провайдера не узнал сайт. Это не VPN: ваш IP он не скрывает.",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Пускать трафик «напрямую» через ByeDPI", Modifier.weight(1f))
+            Switch(checked = dpi.enabled, onCheckedChange = { v -> c.setDpi { it.copy(enabled = v) } }, enabled = dpiAvailable)
+        }
+        var custom by remember(dpi.strategy) { mutableStateOf(dpi.strategy) }
+        OutlinedTextField(custom, { custom = it }, Modifier.fillMaxWidth(), label = { Text("Стратегия (аргументы ciadpi)") }, isError = !DpiArgs.isUsable(custom))
+        var showPresets by remember { mutableStateOf(false) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { c.setDpi { it.copy(strategy = custom.trim().ifBlank { DpiStrategies.DEFAULT }) } }) { Text("Применить") }
+            OutlinedButton(onClick = { showPresets = !showPresets }) { Text("Готовые") }
+            OutlinedButton(onClick = { c.addByeDpiProfile(dpi.strategy) }) { Text("Добавить профиль «Обход DPI»") }
+        }
+        if (showPresets) DpiStrategies.PRESETS.forEachIndexed { i, s ->
+            Text("${i + 1}. $s", fontSize = 11.sp, color = if (s == dpi.strategy) Accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().clickable { custom = s; c.setDpi { it.copy(strategy = s) } })
+        }
+    }
+}
+
+@Composable
+private fun RulesSection(c: AppController, ui: UiState) {
+    val cfg = ui.data.settings.routing.routes
+    val servers = ui.data.servers
+    val nodes = servers.filter { it.protocol?.engine == Engine.SINGBOX || it.protocol?.engine == Engine.OPENFLUX || it.protocol?.engine == Engine.OLCRTC }
+    Section("Правила маршрутизации") {
+        Text("Разные программы, сайты, адреса и страны — через разные выходы одновременно. Условия с одной меткой группы объединяются по «И», «НЕ» инвертирует условие.",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val rules = cfg.rules.filter { it.kind != RouteKind.APP }
+        if (rules.isEmpty()) Text("Правил пока нет", fontSize = 12.sp)
+        rules.forEach { r ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text((if (r.invert) "НЕ " else "") + "${kindNames[r.kind]}  ${r.value}" + (if (r.group.isNotBlank()) " [${r.group}]" else "") +
+                    "  →  ${targetName(r.target, servers, cfg.groups)}", Modifier.weight(1f), fontSize = 13.sp)
+                TextButton(onClick = { c.removeRouteRule(r) }) { Text("Удалить", color = Danger) }
+            }
+        }
+        var kind by remember { mutableStateOf(RouteKind.PROCESS) }
+        var value by remember { mutableStateOf("") }
+        var target by remember { mutableStateOf(RouteTarget.DIRECT) }
+        var invert by remember { mutableStateOf(false) }
+        var group by remember { mutableStateOf("") }
+        ChipRow {
+            RouteKind.entries.filter { it != RouteKind.APP }.forEach { k ->
+                FilterChip(selected = kind == k, onClick = { kind = k }, label = { Text(kindNames.getValue(k)) })
+            }
+        }
+        OutlinedTextField(value, { value = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Значение (программа, домен, CIDR, порт, код страны)") })
+        ChipRow {
+            (listOf(RouteTarget.PROXY, RouteTarget.DIRECT, RouteTarget.DPI, RouteTarget.BLOCK) + cfg.groups.map { it.tag } + nodes.map { RouteTarget.node(it.id) }).forEach { t ->
+                FilterChip(selected = target == t, onClick = { target = t }, label = { Text(targetName(t, servers, cfg.groups)) })
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = invert, onClick = { invert = !invert }, label = { Text("НЕ") })
+            OutlinedTextField(group, { group = it }, Modifier.weight(1f), singleLine = true, label = { Text("Метка группы «И» (необязательно)") })
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { if (value.isNotBlank()) { c.addRouteRule(RouteRule(kind, value.trim(), target, invert, group.trim())); value = "" } }) { Text("Добавить правило") }
+            OutlinedButton(onClick = { c.applyBlockedRuPreset() }) { Text("Заблокированное в РФ → обход DPI") }
+        }
+    }
+}
+
+@Composable
+private fun GroupsSection(c: AppController, ui: UiState) {
+    val cfg = ui.data.settings.routing.routes
+    val servers = ui.data.servers
+    val nodes = servers.filter { it.protocol?.engine == Engine.SINGBOX || it.protocol?.engine == Engine.OPENFLUX || it.protocol?.engine == Engine.OLCRTC }
+    Section("Группы выходов") {
+        Text("Автоматически (самый быстрый живой выход, с переключением при сбое) или ручной выбор. Группа может быть целью правила или членом другой группы.",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        cfg.groups.forEach { g ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("◎ ${g.name} · ${if (g.type == RouteGroup.TYPE_URLTEST) "авто" else "ручной"}: " + g.members.joinToString { targetName(it, servers, cfg.groups) },
+                    Modifier.weight(1f), fontSize = 13.sp)
+                TextButton(onClick = { c.removeRouteGroup(g) }) { Text("Удалить", color = Danger) }
+            }
+        }
+        var name by remember { mutableStateOf("") }
+        var type by remember { mutableStateOf(RouteGroup.TYPE_URLTEST) }
+        var members by remember { mutableStateOf(setOf<String>()) }
+        OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Название группы") })
+        ChipRow {
+            FilterChip(selected = type == RouteGroup.TYPE_URLTEST, onClick = { type = RouteGroup.TYPE_URLTEST }, label = { Text("Авто") })
+            FilterChip(selected = type == RouteGroup.TYPE_SELECTOR, onClick = { type = RouteGroup.TYPE_SELECTOR }, label = { Text("Ручной") })
+        }
+        ChipRow {
+            (listOf(RouteTarget.PROXY, RouteTarget.DIRECT, RouteTarget.DPI) + nodes.map { RouteTarget.node(it.id) }).forEach { t ->
+                FilterChip(selected = t in members, onClick = { members = if (t in members) members - t else members + t },
+                    label = { Text(targetName(t, servers, cfg.groups)) })
+            }
+        }
+        Button(onClick = { if (name.isNotBlank() && members.isNotEmpty()) { c.addRouteGroup(RouteGroup(name.trim(), type, members.toList())); name = ""; members = emptySet() } }) {
+            Text("Создать группу")
+        }
+    }
+}
+
+@Composable
+private fun ChainsSection(c: AppController, ui: UiState) {
+    val servers = ui.data.servers
+    val chainable = servers.filter { it.protocolId in setOf("vless", "vmess", "trojan", "ss") }
+    val nodes = servers.filter { it.protocol?.engine == Engine.SINGBOX || it.protocol?.engine == Engine.OPENFLUX || it.protocol?.engine == Engine.OLCRTC }
+    Section("Цепочки «протокол внутри протокола»") {
+        Text("Пускать соединение самого сервера через обход DPI или через другой сервер (только TCP-протоколы). Цепочка может быть любой глубины.",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (chainable.isEmpty()) Text("Добавьте сервер VLESS, VMess, Trojan или Shadowsocks.", fontSize = 12.sp)
+        chainable.forEach { s ->
+            Text(s.name, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+            val via = viaOf(s)
+            ChipRow {
+                FilterChip(selected = via == null, onClick = { c.setServerVia(s, null) }, label = { Text("Напрямую") })
+                FilterChip(selected = via == RouteTarget.DPI, onClick = { c.setServerVia(s, RouteTarget.DPI) }, label = { Text("Обход DPI") })
+                nodes.filter { it.id != s.id }.take(8).forEach { n ->
+                    FilterChip(selected = via == RouteTarget.node(n.id), onClick = { c.setServerVia(s, RouteTarget.node(n.id)) }, label = { Text(n.name) })
+                }
+            }
+        }
+        Text("UDP-протоколы (Hysteria2, TUIC, WireGuard) в цепочку не ставятся.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun GeoLayerSection(c: AppController, ui: UiState) {
+    val g = ui.data.settings.routing.geo
+    val entries = remember(ui.geoTick) { Platform.geoStore.entries() }
+    Section("Geo-базы") {
+        Text("Списки стран и сайтов для маршрутизации Hydra скачивает сама и заменяет атомарно. Вшитые списки — запасные: на первый запуск и офлайн.",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Автообновление (раз в ${g.intervalHours} ч)", Modifier.weight(1f))
+            Switch(checked = g.autoUpdate, onCheckedChange = { v -> c.setGeo { it.copy(autoUpdate = v) } })
+        }
+        ChipRow {
+            listOf(6, 12, 24, 72, 168).forEach { h -> FilterChip(selected = g.intervalHours == h, onClick = { c.setGeo { it.copy(intervalHours = h) } }, label = { Text("$h ч") }) }
+        }
+        Button(onClick = { c.updateGeo(manual = true) }) { Text("Обновить сейчас") }
+        Text("IP-диапазоны из:", fontSize = 12.sp)
+        ChipRow { GeoSources.ALL.forEach { s -> FilterChip(selected = g.ipSource == s.id, onClick = { c.setGeo { it.copy(ipSource = s.id) } }, label = { Text(s.title) }) } }
+        Text("Домены из:", fontSize = 12.sp)
+        ChipRow { GeoSources.ALL.forEach { s -> FilterChip(selected = g.siteSource == s.id, onClick = { c.setGeo { it.copy(siteSource = s.id) } }, label = { Text(s.title) }) } }
+        Text("Зеркала пробуются по очереди, поэтому заблокированный GitHub не мешает обновлению. Источники .dat конвертируются на устройстве.",
+            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        var name by remember { mutableStateOf("") }
+        OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Имя набора, например ru-blocked или youtube") })
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { val n = name.trim().lowercase(); if (n.isNotEmpty()) { c.setGeo { it.copy(extraIp = (it.extraIp + n).distinct()) }; name = "" } }) { Text("+ список IP") }
+            OutlinedButton(onClick = { val n = name.trim().lowercase(); if (n.isNotEmpty()) { c.setGeo { it.copy(extraSite = (it.extraSite + n).distinct()) }; name = "" } }) { Text("+ список доменов") }
+        }
+        (g.extraIp.map { GeoKind.IP to it } + g.extraSite.map { GeoKind.SITE to it }).forEach { (k, n) ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("${k.dir}: $n", Modifier.weight(1f), fontSize = 13.sp)
+                TextButton(onClick = { c.setGeo { if (k == GeoKind.IP) it.copy(extraIp = it.extraIp - n) else it.copy(extraSite = it.extraSite - n) } }) { Text("Убрать", color = Danger) }
+            }
+        }
+
+        Text("Свой список — прямая ссылка (https): текстовый список (CIDR или домены), готовый .srs или запись из .dat.", fontSize = 12.sp)
+        var ckind by remember { mutableStateOf(GeoKind.IP) }
+        var ctype by remember { mutableStateOf(CustomGeoSource.TYPE_LIST) }
+        var cname by remember { mutableStateOf("") }
+        var curl by remember { mutableStateOf("") }
+        ChipRow {
+            FilterChip(selected = ckind == GeoKind.IP, onClick = { ckind = GeoKind.IP }, label = { Text("geoip") })
+            FilterChip(selected = ckind == GeoKind.SITE, onClick = { ckind = GeoKind.SITE }, label = { Text("geosite") })
+            listOf(CustomGeoSource.TYPE_LIST, CustomGeoSource.TYPE_SRS, CustomGeoSource.TYPE_DAT).forEach { t ->
+                FilterChip(selected = ctype == t, onClick = { ctype = t }, label = { Text(".$t") })
+            }
+        }
+        OutlinedTextField(cname, { cname = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Имя") })
+        OutlinedTextField(curl, { curl = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("URL") })
+        Button(onClick = {
+            val n = cname.trim().lowercase(); val u = curl.trim()
+            if (n.isNotEmpty() && u.startsWith("https://")) {
+                c.setGeo { it.copy(custom = it.custom.filterNot { x -> x.kind == ckind && x.name == n } + CustomGeoSource(ckind, n, u, ctype)) }
+                cname = ""; curl = ""
+            }
+        }) { Text("Сохранить") }
+        g.custom.forEach { x ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("${x.kind.dir}/${x.name} ← ${x.url}", Modifier.weight(1f), fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                TextButton(onClick = { c.setGeo { it.copy(custom = it.custom - x) } }) { Text("Убрать", color = Danger) }
+            }
+        }
+
+        Text("Скачано", fontWeight = FontWeight.Medium)
+        if (entries.isEmpty()) Text("Пока ничего не скачано — работают вшитые списки", fontSize = 12.sp)
+        val df = remember { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT) }
+        entries.forEach { e ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("${e.kind.dir}/${e.name} · ${e.source} · ${e.size / 1024} КБ · ${df.format(Date(e.updatedAt))} · ${e.sha256.take(8)}", Modifier.weight(1f), fontSize = 12.sp)
+                if (e.hasPrev) TextButton(onClick = { c.rollbackGeo(e.kind, e.name) }) { Text("Откат") }
+                TextButton(onClick = { c.removeGeo(e.kind, e.name) }) { Text("Удалить", color = Danger) }
+            }
+        }
+    }
+}

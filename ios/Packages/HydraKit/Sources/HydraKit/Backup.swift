@@ -21,11 +21,14 @@ public enum BackupCodec {
 
     public static func export(_ s: HydraState, appVersion: String, now: Date = Date()) throws -> Data {
         let r = s.routing
-        let routing: [String: Any] = [
+        var routing: [String: Any] = [
             "dns_provider": tv(r.dnsProvider.rawValue), "dns_custom_address": tv(r.dnsCustomAddress),
             "geo_routing_mode": tv(r.geoMode.rawValue), "geo_countries": tv(r.geoCountries.sorted().joined(separator: ",")),
             "tun_mtu": tv(r.mtu.rawValue), "tls_fragment": tv(r.tlsFragment.rawValue), "ipv6_mode": tv(r.ipv6.rawValue),
         ]
+        // Маршруты и geo-базы (0.7.13) пишем, только если пользователь их настраивал: пустое значение не должно превращаться в «настроенное».
+        if let routes = r.routes { routing["route_config"] = tv(routes.androidJSON()) }
+        if let geo = r.geo { routing["geo_config"] = tv(geo.androidJSON()) }
         let rules = r.netRules.map { ["type": $0.type.rawValue, "value": $0.value] }
         let rulesJSON = String(data: (try? JSONSerialization.data(withJSONObject: rules)) ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
         let settings: [String: Any] = ["split_net_mode": tv(r.netMode.rawValue), "split_net_rules": tv(rulesJSON)]
@@ -68,6 +71,8 @@ public enum BackupCodec {
         if let x = v(rp, "tun_mtu") as? String, let e = MtuPreset(rawValue: x) { s.routing.mtu = e }
         if let x = v(rp, "tls_fragment") as? String, let e = TlsFragmentMode(rawValue: x) { s.routing.tlsFragment = e }
         if let x = v(rp, "ipv6_mode") as? String, let e = Ipv6Mode(rawValue: x) { s.routing.ipv6 = e }
+        if let x = v(rp, "route_config") as? String { s.routing.routes = RouteConfig(androidJSON: x) }
+        if let x = v(rp, "geo_config") as? String { s.routing.geo = GeoSettings(androidJSON: x) }
         if let x = v("settings", "split_net_mode") as? String, let e = SplitMode(rawValue: x) { s.routing.netMode = e }
         if let x = v("settings", "split_net_rules") as? String, let d = x.data(using: .utf8),
            let arr = try? JSONSerialization.jsonObject(with: d) as? [[String: String]] {

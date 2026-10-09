@@ -89,6 +89,7 @@ internal fun RoutingScreen(c: AppController, ui: UiState) {
         }
 
         item { GeoSection(c, ui) }
+        dpiRoutesItems(c, ui)
     }
 }
 

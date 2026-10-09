@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import ru.gidravpn.hydra.data.model.DnsEndpoint
+import ru.gidravpn.hydra.data.geo.GeoSettings
+import ru.gidravpn.hydra.data.routing.RouteConfig
 import ru.gidravpn.hydra.data.model.DnsProvider
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
 import ru.gidravpn.hydra.data.model.Ipv6Mode
@@ -24,6 +26,20 @@ class RoutingRepository(private val context: Context) {
     private val KEY_MTU = stringPreferencesKey("tun_mtu")
     private val KEY_TLS_FRAGMENT = stringPreferencesKey("tls_fragment")
     private val KEY_IPV6 = stringPreferencesKey("ipv6_mode")
+    private val KEY_ROUTE_CONFIG = stringPreferencesKey("route_config")
+    private val KEY_GEO_CONFIG = stringPreferencesKey("geo_config")
+
+    /** Источники и расписание geo-баз (0.7.13). */
+    val geoSettings: Flow<GeoSettings> = context.routingStore.data.map { GeoSettings.fromJson(it[KEY_GEO_CONFIG]) }
+    suspend fun setGeoSettings(s: GeoSettings) {
+        context.routingStore.edit { it[KEY_GEO_CONFIG] = s.toJson() }
+    }
+
+    /** Правила «что → через какой выход» и обход DPI (0.7.12). Лежит в routing_settings — значит, входит в профили маршрутизации и резервную копию. */
+    val routeConfig: Flow<RouteConfig> = context.routingStore.data.map { RouteConfig.fromJson(it[KEY_ROUTE_CONFIG]) }
+    suspend fun setRouteConfig(cfg: RouteConfig) {
+        context.routingStore.edit { it[KEY_ROUTE_CONFIG] = cfg.toJson() }
+    }
 
     val ipv6Mode: Flow<Ipv6Mode> = context.routingStore.data.map { Ipv6Mode.fromId(it[KEY_IPV6]) }
     suspend fun setIpv6Mode(mode: Ipv6Mode) {

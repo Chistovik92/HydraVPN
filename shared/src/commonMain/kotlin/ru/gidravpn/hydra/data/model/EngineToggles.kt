@@ -17,7 +17,7 @@ data class EngineToggles(
     val openFlux: Boolean = true,
     val preferXray: Boolean = false,
 ) {
-    enum class Kind { SINGBOX, XRAY, AWG, PPP, OLCRTC, OPENFLUX }
+    enum class Kind { SINGBOX, XRAY, AWG, PPP, OLCRTC, OPENFLUX, BYEDPI }
 
     /** Кто обслужит протокол; null — ни одно подходящее ядро не включено (или протокол недоступен). */
     fun engineFor(protocol: Protocol?, xrayAvailable: Boolean): Kind? {
@@ -36,6 +36,7 @@ data class EngineToggles(
             Engine.USERSPACE -> if (ppp) Kind.PPP else null
             Engine.OLCRTC -> if (olcRtc) Kind.OLCRTC else null
             Engine.OPENFLUX -> if (openFlux) Kind.OPENFLUX else null
+            Engine.BYEDPI -> Kind.BYEDPI  // отдельного тумблера нет: это обход DPI, а не VPN-протокол
             Engine.WDTT, Engine.UNAVAILABLE -> null
         }
     }

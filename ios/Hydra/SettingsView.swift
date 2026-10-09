@@ -16,6 +16,8 @@ struct SettingsView: View {
                 link("set_security", "set_security_sub", "shield.lefthalf.filled") { SecuritySettings() }
                 link("set_routing", "set_routing_sub", "arrow.triangle.branch") { RoutingSettingsView() }
                 link("set_split", "set_split_sub", "arrow.left.arrow.right") { SplitSettings() }
+                link("set_dpi", "set_dpi_sub", "shield.checkered") { DpiRoutesView() }
+                link("set_geo", "set_geo_sub", "globe.europe.africa") { GeoView() }
                 link("hotspot_hub_title", "hotspot_hub_subtitle", "antenna.radiowaves.left.and.right") { HotspotSettings() }
                 link("set_logs", "set_logs_sub", "doc.text") { LogsView() }
                 link("theme_title", nil, "paintpalette") { ThemeSettings() }

@@ -82,6 +82,12 @@ object Platform {
     fun bundledOpenFlux(): File? = if (goClientsSupported) bundled("openflux", "HYDRA_OPENFLUX") else null
     fun bundledOlcRtc(): File? = if (goClientsSupported) bundled("olcrtc", "HYDRA_OLCRTC") else null
 
+    /** ByeDPI (`ciadpi`, MIT) — обход DPI (0.7.13); готовый бинарь релиза или сборка из исходников метки. */
+    fun bundledByeDpi(): File? = bundled("ciadpi", "HYDRA_BYEDPI")
+
+    /** Скачанные geo-базы (0.7.13): имеют приоритет над вшитыми из [geoDir]. */
+    val geoStore: ru.gidravpn.hydra.data.geo.GeoStore by lazy { ru.gidravpn.hydra.data.geo.GeoStore(File(dataDir, "geo")) }
+
     /**
      * Клиенты olcRTC и OpenFlux собраны современным Go, а он не поддерживает Windows 7 / 8.0 (нужна 8.1+ — NT 6.3).
      * В Hydra Classic для Windows они лежат в архиве (тот же архив и для Windows 10 x86), но на старой системе не предлагаются (0.7.10).

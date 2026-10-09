@@ -13,6 +13,8 @@ public enum Engine: String, Codable, Sendable {
     case socksBridge
     /// Есть на Android, на iOS пока нет — показываем честно, с причиной.
     case notYetOnIOS
+    /// Обход DPI (0.7.13): ByeDPI внутри расширения, sing-box — мост tun → socks к нему.
+    case byeDpi
     /// Невозможно на iOS в принципе (подпроцессы, GRE и т. п.).
     case unavailable
 }
@@ -25,6 +27,7 @@ public enum ServerProtocol: String, Codable, CaseIterable, Sendable {
     case hysteria2, tuic, wireguard
     case amneziaWG = "awg"
     case wdtt, olcrtc, openflux
+    case byedpi
 
     public var displayName: String {
         switch self {
@@ -42,6 +45,7 @@ public enum ServerProtocol: String, Codable, CaseIterable, Sendable {
         case .wdtt: "WDTT"
         case .olcrtc: "olcRTC"
         case .openflux: "OpenFlux"
+        case .byedpi: "Обход DPI (ByeDPI)"
         }
     }
 
@@ -56,12 +60,13 @@ public enum ServerProtocol: String, Codable, CaseIterable, Sendable {
         case .wireguard: "WG"
         case .amneziaWG: "AWG"
         case .openflux: "OFX"
+        case .byedpi: "DPI"
         default: String(rawValue.prefix(3)).uppercased()
         }
     }
 
     /// Протокол можно поднять на iOS (sing-box или AmneziaWG).
-    public var supportedOnIOS: Bool { engine == .singBox || engine == .amneziaWG || engine == .socksBridge }
+    public var supportedOnIOS: Bool { engine == .singBox || engine == .amneziaWG || engine == .socksBridge || engine == .byeDpi }
 
     public var engine: Engine {
         switch self {
@@ -71,6 +76,7 @@ public enum ServerProtocol: String, Codable, CaseIterable, Sendable {
         // живом сервере — Android-реализация расходится со спецификацией (см. docs/ROADMAP.md, 0.6.25).
         case .sstp, .l2tp: .notYetOnIOS
         case .olcrtc, .openflux: .socksBridge
+        case .byedpi: .byeDpi
         case .pptp, .wdtt: .unavailable
         }
     }
@@ -91,6 +97,7 @@ public enum ServerProtocol: String, Codable, CaseIterable, Sendable {
         case "wdtt": .wdtt
         case "olcrtc": .olcrtc
         case "openflux": .openflux
+        case "byedpi": .byedpi
         default: nil
         }
     }
@@ -255,8 +262,14 @@ public struct RoutingSettings: Codable, Hashable, Sendable {
     public var ipv6: Ipv6Mode = .block
     public var netMode: SplitMode = .off
     public var netRules: [NetworkRule] = []
+    /// Правила «что → через какой выход», группы и обход DPI (0.7.13). Optional: состояние, сохранённое старой версией, читается.
+    public var routes: RouteConfig?
+    /// Источники и расписание geo-баз (0.7.13). Optional по той же причине.
+    public var geo: GeoSettings?
     public init() {}
 
+    public var routeConfig: RouteConfig { routes ?? RouteConfig() }
+    public var geoSettings: GeoSettings { geo ?? GeoSettings() }
     public var netActive: Bool { netMode != .off && !netRules.isEmpty }
 
     /// Действующий DNS: nil — системный резолвер. Невалидный свой адрес → Cloudflare.

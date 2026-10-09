@@ -30,6 +30,7 @@ class NativeCoreFactory : CoreFactory {
             Protocol.WDTT -> WdttCore()
             Protocol.OLCRTC -> OlcRtcCore()
             Protocol.OPENFLUX -> OpenFluxCore()
+            Protocol.BYEDPI -> ByeDpiCore()
             else -> when {
                 proto?.engine == Engine.AWG -> AmneziaWgCore()
                 // Тумблеры ядер (0.6.22): Xray берёт VLESS/VMess/Trojan/SS, если он предпочтён или

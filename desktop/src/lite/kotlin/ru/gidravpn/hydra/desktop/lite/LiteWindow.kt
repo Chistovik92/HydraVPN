@@ -42,6 +42,7 @@ internal class LiteWindow(
         val servers = ServersPanel(c)
         val subs = SubsPanel(c)
         val routing = RoutingPanel(c)
+        val dpi = DpiPanel(c)
         val settings = SettingsPanel(c)
         val log = LogPanel(c)
         fun tab(title: String, comp: java.awt.Component, r: Renderable) { tabs.addTab(title, comp); renderables += r }
@@ -49,6 +50,7 @@ internal class LiteWindow(
         tab("Серверы", servers, servers)
         tab("Подписки", subs, subs)
         tab("Маршруты", routing.component, routing)
+        tab("Обход DPI", dpi.component, dpi)
         tab("Настройки", settings.component, settings)
         tab("Журнал", log, log)
         contentPane.add(tabs)

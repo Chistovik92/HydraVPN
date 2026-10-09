@@ -57,6 +57,7 @@ struct HydraApp: App {
                 backgroundedAt = Date()
                 HydraApp.scheduleRefresh()
             case .active:
+                Task { await model.updateGeo(manual: false) }
                 if let t = backgroundedAt, Date().timeIntervalSince(t) > 30 { unlocked = false }
                 backgroundedAt = nil
                 model.refreshDueSubscriptions()

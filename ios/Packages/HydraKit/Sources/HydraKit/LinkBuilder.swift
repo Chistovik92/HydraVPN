@@ -63,6 +63,8 @@ public enum LinkBuilder {
             return "\(proto == .wireguard ? "wireguard" : "awg")://\(b64url(wireGuardConf(p)))#\(name)"
         case .openflux:
             return openFluxLink(p, e)
+        case .byedpi:
+            return ByeDpiLink.build(p)
         default:
             return nil
         }

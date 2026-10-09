@@ -3,7 +3,12 @@ package ru.gidravpn.hydra.desktop.core
 import org.json.JSONArray
 import org.json.JSONObject
 import ru.gidravpn.hydra.data.model.DnsEndpoint
+import ru.gidravpn.hydra.data.geo.GeoKind
+import ru.gidravpn.hydra.data.geo.GeoStore
 import ru.gidravpn.hydra.data.model.Engine
+import ru.gidravpn.hydra.data.routing.RouteKind
+import ru.gidravpn.hydra.data.routing.RoutePlan
+import ru.gidravpn.hydra.data.routing.RoutePlanApplier
 import ru.gidravpn.hydra.data.model.EngineToggles
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
 import ru.gidravpn.hydra.data.model.ServerProfile
@@ -36,7 +41,7 @@ object DesktopConfig {
     /** На ПК работают протоколы ядер sing-box и Xray (Xray обслуживает их подмножество), а также olcRTC и OpenFlux (0.7.4, BETA). */
     fun isSupported(p: ServerProfile): Boolean = p.protocol?.engine in SUPPORTED_ENGINES
 
-    private val SUPPORTED_ENGINES = setOf(Engine.SINGBOX, Engine.OLCRTC, Engine.OPENFLUX)
+    private val SUPPORTED_ENGINES = setOf(Engine.SINGBOX, Engine.OLCRTC, Engine.OPENFLUX, Engine.BYEDPI)
 
     /** Кто обслужит профиль с текущими тумблерами движков; null — подходящий движок выключен. */
     fun engineFor(p: ServerProfile, settings: DesktopSettings, xrayAvailable: Boolean): EngineToggles.Kind? =
@@ -67,6 +72,9 @@ object DesktopConfig {
         geoDir: File?,
         bridge: XrayBridge? = null,
         bypassPaths: List<String> = emptyList(),
+        plan: RoutePlan? = null,
+        geoStore: GeoStore? = null,
+        onWarn: (String) -> Unit = {},
     ): JSONObject {
         if (!isSupported(profile)) throw UnsupportedProtocol(profile)
         val r = settings.routing
@@ -75,12 +83,12 @@ object DesktopConfig {
         val root = if (bridge != null) {
             SingBoxConfigBuilder.buildXrayBridge(
                 socksPort = bridge.port, splitTunnel = split, dns = dnsEndpoint(settings),
-                geoRouting = geoRouting(settings, geoDir), mtu = r.mtu.value, socksAuth = bridge.auth,
+                geoRouting = geoRouting(settings, geoDir, geoStore), mtu = r.mtu.value, socksAuth = bridge.auth,
             )
         } else {
             SingBoxConfigBuilder.build(
                 profile = profile, splitTunnel = split, dns = dnsEndpoint(settings),
-                geoRouting = geoRouting(settings, geoDir), mtu = r.mtu.value, tlsFragment = r.tlsFragment,
+                geoRouting = geoRouting(settings, geoDir, geoStore), mtu = r.mtu.value, tlsFragment = r.tlsFragment,
             )
         }
 
@@ -115,6 +123,11 @@ object DesktopConfig {
             root.getJSONObject("dns").put("strategy", "ipv4_only")
         }
 
+        // Маршрутизация через несколько выходов, цепочки, группы, обход DPI (0.7.13) — до правил по процессам:
+        // правила «программа мимо туннеля» остаются самыми первыми, как на Android «приложение вне VPN».
+        if (plan != null) RoutePlanApplier.apply(root, plan) { kind, name ->
+            geoFile(if (kind == RouteKind.GEOSITE) GeoKind.SITE else GeoKind.IP, name, geoDir, geoStore)?.absolutePath
+        }.forEach(onWarn)
         addProcessRules(root, settings, bypassPaths)
         convertWireGuard(root)
         return root
@@ -217,12 +230,16 @@ object DesktopConfig {
         else JSONObject().put("type", "logical").put("mode", "or").put("rules", JSONArray(parts))
     }
 
-    private fun geoRouting(settings: DesktopSettings, geoDir: File?): SingBoxConfigBuilder.GeoRouting? {
+    /** База: сначала скачанная ([GeoStore]), потом вшитая в пакет. Доменные наборы стран в апстримах зовутся `category-<код>`, вшитые — по коду. */
+    fun geoFile(kind: GeoKind, name: String, geoDir: File?, store: GeoStore?): File? =
+        store?.resolve(kind, name) ?: geoDir?.let { File(it, "${kind.dir}/$name.srs") }?.takeIf { it.isFile }
+
+    private fun geoRouting(settings: DesktopSettings, geoDir: File?, store: GeoStore?): SingBoxConfigBuilder.GeoRouting? {
         val r = settings.routing
-        if (r.geoMode == GeoRoutingMode.OFF || geoDir == null) return null
+        if (r.geoMode == GeoRoutingMode.OFF || (geoDir == null && store == null)) return null
         val countries = Rules.countries(r.geoCountries).mapNotNull { code ->
-            val ip = File(geoDir, "geoip/$code.srs").takeIf { it.isFile } ?: return@mapNotNull null
-            val site = File(geoDir, "geosite/$code.srs").takeIf { it.isFile }
+            val ip = geoFile(GeoKind.IP, code, geoDir, store) ?: return@mapNotNull null
+            val site = geoFile(GeoKind.SITE, code, geoDir, store)
             SingBoxConfigBuilder.GeoCountry(code, ip.absolutePath, site?.absolutePath)
         }
         return SingBoxConfigBuilder.GeoRouting(r.geoMode, countries).takeIf { it.active }

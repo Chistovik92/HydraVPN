@@ -33,6 +33,7 @@ object LinkBuilder {
             Protocol.AMNEZIAWG -> wireguard(p, "awg")
             Protocol.OLCRTC -> OlcRtcLink.build(p)
             Protocol.OPENFLUX -> OpenFluxLink.build(p)
+            Protocol.BYEDPI -> ByeDpiLink.build(p)
             else -> null
         }
     }

@@ -56,12 +56,14 @@ class CoreRunner(
     @Volatile private var singBox: Handle? = null
     @Volatile private var xray: Handle? = null
     @Volatile private var sidecarSecrets: List<File> = emptyList()
+    /** Дополнительные клиенты (0.7.13): ByeDPI и узлы маршрутизации на OpenFlux/olcRTC — каждому свой процесс и порт. */
+    private val extra = mutableListOf<Handle>()
 
     /** Все запущенные ядра живы. */
     val isAlive: Boolean get() = singBox?.alive == true && (xray == null || xray?.alive == true)
 
     @Synchronized
-    fun start(session: Int, configJson: String, mode: ConnectionMode, xrayConfig: String? = null, xraySocksPort: Int = 0, sidecar: Sidecar? = null) {
+    fun start(session: Int, configJson: String, mode: ConnectionMode, xrayConfig: String? = null, xraySocksPort: Int = 0, sidecar: Sidecar? = null, extraSidecars: List<Sidecar> = emptyList()) {
         check(singBox?.alive != true && xray?.alive != true) { "ядро уже запущено" }
         val core = Platform.bundledCore()
             ?: error("Не найдено ядро sing-box в пакете приложения — переустановите Hydra")
@@ -99,6 +101,22 @@ class CoreRunner(
             }
         }
 
+        // Дополнительные клиенты — до sing-box: правила маршрутизации сразу могут вести в их порты.
+        extraSidecars.forEachIndexed { i, sc ->
+            val lastLine = java.util.concurrent.atomic.AtomicReference("")
+            val h = spawn(session, sc.name, listOf(sc.exe.absolutePath) + sc.args, "sidecar-$i.pid", dir) {
+                if (it.isNotBlank()) lastLine.set(it.trim())
+                "[${sc.name}] $it"
+            }
+            extra += h
+            sidecarSecrets = sidecarSecrets + sc.secrets
+            if (!waitPort(sc.socksPort, h, sc.readyTimeoutMs)) {
+                stop()
+                val why = lastLine.get().takeIf { it.isNotEmpty() }?.let { ": ${it.take(200)}" } ?: " — проверьте параметры и журнал"
+                error("${sc.name}: не запустился за ${sc.readyTimeoutMs / 1000} с$why")
+            }
+        }
+
         val config = File(dir, "config.json")
         Store.writePrivateAtomic(config, configJson)
         val cmd = { bin: File -> listOf(bin.absolutePath, "run", "-c", config.absolutePath, "-D", dir.absolutePath) }
@@ -125,6 +143,8 @@ class CoreRunner(
         singBox = null
         xray?.stop()
         xray = null
+        extra.forEach { runCatching { it.stop() } }
+        extra.clear()
         sidecarSecrets.forEach { runCatching { it.delete() } }
         sidecarSecrets = emptyList()
     }
@@ -155,6 +175,7 @@ class CoreRunner(
             killStale(CORE_PID, "sing-box")
             killStale(XRAY_PID, "xray")
             killStale(SIDECAR_PID, "olcrtc", "openflux")
+            (0 until 24).forEach { killStale("sidecar-$it.pid", "olcrtc", "openflux", "ciadpi") }
         }
 
         private fun killStale(pidName: String, vararg prefixes: String) {

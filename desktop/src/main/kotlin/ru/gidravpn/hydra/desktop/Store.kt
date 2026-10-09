@@ -47,6 +47,10 @@ data class RoutingSettings(
     /** По сайтам и адресам — те же правила, что на Android (ip_cidr/domain/…). */
     val netMode: SplitTunnelMode = SplitTunnelMode.OFF,
     val netRules: List<NetworkRule> = emptyList(),
+    /** Правила «что → через какой выход», группы и обход DPI (0.7.13). */
+    val routes: ru.gidravpn.hydra.data.routing.RouteConfig = ru.gidravpn.hydra.data.routing.RouteConfig(),
+    /** Источники и расписание geo-баз (0.7.13). */
+    val geo: ru.gidravpn.hydra.data.geo.GeoSettings = ru.gidravpn.hydra.data.geo.GeoSettings(),
 ) {
     val appsActive get() = appMode != SplitTunnelMode.OFF && apps.isNotEmpty()
     val netActive get() = netMode != SplitTunnelMode.OFF && netRules.isNotEmpty()
@@ -221,6 +225,7 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
             .put("appMode", r.appMode.name).put("apps", JSONArray(r.apps))
             .put("netMode", r.netMode.name)
             .put("netRules", JSONArray(r.netRules.map { JSONObject().put("type", it.type.name).put("value", it.value) }))
+            .put("routes", r.routes.toJson()).put("geo", r.geo.toJson())
 
         /** Значения из файла не доверенные (ручная правка, чужая резервная копия) — всё проверяется. */
         fun routingFromJson(o: JSONObject): RoutingSettings = RoutingSettings(
@@ -237,6 +242,8 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
                 val type = runCatching { NetRuleType.valueOf(r.optString("type")) }.getOrNull() ?: return@mapNotNull null
                 Rules.netRule(type, r.optString("value"))
             }.distinct().take(Rules.MAX_RULES),
+            routes = ru.gidravpn.hydra.data.routing.RouteConfig.fromJson(o.optString("routes", "").ifEmpty { null }),
+            geo = ru.gidravpn.hydra.data.geo.GeoSettings.fromJson(o.optString("geo", "").ifEmpty { null }),
         )
 
         private fun splitMode(s: String) = runCatching { SplitTunnelMode.valueOf(s) }.getOrDefault(SplitTunnelMode.OFF)

@@ -30,7 +30,8 @@ enum class Protocol(
     AMNEZIAWG ("awg",    "AmneziaWG",                Engine.AWG,     shortCode = "AWG"),
     WDTT      ("wdtt",   "WDTT (WG over TURN, VK)",   Engine.WDTT,  beta = true),
     OLCRTC    ("olcrtc", "olcRTC (TCP over WebRTC)", Engine.OLCRTC, beta = true),
-    OPENFLUX  ("openflux", "OpenFlux (Yandex/MAX/Mail.ru)", Engine.OPENFLUX, beta = true, shortCode = "OFX");
+    OPENFLUX  ("openflux", "OpenFlux (Yandex/MAX/Mail.ru)", Engine.OPENFLUX, beta = true, shortCode = "OFX"),
+    BYEDPI    ("byedpi", "Обход DPI (ByeDPI)",       Engine.BYEDPI, shortCode = "DPI");
 
     companion object {
         fun fromId(id: String): Protocol? = entries.firstOrNull { it.id == id }
@@ -49,6 +50,7 @@ enum class Protocol(
             "wdtt" -> WDTT
             "olcrtc" -> OLCRTC
             "openflux" -> OPENFLUX
+            "byedpi" -> BYEDPI
             else -> null
         }
     }
@@ -63,6 +65,7 @@ enum class Protocol(
  *  - [WDTT] — нативный libclient.so (WG через TURN, VK-auth) — beta;
  *  - [OLCRTC] — исполняемый libolcrtc.so, подпроцесс + SOCKS5 → sing-box (TCP over WebRTC) — beta;
  *  - [OPENFLUX] — исполняемый libopenflux.so, подпроцесс + SOCKS5 → sing-box — beta;
+ *  - [BYEDPI] — исполняемый libciadpi.so (ByeDPI), подпроцесс + SOCKS5 → sing-box: обход DPI без сервера;
  *  - [UNAVAILABLE] — протокол невозможен на Android (PPTP/GRE).
  */
-enum class Engine { SINGBOX, XRAY, AWG, USERSPACE, WDTT, OLCRTC, OPENFLUX, UNAVAILABLE }
+enum class Engine { SINGBOX, XRAY, AWG, USERSPACE, WDTT, OLCRTC, OPENFLUX, BYEDPI, UNAVAILABLE }

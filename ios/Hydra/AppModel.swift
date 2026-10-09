@@ -15,6 +15,8 @@ final class AppModel: ObservableObject {
     @Published var refreshing: Set<Int64> = []
     @Published var measuring: Set<Int64> = []
     @Published var connectedSince: Date?
+    /// Растёт после обновления geo-баз: экран «Geo-базы» перечитывает хранилище.
+    @Published var geoVersion = 0
     let traffic = TrafficClient()
 
     init() {

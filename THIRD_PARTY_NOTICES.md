@@ -19,6 +19,14 @@ Hydra распространяется под GPL-3.0 (см. [LICENSE](../LICENS
 | olcRTC (beta) | github.com/openlibrecommunity/olcrtc | WTFPL (апстрим заархивирован) | TCP over WebRTC; Android — libolcrtc.so, ПК — собирается из закреплённого коммита |
 | OpenFlux (beta) | github.com/p1neappleXpress/OpenFlux | GPL-3.0 | TCP-туннель с транспортами; Android — libopenflux.so, ПК — бинарь релиза v0.3.0 (SHA-256 закреплён) |
 
+## ByeDPI и стратегии обхода DPI (0.7.13)
+
+| Компонент | Лицензия | Где |
+|---|---|---|
+| ByeDPI (`ciadpi`, github.com/hufrea/byedpi, v0.17.3) | MIT | подпроцесс на Android/Windows/Linux/macOS; статическая библиотека `ios/Packages/CiaDPI` (исходники без изменений, кроме переименования `main` флагом компиляции) |
+| Список из 60 стратегий и сайты проверки (ByeByeDPI, github.com/romanvht/ByeByeDPI) | GPL-3.0 (как Hydra) | `DpiStrategies.kt` / `DpiStrategies.swift` |
+| Источники geo-баз: MetaCubeX/meta-rules-dat, SagerNet/sing-geoip и sing-geosite, runetfreedom/russia-v2ray-rules-dat, v2fly/geoip и domain-list-community | данные, скачиваются приложением у источников; сами файлы в репозиторий не входят (вшитые `.srs` — из meta-rules-dat) | `data/geo` |
+
 ## Библиотеки приложения (через Gradle/Maven)
 
 | Компонент | Лицензия |

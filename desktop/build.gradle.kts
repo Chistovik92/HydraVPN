@@ -205,6 +205,62 @@ val downloadOpenFlux by tasks.registering {
     }
 }
 
+// ---- ByeDPI (0.7.13): обход DPI без сервера -----------------------------------------------------------------------
+// `ciadpi` (github.com/hufrea/byedpi, MIT) — локальный SOCKS5, режущий и подделывающий первые пакеты соединения.
+// Готовые бинари релиза v0.17.3 (SHA-256 закреплены); для macOS релиз бинарей не выпускает — собираем из исходников
+// метки (SHA-256 архива тоже закреплён) системным `cc` (на macOS он есть вместе с Xcode Command Line Tools).
+val byeDpiVersion = "0.17.3"
+val byeDpiSourceSha = "0a9cb8585554c68c3e2be88c33c9bf6f99f8e8c7f54b362285adab99e262566c"
+val byeDpiBinaries = mapOf(
+    "windows-x64" to ("byedpi-17.3-x86_64-w64.zip" to "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456"),
+    "windows-arm64" to ("byedpi-17.3-x86_64-w64.zip" to "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456"),  // эмуляция x64 в Windows 11 ARM
+    "linux-x64" to ("byedpi-17.3-x86_64.tar.gz" to "98f73c32eacb571ebd88d790f6376ed9e70f02d44c1fe862472ecea75cd7117d"),
+    "linux-arm64" to ("byedpi-17.3-aarch64.tar.gz" to "d5806504e159e8119ede5af1164a609251b0520cd4483a7db611b6d238b9404b"),
+)
+
+val downloadByeDpi by tasks.registering {
+    group = "hydra"
+    val target = hostTarget()
+    val exe = if (target.startsWith("windows")) "ciadpi.exe" else "ciadpi"
+    val outDir = appResourcesDir.map { it.dir(target) }
+    outputs.dir(outDir)
+    inputs.property("byedpi", "$byeDpiVersion-$target")
+    doLast {
+        val cache = coreCacheDir.get().asFile.apply { mkdirs() }
+        fun sha(f: File) = MessageDigest.getInstance("SHA-256").digest(f.readBytes()).joinToString("") { "%02x".format(it) }
+        fun fetchPinned(url: String, name: String, sha256: String): File {
+            val file = cache.resolve(name)
+            if (!file.exists() || sha(file) != sha256) {
+                logger.lifecycle("Скачиваю $url")
+                URI(url).toURL().openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+            }
+            check(sha(file) == sha256) { "SHA-256 $name не совпал: ${sha(file)} (ожидался $sha256)" }
+            return file
+        }
+        val dest = outDir.get().asFile.apply { mkdirs() }
+        val prebuilt = byeDpiBinaries[target]
+        if (prebuilt != null) {
+            val (asset, sha256) = prebuilt
+            val file = fetchPinned("https://github.com/hufrea/byedpi/releases/download/v$byeDpiVersion/$asset", "ByeDPI-$byeDpiVersion-$asset", sha256)
+            val tree = if (asset.endsWith(".zip")) zipTree(file) else tarTree(resources.gzip(file))
+            copy { from(tree); include("**/ciadpi*"); exclude("**/*.bat"); eachFile { path = exe }; includeEmptyDirs = false; into(dest) }
+        } else {
+            val src = fetchPinned("https://github.com/hufrea/byedpi/archive/refs/tags/v$byeDpiVersion.tar.gz", "ByeDPI-$byeDpiVersion-src.tar.gz", byeDpiSourceSha)
+            val work = layout.buildDirectory.dir("byedpi-src").get().asFile.apply { deleteRecursively(); mkdirs() }
+            copy { from(tarTree(resources.gzip(src))) { eachFile { path = path.substringAfter('/') } }; includeEmptyDirs = false; into(work) }
+            val cmd = listOf("cc", "-D_DEFAULT_SOURCE", "-I.", "-std=c99", "-O2", "-o", dest.resolve(exe).absolutePath,
+                "packets.c", "main.c", "conev.c", "proxy.c", "desync.c", "mpool.c", "extend.c")
+            val pr = runCatching { ProcessBuilder(cmd).directory(work).redirectErrorStream(true).start() }.getOrNull()
+            val out = pr?.inputStream?.bufferedReader()?.readText().orEmpty()
+            if (pr == null || pr.waitFor() != 0) {
+                logger.warn("downloadByeDpi: не удалось собрать ciadpi (нужен cc) — обход DPI в пакет не войдёт. $out")
+                return@doLast
+            }
+        }
+        dest.resolve(exe).setExecutable(true, false)
+    }
+}
+
 // olcRTC — апстрим заархивирован и релизов не выпускает: клиент (`cmd/olcrtc`, чистый Go, WTFPL) собирается из закреплённого
 // коммита. Нужен `go` (и git); без них клиент в пакет не попадает, а в приложении пункт olcRTC неактивен.
 val olcRtcCommit = "f3ad8fb7c0d0fa981423f83269526fa94077c23d"
@@ -245,7 +301,7 @@ val buildOlcRtc by tasks.registering {
 
 val hydraAppResources by tasks.registering {
     group = "hydra"
-    dependsOn(downloadSingBox, downloadXray, downloadOpenFlux, buildOlcRtc, syncGeoAssets)
+    dependsOn(downloadSingBox, downloadXray, downloadOpenFlux, downloadByeDpi, buildOlcRtc, syncGeoAssets)
 }
 
 // ---- Иконки: PNG/ICO/ICNS из одной 1024px-иконки iOS ---------------------------
@@ -406,7 +462,7 @@ tasks.matching { it.name == "prepareAppResources" }.configureEach {
     dependsOn(hydraAppResources)
     // Compose копирует ресурсы без бита исполнения — ядро в пакете было бы «Permission denied».
     (this as? AbstractCopyTask)?.eachFile {
-        if (name in setOf("sing-box", "xray", "openflux", "olcrtc")) permissions { unix("rwxr-xr-x") }
+        if (name in setOf("sing-box", "xray", "openflux", "olcrtc", "ciadpi")) permissions { unix("rwxr-xr-x") }
     }
 }
 tasks.matching { it.name.startsWith("package") || it.name.startsWith("createDistributable") || it.name.startsWith("createReleaseDistributable") }
@@ -416,7 +472,7 @@ tasks.matching { it.name.startsWith("package") || it.name.startsWith("createDist
 // образе: из него же собираются DEB/RPM (--app-image) и DMG в scripts/package-desktop.sh.
 tasks.matching { it.name == "createDistributable" || it.name == "createReleaseDistributable" }.configureEach {
     doLast {
-        outputs.files.asFileTree.matching { include("**/resources/sing-box", "**/resources/xray", "**/resources/openflux", "**/resources/olcrtc") }.forEach { it.setExecutable(true, false) }
+        outputs.files.asFileTree.matching { include("**/resources/sing-box", "**/resources/xray", "**/resources/openflux", "**/resources/olcrtc", "**/resources/ciadpi") }.forEach { it.setExecutable(true, false) }
     }
 }
 
@@ -508,6 +564,8 @@ data class Classic(
     val olcRtc: Triple<String, String, String>? = null,
     /** Сборка OpenFlux из закреплённого коммита (0.7.10) — там, где апстрим готового бинаря не выпускает. */
     val openFluxSrc: Triple<String, String, String>? = null,
+    /** Готовый ciadpi (ByeDPI) из релиза: имя файла релиза и SHA-256 (0.7.13). */
+    val byeDpi: Pair<String, String>? = null,
     /** JRE, которая кладётся в архив (Windows). Linux берёт Java системы. */
     val jre: Triple<String, String, String>? = null,   // url, имя файла, sha256
 )
@@ -520,23 +578,27 @@ val classicTargets = listOf(
         "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "e4024508be5616015353c893b0d3f2dd3c080617a750ef6bd64f8183107611c8",
         "Xray-win7-32.zip", "3d73134f74e119589cc117c8f45b4564a14417f9b74508cc48599f142ac3aa81",
         olcRtc = Triple("windows", "386", ""), openFluxSrc = Triple("windows", "386", ""),
+        byeDpi = "byedpi-17.3-i686-w64.zip" to "3f3d0af999371cfa623bd641738a42785e107a9d829b38480ed3d942dafea28a",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.29%2B7/OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip",
             "OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip", "b747698a05a39391a58b9caac30310275e4e6bd9fef92d6c149cba310d91d2be")),
     Classic("windows-x64", "WindowsX64", "windows", "x64",
         "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "4f27f807f99198b2681a59c1f12564b3683331e68215344e75761ee9199a9b90",
         "Xray-win7-64.zip", "75e67c738fdfafb9649f1a81a7ab6b3ba97a0f2e09a44254bff03c5b077547d3",
         olcRtc = Triple("windows", "amd64", ""), openFluxSrc = Triple("windows", "amd64", ""),
+        byeDpi = "byedpi-17.3-x86_64-w64.zip" to "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.32.1%2B1/OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip",
             "OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip", "f8c7da672f5dba36b6f870608820b6b598cfae91296929f1b8f21ef2f1e8a0dd")),
     Classic("linux-x86", "LinuxX86", "linux", "x86",
         "sing-box-$singBoxVersion-linux-386.tar.gz", "b2361b5eb0ef6da8f068d9bba762b9edbb3a8637515e30251ee8d5d78b30d846",
         "Xray-linux-32.zip", "277ffde84d86cb593ae9c3d144b11a5e4c80ba579fdfe6fe09830e04c85d04aa",
-        olcRtc = Triple("linux", "386", ""), openFluxSrc = Triple("linux", "386", "")),
+        olcRtc = Triple("linux", "386", ""), openFluxSrc = Triple("linux", "386", ""),
+        byeDpi = "byedpi-17.3-i686.tar.gz" to "655452c2f8e1e3a99b021043b0a68f57927c97010efe19b06ac3b9949fd784ed"),
     Classic("linux-armv7", "LinuxArmv7", "linux", "armv7",
         "sing-box-$singBoxVersion-linux-armv7.tar.gz", "9eedd8eb2d3ea66a48794359d1cc1e32ce618b6e1b105c9cd314da6408c9fc87",
         "Xray-linux-arm32-v7a.zip", "0b9719471c7c69752857714e9711d4da57cf38a6beb75dcddfb21425f7919908",
         openFlux = "openflux-linux-arm" to "489387fd9bd8eed248933b147ed8f9964d61188baae5f9d9f6a06b6b810214f7",
-        olcRtc = Triple("linux", "arm", "7")),
+        olcRtc = Triple("linux", "arm", "7"),
+        byeDpi = "byedpi-17.3-armv7l.tar.gz" to "d231b95fc130a40994ef593ac87498ad8614e003b263e3a453bd62af096abb0c"),
 )
 
 // ---- olcRTC и OpenFlux: кросс-сборка из закреплённых коммитов (чистый Go, без cgo) ---------------------------------
@@ -663,6 +725,11 @@ val classicDistTasks = classicTargets.map { t ->
                 val f = fetch("https://github.com/p1neappleXpress/OpenFlux/releases/download/v$openFluxVersion/$asset", sha, "OpenFlux-$openFluxVersion-$asset")
                 f.copyTo(File(res, "openflux$exe"), overwrite = true)
             }
+            t.byeDpi?.let { (asset, sha) ->
+                val f = fetch("https://github.com/hufrea/byedpi/releases/download/v$byeDpiVersion/$asset", sha, "ByeDPI-$byeDpiVersion-$asset")
+                val tree = if (f.name.endsWith(".zip")) zipTree(f) else tarTree(resources.gzip(f))
+                copy { from(tree); include("**/ciadpi*"); exclude("**/*.bat"); eachFile { path = "ciadpi$exe" }; includeEmptyDirs = false; into(res) }
+            }
             t.olcRtc?.let { (goos, goarch, goarm) -> buildOlcRtc(goos, goarch, goarm, File(res, "olcrtc$exe")) }
             t.openFluxSrc?.let { (goos, goarch, goarm) -> buildOpenFlux(goos, goarch, goarm, File(res, "openflux$exe")) }
 
@@ -700,7 +767,7 @@ val classicDistTasks = classicTargets.map { t ->
         configureCommon()
         compression = Compression.GZIP
         // Бит исполнения задаём явно: на Windows-машине сборки файловая система его не хранит.
-        filesMatching(listOf("**/hydra.sh", "**/resources/sing-box", "**/resources/xray", "**/resources/openflux", "**/resources/olcrtc")) {
+        filesMatching(listOf("**/hydra.sh", "**/resources/sing-box", "**/resources/xray", "**/resources/openflux", "**/resources/olcrtc", "**/resources/ciadpi")) {
             permissions { unix("rwxr-xr-x") }
         }
     }

@@ -79,7 +79,7 @@ public enum SingBoxConfigBuilder {
         }
         var route: [String: Any] = [:]
         if geoActive {
-            route["rule_set"] = geoTags.map { ["type": "local", "tag": $0.0, "format": "binary", "path": $0.1] }
+            route["rule_set"] = geoTags.map { ["type": "local", "tag": $0.0, "format": $0.1.hasSuffix(".json") ? "source" : "binary", "path": $0.1] }
         }
         var rules: [[String: Any]] = [["action": "sniff"], ["protocol": "dns", "action": "hijack-dns"]]
         if v4only { rules.append(["ip_version": 6, "action": "reject"]) }
@@ -103,6 +103,21 @@ public enum SingBoxConfigBuilder {
         route["default_domain_resolver"] = "local"
         root["route"] = route
         return root
+    }
+
+    /// Outbound для правил «через другой сервер» и цепочек (0.7.13): протоколы sing-box с тегом `tag`. nil — не sing-box-протокол.
+    public static func nodeOutbound(_ p: ServerProfile, _ tag: String, fragment: TlsFragmentMode = .off) -> [String: Any]? {
+        guard p.serverProtocol?.engine == .singBox, var o = try? outbound(p, fragment) else { return nil }
+        o["tag"] = tag
+        return o
+    }
+
+    /// Конфиг с планом маршрутизации (0.7.13): правила, группы, цепочки, обход DPI. `geoPath` — база страны/набора (скачанная или вшитая).
+    public static func buildJSON(_ profile: ServerProfile, _ o: Options, plan: RoutePlan, geoPath: (RouteKind, String) -> String?) throws -> (json: String, warnings: [String]) {
+        var root = try build(profile, o)
+        let warnings = RoutePlanApplier.apply(&root, plan, geoPath: geoPath)
+        let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
+        return (String(data: data, encoding: .utf8) ?? "{}", warnings)
     }
 
     public static func buildJSON(_ profile: ServerProfile, _ o: Options) throws -> String {

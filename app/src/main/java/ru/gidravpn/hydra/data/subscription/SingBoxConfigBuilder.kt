@@ -161,7 +161,7 @@ object SingBoxConfigBuilder {
                 put("rule_set", JSONArray().apply {
                     geoTags.forEach { (tag, path) ->
                         put(JSONObject().put("type", "local").put("tag", tag)
-                            .put("format", "binary").put("path", path))
+                            .put("format", if (path.endsWith(".json")) "source" else "binary").put("path", path))
                     }
                 })
             }
@@ -207,6 +207,13 @@ object SingBoxConfigBuilder {
 
         return root
     }
+
+    /**
+     * Выход для правил «через другой сервер» и цепочек (0.7.12): outbound sing-box с тегом [tag].
+     * null — у профиля не sing-box-протокол (AWG, SSTP, OpenFlux… идут своими движками и узлом быть не могут).
+     */
+    fun nodeOutbound(p: ServerProfile, tag: String): JSONObject? =
+        if (p.protocol?.engine == ru.gidravpn.hydra.data.model.Engine.SINGBOX) outboundFor(p).put("tag", tag) else null
 
     private fun outboundFor(p: ServerProfile, tlsFragment: TlsFragmentMode = TlsFragmentMode.OFF): JSONObject {
         val o = JSONObject().put("tag", "proxy").put("server", p.address).put("server_port", p.port)

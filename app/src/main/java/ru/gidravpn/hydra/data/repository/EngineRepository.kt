@@ -51,6 +51,7 @@ class EngineRepository(private val context: Context) {
             EngineToggles.Kind.PPP -> KEY_PPP
             EngineToggles.Kind.OLCRTC -> KEY_OLCRTC
             EngineToggles.Kind.OPENFLUX -> KEY_OPENFLUX
+            EngineToggles.Kind.BYEDPI -> return  // тумблера нет
         }
         context.engineStore.edit { it[key] = enabled }
     }
