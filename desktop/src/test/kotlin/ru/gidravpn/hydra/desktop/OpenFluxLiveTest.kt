@@ -111,7 +111,12 @@ class OpenFluxLiveTest {
         assertEquals("10.0.0.5:9000", cfg.getJSONArray("transports").getJSONObject(0).getString("dial"))
     }
 
-    @Test fun realExitNodeCarriesTraffic() {
+    @Test fun realExitNodeCarriesTraffic() = carryTraffic(session = false)
+
+    /** 0.7.11: клиент собран из официальной ссылки `openflux://v1/` (сессия, `--negotiate`), exit запущен с `--negotiate`. */
+    @Test fun sessionFromOfficialLinkCarriesTraffic() = carryTraffic(session = true)
+
+    private fun carryTraffic(session: Boolean) {
         val exe = listOf("openflux.exe", "openflux").flatMap { n -> File("build/hydra-app-resources").listFiles()?.map { File(it, n) }.orEmpty() }
             .firstOrNull { it.isFile && it.canExecute() }
         assumeTrue("нет бинаря OpenFlux", exe != null)
@@ -126,13 +131,17 @@ class OpenFluxLiveTest {
         web.start()
         val tunnel = freePort(); val socks = freePort()
         val keyFile = File.createTempFile("ofkey", ".txt").apply { writeText("test-key-0123456789abcdef"); deleteOnExit() }
-        val exit = ProcessBuilder(exe.absolutePath, "--role", "exit", "--transports", "direct:100", "--direct-listen", "127.0.0.1:$tunnel", "--mode", "l4", "--encryption-key-file", keyFile.absolutePath)
+        val exit = ProcessBuilder(exe.absolutePath, "--role", "exit", "--transports", "direct:100", "--direct-listen", "127.0.0.1:$tunnel", "--mode", "l4", "--encryption-key-file", keyFile.absolutePath, *(if (session) arrayOf("--negotiate") else emptyArray()))
             .redirectErrorStream(true).start()
         // Клиент — только после того, как exit-узел слушает: иначе на медленном раннере (linux-arm64, релиз 0.7.10)
         // клиент уходил в классический режим, первый запрос висел, и тест падал по таймауту чтения.
         val tEnd = System.currentTimeMillis() + 30_000
         while (System.currentTimeMillis() < tEnd && runCatching { Socket("127.0.0.1", tunnel).close() }.isFailure) Thread.sleep(200)
-        val profile = ServerProfile(name = "t", protocolId = Protocol.OPENFLUX.id, address = "127.0.0.1:$tunnel", port = 0, transport = "direct", uuidOrPassword = "test-key-0123456789abcdef")
+        val profile = if (session) {
+            val link = OpenFluxShare.encode(OpenFluxShare.Config("t", negotiate = true, secret = "test-key-0123456789abcdef",
+                transports = listOf(OpenFluxShare.Transport("direct", dial = "127.0.0.1:$tunnel", priority = 100))))
+            LinkParser.parseLine(link)!!
+        } else ServerProfile(name = "t", protocolId = Protocol.OPENFLUX.id, address = "127.0.0.1:$tunnel", port = 0, transport = "direct", uuidOrPassword = "test-key-0123456789abcdef")
         val client = ProcessBuilder(listOf(exe.absolutePath) + OpenFluxArgs.build(profile, socks, keyFile.absolutePath)).redirectErrorStream(true).start()
         try {
             val end = System.currentTimeMillis() + 30_000
