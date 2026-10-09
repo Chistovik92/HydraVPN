@@ -202,7 +202,7 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
                 tun = newTun,
                 profile = profile,
                 onLog = { VpnState.log(it) },
-                onStats = { VpnState.stats.value = it },
+                onStats = { VpnState.onTraffic(it) },
             )
 
             currentCoroutineContext().ensureActive()
@@ -341,7 +341,7 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
         killSwitchBlocking = true
         VpnState.state.value = ConnectionState.ERROR
         VpnState.activeServer.value = null
-        VpnState.connectedSince.value = 0L
+        VpnState.connectedSince.value = 0L; VpnState.resetSpeed()
         VpnState.log("Kill Switch: трафик заблокирован ($reason)")
         updateNotification(ConnectionState.ERROR, getString(R.string.tile_blocked))
     }
@@ -416,7 +416,7 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             }
             VpnState.state.value = ConnectionState.ERROR
             VpnState.activeServer.value = null
-            VpnState.connectedSince.value = 0L
+            VpnState.connectedSince.value = 0L; VpnState.resetSpeed()
             updateNotification(ConnectionState.ERROR, getString(R.string.notif_conn_dropped))
             stopForeground(STOP_FOREGROUND_DETACH)
             stopSelf()
@@ -512,7 +512,7 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             releaseTun()
             VpnState.state.value = ConnectionState.DISCONNECTED
             VpnState.activeServer.value = null
-            VpnState.connectedSince.value = 0L
+            VpnState.connectedSince.value = 0L; VpnState.resetSpeed()
             VpnState.log("Соединение разорвано")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -533,7 +533,7 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
         reconnectJob?.cancel()
         reconnectJob = scope.launch {
             VpnState.state.value = ConnectionState.RECONNECTING
-            VpnState.connectedSince.value = 0L
+            VpnState.connectedSince.value = 0L; VpnState.resetSpeed()
             val name = VpnState.activeServer.value?.name ?: "…"
             updateNotification(ConnectionState.RECONNECTING, name)
             var n = 0
@@ -663,10 +663,13 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             val s = VpnState.stats.value
             // Строка трафика имеет смысл только когда счётчики ненулевые;
             // иначе показываем один сервер, чтобы не рисовать «0 B / 0 B».
-            val traffic = if (s.downBytes > 0 || s.upBytes > 0) {
-                "  ·  ↓ ${humanBytes(s.downBytes)}  ↑ ${humanBytes(s.upBytes)}"
-            } else ""
-            b.setContentText("$server$traffic")
+            val sp = VpnState.speed.value
+            // Свёрнутое уведомление: сервер и скорость в моменте; развёрнутое — ещё и объём за сеанс.
+            val speedLine = "↓ ${humanSpeed(sp.down)}  ↑ ${humanSpeed(sp.up)}"
+            if (s.downBytes > 0 || s.upBytes > 0) {
+                b.setContentText("$server  ·  $speedLine")
+                b.setStyle(NotificationCompat.BigTextStyle().bigText("$server" + "\n$speedLine\n${getString(R.string.notif_total)} ↓ ${humanBytes(s.downBytes)}  ↑ ${humanBytes(s.upBytes)}"))
+            } else b.setContentText(server)
 
             val disconnect = PendingIntent.getService(
                 this, 1,
@@ -704,4 +707,5 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
 
     /** Байты в человекочитаемый вид: «0,0 MB» для килобайт выглядело как поломка. */
     private fun humanBytes(bytes: Long): String = ru.gidravpn.hydra.ui.components.humanBytes(bytes)
+    private fun humanSpeed(bps: Long): String = ru.gidravpn.hydra.ui.components.humanSpeed(bps)
 }

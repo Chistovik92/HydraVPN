@@ -486,3 +486,5 @@
 "import_of_secret" = "کلید داخل پیوند OpenFlux کمتر از ۱۶ نویسه است.";
 "import_of_stream" = "حالت «بدون سرور» OpenFlux (گره خروجی روی میزبان PHP) هنوز پشتیبانی نمی‌شود — برای 0.8.0 برنامه‌ریزی شده است.";
 "import_of_other" = "این پیوند OpenFlux قابل استفاده نیست (%@).";
+"info_speed_down" = "سرعت ↓";
+"info_speed_up" = "سرعت ↑";

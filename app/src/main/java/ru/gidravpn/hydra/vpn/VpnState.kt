@@ -1,6 +1,8 @@
 package ru.gidravpn.hydra.vpn
 
 import ru.gidravpn.hydra.data.model.ServerProfile
+import ru.gidravpn.hydra.data.stats.Speed
+import ru.gidravpn.hydra.data.stats.SpeedMeter
 import ru.gidravpn.hydra.vpn.core.ConnectionState
 import ru.gidravpn.hydra.vpn.core.TrafficStats
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +21,18 @@ object VpnState {
     val activeServer = MutableStateFlow<ServerProfile?>(null)
     val stats = MutableStateFlow(TrafficStats())
     val connectedSince = MutableStateFlow(0L)
+
+    /** Скорость в моменте (0.7.11): по разности накопительных счётчиков за две секунды, для любого ядра. */
+    val speed = MutableStateFlow(Speed())
+    private val speedMeter = SpeedMeter()
+
+    /** Принять замер счётчиков от ядра: обновляет и [stats], и [speed]. */
+    fun onTraffic(s: TrafficStats) {
+        speed.value = speedMeter.add(System.currentTimeMillis(), s.downBytes, s.upBytes)
+        stats.value = s
+    }
+
+    fun resetSpeed() { speedMeter.reset(); speed.value = Speed() }
 
     /**
      * Системный Always-on VPN (Фаза 8): (включён, «Блокировать соединения без VPN»). Узнать это

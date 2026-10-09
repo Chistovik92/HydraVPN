@@ -82,6 +82,11 @@ public enum ServerLocation {
 }
 
 public enum Format {
+    /// Скорость «4,2 МБ/с».
+    public static func speed(_ bytesPerSec: Int64) -> String {
+        bytes(bytesPerSec) + (Locale.current.identifier.hasPrefix("ru") ? "/с" : "/s")
+    }
+
     /// Байты в человекочитаемый вид (как `humanBytes` на Android).
     public static func bytes(_ b: Int64) -> String {
         let ru = Locale.current.identifier.hasPrefix("ru")

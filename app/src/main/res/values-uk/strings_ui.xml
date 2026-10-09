@@ -340,4 +340,11 @@
     <string name="import_of_secret">Ключ у посиланні OpenFlux коротший за 16 символів.</string>
     <string name="import_of_stream">Режим OpenFlux «без сервера» (вузол на PHP-хостингу) поки не підтримується — він запланований на 0.8.0.</string>
     <string name="import_of_other">Це посилання OpenFlux не можна використати (%1$s).</string>
+    <string name="info_speed_down">Швидкість ↓</string>
+    <string name="info_speed_up">Швидкість ↑</string>
+    <string name="notif_total">всього</string>
+    <string name="btn_cancel_connect">СКАСУВАТИ</string>
+    <string name="split_preset_ru">Російські застосунки напряму</string>
+    <string name="split_preset_done">Додано до винятків: %1$d. Режим: усе, крім вибраних.</string>
+    <string name="split_preset_none">Відповідних російських застосунків не знайдено</string>
 </resources>

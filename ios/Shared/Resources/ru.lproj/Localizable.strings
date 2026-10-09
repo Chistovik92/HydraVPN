@@ -486,3 +486,5 @@
 "import_of_secret" = "Ключ в ссылке OpenFlux короче 16 символов.";
 "import_of_stream" = "Режим OpenFlux «без сервера» (узел на PHP-хостинге) пока не поддерживается — он запланирован на 0.8.0.";
 "import_of_other" = "Эту ссылку OpenFlux нельзя использовать (%@).";
+"info_speed_down" = "Скорость ↓";
+"info_speed_up" = "Скорость ↑";

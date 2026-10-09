@@ -486,3 +486,5 @@
 "import_of_secret" = "The secret in the OpenFlux link is shorter than 16 characters.";
 "import_of_stream" = "OpenFlux “no server” mode (an exit on PHP hosting) is not supported yet — it is planned for 0.8.0.";
 "import_of_other" = "This OpenFlux link cannot be used (%@).";
+"info_speed_down" = "Speed ↓";
+"info_speed_up" = "Speed ↑";

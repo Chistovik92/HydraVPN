@@ -80,6 +80,8 @@ struct TrafficRows: View {
     var body: some View {
         HStack { Text(L("info_down")).foregroundStyle(Color.hydraMuted); Spacer(); Text(Format.bytes(traffic.down)) }.font(.subheadline)
         HStack { Text(L("info_up")).foregroundStyle(Color.hydraMuted); Spacer(); Text(Format.bytes(traffic.up)) }.font(.subheadline)
+        HStack { Text(L("info_speed_down")).foregroundStyle(Color.hydraMuted); Spacer(); Text(Format.speed(traffic.downSpeed)) }.font(.subheadline)
+        HStack { Text(L("info_speed_up")).foregroundStyle(Color.hydraMuted); Spacer(); Text(Format.speed(traffic.upSpeed)) }.font(.subheadline)
     }
 }
 

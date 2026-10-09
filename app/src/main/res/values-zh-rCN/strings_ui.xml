@@ -340,4 +340,11 @@
     <string name="import_of_secret">OpenFlux 链接中的密钥短于 16 个字符。</string>
     <string name="import_of_stream">暂不支持 OpenFlux“无服务器”模式（PHP 主机上的出口节点）——计划在 0.8.0 提供。</string>
     <string name="import_of_other">无法使用此 OpenFlux 链接（%1$s）。</string>
+    <string name="info_speed_down">速度 ↓</string>
+    <string name="info_speed_up">速度 ↑</string>
+    <string name="notif_total">累计</string>
+    <string name="btn_cancel_connect">取消</string>
+    <string name="split_preset_ru">俄罗斯应用直连</string>
+    <string name="split_preset_done">已加入例外：%1$d 个。模式：除所选外全部走 VPN。</string>
+    <string name="split_preset_none">未找到匹配的俄罗斯应用</string>
 </resources>

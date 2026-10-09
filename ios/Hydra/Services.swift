@@ -69,7 +69,19 @@ enum Ping {
 final class TrafficClient: ObservableObject {
     @Published var up: Int64 = 0
     @Published var down: Int64 = 0
+    /// Скорость в моменте (0.7.11), байт/с: среднее по двум последним замерам статуса sing-box (раз в секунду).
+    @Published var upSpeed: Int64 = 0
+    @Published var downSpeed: Int64 = 0
+    private var lastUp: Int64 = 0
+    private var lastDown: Int64 = 0
     private var client: LibboxCommandClient?
+
+    fileprivate func applySpeed(up: Int64, down: Int64) {
+        upSpeed = (up + lastUp) / 2
+        downSpeed = (down + lastDown) / 2
+        lastUp = up
+        lastDown = down
+    }
 
     static func setupLibbox() {
         let store = HydraStore.shared()
@@ -101,7 +113,7 @@ final class TrafficClient: ObservableObject {
     func disconnect() {
         try? client?.disconnect()
         client = nil
-        up = 0; down = 0
+        up = 0; down = 0; upSpeed = 0; downSpeed = 0; lastUp = 0; lastDown = 0
     }
 
     private final class Handler: NSObject, LibboxCommandClientHandlerProtocol {
@@ -114,7 +126,11 @@ final class TrafficClient: ObservableObject {
         func writeStatus(_ message: LibboxStatusMessage?) {
             guard let message else { return }
             let up = message.uplinkTotal, down = message.downlinkTotal
-            Task { @MainActor [weak owner] in owner?.up = up; owner?.down = down }
+            let upNow = message.uplink, downNow = message.downlink
+            Task { @MainActor [weak owner] in
+                owner?.up = up; owner?.down = down
+                owner?.applySpeed(up: upNow, down: downNow)
+            }
         }
         func writeGroups(_: LibboxOutboundGroupIteratorProtocol?) {}
         func initializeClashMode(_: LibboxStringIteratorProtocol?, currentMode _: String?) {}

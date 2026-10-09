@@ -38,6 +38,7 @@ import ru.gidravpn.hydra.ui.MainViewModel
 import ru.gidravpn.hydra.ui.components.BetaBadge
 import ru.gidravpn.hydra.ui.components.Card
 import ru.gidravpn.hydra.ui.components.humanBytes
+import ru.gidravpn.hydra.ui.components.humanSpeed
 import ru.gidravpn.hydra.ui.components.Label
 import ru.gidravpn.hydra.ui.components.clickableNoRipple
 import ru.gidravpn.hydra.ui.theme.*
@@ -48,6 +49,7 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
     val state by vm.state.collectAsState()
     val server by vm.selectedServer.collectAsState()
     val stats by vm.stats.collectAsState()
+    val speed by vm.speed.collectAsState()
     val since by vm.connectedSince.collectAsState()
 
     Column(
@@ -120,7 +122,7 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
         }
         Spacer(Modifier.height(32.dp))
 
-        ConnectionInfo(state, server?.name, stats, since)
+        ConnectionInfo(state, server?.name, stats, speed, since)
         Spacer(Modifier.height(20.dp))
 
         // Превью конфигурации
@@ -171,7 +173,8 @@ private fun ConnectButton(state: ConnectionState, onClick: () -> Unit) {
         error -> stringResource(R.string.btn_error_retry)
         connected -> stringResource(R.string.btn_disconnect)
         state == ConnectionState.RECONNECTING -> stringResource(R.string.btn_reconnecting)
-        connecting -> stringResource(R.string.btn_connecting)
+        // Повторное нажатие во время подключения отменяет его (0.7.11) — кнопка так и подписана.
+        connecting -> stringResource(R.string.btn_cancel_connect)
         else -> stringResource(R.string.btn_connect)
     }
 
@@ -241,7 +244,7 @@ private fun RadarRings(active: Boolean, color: androidx.compose.ui.graphics.Colo
 @Composable
 private fun ConnectionInfo(
     state: ConnectionState, serverName: String?,
-    stats: ru.gidravpn.hydra.vpn.core.TrafficStats, since: Long
+    stats: ru.gidravpn.hydra.vpn.core.TrafficStats, speed: ru.gidravpn.hydra.data.stats.Speed, since: Long
 ) {
     val connected = state == ConnectionState.CONNECTED
     var elapsed by remember { mutableStateOf("00:00") }
@@ -276,6 +279,12 @@ private fun ConnectionInfo(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 InfoCell(stringResource(R.string.info_down), humanBytes(stats.downBytes), AccentCyan, Modifier.weight(1f))
                 InfoCell(stringResource(R.string.info_up), humanBytes(stats.upBytes), AccentIndigo, Modifier.weight(1f))
+            }
+            // Скорость в моменте (0.7.11), под счётчиками объёма.
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                InfoCell(stringResource(R.string.info_speed_down), humanSpeed(speed.down), AccentCyan, Modifier.weight(1f))
+                InfoCell(stringResource(R.string.info_speed_up), humanSpeed(speed.up), AccentIndigo, Modifier.weight(1f))
             }
         }
     }

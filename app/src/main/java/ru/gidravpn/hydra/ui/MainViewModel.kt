@@ -275,6 +275,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         reapplySplitIfConnected()
     }
 
+    /**
+     * Пресет «Российские приложения напрямую» (0.7.11): режим «все, кроме выбранных» и в исключения — установленные банки и
+     * госуслуги ([RuAppsPreset]). Уже выбранное не трогаем. [onDone] получает число найденных приложений (0 — режим не менялся).
+     */
+    fun applyRuAppsPreset(installed: List<String>, onDone: (Int) -> Unit) = safeLaunch {
+        val found = ru.gidravpn.hydra.data.model.RuAppsPreset.presentIn(installed)
+        if (found.isNotEmpty()) {
+            splitRepo.setPackages(splitTunnel.value.packages + found)
+            splitRepo.setMode(SplitTunnelMode.EXCLUDE)
+            VpnState.log("Split tunneling: пресет «Российские приложения напрямую» — ${found.size} шт.")
+            reapplySplitIfConnected()
+        }
+        onDone(found.size)
+    }
+
     fun toggleSplitApp(pkg: String) = safeLaunch {
         splitRepo.toggleApp(pkg)
         reapplySplitIfConnected()
@@ -287,6 +302,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val state = VpnState.state
     val logs = VpnState.logs
     val stats = VpnState.stats
+    val speed = VpnState.speed
     val activeServer = VpnState.activeServer
     val connectedSince = VpnState.connectedSince
 
@@ -343,7 +359,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (VpnService.prepare(ctx) == null) startTunnelWith(server)
     }
 
+    private var tunnelStartedAt = 0L
+
     fun toggle() = safeLaunch {
+        // Двойной тап по «Подключить» не должен тут же отменять только что начатое подключение.
+        if (state.value == ConnectionState.CONNECTING && android.os.SystemClock.elapsedRealtime() - tunnelStartedAt < 1000) return@safeLaunch
         if (state.value == ConnectionState.CONNECTED || state.value == ConnectionState.CONNECTING || state.value == ConnectionState.RECONNECTING) {
             disconnect()
         } else {
@@ -359,6 +379,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun startTunnelWith(server: ServerProfile) {
+        tunnelStartedAt = android.os.SystemClock.elapsedRealtime()
         val ctx = getApplication<Application>()
 
         // PPTP честно недоступен: GRE требует root, стек удалён из Android 12/13.

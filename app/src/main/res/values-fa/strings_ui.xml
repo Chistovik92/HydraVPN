@@ -340,4 +340,11 @@
     <string name="import_of_secret">کلید داخل پیوند OpenFlux کمتر از ۱۶ نویسه است.</string>
     <string name="import_of_stream">حالت «بدون سرور» OpenFlux (گره خروجی روی میزبان PHP) هنوز پشتیبانی نمی‌شود — برای 0.8.0 برنامه‌ریزی شده است.</string>
     <string name="import_of_other">این پیوند OpenFlux قابل استفاده نیست (%1$s).</string>
+    <string name="info_speed_down">سرعت ↓</string>
+    <string name="info_speed_up">سرعت ↑</string>
+    <string name="notif_total">مجموع</string>
+    <string name="btn_cancel_connect">لغو</string>
+    <string name="split_preset_ru">برنامه‌های روسی مستقیم</string>
+    <string name="split_preset_done">به استثناها افزوده شد: %1$d. حالت: همه به جز انتخاب‌شده‌ها.</string>
+    <string name="split_preset_none">برنامه‌ی روسی مناسبی نصب نیست</string>
 </resources>

@@ -91,6 +91,16 @@ private fun AppsSection(vm: MainViewModel, split: SplitTunnel) {
     }
     Spacer(Modifier.height(16.dp))
 
+    // Пресет (0.7.11): банки и госуслуги — мимо VPN.
+    var presetMsg by remember { mutableStateOf<String?>(null) }
+    val doneText = stringResource(R.string.split_preset_done)
+    val noneText = stringResource(R.string.split_preset_none)
+    OutlinedActionButton(stringResource(R.string.split_preset_ru)) {
+        vm.applyRuAppsPreset(apps.map { it.packageName }) { n -> presetMsg = if (n > 0) doneText.format(n) else noneText }
+    }
+    presetMsg?.let { Text(it, color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp)) }
+    Spacer(Modifier.height(12.dp))
+
     // Режим
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ModeChip(stringResource(R.string.split_all_traffic), split.mode == SplitTunnelMode.OFF) { vm.setSplitMode(SplitTunnelMode.OFF) }

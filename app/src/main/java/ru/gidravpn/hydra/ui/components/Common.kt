@@ -89,6 +89,10 @@ fun humanBytes(bytes: Long): String = when {
     else -> "$bytes ${byteUnit(0)}"
 }
 
+/** Скорость «4,2 МБ/с». */
+fun humanSpeed(bytesPerSec: Long): String =
+    humanBytes(bytesPerSec) + if (java.util.Locale.getDefault().language == "ru") "/с" else "/s"
+
 private fun byteUnit(i: Int): String {
     val ru = java.util.Locale.getDefault().language == "ru"
     return (if (ru) listOf("Б", "КБ", "МБ", "ГБ") else listOf("B", "KB", "MB", "GB"))[i]
