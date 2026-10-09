@@ -89,6 +89,8 @@ public enum SubscriptionSync {
                 pool[k] = bucket
                 var next = fresh
                 next.id = old.id; next.subscriptionId = subId; next.pingMs = old.pingMs; next.flag = old.flag
+                // «Пустить через …» (0.7.13) хранится в профиле — обновление подписки его не стирает.
+                if let v = viaOf(old) { next = withVia(next, v) }
                 if next != old { update.append(next) }
             } else {
                 var n = fresh

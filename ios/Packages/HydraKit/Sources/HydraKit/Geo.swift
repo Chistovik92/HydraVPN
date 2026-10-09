@@ -315,7 +315,7 @@ public enum DatConverter {
             return nil
         }
         mutating func bytes(_ n: Int) -> Data? {
-            guard n >= 0, p + n <= d.count else { return nil }
+            guard n >= 0, n <= d.count - p else { return nil }
             let s = d.startIndex + p
             p += n
             return d.subdata(in: s..<(s + n))
@@ -332,7 +332,7 @@ public enum DatConverter {
             let num = Int(tag >> 3)
             switch tag & 7 {
             case 0: guard let v = r.varint() else { return out }; out.append((num, .num(v)))
-            case 2: guard let n = r.varint(), let x = r.bytes(Int(n)) else { return out }; out.append((num, .data(x)))
+            case 2: guard let n = r.varint(), n <= UInt64(Int.max), let x = r.bytes(Int(n)) else { return out }; out.append((num, .data(x)))
             case 1: r.p += 8
             case 5: r.p += 4
             default: return out
@@ -349,8 +349,11 @@ public enum DatConverter {
             guard let tag = r.varint() else { return nil }
             let type = tag & 7
             if type != 2 { if type == 0 { _ = r.varint(); continue } else { return nil } }
-            guard let len = r.varint() else { return nil }
-            if tag >> 3 != 1 { r.p += Int(len); continue }
+            guard let len = r.varint(), len <= UInt64(Int.max) else { return nil }
+            if tag >> 3 != 1 {
+                guard Int(len) <= data.count - r.p else { return nil }
+                r.p += Int(len); continue
+            }
             guard let entry = r.bytes(Int(len)) else { return nil }
             let f = fields(entry)
             var code = ""

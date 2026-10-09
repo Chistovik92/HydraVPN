@@ -302,7 +302,11 @@ object DatConverter {
         }
     }
 
+    /** Запись .dat длиннее этого — файл повреждён или враждебен (самый крупный набор geosite — единицы мегабайт). */
+    private const val MAX_ENTRY = 64 * 1024 * 1024
+
     private fun readBytes(s: InputStream, n: Int): ByteArray {
+        require(n in 0..MAX_ENTRY) { "повреждённый .dat: запись длиной $n" }
         val a = ByteArray(n); var o = 0
         while (o < n) { val r = s.read(a, o, n - o); if (r < 0) error("обрыв файла .dat"); o += r }
         return a
@@ -336,9 +340,10 @@ object DatConverter {
             if (tag < 0) return null
             val type = (tag and 7).toInt()
             if (type != 2) { if (type == 0) readVarint(s) else error("формат .dat не распознан"); continue }
-            val len = readVarint(s).toInt()
-            if (tag shr 3 != 1L) { s.skip(len.toLong()); continue }
-            val entry = readBytes(s, len)
+            val len = readVarint(s)
+            require(len in 0..MAX_ENTRY) { "повреждённый .dat: запись длиной $len" }
+            if (tag shr 3 != 1L) { s.skip(len); continue }
+            val entry = readBytes(s, len.toInt())
             val f = fields(entry)
             val code = (f.firstOrNull { it.first == 1 }?.second as? ByteArray)?.toString(Charsets.UTF_8)?.lowercase()
             if (code != want) continue

@@ -455,7 +455,10 @@ class AppController(
         val fresh = f.servers.filter { it.hasValidEndpoint }.map { n ->
             val same = old.firstOrNull { it.id !in used && it.address == n.address && it.port == n.port && it.name == n.name }
             same?.let { used += it.id }
-            n.copy(id = same?.id ?: next++, subscriptionId = id, pingMs = same?.pingMs ?: -1)
+            n.copy(id = same?.id ?: next++, subscriptionId = id, pingMs = same?.pingMs ?: -1).let { fresh ->
+                // «Пустить через …» (0.7.13) хранится в профиле — обновление подписки его не стирает.
+                same?.let { viaOf(it) }?.let { v -> withVia(fresh, v) } ?: fresh
+            }
         }
         // Сервер, к которому сейчас подключены, не удаляем из-под туннеля.
         val keepConnected = old.filter { it.id == connected && it.id !in used }
@@ -891,7 +894,7 @@ class AppController(
     private fun olcRtcSidecar(profile: ServerProfile): Sidecar {
         val exe = Platform.bundledOlcRtc() ?: error("olcRTC не входит в эту сборку Hydra (нужен Go при сборке) — выберите другой сервер")
         val port = freePort()
-        val cfg = File(Platform.runDir, "olcrtc-client.yaml")
+        val cfg = File(Platform.runDir, "olcrtc-client-$port.yaml")
         Store.writePrivateAtomic(cfg, OlcRtcConfigBuilder.build(profile, port))
         return Sidecar("olcRTC", exe, listOf(cfg.absolutePath), port, secrets = listOf(cfg))
     }
@@ -900,7 +903,7 @@ class AppController(
     private fun openFluxSidecar(profile: ServerProfile): Sidecar {
         val exe = Platform.bundledOpenFlux() ?: error("OpenFlux не входит в эту сборку Hydra — выберите другой сервер")
         val port = freePort()
-        val key = if (profile.uuidOrPassword.isNotEmpty()) File(Platform.runDir, "openflux.key").also { Store.writePrivateAtomic(it, profile.uuidOrPassword) } else null
+        val key = if (profile.uuidOrPassword.isNotEmpty()) File(Platform.runDir, "openflux-$port.key").also { Store.writePrivateAtomic(it, profile.uuidOrPassword) } else null
         return Sidecar("OpenFlux", exe, OpenFluxArgs.build(profile, port, key?.absolutePath), port, secrets = listOfNotNull(key))
     }
 

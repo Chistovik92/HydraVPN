@@ -37,10 +37,12 @@ object GeoAssets {
     fun resolve(context: Context, countries: Set<String>): List<SingBoxConfigBuilder.GeoCountry> {
         val withIp = availableCountries(context).toSet()
         val withDomains = countriesWithDomains(context)
-        return countries.filter { it in withIp }.sorted().map { cc ->
+        return countries.filter { it in withIp }.sorted().mapNotNull { cc ->
+            // Скачанная база могла оказаться повреждённой, а вшитой для страны нет — такую страну пропускаем, а не падаем.
+            val ip = pathFor(context, false, cc) ?: return@mapNotNull null
             SingBoxConfigBuilder.GeoCountry(
                 code = cc,
-                geoipPath = pathFor(context, false, cc)!!,
+                geoipPath = ip,
                 geositePath = if (cc in withDomains) pathFor(context, true, cc) else null,
             )
         }

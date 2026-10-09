@@ -1,6 +1,8 @@
 package ru.gidravpn.hydra.data.subscription
 
 import ru.gidravpn.hydra.data.model.ServerProfile
+import ru.gidravpn.hydra.data.routing.viaOf
+import ru.gidravpn.hydra.data.routing.withVia
 
 /**
  * Синхронизация подписки с тем, что отдал сервер (0.6.21): «как сказал хозяин подписки».
@@ -32,7 +34,9 @@ object SubscriptionSync {
             if (old == null) {
                 insert += fresh.copy(id = 0, subscriptionId = subId)
             } else {
-                val next = fresh.copy(id = old.id, subscriptionId = subId, pingMs = old.pingMs, flag = old.flag)
+                var next = fresh.copy(id = old.id, subscriptionId = subId, pingMs = old.pingMs, flag = old.flag)
+                // «Пустить через …» (0.7.13) хранится в профиле — обновление подписки его не стирает.
+                viaOf(old)?.let { next = withVia(next, it) }
                 if (next != old) update += next
             }
         }
