@@ -1,6 +1,6 @@
 module github.com/Chistovik92/HydraVPN/ios/bridge
 
-go 1.26.4
+go 1.26.6
 
 require (
 	github.com/openlibrecommunity/olcrtc v0.0.0-20260930093851-f3ad8fb7c0d0
@@ -35,6 +35,9 @@ require (
 	github.com/dblohm7/wingoes v0.0.0-20240119213807-a09d6be7affa // indirect
 	github.com/dennwc/iters v1.2.2 // indirect
 	github.com/digitalocean/go-smbios v0.0.0-20180907143718-390a4f403a8e // indirect
+	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
+	github.com/dop251/goja v0.0.0-20260926152631-39ec2650adc9 // indirect
+	github.com/dop251/goja_nodejs v0.0.0-20260918173711-b481721df8a2 // indirect
 	github.com/frostbyte73/core v0.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
@@ -46,6 +49,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
+	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/godbus/dbus/v5 v5.1.1-0.20230522191255-76236955d466 // indirect
@@ -56,6 +60,7 @@ require (
 	github.com/google/cel-go v0.28.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/nftables v0.2.1-0.20240414091927-5e242ec57806 // indirect
+	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/csrf v1.7.3-0.20250123201450-9dd6af1f6d30 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
@@ -98,30 +103,22 @@ require (
 	github.com/owenewans/owenlivekit/v2 v2.18.2 // indirect
 	github.com/p1neappleXpress/OpenFlux v0.0.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.27 // indirect
-	github.com/pion/datachannel v1.6.0 // indirect
-	github.com/pion/dtls/v2 v2.2.12 // indirect
-	github.com/pion/dtls/v3 v3.1.4 // indirect
-	github.com/pion/ice/v2 v2.3.38 // indirect
-	github.com/pion/ice/v4 v4.2.7 // indirect
-	github.com/pion/interceptor v0.1.45 // indirect
+	github.com/pion/datachannel v1.6.3 // indirect
+	github.com/pion/dtls/v3 v3.1.9 // indirect
+	github.com/pion/ice/v4 v4.4.4 // indirect
+	github.com/pion/interceptor v0.1.49 // indirect
 	github.com/pion/logging v0.2.4 // indirect
-	github.com/pion/mdns v0.0.12 // indirect
-	github.com/pion/mdns/v2 v2.1.0 // indirect
+	github.com/pion/mdns/v2 v2.2.1 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
-	github.com/pion/rtcp v1.2.16 // indirect
-	github.com/pion/rtp v1.10.2 // indirect
-	github.com/pion/sctp v1.10.0 // indirect
-	github.com/pion/sdp/v3 v3.0.19 // indirect
-	github.com/pion/srtp/v2 v2.0.20 // indirect
-	github.com/pion/srtp/v3 v3.0.11 // indirect
-	github.com/pion/stun v0.6.1 // indirect
+	github.com/pion/rtcp v1.2.18 // indirect
+	github.com/pion/rtp v1.10.5 // indirect
+	github.com/pion/sctp v1.11.3 // indirect
+	github.com/pion/sdp/v3 v3.0.20 // indirect
+	github.com/pion/srtp/v3 v3.1.0 // indirect
 	github.com/pion/stun/v3 v3.1.5 // indirect
-	github.com/pion/transport/v2 v2.2.10 // indirect
 	github.com/pion/transport/v4 v4.0.2 // indirect
-	github.com/pion/turn/v2 v2.1.6 // indirect
-	github.com/pion/turn/v5 v5.0.9 // indirect
-	github.com/pion/webrtc/v3 v3.3.6 // indirect
-	github.com/pion/webrtc/v4 v4.2.15 // indirect
+	github.com/pion/turn/v5 v5.1.2 // indirect
+	github.com/pion/webrtc/v4 v4.2.22 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus-community/pro-bing v0.4.0 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
@@ -152,7 +149,6 @@ require (
 	github.com/sagernet/wireguard-go v0.0.1-beta.7 // indirect
 	github.com/sagernet/ws v0.0.0-20231204124109-acfe8907c854 // indirect
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
-	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/tailscale/certstore v0.1.1-0.20231202035212-d3fa0460f47e // indirect
 	github.com/tailscale/go-winio v0.0.0-20231025203758-c4f33415bf55 // indirect
 	github.com/tailscale/golang-x-crypto v0.0.0-20240604161659-3fde5e568aa4 // indirect
@@ -211,5 +207,23 @@ require (
 // поэтому оба берутся из клона закреплённого коммита (build.sh кладёт его в third_party/OpenFlux).
 replace (
 	github.com/p1neappleXpress/OpenFlux => ./third_party/OpenFlux
+	// OpenFlux 0.4.2 ждёт pion transport/v5, а olcRTC собран на v4: в одном бинарнике — одна версия pion (как у olcRTC);
+	// OpenFlux использует только webrtc/v4 (oneme).
+	github.com/pion/datachannel => github.com/pion/datachannel v1.6.0
+	github.com/pion/dtls/v3 => github.com/pion/dtls/v3 v3.1.4
+	github.com/pion/ice/v4 => github.com/pion/ice/v4 v4.2.7
+	github.com/pion/interceptor => github.com/pion/interceptor v0.1.45
+	github.com/pion/logging => github.com/pion/logging v0.2.4
+	github.com/pion/mdns/v2 => github.com/pion/mdns/v2 v2.1.0
+	github.com/pion/randutil => github.com/pion/randutil v0.1.0
+	github.com/pion/rtcp => github.com/pion/rtcp v1.2.16
+	github.com/pion/rtp => github.com/pion/rtp v1.10.2
+	github.com/pion/sctp => github.com/pion/sctp v1.10.0
+	github.com/pion/sdp/v3 => github.com/pion/sdp/v3 v3.0.19
+	github.com/pion/srtp/v3 => github.com/pion/srtp/v3 v3.0.11
+	github.com/pion/stun/v3 => github.com/pion/stun/v3 v3.1.5
+	github.com/pion/transport/v4 => github.com/pion/transport/v4 v4.0.2
+	github.com/pion/turn/v5 => github.com/pion/turn/v5 v5.0.9
+	github.com/pion/webrtc/v4 => github.com/pion/webrtc/v4 v4.2.15
 	openflux-mobile => ./third_party/OpenFlux/mobile
 )

@@ -84,10 +84,7 @@ class OpenFluxLiveTest {
                 val reply = ByteArray(10); var n = 0
                 while (n < 10) { val r = inp.read(reply, n, 10 - n); if (r < 0) break; n += r }
                 assertEquals("SOCKS5 CONNECT отклонён: ${reply.joinToString()}", 0, reply[1].toInt())
-                out.write("GET / HTTP/1.0
-Host: x
-
-".toByteArray()); out.flush()
+                out.write("GET / HTTP/1.0\r\nHost: x\r\n\r\n".toByteArray()); out.flush()
                 inp.readBytes().toString(Charsets.UTF_8)
             }
             // Сессия с узлом согласуется не мгновенно — до трёх попыток, каждая на свежем соединении.

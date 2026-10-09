@@ -17,7 +17,7 @@ OUT="${1:-$PWD}"
 
 SING_BOX_VERSION="${SING_BOX_VERSION:-1.12.25}"
 # Тот же коммит OpenFlux, что у ПК и Android (scripts/build-openflux.sh, desktop/build.gradle.kts).
-OPENFLUX_REF="${OPENFLUX_REF:-bb55dc35604ea11e3b611fda55dd6383f0c3c68d}"
+OPENFLUX_REF="${OPENFLUX_REF:-74cac6d47bf4c27947348ee957538a2c0728a485}"
 
 # OpenFlux подключён через replace (модуль `mobile` объявлен как openflux-mobile) — нужен клон коммита.
 if [[ ! -d third_party/OpenFlux/.git ]]; then

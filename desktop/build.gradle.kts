@@ -167,17 +167,17 @@ val syncGeoAssets by tasks.registering(Sync::class) {
 
 
 // ---- olcRTC и OpenFlux (0.7.4, BETA): клиенты-подпроцессы -------------------------
-// OpenFlux — готовые бинари из релиза апстрима (GPL-3.0), SHA-256 закреплены (SHA256SUMS.txt релиза v0.3.0).
+// OpenFlux — готовые бинари из релиза апстрима (GPL-3.0), SHA-256 закреплены (SHA256SUMS.txt релиза v0.4.2).
 // 04.10.2026 апстрим переставил метку v0.3.0 на новый коммит bb55dc3 («Boards, mailru and yandex: the new native transports»)
 // и перезалил все бинари — хеши обновлены; Android собирается из того же коммита (scripts/build-openflux.sh).
-val openFluxVersion = "0.3.0"
+val openFluxVersion = "0.4.2"
 val openFluxBinaries = mapOf(
-    "windows-x64" to ("openflux-windows-amd64.exe" to "56bfc44fd897d3d5b8adbec90919d25feefd8169cd5a316240febb8ded05eb77"),
-    "windows-arm64" to ("openflux-windows-arm64.exe" to "d1762cdfb50942ece61a69f29d1d9cd9c484623e36b6bbd4436b98ebc8627f48"),
-    "linux-x64" to ("openflux-linux-amd64" to "fdc30ccd12f65bc88db080da600a5fb2e5bbb22fe886648b67583ed77282c622"),
-    "linux-arm64" to ("openflux-linux-arm64" to "35708a36e43c870fa4a1fdc6838e5d624e8ca48ad1364a3178d7af7e07f26940"),
-    "macos-x64" to ("openflux-darwin-amd64" to "b708bc6e9297f7b6ded7110a9cc39b7d305f4812f4714f920df636f7c3da3612"),
-    "macos-arm64" to ("openflux-darwin-arm64" to "614cd151b68de8f88dc32800d6ba884e3b9194fae78b8522f0062dab46c2c19f"),
+    "windows-x64" to ("openflux-windows-amd64.exe" to "c6b4b2db082099aba88a1dbf28b93defd62e8759351f7204aaa0c6eb7340f520"),
+    "windows-arm64" to ("openflux-windows-arm64.exe" to "dbf1b33b6d38fbab59d12a1dd3ee9912620d44313c968aaa5aaaae8390a55a8f"),
+    "linux-x64" to ("openflux-linux-amd64" to "c51e82c1dc9c74b1fd6b264ee25533fb5d885e3e8bea451fb8920245ac1bf2c1"),
+    "linux-arm64" to ("openflux-linux-arm64" to "5e69a7ce3160684cf7e4c51592cb71084ef56819407b556478bb4abc75156427"),
+    "macos-x64" to ("openflux-darwin-amd64" to "f20268215c8952698b424824180f9f1bd24cc789163fb09a620d780b751367b7"),
+    "macos-arm64" to ("openflux-darwin-arm64" to "c2c41fadbfbb2eeba8bfa22e89787e0cb9b796045cf09a6ed2e401320ff778e0"),
 )
 
 val downloadOpenFlux by tasks.registering {
@@ -535,7 +535,7 @@ val classicTargets = listOf(
     Classic("linux-armv7", "LinuxArmv7", "linux", "armv7",
         "sing-box-$singBoxVersion-linux-armv7.tar.gz", "9eedd8eb2d3ea66a48794359d1cc1e32ce618b6e1b105c9cd314da6408c9fc87",
         "Xray-linux-arm32-v7a.zip", "0b9719471c7c69752857714e9711d4da57cf38a6beb75dcddfb21425f7919908",
-        openFlux = "openflux-linux-arm" to "e026e591deb9fcf467911ab6a509633ec0919ad858ef47939f27b84d9a575f4b",
+        openFlux = "openflux-linux-arm" to "489387fd9bd8eed248933b147ed8f9964d61188baae5f9d9f6a06b6b810214f7",
         olcRtc = Triple("linux", "arm", "7")),
 )
 
@@ -543,8 +543,8 @@ val classicTargets = listOf(
 fun buildOlcRtc(goos: String, goarch: String, goarm: String, dest: File) =
     buildGoClient("olcrtc-src", "https://github.com/openlibrecommunity/olcrtc.git", olcRtcCommit, "./cmd/olcrtc", goos, goarch, goarm, dest)
 
-/** Коммит OpenFlux — тот же, что у готовых бинарей (метка v0.3.0 после перезаливки апстримом) и у Android-сборки. */
-val openFluxCommit = "bb55dc35604ea11e3b611fda55dd6383f0c3c68d"
+/** Коммит OpenFlux — тот же, что у готовых бинарей (метка v0.4.2) и у Android-сборки. */
+val openFluxCommit = "74cac6d47bf4c27947348ee957538a2c0728a485"
 fun buildOpenFlux(goos: String, goarch: String, goarm: String, dest: File) =
     buildGoClient("openflux-src", "https://github.com/p1neappleXpress/OpenFlux.git", openFluxCommit, ".", goos, goarch, goarm, dest)
 
