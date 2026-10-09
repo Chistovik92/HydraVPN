@@ -77,7 +77,12 @@ public enum DpiArgs {
 
 /// Итог проверки стратегии: сколько сайтов открылось (порт `DpiProbe.Result` с Android).
 public struct DpiProbeResult: Hashable, Sendable, Identifiable {
-    public struct Group: Hashable, Sendable { public var name: String; public var ok: Int; public var total: Int }
+    public struct Group: Hashable, Sendable {
+        public var name: String
+        public var ok: Int
+        public var total: Int
+        public init(name: String, ok: Int, total: Int) { self.name = name; self.ok = ok; self.total = total }
+    }
     public var strategy: String
     public var ok: Int
     public var total: Int

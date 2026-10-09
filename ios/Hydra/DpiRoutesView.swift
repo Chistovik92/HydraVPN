@@ -62,6 +62,18 @@ struct DpiRoutesView: View {
         }
     }
 
+    /// Строка правила; собрана по частям — длинное выражение из `+` и интерполяций компилятор не успевает разобрать.
+    private func ruleTitle(_ r: RouteRule) -> String {
+        var parts: [String] = []
+        if r.invert { parts.append(L("dpi_not")) }
+        parts.append(kindName(r.kind))
+        parts.append(r.value)
+        if !r.group.isEmpty { parts.append("[" + r.group + "]") }
+        parts.append("→")
+        parts.append(targetName(r.target))
+        return parts.joined(separator: " ")
+    }
+
     private func kindName(_ k: RouteKind) -> String {
         switch k {
         case .app: L("dpi_k_app")
@@ -180,7 +192,7 @@ struct DpiRoutesView: View {
         Section(header: Text(L("dpi_rules_title")), footer: Text(L("dpi_rules_sub"))) {
             if cfg.rules.isEmpty { Text(L("dpi_rules_empty")).foregroundStyle(Color.hydraMuted) }
             ForEach(Array(cfg.rules.enumerated()), id: \.offset) { _, r in
-                Text((r.invert ? L("dpi_not") + " " : "") + "\(kindName(r.kind))  \(r.value)" + (r.group.isEmpty ? "" : " [\(r.group)]") + "  →  \(targetName(r.target))")
+                Text(ruleTitle(r))
                     .font(.footnote)
                     .swipeActions { Button(role: .destructive) { setRoutes { $0.rules.removeAll { $0 == r } } } label: { Text(L("profiles_delete")) } }
             }
