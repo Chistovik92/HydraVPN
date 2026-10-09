@@ -10,6 +10,8 @@ on:
   workflow_call:   # release.yml: неподписанный .ipa в релиз
 
 env:
+  # TestFlight: true, когда в репозитории заданы секреты Apple (иначе соответствующие шаги пропускаются).
+  HAS_ASC: ${{ secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.ASC_KEY_P8 != '' && secrets.APPLE_TEAM_ID != '' }}
   # Приватный DNS Hydra VPN (секрет репозитория): нужен сборке, в исходниках его нет. Пусто — пункт DNS скрыт.
   HYDRA_PRIVATE_DNS: ${{ secrets.HYDRA_PRIVATE_DNS }}
   SING_BOX_VERSION: "1.12.25"
@@ -119,3 +121,40 @@ jobs:
         with:
           name: hydra-ios-unsigned
           path: Hydra-ios-unsigned.ipa
+
+      # ---- TestFlight (0.7.11, docs/IOS_TESTING.md) --------------------------------------------------------------
+      # Без секретов репозитория (ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8, APPLE_TEAM_ID) подпись и выгрузка пропускаются;
+      # вместо них проверяются настройки подписи с тестовыми значениями — задача не ломается, когда аккаунта ещё нет.
+      - name: TestFlight — проверка настроек подписи (без секретов)
+        if: env.HAS_ASC != 'true'
+        run: |
+          cd ios
+          for t in Hydra HydraTunnel HydraAWG HydraWidgets; do
+            xcodebuild -project Hydra.xcodeproj -target "$t" -configuration Release -showBuildSettings               DEVELOPMENT_TEAM=ABCDE12345 CURRENT_PROJECT_VERSION=1 CODE_SIGN_STYLE=Automatic > "settings-$t.txt"
+            grep -E "^\s+(PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM|CURRENT_PROJECT_VERSION) =" "settings-$t.txt"
+            grep -q "DEVELOPMENT_TEAM = ABCDE12345" "settings-$t.txt"
+          done
+          for p in Hydra HydraTunnel HydraAWG HydraWidgets; do
+            /usr/libexec/PlistBuddy -c "Print :ITSAppUsesNonExemptEncryption" "$p/Info.plist"
+          done
+      - name: TestFlight — подпись и выгрузка
+        if: env.HAS_ASC == 'true' && github.event_name != 'pull_request'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          KEY_DIR="$RUNNER_TEMP/asc"; mkdir -p "$KEY_DIR" ~/.appstoreconnect/private_keys
+          printf '%s' "$ASC_KEY_P8" > "$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+          cp "$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8" ~/.appstoreconnect/private_keys/
+          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+                -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          cd ios
+          # Номер сборки = номер запуска CI: Apple не принимает повторный.
+          xcodebuild -project Hydra.xcodeproj -scheme Hydra -configuration Release -destination 'generic/platform=iOS'             -archivePath build/Hydra.xcarchive DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" "${AUTH[@]}" archive
+          sed "s/TEAM_ID/$APPLE_TEAM_ID/" ExportOptions-appstore.plist > build/ExportOptions.plist
+          xcodebuild -exportArchive -archivePath build/Hydra.xcarchive -exportPath build/export             -exportOptionsPlist build/ExportOptions.plist "${AUTH[@]}"
+          xcrun altool --upload-app -f build/export/Hydra.ipa -t ios --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+          rm -rf "$KEY_DIR" ~/.appstoreconnect/private_keys
