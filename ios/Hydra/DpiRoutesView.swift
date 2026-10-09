@@ -74,6 +74,12 @@ struct DpiRoutesView: View {
         return parts.joined(separator: " ")
     }
 
+    private func groupTitle(_ g: RouteGroup) -> String {
+        let kindLabel: String = g.type == RouteGroup.urltest ? L("dpi_g_auto") : L("dpi_g_manual")
+        let members: String = g.members.map { targetName($0) }.joined(separator: ", ")
+        return "◎ " + g.name + " · " + kindLabel + ": " + members
+    }
+
     private func kindName(_ k: RouteKind) -> String {
         switch k {
         case .app: L("dpi_k_app")
@@ -234,7 +240,7 @@ struct DpiRoutesView: View {
     private var groupsSection: some View {
         Section(header: Text(L("dpi_groups_title")), footer: Text(L("dpi_groups_sub"))) {
             ForEach(cfg.groups, id: \.name) { g in
-                Text("◎ \(g.name) · \(g.type == RouteGroup.urltest ? L("dpi_g_auto") : L("dpi_g_manual")): " + g.members.map(targetName).joined(separator: ", "))
+                Text(groupTitle(g))
                     .font(.footnote)
                     .swipeActions { Button(role: .destructive) { setRoutes { $0.groups.removeAll { $0.name == g.name } } } label: { Text(L("profiles_delete")) } }
             }
