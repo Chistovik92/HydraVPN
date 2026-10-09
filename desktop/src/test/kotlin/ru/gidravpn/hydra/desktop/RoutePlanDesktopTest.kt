@@ -103,7 +103,7 @@ class RoutePlanDesktopTest {
         val cfg = DesktopConfig.build(vless, settings, Os.WINDOWS, api, bundled, null, emptyList(), plan, store)
         val sets = cfg.getJSONObject("route").objs("rule_set")
         assertTrue(sets.all { it.getString("format") == "source" && it.getString("path").endsWith(".json") }, sets.toString())
-        dumpDir?.let { File(it, "desktop-geo-dynamic.json").writeText(cfg.toString(2)) }
+        // Конфиг не сбрасываем в файл для `sing-box check`: пути ведут во временный каталог, который удаляется ниже.
         dir.deleteRecursively()
     }
 
