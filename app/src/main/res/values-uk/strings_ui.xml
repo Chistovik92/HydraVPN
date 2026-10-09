@@ -335,4 +335,9 @@
     <string name="srv_empty_desc">Додайте підписку чи сервер: вставте посилання, відскануйте QR-код або виберіть фото.</string>
     <string name="srv_more">Ще…</string>
     <string name="sub_refresh_short">Оновити</string>
+    <string name="import_of_damaged">Посилання OpenFlux пошкоджене або обрізане (можливо, змінився регістр літер) — скопіюйте його знову повністю.</string>
+    <string name="import_of_version">Це посилання OpenFlux створене новішою версією — оновіть Hydra.</string>
+    <string name="import_of_secret">Ключ у посиланні OpenFlux коротший за 16 символів.</string>
+    <string name="import_of_stream">Режим OpenFlux «без сервера» (вузол на PHP-хостингу) поки не підтримується — він запланований на 0.8.0.</string>
+    <string name="import_of_other">Це посилання OpenFlux не можна використати (%1$s).</string>
 </resources>

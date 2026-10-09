@@ -335,4 +335,9 @@
     <string name="bot_err_auth">Код неверен или устарел, либо это устройство отключили в боте. Возьмите новый код.</string>
     <string name="bot_err_off">На этом сервере API для приложений выключен.</string>
     <string name="bot_err_rate">Слишком много попыток. Подождите несколько минут.</string>
+    <string name="import_of_damaged">Ссылка OpenFlux повреждена или обрезана (возможно, изменился регистр букв) — скопируйте её заново целиком.</string>
+    <string name="import_of_version">Эта ссылка OpenFlux создана более новой версией — обновите Hydra.</string>
+    <string name="import_of_secret">Ключ в ссылке OpenFlux короче 16 символов.</string>
+    <string name="import_of_stream">Режим OpenFlux «без сервера» (узел на PHP-хостинге) пока не поддерживается — он запланирован на 0.8.0.</string>
+    <string name="import_of_other">Эту ссылку OpenFlux нельзя использовать (%1$s).</string>
 </resources>

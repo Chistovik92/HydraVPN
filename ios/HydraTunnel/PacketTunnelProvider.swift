@@ -107,8 +107,14 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             _ = HydraolcStart(provider, transport, s.address, s.uuidOrPassword, "1.1.1.1:53", port, 30_000, &err)
             if let err { throw fail("olcRTC: \(err.localizedDescription)") }
         case .openflux:
-            store.appendLog("OpenFlux: запуск транспорта \(s.transport)…")
-            _ = HydrafluxStart(s.transport, s.address, s.uuidOrPassword, str("codec"), str("maxToken"), str("maxUid"), port, &err)
+            if let specs = OpenFluxSession.specsJSON(extra) {
+                // Профиль из официальной ссылки openflux://v1/ — сессия из нескольких транспортов.
+                store.appendLog("OpenFlux: сессия, транспортов — \(OpenFluxSession.count(extra))…")
+                _ = HydrafluxStartSession(specs, s.uuidOrPassword, port, &err)
+            } else {
+                store.appendLog("OpenFlux: запуск транспорта \(s.transport)…")
+                _ = HydrafluxStart(s.transport, s.address, s.uuidOrPassword, str("codec"), str("maxToken"), str("maxUid"), port, &err)
+            }
             if let err {
                 let tail = HydrafluxLogs().split(separator: "\n").suffix(3).joined(separator: " · ")
                 throw fail("OpenFlux: \(err.localizedDescription)" + (tail.isEmpty ? "" : " (\(tail))"))

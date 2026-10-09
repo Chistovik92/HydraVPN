@@ -25,6 +25,18 @@ func Start(transport, url, key, codec, maxToken, maxUid string, socksPort int) e
 	return nil
 }
 
+// StartSession поднимает клиент в режиме сессии (0.7.11, ссылки openflux://v1/): несколько транспортов
+// с приоритетами и автопереключением. specsJSON — {"context": "...", "transports": [{"type","url","priority"}]},
+// для direct в url лежит адрес узла host:port (так хранит профиль ядро); key обязателен (не короче 16 знаков).
+func StartSession(specsJSON, key string, socksPort int) error {
+	flux.SetLowMemory(true)
+	listen := fmt.Sprintf("127.0.0.1:%d", socksPort)
+	if msg := flux.StartSessionProxy(specsJSON, key, listen, "", "", ""); msg != "" {
+		return errors.New(msg)
+	}
+	return nil
+}
+
 // Stop останавливает клиент.
 func Stop() { flux.StopProxy() }
 

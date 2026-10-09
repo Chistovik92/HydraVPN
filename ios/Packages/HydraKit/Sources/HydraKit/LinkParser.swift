@@ -77,7 +77,12 @@ public enum LinkParser {
     /// OpenFlux — соглашение Hydra (порт `OpenFluxLink`):
     /// `openflux://<transport>?url=<url>&maxToken=<t>&maxUid=<u>&codec=<batched|legacy>&key=<секрет>#<имя>`.
     static func parseOpenFlux(_ link: String) -> ServerProfile? {
-        guard link.lowercased().hasPrefix("openflux://") else { return nil }
+        guard link.trimmingCharacters(in: .whitespaces).lowercased().hasPrefix("openflux://") else { return nil }
+        // 0.7.11: официальная ссылка openflux://v1/… (её делают и читают официальные клиенты).
+        if OpenFluxShare.isV1(link) {
+            guard let c = try? OpenFluxShare.decode(link), c.mode != "stream" else { return nil }
+            return openFluxProfile(c)
+        }
         let body = String(link.dropFirst("openflux://".count))
         let hashSplit = body.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
         let name = hashSplit.count > 1 ? urlDecode(String(hashSplit[1])).trimmingCharacters(in: .whitespaces) : ""
@@ -104,6 +109,33 @@ public enum LinkParser {
             name: name.isEmpty ? "OpenFlux \(transport)" : name, protocolId: ServerProtocol.openflux.rawValue,
             address: url, port: 0, uuidOrPassword: key, transport: transport,
             extra: json(["maxToken": token, "maxUid": uid, "codec": codec]))
+    }
+
+    /// Код ошибки ядра для ссылки `openflux://v1/…`, которую нельзя использовать (`stream_unsupported` — режим «без сервера»); nil — всё в порядке.
+    public static func openFluxErrorCode(_ link: String) -> String? {
+        guard OpenFluxShare.isV1(link) else { return nil }
+        do {
+            let c = try OpenFluxShare.decode(link)
+            return c.mode == "stream" ? "stream_unsupported" : nil
+        } catch let e as OpenFluxShare.ShareError {
+            return e.code
+        } catch {
+            return "damaged"
+        }
+    }
+
+    /// Конфигурация ссылки → профиль: сессия в `extra.session`, ключ в `uuidOrPassword`, `transport` — тип единственного транспорта или `session`.
+    static func openFluxProfile(_ c: OpenFluxShare.Config) -> ServerProfile {
+        let first = c.transports[0]
+        let single = c.transports.count == 1 ? first.type : nil
+        let ts: [[String: Any]] = c.transports.map {
+            ["type": $0.type, "url": $0.url, "priority": $0.priority, "dial": $0.dial, "name": $0.name]
+        }
+        let session: [String: Any] = ["negotiate": c.negotiate, "codec": c.codec, "context": c.context, "mode": c.mode, "transports": ts]
+        return ServerProfile(
+            name: c.name.isEmpty ? "OpenFlux \(single ?? "session")" : c.name, protocolId: ServerProtocol.openflux.rawValue,
+            address: first.dial.isEmpty ? first.url : first.dial, port: 0, uuidOrPassword: c.secret, transport: single ?? "session",
+            extra: json(["session": session, "codec": c.codec.isEmpty ? "batched" : c.codec]))
     }
 
     private static func parseUserPass(_ link: String, _ proto: ServerProtocol, _ defaultPort: Int) -> ServerProfile? {

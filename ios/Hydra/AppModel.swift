@@ -94,6 +94,14 @@ final class AppModel: ObservableObject {
         switch ImportDetector.classify(text) {
         case .empty: message = L("srv_clipboard_empty")
         case .unsupportedJSON: message = L("import_json_unsupported")
+        case .openFluxError(let code):
+            switch code {
+            case "damaged", "case_changed", "bad_payload", "too_large", "not_link": message = L("import_of_damaged")
+            case "unsupported_version": message = L("import_of_version")
+            case "short_secret", "session_secret": message = L("import_of_secret")
+            case "stream_unsupported": message = L("import_of_stream")
+            default: message = L("import_of_other", code)
+            }
         case .unknown: message = L("import_unknown")
         case .subscriptionURL(let url, let hint): addSubscription(name: subscriptionName ?? hint, url: url)
         case .servers(let profiles):

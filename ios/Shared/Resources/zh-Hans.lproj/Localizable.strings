@@ -481,3 +481,8 @@
 "upd_ios_downloading" = "正在下载更新… %1$ld%%";
 "upd_ios_hint" = "iOS 不允许应用自行安装。下载后请用侧载工具（AltStore、Sideloadly 等）打开该文件。";
 "upd_ios_bad_hash" = "校验和不匹配 — 文件未打开。";
+"import_of_damaged" = "OpenFlux 链接已损坏或被截断（也可能是字母大小写被改变）——请重新完整复制。";
+"import_of_version" = "该 OpenFlux 链接由更新的版本生成——请更新 Hydra。";
+"import_of_secret" = "OpenFlux 链接中的密钥短于 16 个字符。";
+"import_of_stream" = "暂不支持 OpenFlux“无服务器”模式（PHP 主机上的出口节点）——计划在 0.8.0 提供。";
+"import_of_other" = "无法使用此 OpenFlux 链接（%@）。";

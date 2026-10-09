@@ -335,4 +335,9 @@
     <string name="srv_empty_desc">یک اشتراک یا سرور اضافه کنید: پیوند را جای‌گذاری کنید، QR کد را اسکن کنید یا عکسی انتخاب کنید.</string>
     <string name="srv_more">بیشتر…</string>
     <string name="sub_refresh_short">به‌روزرسانی</string>
+    <string name="import_of_damaged">پیوند OpenFlux خراب یا ناقص است (یا بزرگی و کوچکی حروف تغییر کرده) — دوباره و کامل کپی کنید.</string>
+    <string name="import_of_version">این پیوند OpenFlux با نسخه‌ی جدیدتری ساخته شده — Hydra را به‌روز کنید.</string>
+    <string name="import_of_secret">کلید داخل پیوند OpenFlux کمتر از ۱۶ نویسه است.</string>
+    <string name="import_of_stream">حالت «بدون سرور» OpenFlux (گره خروجی روی میزبان PHP) هنوز پشتیبانی نمی‌شود — برای 0.8.0 برنامه‌ریزی شده است.</string>
+    <string name="import_of_other">این پیوند OpenFlux قابل استفاده نیست (%1$s).</string>
 </resources>

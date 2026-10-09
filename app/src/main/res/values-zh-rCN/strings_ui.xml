@@ -335,4 +335,9 @@
     <string name="srv_empty_desc">添加订阅或服务器：粘贴链接、扫描二维码或选择图片。</string>
     <string name="srv_more">更多…</string>
     <string name="sub_refresh_short">更新</string>
+    <string name="import_of_damaged">OpenFlux 链接已损坏或被截断（也可能是字母大小写被改变）——请重新完整复制。</string>
+    <string name="import_of_version">该 OpenFlux 链接由更新的版本生成——请更新 Hydra。</string>
+    <string name="import_of_secret">OpenFlux 链接中的密钥短于 16 个字符。</string>
+    <string name="import_of_stream">暂不支持 OpenFlux“无服务器”模式（PHP 主机上的出口节点）——计划在 0.8.0 提供。</string>
+    <string name="import_of_other">无法使用此 OpenFlux 链接（%1$s）。</string>
 </resources>

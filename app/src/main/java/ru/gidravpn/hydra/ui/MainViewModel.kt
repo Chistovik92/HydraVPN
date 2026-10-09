@@ -439,6 +439,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 is ru.gidravpn.hydra.data.subscription.ImportDetector.Result.Unsupported ->
                     lines += s(if (r.reason == ru.gidravpn.hydra.data.subscription.ImportDetector.Reason.JSON_CONFIG)
                         ru.gidravpn.hydra.R.string.import_json_unsupported else ru.gidravpn.hydra.R.string.import_unknown)
+                is ru.gidravpn.hydra.data.subscription.ImportDetector.Result.OpenFluxError ->
+                    lines += when (r.code) {
+                        "damaged", "case_changed", "bad_payload", "too_large", "not_link" -> s(ru.gidravpn.hydra.R.string.import_of_damaged)
+                        "unsupported_version" -> s(ru.gidravpn.hydra.R.string.import_of_version)
+                        "short_secret", "session_secret" -> s(ru.gidravpn.hydra.R.string.import_of_secret)
+                        "stream_unsupported" -> s(ru.gidravpn.hydra.R.string.import_of_stream)
+                        else -> s(ru.gidravpn.hydra.R.string.import_of_other, r.code)
+                    }
                 ru.gidravpn.hydra.data.subscription.ImportDetector.Result.Empty -> Unit
             }
         }

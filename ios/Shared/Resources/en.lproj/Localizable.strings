@@ -481,3 +481,8 @@
 "upd_ios_downloading" = "Downloading update… %1$ld%%";
 "upd_ios_hint" = "iOS does not let an app install itself. After downloading, open the file in your sideloading tool (AltStore, Sideloadly…).";
 "upd_ios_bad_hash" = "The checksum does not match — the file was not opened.";
+"import_of_damaged" = "The OpenFlux link is damaged or cut off (or its letter case changed) — copy it again in full.";
+"import_of_version" = "This OpenFlux link comes from a newer version — update Hydra.";
+"import_of_secret" = "The secret in the OpenFlux link is shorter than 16 characters.";
+"import_of_stream" = "OpenFlux “no server” mode (an exit on PHP hosting) is not supported yet — it is planned for 0.8.0.";
+"import_of_other" = "This OpenFlux link cannot be used (%@).";

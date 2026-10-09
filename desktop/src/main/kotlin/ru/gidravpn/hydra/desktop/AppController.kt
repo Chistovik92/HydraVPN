@@ -29,6 +29,7 @@ import ru.gidravpn.hydra.data.subscription.LinkBuilder
 import ru.gidravpn.hydra.data.subscription.LinkParser
 import ru.gidravpn.hydra.data.subscription.OlcRtcConfigBuilder
 import ru.gidravpn.hydra.data.subscription.OpenFluxArgs
+import ru.gidravpn.hydra.data.subscription.OpenFluxLink
 import ru.gidravpn.hydra.data.subscription.XrayConfigBuilder
 import ru.gidravpn.hydra.desktop.core.Autostart
 import ru.gidravpn.hydra.desktop.core.ClashApi
@@ -199,7 +200,12 @@ class AppController(
         val parsed = if ("[Interface]" in t) listOfNotNull(runCatching { LinkParser.parseLine(t) }.getOrNull())
         else LinkParser.parseSubscription(t)
         val valid = parsed.filter { it.hasValidEndpoint }
-        if (valid.isEmpty()) return toast("Не найдено ни одной поддерживаемой ссылки")
+        if (valid.isEmpty()) {
+            t.lineSequence().map { it.trim() }.firstNotNullOfOrNull { l ->
+                if (l.startsWith("openflux://", true)) OpenFluxLink.errorCode(l) else null
+            }?.let { return toast(openFluxErrorText(it)) }
+            return toast("Не найдено ни одной поддерживаемой ссылки")
+        }
         mutate { s ->
             var id = nextId(s.servers.map { it.id })
             val first = id
@@ -209,6 +215,15 @@ class AppController(
         }
         val unsupported = valid.count { !DesktopConfig.isSupported(it) }
         toast("Добавлено серверов: ${valid.size}" + if (unsupported > 0) " (на ПК недоступно: $unsupported)" else "")
+    }
+
+    private fun openFluxErrorText(code: String) = when (code) {
+        "damaged", "case_changed", "bad_payload", "too_large", "not_link" ->
+            "Ссылка OpenFlux повреждена или обрезана (возможно, изменился регистр букв) — скопируйте её заново целиком."
+        "unsupported_version" -> "Эта ссылка OpenFlux создана более новой версией — обновите Hydra."
+        "short_secret", "session_secret" -> "Ключ в ссылке OpenFlux короче 16 символов."
+        "stream_unsupported" -> "Режим OpenFlux «без сервера» (узел на PHP-хостинге) пока не поддерживается — он запланирован на 0.8.0."
+        else -> "Эту ссылку OpenFlux нельзя использовать ($code)."
     }
 
     fun deleteServer(id: Long) {

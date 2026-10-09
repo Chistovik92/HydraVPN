@@ -119,6 +119,8 @@ public enum ImportDetector {
         case subscriptionURL(url: String, nameHint: String)
         case servers([ServerProfile])
         case unsupportedJSON
+        /// Ссылка `openflux://v1/…` не годится: код ошибки ядра (`damaged`, `short_secret`, …) или `stream_unsupported`.
+        case openFluxError(code: String)
         case unknown
         case empty
     }
@@ -139,7 +141,14 @@ public enum ImportDetector {
         let profiles = text.contains("[Interface]")
             ? [LinkParser.parseLine(text)].compactMap { $0 }
             : LinkParser.parseSubscription(text)
-        return profiles.isEmpty ? .unknown : .servers(profiles)
+        if profiles.isEmpty {
+            for line in text.split(whereSeparator: \.isNewline) {
+                let l = line.trimmingCharacters(in: .whitespaces)
+                if l.lowercased().hasPrefix("openflux://"), let code = LinkParser.openFluxErrorCode(l) { return .openFluxError(code: code) }
+            }
+            return .unknown
+        }
+        return .servers(profiles)
     }
 
     static func unwrapDeepLink(_ text: String) -> String? {

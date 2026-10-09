@@ -61,9 +61,33 @@ public enum LinkBuilder {
             return "\(proto.rawValue)://\(enc(s("username"))):\(enc(p.uuidOrPassword))@\(host(p.address)):\(p.port)\(q.isEmpty ? "" : "?" + query(q))#\(name)"
         case .wireguard, .amneziaWG:
             return "\(proto == .wireguard ? "wireguard" : "awg")://\(b64url(wireGuardConf(p)))#\(name)"
+        case .openflux:
+            return openFluxLink(p, e)
         default:
             return nil
         }
+    }
+
+    /// OpenFlux → официальная ссылка `openflux://v1/…`; профиль, который ею не выразить (MAX, ключ короче 16 знаков), — nil.
+    static func openFluxLink(_ p: ServerProfile, _ e: [String: Any]) -> String? {
+        var cfg: OpenFluxShare.Config
+        if let s = e["session"] as? [String: Any], let arr = s["transports"] as? [[String: Any]] {
+            let ts = arr.map {
+                OpenFluxShare.Transport(type: $0["type"] as? String ?? "", url: $0["url"] as? String ?? "",
+                                        priority: ($0["priority"] as? NSNumber)?.intValue ?? 0,
+                                        dial: $0["dial"] as? String ?? "", name: $0["name"] as? String ?? "")
+            }
+            cfg = OpenFluxShare.Config(name: p.name, negotiate: (s["negotiate"] as? Bool) ?? false, codec: s["codec"] as? String ?? "",
+                                       secret: p.uuidOrPassword, context: s["context"] as? String ?? "", mode: s["mode"] as? String ?? "",
+                                       transports: ts)
+        } else {
+            let direct = p.transport == "direct"
+            let t = direct ? OpenFluxShare.Transport(type: "direct", priority: 100, dial: p.address)
+                           : OpenFluxShare.Transport(type: p.transport, url: p.address)
+            cfg = OpenFluxShare.Config(name: p.name, negotiate: direct, codec: (e["codec"] as? String) == "legacy" ? "legacy" : "",
+                                       secret: p.uuidOrPassword, transports: [t])
+        }
+        return try? OpenFluxShare.encode(cfg)
     }
 
     /// .conf WireGuard/AmneziaWG из профиля (для ссылки wireguard:// и экспорта).

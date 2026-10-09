@@ -23,6 +23,8 @@ object ImportDetector {
         data class SubscriptionUrl(val url: String, val nameHint: String) : Result
         data class Servers(val profiles: List<ServerProfile>) : Result
         data class Unsupported(val reason: Reason) : Result
+        /** Ссылка `openflux://v1/…` не годится: [code] — код ошибки ядра (`damaged`, `short_secret`, …) или `stream_unsupported`. */
+        data class OpenFluxError(val code: String) : Result
         data object Empty : Result
     }
 
@@ -54,6 +56,10 @@ object ImportDetector {
             LinkParser.parseSubscription(text)
         }
         if (profiles.isNotEmpty()) return Result.Servers(profiles)
+
+        text.lineSequence().map { it.trim() }.firstNotNullOfOrNull { l ->
+            if (l.startsWith("openflux://", ignoreCase = true)) OpenFluxLink.errorCode(l) else null
+        }?.let { return Result.OpenFluxError(it) }
 
         return Result.Unsupported(Reason.UNKNOWN)
     }

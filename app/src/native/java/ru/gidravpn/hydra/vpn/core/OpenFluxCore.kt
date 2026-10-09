@@ -2,6 +2,7 @@ package ru.gidravpn.hydra.vpn.core
 
 import android.content.Context
 import ru.gidravpn.hydra.data.model.ServerProfile
+import ru.gidravpn.hydra.data.subscription.OpenFluxArgs
 import java.io.File
 
 /**
@@ -22,30 +23,7 @@ class OpenFluxCore : SocksBridgeCore() {
     override val buildScript = "scripts/build-openflux.sh"
 
     override fun prepare(ctx: Context, profile: ServerProfile, secrets: MutableList<File>): List<String> {
-        val extra = runCatching { org.json.JSONObject(profile.extra) }.getOrDefault(org.json.JSONObject())
-        val transport = profile.transport
-        return buildList {
-            add("--role"); add("client")
-            add("--inbound"); add("socks5")
-            add("--socks5"); add("127.0.0.1:$socksPort")
-            when {
-                // Обычный TCP до своего exit-узла: у апстрима это режим нескольких транспортов, ключ обязателен.
-                transport == "direct" -> { add("--transports"); add("direct:100"); add("--direct-dial"); add(profile.address) }
-                transport == "oneme" -> {
-                    add("--transport"); add(transport)
-                    add("--maxToken"); add(extra.optString("maxToken"))
-                    add("--maxUid"); add(extra.optString("maxUid"))
-                }
-                else -> {
-                    add("--transport"); add(transport)
-                    if (profile.address.isNotEmpty()) { add("--url"); add(profile.address) }
-                }
-            }
-            extra.optString("codec").takeIf { it == "legacy" }?.let { add("--codec"); add(it) }
-            if (profile.uuidOrPassword.isNotEmpty()) {
-                val key = secretFile(ctx, "openflux.key", profile.uuidOrPassword, secrets)
-                add("--encryption-key-file"); add(key.path)
-            }
-        }
+        val key = if (profile.uuidOrPassword.isNotEmpty()) secretFile(ctx, "openflux.key", profile.uuidOrPassword, secrets).path else null
+        return OpenFluxArgs.build(profile, socksPort, key)
     }
 }
