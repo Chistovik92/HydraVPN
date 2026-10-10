@@ -34,10 +34,11 @@
 │    ├─ XrayCore      (native, libXray.aar + tun2socks)       │
 │    ├─ AmneziaWgCore (native, amneziawg-go.aar)              │
 │    ├─ SstpCore / L2tpCore (native, userspace PPP)           │
-│    ├─ PptpCore      (native, честный отказ GRE)             │
+│    ├─ PptpCore      (native, PPP + GRE через root-помощник) │
 │    ├─ WdttCore / OlcRtcCore (native, BETA-каркасы)          │
 │    └─ NoopCore      (flavor stub — симуляция)               │
-│  vpn/ppp: Md4, MsChapV2, Ppp, PppSession, TunBridge (SNAT) │
+│  vpn/ppp: Md4, MsChapV2, Ppp, PppSession (+CCP/MPPE), TunBridge │
+│  vpn/pptp (из :shared): PptpProtocol, Mppe, PptpClient      │
 │  VpnState — общая шина состояния (StateFlow)                │
 └───────────────────────────────────────────────────────────┘
 ```
@@ -68,8 +69,8 @@ fd. Для Xray/olcRTC нужен мост tun2socks. Для PPP-ядер `TunBr
 
 **Userspace-PPP вместо системных стеков.** L2TP/SSTP реализованы на Kotlin:
 не нужен root, нет зависимости от удалённых системных стеков Android.
-PPTP невозможен принципиально (GRE → raw-сокеты) — ядро сообщает об этом
-честно. Transport-сокеты выносятся из-под VPN через `SocketGuard.protect()`.
+PPTP (0.7.19) требует raw-сокета для GRE: на Android он открывается root-помощником
+(`GreRelay`), без root ядро сообщает причину; на Windows — встроенный RAS. Transport-сокеты выносятся из-под VPN через `SocketGuard.protect()`.
 
 **Раздельное туннелирование.** `SplitTunnelRepository` (DataStore) → правила
 `addAllowed/addDisallowedApplication` в `establishTun()`. Применяется при

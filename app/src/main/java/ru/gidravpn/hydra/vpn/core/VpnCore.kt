@@ -20,7 +20,7 @@ data class TrafficStats(val downBytes: Long = 0, val upBytes: Long = 0)
  *  - XrayCore    (native, libXray.aar) — альтернативный движок Xray
  *  - AmneziaWgCore (native, amneziawg-go.aar)
  *  - SstpCore / L2tpCore (native, userspace PPP на Kotlin — без .aar)
- *  - PptpCore    (native) — честный отказ (GRE → root)
+ *  - PptpCore    (native) — PPP/GRE через root-помощника (0.7.19)
  *  - NoopCore    (stub)   — симуляция для разработки/CI
  */
 interface VpnCore {

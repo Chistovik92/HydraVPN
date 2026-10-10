@@ -1,0 +1,1 @@
+0.7.19 - PPTP (GRE + MPPE): на Android нужен root (GRE идёт через root-помощника), на Windows - встроенный клиент RAS. PPTP слабо защищён - лучше SSTP или WireGuard.

@@ -77,7 +77,7 @@
 
 | Протокол | Ограничение | Что предлагать пользователю |
 |---|---|---|
-| PPTP | GRE требует root; стек удалён из Android 12/13 | SSTP / L2TP / WireGuard |
+| PPTP | Android — только с root (GRE через `su`), iOS/Linux/macOS — нет, Windows — встроенный RAS; MS-CHAPv2 и MPPE/RC4 слабы | SSTP / WireGuard |
 | L2TP+IPsec | ESP недоступен в userspace | SSTP (TLS) или AWG |
 | SSTP+PAP | Нет crypto-binding (PAP не даёт CMK) | MS-CHAPv2 |
 | WDTT | Не интегрирован (обход VK-капчи) | AmneziaWG / WireGuard на своём сервере |

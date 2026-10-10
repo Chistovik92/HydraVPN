@@ -17,7 +17,7 @@ import ru.gidravpn.hydra.data.repository.EngineRepository
  *  - AWG — amneziawg-go.aar;
  *  - XRAY — libXray.aar + sing-box как tun2socks-мост (опционально, см. ниже);
  *  - WDTT — libclient.so (beta), OLCRTC — olcrtc.aar + tun2socks (beta);
- *  - UNAVAILABLE (PPTP) — PptpCore с честным отказом.
+ *  - PPTP (USERSPACE) — PptpCore: PPP + GRE через root-помощника.
  * tun-дескриптор передаётся в VpnCore.start(), поэтому фабрике он не нужен.
  */
 class NativeCoreFactory : CoreFactory {

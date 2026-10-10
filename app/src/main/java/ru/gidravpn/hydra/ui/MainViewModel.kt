@@ -554,7 +554,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         tunnelStartedAt = android.os.SystemClock.elapsedRealtime()
         val ctx = getApplication<Application>()
 
-        // PPTP честно недоступен: GRE требует root, стек удалён из Android 12/13.
+        // Протоколы с Engine.UNAVAILABLE (сейчас таких нет) не запускаем. PPTP идёт через PptpCore (нужен root).
         if (server.protocol?.engine == Engine.UNAVAILABLE) {
             VpnState.log("${server.protocol?.displayName}: протокол недоступен на Android — используйте SSTP/L2TP/WireGuard")
             return
