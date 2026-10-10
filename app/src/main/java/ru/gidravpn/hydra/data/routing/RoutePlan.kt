@@ -34,6 +34,9 @@ object RouteTarget {
     const val PROXY = "proxy"
     const val DIRECT = "direct"
     const val DPI = "dpi"
+    /** «Telegram через WebSocket» (0.7.14): локальный SOCKS5 [ru.gidravpn.hydra.data.tgws.TgWsProxy]. */
+    const val TGWS = "tgws"
+    const val TGWS_PORT = 10881
     const val BLOCK = "block"
     private const val NODE_PREFIX = "node-"
     private const val GROUP_PREFIX = "grp-"
@@ -84,6 +87,16 @@ data class RoutePlan(
         get() = dpi.enabled || proxyVia == RouteTarget.DPI || rules.any { it.target == RouteTarget.DPI } ||
             nodes.any { it.via == RouteTarget.DPI } || groups.any { RouteTarget.DPI in it.members }
 
+    /** Нужен ли локальный TG WS: правило, группа или узел с выходом «tgws». */
+    val needsTgWs
+        get() = rules.any { it.target == RouteTarget.TGWS } || groups.any { RouteTarget.TGWS in it.members }
+
+    /** План без TG WS: если он не запустился (порт занят), соединение всё равно поднимается. */
+    fun withoutTgWs() = copy(
+        rules = rules.filter { it.target != RouteTarget.TGWS },
+        groups = groups.map { g -> g.copy(members = g.members.filter { it != RouteTarget.TGWS }) },
+    )
+
     /** План без всего, что опирается на ByeDPI: если он не запустился, соединение всё равно поднимается. */
     fun withoutDpi() = copy(
         dpi = dpi.copy(enabled = false),
@@ -117,6 +130,7 @@ object RoutePlanApplier {
         fun addOutbound(o: JSONObject) { if (tags.add(o.getString("tag"))) outbounds.put(o) }
 
         if (plan.needsDpi) addOutbound(dpiOutbound(plan.dpi.port))
+        if (plan.needsTgWs) addOutbound(tgWsOutbound())
         plan.nodes.forEach { addOutbound(it.outbound) }
 
         // Цепочки: «выход → через выход». У основного сервера и у каждого узла своя; глубина любая, петли отсекаются.
@@ -264,6 +278,10 @@ object RoutePlanApplier {
         }
         return false
     }
+
+    fun tgWsOutbound(port: Int = RouteTarget.TGWS_PORT): JSONObject = JSONObject()
+        .put("type", "socks").put("tag", RouteTarget.TGWS)
+        .put("server", "127.0.0.1").put("server_port", port).put("version", "5")
 
     fun dpiOutbound(port: Int): JSONObject = JSONObject()
         .put("type", "socks").put("tag", RouteTarget.DPI)

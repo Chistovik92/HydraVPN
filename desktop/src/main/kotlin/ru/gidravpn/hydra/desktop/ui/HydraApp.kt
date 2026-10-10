@@ -363,7 +363,7 @@ private fun ServerRow(c: AppController, ui: UiState, s: ServerProfile, onDelete:
         }
         Text(
             when {
-                s.pingMs == -2 -> "нет ответа"
+                s.pingMs == -2 -> "недоступно"
                 s.pingMs >= 0 -> "${s.pingMs} мс"
                 else -> ""
             },

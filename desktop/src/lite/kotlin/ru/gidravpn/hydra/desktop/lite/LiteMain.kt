@@ -80,6 +80,8 @@ private fun start(args: Array<String>) {
                 last = res
                 runCatching { AppController::class.java.getResourceAsStream(res)?.use { ImageIO.read(it) } }
                     .getOrNull()?.let { window.iconImage = it }
+                val ic = u.data.settings.appIcon; val th = u.data.settings.theme
+                Thread { runCatching { ru.gidravpn.hydra.desktop.core.LauncherIcon.apply(ic, th) } }.apply { isDaemon = true }.start()
             }
         }
     }

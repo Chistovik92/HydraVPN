@@ -494,7 +494,10 @@ private fun ServerRow(
                 if (engineOff) {
                     Text(stringResource(R.string.srv_engine_off), color = PingSlow, fontSize = 11.sp)
                 } else {
-                    Text(
+                    if (!measuring && s.pingMs == ru.gidravpn.hydra.data.net.PingMeasurer.UNREACHABLE) {
+                        // Замер прошёл, а сервер не ответил: красная надпись, не кнопка (перемерить — из меню «⋮»).
+                        Text(stringResource(R.string.servers_unreachable), color = Danger, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    } else Text(
                         when {
                             measuring -> stringResource(R.string.servers_measuring)
                             s.pingMs >= 0 -> stringResource(R.string.servers_ping_ms, s.pingMs)

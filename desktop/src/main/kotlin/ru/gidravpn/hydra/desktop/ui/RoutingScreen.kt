@@ -22,6 +22,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Tab
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,55 +55,79 @@ import java.io.File
  * по приложениям (здесь — по процессам/программам), по сайтам и IP, по странам и
  * профили маршрутизации.
  */
+private enum class RouteTab(val title: String) { PROGRAMS("Программы"), SITES("Сайты и IP"), DPI("Обход DPI"), EXITS("Выходы"), MORE("Страны и профили") }
+
+/**
+ * «Маршрутизация» (0.7.14): одно место вместо длинной простыни. Пять вкладок — по вопросу на каждую: какие программы идут через VPN
+ * и куда, что делать с сайтами и адресами, как обойти блокировки, какие бывают выходы, страны/geo-базы/профили.
+ */
 @Composable
 internal fun RoutingScreen(c: AppController, ui: UiState) {
     val s = ui.data.settings
     val r = s.routing
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { Header("Маршрутизация") {} }
-        if (ui.active) item { Text("Изменения применятся при следующем подключении.", color = Warn, fontSize = 13.sp) }
-
-        item { ProfilesSection(c, ui) }
-
-        item {
-            Section("По приложениям") {
-                Text(
-                    "Какие программы идут через VPN. Укажите имя процесса (chrome.exe, firefox, Telegram) или полный путь к программе. " +
-                        if (s.mode == ConnectionMode.PROXY) "В режиме «Системный прокси» правило действует только для программ, которые сами ходят через прокси; " +
-                            "для всех программ выберите режим TUN." else "В режиме TUN правило действует для всего трафика программы.",
-                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                SplitModeChips(r.appMode, "Все программы через VPN", "Только выбранные через VPN", "Выбранные — мимо VPN") { c.setAppMode(it) }
-                if (r.appMode != SplitTunnelMode.OFF) {
-                    AppsEditor(c, r.apps)
-                    if (r.apps.isEmpty()) Text("Список пуст — правило не действует.", color = Warn, fontSize = 12.sp)
+    var tab by remember { mutableStateOf(RouteTab.PROGRAMS) }
+    Column {
+        Header("Маршрутизация") {}
+        Text("Что идёт через VPN, что мимо него и что получает особый выход. Пять вкладок — по одному вопросу на каждую.",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
+        if (ui.active) Text("Изменения применятся при следующем подключении.", color = Warn, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
+        ScrollableTabRow(selectedTabIndex = tab.ordinal, edgePadding = 0.dp) {
+            RouteTab.entries.forEach { t -> Tab(selected = tab == t, onClick = { tab = t }, text = { Text(t.title) }) }
+        }
+        Spacer(Modifier.height(12.dp))
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            when (tab) {
+                RouteTab.PROGRAMS -> {
+                    item {
+                        Section("Какие программы идут через VPN") {
+                            Text(
+                                "Основной переключатель: все, только отмеченные или все, кроме отмеченных. Укажите имя процесса (chrome.exe, firefox, Telegram) или полный путь. " +
+                                    if (s.mode == ConnectionMode.PROXY) "В режиме «Системный прокси» правило действует только для программ, которые сами ходят через прокси; " +
+                                        "для всех программ выберите режим TUN." else "В режиме TUN правило действует для всего трафика программы.",
+                                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            SplitModeDrop("Режим", r.appMode, "Все программы через VPN", "Только выбранные через VPN", "Выбранные — мимо VPN") { c.setAppMode(it) }
+                            if (r.appMode != SplitTunnelMode.OFF) {
+                                AppsEditor(c, r.apps)
+                                if (r.apps.isEmpty()) Text("Список пуст — правило не действует.", color = Warn, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                    programRulesItems(c, ui)
+                }
+                RouteTab.SITES -> {
+                    item {
+                        Section("Какие сайты и адреса идут через VPN") {
+                            Text("Домены (youtube.com — вместе с поддоменами), ключевые слова и IP/подсети. Работает в обоих режимах и с обоими движками.",
+                                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            SplitModeDrop("Режим", r.netMode, "Выключено", "Только эти — через VPN", "Эти — мимо VPN") { c.setNetMode(it) }
+                            if (r.netMode != SplitTunnelMode.OFF) NetRulesEditor(c, ui)
+                        }
+                    }
+                    sitesRulesItems(c, ui)
+                }
+                RouteTab.DPI -> dpiItems(c, ui)
+                RouteTab.EXITS -> {
+                    item {
+                        Text("Выход — это то, откуда трафик выходит в сеть: VPN, напрямую, обход DPI, Telegram по WebSocket или любой сервер. Здесь собираются группы выходов и цепочки серверов.",
+                            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    exitsItems(c, ui)
+                }
+                RouteTab.MORE -> {
+                    item { GeoSection(c, ui) }
+                    geoLayerItems(c, ui)
+                    item { ProfilesSection(c, ui) }
                 }
             }
         }
-
-        item {
-            Section("По сайтам и IP-адресам") {
-                Text(
-                    "Домены (youtube.com — вместе с поддоменами), ключевые слова и IP/подсети. Работает в обоих режимах и с обоими движками.",
-                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                SplitModeChips(r.netMode, "Выключено", "Только эти — через VPN", "Эти — мимо VPN") { c.setNetMode(it) }
-                if (r.netMode != SplitTunnelMode.OFF) NetRulesEditor(c, ui)
-            }
-        }
-
-        item { GeoSection(c, ui) }
-        dpiRoutesItems(c, ui)
     }
 }
 
 @Composable
-private fun SplitModeChips(mode: SplitTunnelMode, off: String, include: String, exclude: String, onChange: (SplitTunnelMode) -> Unit) {
-    ChipRow {
-        listOf(SplitTunnelMode.OFF to off, SplitTunnelMode.INCLUDE to include, SplitTunnelMode.EXCLUDE to exclude).forEach { (m, label) ->
-            FilterChip(selected = mode == m, onClick = { onChange(m) }, label = { Text(label) })
-        }
-    }
+private fun SplitModeDrop(label: String, mode: SplitTunnelMode, off: String, include: String, exclude: String, onChange: (SplitTunnelMode) -> Unit) {
+    val opts = listOf(SplitTunnelMode.OFF to off, SplitTunnelMode.INCLUDE to include, SplitTunnelMode.EXCLUDE to exclude)
+    DropField(label, opts.first { it.first == mode }.second, opts, onChange, selected = mode)
 }
 
 @Composable
@@ -172,9 +200,7 @@ private fun NetRulesEditor(c: AppController, ui: UiState) {
     var type by remember { mutableStateOf<NetRuleType?>(null) }
     val types = listOf(null to "Авто", NetRuleType.DOMAIN_SUFFIX to "Домен + поддомены", NetRuleType.DOMAIN to "Точный домен",
         NetRuleType.DOMAIN_KEYWORD to "Слово в домене", NetRuleType.IP_CIDR to "IP / подсеть")
-    ChipRow {
-        types.forEach { (t, label) -> FilterChip(selected = type == t, onClick = { type = t }, label = { Text(label, fontSize = 12.sp) }) }
-    }
+    DropField("Тип", types.first { it.first == type }.second, types, { type = it }, selected = type)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(input, { input = it }, Modifier.weight(1f), singleLine = true,
             label = { Text("youtube.com, 8.8.8.8, 10.0.0.0/8 … (можно несколько через пробел или запятую)") })
@@ -209,10 +235,8 @@ private fun GeoSection(c: AppController, ui: UiState) {
     }
     Section("По странам (geoip/geosite)") {
         if (geoDir == null) { Text("Базы geo не найдены в пакете — функция недоступна.", color = Warn, fontSize = 13.sp); return@Section }
-        ChipRow {
-            listOf(GeoRoutingMode.OFF to "Выключено", GeoRoutingMode.DIRECT to "Эти страны — мимо VPN", GeoRoutingMode.VIA_PROXY to "Только эти страны — через VPN")
-                .forEach { (m, label) -> FilterChip(selected = r.geoMode == m, onClick = { c.updateRouting { it.copy(geoMode = m) } }, label = { Text(label) }) }
-        }
+        val geoOpts = listOf(GeoRoutingMode.OFF to "Выключено", GeoRoutingMode.DIRECT to "Эти страны — мимо VPN", GeoRoutingMode.VIA_PROXY to "Только эти страны — через VPN")
+        DropField("Режим", geoOpts.first { it.first == r.geoMode }.second, geoOpts, { m -> c.updateRouting { it.copy(geoMode = m) } }, selected = r.geoMode)
         if (r.geoMode == GeoRoutingMode.OFF) return@Section
         Text(
             if (r.geoCountries.isEmpty()) "Страны не выбраны" else r.geoCountries.sorted().joinToString(", ") { countryName(it) },

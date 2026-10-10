@@ -948,6 +948,18 @@ class AppController(
                 extras += Sidecar("ByeDPI", exe, DpiArgs.build(plan.dpi.strategy, plan.dpi.port), plan.dpi.port, readyTimeoutMs = 8_000)
             }
         }
+        if (plan.needsTgWs) {
+            // 0.7.14: Telegram через WebSocket — внутри процесса Hydra (он исключён из tun наравне с ядрами-подпроцессами).
+            val tg = ru.gidravpn.hydra.data.tgws.TgWsProxy(log = { appendLog(it) })
+            try {
+                tg.start(RouteTarget.TGWS_PORT)
+                runner.attachInProcess(AutoCloseable { tg.stop() })
+            } catch (e: Exception) {
+                appendLog("TG WS: не запущен (${e.message}) — продолжаем без него")
+                tg.stop()
+                plan = plan.withoutTgWs()
+            }
+        }
         return plan
     }
 
@@ -1000,6 +1012,15 @@ class AppController(
             )
         }
         updateGeo(manual = true)
+    }
+
+    /** Пресет «Telegram через WebSocket» (0.7.14): подсети Telegram → выход «tgws»; повторное нажатие снимает. */
+    fun toggleTgWsPreset() {
+        val rules = ru.gidravpn.hydra.data.tgws.TgWsPreset.rules()
+        updateRoutes { c ->
+            if (ru.gidravpn.hydra.data.tgws.TgWsPreset.isApplied(c.rules)) c.copy(rules = c.rules - rules.toSet())
+            else c.copy(rules = (c.rules + rules).distinct().take(Rules.MAX_RULES))
+        }
     }
 
     fun rollbackGeo(kind: GeoKind, name: String) {

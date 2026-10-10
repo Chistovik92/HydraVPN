@@ -1,6 +1,8 @@
 package ru.gidravpn.hydra.desktop.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -57,6 +59,43 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { Header("Настройки") {} }
         if (ui.active) item { Text("Изменения применятся при следующем подключении.", color = Warn, fontSize = 13.sp) }
+
+        item {
+            // 0.7.9: темы и иконки как в Android-приложении.
+            Section("Оформление") {
+                Text("Тема", fontSize = 13.sp)
+                ChipRow {
+                    AppTheme.entries.forEach { t ->
+                        FilterChip(selected = s.theme == t, onClick = { c.updateSettings { it.copy(theme = t) } },
+                            label = { Text(t.title) })
+                    }
+                }
+                Text(s.theme.description, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Иконка окна, панели задач и трея", fontSize = 13.sp)
+                // 0.7.14: настоящие миниатюры вместо подписей — видно, что выбираешь.
+                ChipRow {
+                    AppIcon.entries.filter { it != AppIcon.FOLLOW_THEME }.forEach { i ->
+                        val on = s.appIcon == i
+                        androidx.compose.foundation.layout.Column(
+                            Modifier.clickable { c.updateSettings { it.copy(appIcon = i) } }.padding(4.dp),
+                            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                        ) {
+                            androidx.compose.foundation.Image(
+                                androidx.compose.ui.res.painterResource(i.resource(s.theme).removePrefix("/")), i.title,
+                                Modifier.size(64.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                                    .border(2.dp, if (on) Accent else androidx.compose.ui.graphics.Color.Transparent, androidx.compose.foundation.shape.RoundedCornerShape(14.dp)),
+                            )
+                            Text(i.title.substringBefore(" ("), fontSize = 11.sp, color = if (on) Accent else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    FilterChip(selected = s.appIcon == AppIcon.FOLLOW_THEME, onClick = { c.updateSettings { it.copy(appIcon = AppIcon.FOLLOW_THEME) } },
+                        label = { Text(AppIcon.FOLLOW_THEME.title) })
+                }
+                Text("Выбор меняет окно, панель задач и трей сразу; ярлыки на рабочем столе, в «Пуске» (Windows) и в меню приложений (Linux) обновляются сами. Закреплённый на панели задач значок Windows хранит сам — открепите и закрепите заново.",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
 
         item {
             Section("Режим подключения") {
@@ -170,29 +209,6 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
         }
 
         item { BackupSection(c, ui) }
-
-        item {
-            // 0.7.9: темы и иконки как в Android-приложении.
-            Section("Оформление") {
-                Text("Тема", fontSize = 13.sp)
-                ChipRow {
-                    AppTheme.entries.forEach { t ->
-                        FilterChip(selected = s.theme == t, onClick = { c.updateSettings { it.copy(theme = t) } },
-                            label = { Text(t.title) })
-                    }
-                }
-                Text(s.theme.description, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Иконка окна, панели задач и трея", fontSize = 13.sp)
-                ChipRow {
-                    AppIcon.entries.forEach { i ->
-                        FilterChip(selected = s.appIcon == i, onClick = { c.updateSettings { it.copy(appIcon = i) } },
-                            label = { Text(i.title) })
-                    }
-                }
-                Text("Ярлык установщика и меню «Пуск» остаётся изумрудным — его рисует система при установке.",
-                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
 
         item {
             Section("О программе") {
