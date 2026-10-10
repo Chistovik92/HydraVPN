@@ -80,6 +80,8 @@ object LinkParser {
         val extra = JSONObject().apply {
             q["pbk"]?.let { put("reality_pbk", it) }
             q["sid"]?.let { put("reality_sid", it) }
+            q["host"]?.takeIf { it.isNotBlank() }?.let { put("ws_host", it) }
+            if (insecureFlag(q)) put("insecure", true)
         }
         return ServerProfile(
             name = tag(uri) ?: "VLESS ${uri.host}",
@@ -113,6 +115,10 @@ object LinkParser {
             transportPath = q["path"] ?: q["serviceName"].orEmpty(),
             security = q["security"] ?: "tls",
             alpn = q["alpn"].orEmpty(),
+            extra = JSONObject().apply {
+                q["host"]?.takeIf { it.isNotBlank() }?.let { put("ws_host", it) }
+                if (insecureFlag(q)) put("insecure", true)
+            }.toString(),
         )
     }
 
@@ -130,7 +136,8 @@ object LinkParser {
             transportPath = json.optString("path"),
             security = if (json.optString("tls") == "tls") "tls" else "none",
             alpn = json.optString("alpn"),
-            extra = JSONObject().put("aid", json.optInt("aid", 0)).toString(),
+            extra = JSONObject().put("aid", json.optInt("aid", 0))
+                .apply { json.optString("host").takeIf { it.isNotBlank() }?.let { put("ws_host", it) } }.toString(),
         )
     }
 
@@ -164,6 +171,7 @@ object LinkParser {
             extra = JSONObject().apply {
                 q["obfs"]?.let { put("obfs", it) }
                 q["obfs-password"]?.let { put("obfs_password", it) }
+                if (insecureFlag(q)) put("insecure", true)
             }.toString(),
         )
     }
@@ -187,11 +195,15 @@ object LinkParser {
             extra = JSONObject().apply {
                 put("password", pass)
                 put("congestion_control", q["congestion_control"] ?: "bbr")
+                if (insecureFlag(q)) put("insecure", true)
             }.toString(),
         )
     }
 
     // ----- helpers -----
+    private fun insecureFlag(q: Map<String, String>) =
+        listOf("insecure", "allowInsecure", "allow_insecure").any { q[it] == "1" || q[it].equals("true", true) }
+
     private fun Uri.queryMap(): Map<String, String> =
         queryParameterNames.associateWith { getQueryParameter(it).orEmpty() }
 

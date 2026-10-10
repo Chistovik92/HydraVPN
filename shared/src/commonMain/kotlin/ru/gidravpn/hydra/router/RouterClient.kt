@@ -258,6 +258,9 @@ class RouterClient(val link: RouterLink, private val timeoutMs: Int = 10_000) {
                 throw RouterException(code, msg)
             }
             return text
+        } catch (e: java.net.UnknownServiceException) {
+            // Android запрещает http без TLS (network_security_config): вместо «CLEARTEXT communication not permitted» — понятная причина.
+            throw RouterException(0, "система запрещает соединение без TLS — включите api_tls_cert/api_tls_key на роутере и добавьте его заново по новой ссылке")
         } finally {
             conn.disconnect()
         }
