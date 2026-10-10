@@ -182,8 +182,9 @@ class AppController(
     }
 
     /** Вызывается из main после построения окна: автоподключение при запуске (как на Android). */
-    fun onStartup() {
-        if (_ui.value.data.settings.autoConnect && _ui.value.selected != null) connect()
+    fun onStartup(reconnect: Boolean = false) {
+        // reconnect — запуск после «Перезапустить от администратора» (0.7.16): соединение, которое было, поднимается снова.
+        if ((reconnect || _ui.value.data.settings.autoConnect) && _ui.value.selected != null) connect()
     }
 
     // ------------------------------------------------------------------ данные
@@ -716,7 +717,7 @@ class AppController(
                     _ui.update { it.copy(upSpeed = up, downSpeed = down, upTotal = it.upTotal + up, downTotal = it.downTotal + down) }
                 }
             }
-            if (settings.mode == ConnectionMode.PROXY && settings.setSystemProxy) {
+            if (session == sessionId && settings.mode == ConnectionMode.PROXY && settings.setSystemProxy) {
                 SystemProxy.enable(settings.proxyPort).onFailure { toast("Системный прокси не установлен: ${it.message}") }
             }
             _ui.update { it.copy(blocked = false) }
@@ -734,7 +735,7 @@ class AppController(
             extras.forEach { sc -> sc.secrets.forEach { runCatching { it.delete() } } }
             if (session == sessionId) {
                 if (!keepBlocked(settings)) SystemProxy.restore()
-                _ui.update { it.copy(status = Status.ERROR, statusText = e.message ?: e.toString(), connectedId = null) }
+                _ui.update { it.copy(status = Status.ERROR, statusText = e.message ?: e.toString(), connectedId = null, blocked = keepBlocked(settings)) }
             }
         }
     }
@@ -805,7 +806,8 @@ class AppController(
 
     fun disconnect() {
         val st = _ui.value
-        if (!st.active && !st.blocked) return
+        // 0.7.16: и с «зависшим» прокси (kill switch после сбоя запуска) — иначе его нельзя было снять, пока не выйдешь из Hydra.
+        if (!st.active && !st.blocked && !SystemProxy.engaged) return
         userStopped = true
         session++
         _ui.update { it.copy(status = Status.STOPPING, statusText = "Отключение…") }
@@ -860,7 +862,27 @@ class AppController(
         }
     }
 
-    fun relaunchAsAdmin(): Boolean = ru.gidravpn.hydra.desktop.core.Elevation.relaunchAsAdmin()
+    /** Windows: можно перезапустить Hydra от имени администратора (для TUN обязательно, для прокси — по желанию). */
+    val elevationAvailable: Boolean get() = ru.gidravpn.hydra.desktop.core.Elevation.canRelaunch
+    val isElevated: Boolean get() = ru.gidravpn.hydra.desktop.core.Elevation.admin
+
+    /**
+     * Перезапуск от администратора (0.7.16). Сначала запрос UAC — и только после согласия останавливаем ядра и выходим:
+     * отказ (или ошибка запуска) ничего не ломает. Раньше ядра гасились до запроса, а при отказе окно оставалось
+     * «Подключено» с мёртвым ядром; к тому же запрос шёл в потоке интерфейса и вешал окно.
+     */
+    fun relaunchElevated() {
+        if (!elevationAvailable) return toast("Перезапуск от администратора есть только в Windows")
+        if (isElevated) return toast("Hydra уже запущена от администратора")
+        toast("Подтвердите запрос Windows (UAC)…")
+        val wasActive = _ui.value.active
+        scope.launch(Dispatchers.IO) {
+            if (ru.gidravpn.hydra.desktop.core.Elevation.relaunchAsAdmin(wasActive)) {
+                shutdown()
+                quitHandler?.invoke()
+            } else toast("Запрос прав администратора отклонён")
+        }
+    }
 
     /** Синхронно: вызывается при выходе из приложения. */
     fun shutdown() {

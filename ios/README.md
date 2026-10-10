@@ -1,4 +1,4 @@
-# Hydra для iOS (состояние на 0.7.15)
+# Hydra для iOS (состояние на 0.7.16; iOS в 0.7.16 не менялся)
 
 Нативный клиент на SwiftUI с ядром sing-box в Network Extension — тот же подход, что у
 официального клиента sing-box для Apple. Стратегия и почему не Kotlin Multiplatform сейчас —

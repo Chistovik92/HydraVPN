@@ -61,7 +61,7 @@ fun main(args: Array<String>) {
         LaunchedEffect(Unit) {
             Runtime.getRuntime().addShutdownHook(Thread { controller.shutdown() })
             controller.quitHandler = ::quit
-            controller.onStartup()
+            controller.onStartup(ru.gidravpn.hydra.desktop.core.Elevation.RECONNECT_ARG in args)
         }
 
         Window(
@@ -75,15 +75,7 @@ fun main(args: Array<String>) {
             state = rememberWindowState(size = DpSize(980.dp, 680.dp)),
         ) {
             window.minimumSize = java.awt.Dimension(820, 560)
-            HydraApp(controller, ui, onRelaunchAdmin = {
-                controller.shutdown()
-                SingleInstance.release()
-                if (controller.relaunchAsAdmin()) exitApplication()
-                else {
-                    SingleInstance.acquire()
-                    controller.toast("Запрос прав администратора отклонён")
-                }
-            })
+            HydraApp(controller, ui, onRelaunchAdmin = { controller.relaunchElevated() })
         }
     }
 }

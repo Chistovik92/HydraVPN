@@ -1,0 +1,1 @@
+0.7.16: desktop system proxy is removed on disconnect in any state, lossless rollback; run as administrator in any mode (Windows). 0.7.15: DPI-bypass probe settings like ByeByeDPI, "Connect Telegram to proxy" button.

@@ -58,15 +58,7 @@ private fun start(args: Array<String>) {
     }, onQuit = ::quit)
     val trayOk = tray.install()
 
-    window = LiteWindow(controller, scope, image, onRelaunchAdmin = {
-        controller.shutdown()
-        SingleInstance.release()
-        if (controller.relaunchAsAdmin()) exitProcess(0)
-        else {
-            SingleInstance.acquire()
-            controller.toast("Запрос прав администратора отклонён")
-        }
-    }, onClose = {
+    window = LiteWindow(controller, scope, image, onRelaunchAdmin = { controller.relaunchElevated() }, onClose = {
         // С активным VPN окно уходит в трей; без трея или без VPN — выход.
         if (trayOk && controller.ui.value.active) window.isVisible = false else quit()
     })
@@ -90,5 +82,5 @@ private fun start(args: Array<String>) {
     controller.quitHandler = ::quit
     // Автозапуск при входе в систему — сразу в трей (если трей есть).
     window.isVisible = !(trayOk && Autostart.MINIMIZED_ARG in args)
-    controller.onStartup()
+    controller.onStartup(ru.gidravpn.hydra.desktop.core.Elevation.RECONNECT_ARG in args)
 }

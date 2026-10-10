@@ -148,6 +148,16 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
             }
         }
 
+        if (c.elevationAvailable) item {
+            Section("Права администратора") {
+                Text(if (c.isElevated) "Hydra запущена от администратора." else "Hydra запущена с обычными правами.")
+                Text("Нужны для режима TUN; системному прокси не обязательны, но так Hydra сможет всё, что доступно администратору. " +
+                    "Подключение после перезапуска восстановится само (если включено «Подключаться при запуске»).",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedButton(onClick = { c.relaunchElevated() }, enabled = !c.isElevated) { Text("Перезапустить от администратора") }
+            }
+        }
+
         item { LanSection(c, ui) }
 
         item { BotAccountSection(c, ui) }

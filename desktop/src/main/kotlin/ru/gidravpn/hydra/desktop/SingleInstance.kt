@@ -8,10 +8,10 @@ internal object SingleInstance {
     fun acquire(): Boolean = runCatching {
         val f = java.io.File(Platform.runDir, "hydra.lock")
         val ch = java.io.RandomAccessFile(f, "rw").channel
-        // Несколько секунд ожидания: при перезапуске от администратора старый
-        // экземпляр ещё закрывается, когда стартует новый.
+        // Ожидание: при перезапуске от администратора старый экземпляр ещё останавливает ядра (до ~10 с),
+        // когда стартует новый.
         var l = ch.tryLock()
-        val deadline = System.currentTimeMillis() + 4000
+        val deadline = System.currentTimeMillis() + 15_000
         while (l == null && System.currentTimeMillis() < deadline) {
             Thread.sleep(200)
             l = ch.tryLock()

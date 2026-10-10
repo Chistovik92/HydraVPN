@@ -282,13 +282,32 @@ object Elevation {
         Native.load("shell32", Shell32Admin::class.java).IsUserAnAdmin()
     }.getOrDefault(false)
 
+    /** Результат [isAdmin] на время работы процесса (права не меняются), для интерфейса. */
+    val admin: Boolean by lazy { isAdmin() }
+
+    /**
+     * Целиком Hydra перезапускается от администратора только в Windows. На Linux и macOS права нужны одному ядру
+     * в режиме TUN и запрашиваются точечно (pkexec setcap, osascript); весь интерфейс под root сломал бы системный
+     * прокси (gsettings не достучится до сессии пользователя) и оставил бы в каталоге данных файлы root.
+     */
+    val canRelaunch: Boolean get() = Platform.os == Os.WINDOWS
+
     /** Запускает эту же программу с запросом UAC. true — запрос ушёл, текущий экземпляр можно закрыть. */
-    fun relaunchAsAdmin(): Boolean {
+    /** Аргумент нового экземпляра: подключиться сразу (прежнее соединение было активно). */
+    const val RECONNECT_ARG = "--reconnect"
+
+    fun relaunchAsAdmin(reconnect: Boolean = false): Boolean {
+        if (!canRelaunch) return false
+        return runCatching { relaunch(reconnect) }.getOrDefault(false)
+    }
+
+    private fun relaunch(reconnect: Boolean): Boolean {
         val info = ProcessHandle.current().info()
         // Classic (java -cp … по сценарию Hydra.vbs): повторно запускается сценарий, а не голая java без аргументов.
         val launcher = Platform.classicLauncher
         val cmd = if (launcher != null) "wscript.exe" else info.command().orElse(null) ?: return false
-        val args = if (launcher != null) arrayOf(launcher.absolutePath) else info.arguments().orElse(emptyArray())
+        val base = if (launcher != null) arrayOf(launcher.absolutePath) else info.arguments().orElse(emptyArray())
+        val args = if (reconnect && RECONNECT_ARG !in base) base + RECONNECT_ARG else base
         fun ps(s: String) = "'" + s.replace("'", "''") + "'"
         val argList = if (args.isEmpty()) "" else " -ArgumentList " + args.joinToString(",") { ps(if (' ' in it) "\"$it\"" else it) }
         val script = "Start-Process -FilePath ${ps(cmd)}$argList -Verb RunAs"
