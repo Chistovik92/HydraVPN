@@ -94,10 +94,14 @@
   SSTP/WireGuard.
 - Ссылка: `l2tp://user:pass@host:port#name` (параметр `tunnel_secret`).
 
-### PPTP — честно недоступно
-- Данные PPTP идут в **GRE** (IP-протокол 47) — требует raw-сокетов (root).
-- Системный стек PPTP удалён из Android 12/13.
-- UI сообщает правду вместо молчаливого отказа (`PptpCore`).
+### PPTP (0.7.19)
+- Управляющее соединение TCP 1723 + данные PPP в **GRE** (IP-протокол 47, «улучшенный» GRE с номерами и подтверждениями) + **MPPE** 128 бит поверх MS-CHAPv2.
+  Код общий для Android и ПК: `shared/.../vpn/pptp` (`PptpProtocol`, `Mppe`, `PptpClient`), PPP-часть (CCP/MPPE) - в `PppSession`.
+- GRE требует raw-сокета. **Android:** `RootGreTransport` запускает от root `GreRelay` (`su -c app_process`), тот открывает `socket(AF_INET, SOCK_RAW, 47)`,
+  помечает его сетью (SO_MARK = netId | 0x30000) и перекладывает кадры в приложение по локальному TCP (токен в первых 16 байтах). Без root - понятная ошибка.
+- **Windows:** встроенный RAS (`WindowsPptp`): `Add-VpnConnection -TunnelType Pptp -EncryptionLevel Required` + `rasdial`; весь трафик ОС, ядра Hydra не участвуют.
+- **iOS, Linux, macOS:** недоступно (расширение VPN iOS не умеет GRE; на Linux/macOS нет встроенного клиента).
+- Небезопасен: MS-CHAPv2 и RC4 взламываются. Без согласованного MPPE данные не пускаются (`mppe=off` в ссылке отключает шифрование).
 
 ### Как PPP вливается в tun
 - Туннель поднимается с адресом-заглушкой `172.19.0.1/28`; реальный IP

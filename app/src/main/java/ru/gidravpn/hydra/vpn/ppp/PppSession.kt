@@ -23,6 +23,8 @@ class PppSession(
     /** Сессия полностью поднята (IPCP закрыт). */
     private val onUp: (assignedIp: String, dns1: String?, dns2: String?) -> Unit = { _, _, _ -> },
     private val onDown: (reason: String) -> Unit = {},
+    /** PPTP: без согласованного MPPE (128 бит, RFC 3078) данные не пускаем - иначе трафик пошёл бы открытым. */
+    private val mppeRequired: Boolean = false,
 ) {
     enum class Phase { DEAD, LCP, AUTH, IPCP, OPEN }
 
@@ -60,6 +62,16 @@ class PppSession(
 
     private fun id(): Int = (nextId++) and 0xFF
 
+    // ----- MPPE (PPTP) -----
+    @Volatile private var mppe: ru.gidravpn.hydra.vpn.pptp.MppeSession? = null
+    private var ccpOurBits = ru.gidravpn.hydra.vpn.pptp.Mppe.BIT_128 or ru.gidravpn.hydra.vpn.pptp.Mppe.BIT_STATELESS
+    private var ccpPeerBits = 0
+    private var ccpOurAcked = false
+    private var ccpPeerAcked = false
+    @Volatile private var lastCcpTxMs = 0L
+    private var ccpRetries = 0
+    private var resetRequested = false
+
     // ----- Restart-таймер (RFC 1661 §4.6) и LCP Echo (7d) -----
     // Раньше ConfReq уходил ровно один раз: потерянный кадр = ожидание общего таймаута
     // транспорта без единой повторной попытки, а «мёртвый» сервер за открытым PPP
@@ -92,6 +104,10 @@ class PppSession(
     private fun tick() {
         if (closed.get()) return
         val now = System.currentTimeMillis()
+        if (mppeRequired && phase == Phase.IPCP && !ccpOurAcked && now - lastCcpTxMs >= RESTART_MS) {
+            if (++ccpRetries > MAX_CONFIGURE) { terminate("MPPE: сервер не ответил на согласование шифрования"); return }
+            onLog("PPP CCP: повтор ConfReq (${ccpRetries}/$MAX_CONFIGURE)"); sendCcpConfigRequest()
+        }
         when (phase) {
             Phase.LCP -> if (!lcpAcked && now - lastLcpTxMs >= RESTART_MS) {
                 if (++lcpRetries > MAX_CONFIGURE) terminate("LCP: сервер не ответил на Configure-Request")
@@ -127,12 +143,18 @@ class PppSession(
         lastRxMs = System.currentTimeMillis()
         echoMisses = 0
         val (proto, info) = Ppp.parseFrame(frame) ?: return
+        dispatch(proto, info)
+    }
+
+    private fun dispatch(proto: Int, info: ByteArray) {
         when (proto) {
+            Ppp.PROTO_COMP -> onMppeData(info)
             Ppp.PROTO_LCP -> onLcp(info)
             Ppp.PROTO_CHAP -> onChap(info)
             Ppp.PROTO_PAP -> onPap(info)
             Ppp.PROTO_IPCP -> onIpcp(info)
-            Ppp.PROTO_IP -> if (phase == Phase.OPEN) onIpPacket(info)
+            // Открытый IP при согласованном MPPE - подмена или сбой: не принимаем.
+            Ppp.PROTO_IP -> if (phase == Phase.OPEN && mppe == null) onIpPacket(info)
             Ppp.PROTO_CCP -> onCcp(info)
             else -> {
                 // Protocol-Reject для неизвестных
@@ -348,6 +370,10 @@ class PppSession(
     private fun startIpcp() {
         phase = Phase.IPCP
         sendIpcpConfigRequest()
+        if (mppeRequired) {
+            if (lastAuth == null) { terminate("MPPE требует аутентификации MS-CHAPv2"); return }
+            sendCcpConfigRequest()
+        }
     }
 
     private fun sendIpcpConfigRequest() {
@@ -392,7 +418,7 @@ class PppSession(
     }
 
     private fun maybeIpcpUp() {
-        if (ipcpAcked && peerIpcpAcked && phase == Phase.IPCP) {
+        if (ipcpAcked && peerIpcpAcked && phase == Phase.IPCP && (!mppeRequired || mppe != null)) {
             val ip = intToIp(requestedIp)
             if (ip == "0.0.0.0") {
                 onLog("PPP IPCP: сервер не назначил IP — разрыв")
@@ -406,27 +432,103 @@ class PppSession(
         }
     }
 
-    // ----- CCP (игнорируем: без MPPE) -----
+    // ----- CCP / MPPE -----
+
+    private fun sendCcpConfigRequest() {
+        lastCcpTxMs = System.currentTimeMillis()
+        val opt = Ppp.Option(ru.gidravpn.hydra.vpn.pptp.Mppe.CCP_OPTION, ru.gidravpn.hydra.vpn.pptp.Mppe.optionBytes(ccpOurBits))
+        sendFrame(Ppp.controlFrame(Ppp.PROTO_CCP, Ppp.CODE_CONF_REQ, id(), Ppp.encodeOptions(listOf(opt))))
+    }
 
     private fun onCcp(info: ByteArray) {
         val pkt = runCatching { Ppp.parseControl(info) }.getOrNull() ?: return
-        if (pkt.code == Ppp.CODE_CONF_REQ) {
-            // Reject на MPPE (опция 18): шифрование PPP не поддерживаем
-            val mppe = Ppp.parseOptions(pkt.data).filter { it.type == 18 }
-            if (mppe.isNotEmpty()) {
-                sendFrame(Ppp.controlFrame(Ppp.PROTO_CCP, Ppp.CODE_CONF_REJ, pkt.id, Ppp.encodeOptions(mppe)))
-                onLog("PPP CCP: MPPE отклонён (не поддерживается)")
-            } else {
+        val m = ru.gidravpn.hydra.vpn.pptp.Mppe
+        when (pkt.code) {
+            Ppp.CODE_CONF_REQ -> {
+                val opts = Ppp.parseOptions(pkt.data)
+                val mppeOpt = opts.firstOrNull { it.type == m.CCP_OPTION }
+                if (!mppeRequired) {
+                    // Шифрование не включено в профиле (SSTP/L2TP): MPPE отклоняем, остальное подтверждаем.
+                    if (mppeOpt != null) {
+                        sendFrame(Ppp.controlFrame(Ppp.PROTO_CCP, Ppp.CODE_CONF_REJ, pkt.id, Ppp.encodeOptions(listOf(mppeOpt))))
+                        onLog("PPP CCP: MPPE отклонён (не включён)")
+                    } else sendFrame(Ppp.controlFrame(Ppp.PROTO_CCP, Ppp.CODE_CONF_ACK, pkt.id, pkt.data))
+                    return
+                }
+                val others = opts.filter { it.type != m.CCP_OPTION }
+                if (others.isNotEmpty()) {
+                    sendFrame(Ppp.controlFrame(Ppp.PROTO_CCP, Ppp.CODE_CONF_REJ, pkt.id, Ppp.encodeOptions(others)))
+                    return
+                }
+                val bits = mppeOpt?.let { m.optionBits(it.value) }
+                if (bits == null) {
+                    val nak = Ppp.Option(m.CCP_OPTION, m.optionBytes(m.BIT_128 or m.BIT_STATELESS))
+                    sendFrame(Ppp.controlFrame(Ppp.PROTO_CCP, Ppp.CODE_CONF_NAK, pkt.id, Ppp.encodeOptions(listOf(nak))))
+                    return
+                }
+                val clean = m.BIT_128 or (bits and m.BIT_STATELESS)
+                if (bits != clean) {
+                    // 40/56 бит и MPPC не поддерживаем: оставляем 128 бит.
+                    val nak = Ppp.Option(m.CCP_OPTION, m.optionBytes(clean))
+                    sendFrame(Ppp.controlFrame(Ppp.PROTO_CCP, Ppp.CODE_CONF_NAK, pkt.id, Ppp.encodeOptions(listOf(nak))))
+                    onLog("PPP CCP: сервер предложил MPPE 0x%08X - оставляем 128 бит".format(bits))
+                    return
+                }
                 sendFrame(Ppp.controlFrame(Ppp.PROTO_CCP, Ppp.CODE_CONF_ACK, pkt.id, pkt.data))
+                ccpPeerBits = bits; ccpPeerAcked = true
+                tryActivateMppe()
             }
+            Ppp.CODE_CONF_ACK -> if (mppeRequired) { ccpOurAcked = true; tryActivateMppe() }
+            Ppp.CODE_CONF_NAK -> if (mppeRequired) {
+                val bits = Ppp.parseOptions(pkt.data).firstOrNull { it.type == m.CCP_OPTION }?.let { m.optionBits(it.value) }
+                if (bits == null || bits and m.BIT_128 == 0) { terminate("MPPE: сервер не поддерживает 128-битное шифрование"); return }
+                ccpOurBits = m.BIT_128 or (bits and m.BIT_STATELESS)
+                sendCcpConfigRequest()
+            }
+            Ppp.CODE_CONF_REJ -> if (mppeRequired) terminate("MPPE: сервер отклонил шифрование")
+            CCP_RESET_REQ -> {
+                // Сервер потерял синхронизацию потока RC4 (stateful): ответить и начать поток заново.
+                mppe?.flushTx()
+                sendFrame(Ppp.controlFrame(Ppp.PROTO_CCP, CCP_RESET_ACK, pkt.id, ByteArray(0)))
+            }
+            CCP_RESET_ACK -> resetRequested = false
         }
+    }
+
+    private fun tryActivateMppe() {
+        if (!ccpOurAcked || !ccpPeerAcked || mppe != null) return
+        val key = lastAuth?.masterKey ?: run { terminate("MPPE требует аутентификации MS-CHAPv2"); return }
+        val m = ru.gidravpn.hydra.vpn.pptp.Mppe
+        // Биты запроса стороны определяют, как шифрует ОНА для нас: наш запрос -> приём, запрос сервера -> передача.
+        mppe = ru.gidravpn.hydra.vpn.pptp.MppeSession(key, txStateless = ccpPeerBits and m.BIT_STATELESS != 0, rxStateless = ccpOurBits and m.BIT_STATELESS != 0)
+        onLog("PPP CCP: MPPE 128 бит согласован (${if (ccpOurBits and m.BIT_STATELESS != 0) "stateless" else "stateful"}) ✓")
+        maybeIpcpUp()
+    }
+
+    private fun onMppeData(info: ByteArray) {
+        val s = mppe ?: return
+        val plain = s.decrypt(info)
+        if (plain == null) {
+            // Stateful: поток RC4 разошёлся - просим сервер начать заново (CCP Reset-Request), пока не пришёл Reset-Ack.
+            if (!resetRequested) {
+                resetRequested = true
+                sendFrame(Ppp.controlFrame(Ppp.PROTO_CCP, CCP_RESET_REQ, id(), ByteArray(0)))
+            }
+            return
+        }
+        val (proto, inner) = Ppp.parseFrame(plain) ?: return
+        if (proto == Ppp.PROTO_COMP) return                   // вложенное шифрование недопустимо
+        if (proto == Ppp.PROTO_IP) { if (phase == Phase.OPEN) onIpPacket(inner) } else dispatch(proto, inner)
     }
 
     // ----- прочее -----
 
     /** Отправить IP-пакет в туннель (исходящий, от устройства). */
     fun sendIpPacket(packet: ByteArray) {
-        if (phase == Phase.OPEN) sendFrame(Ppp.frame(Ppp.PROTO_IP, packet))
+        if (phase != Phase.OPEN) return
+        val plain = Ppp.frame(Ppp.PROTO_IP, packet)
+        val s = mppe
+        sendFrame(if (s == null) plain else Ppp.frame(Ppp.PROTO_COMP, s.encrypt(plain)))
     }
 
     fun close() {
@@ -454,6 +556,8 @@ class PppSession(
 
     companion object {
         const val AUTH_NONE = 0
+        private const val CCP_RESET_REQ = 14
+        private const val CCP_RESET_ACK = 15
         private const val RESTART_MS = 3_000L      // Restart-таймер RFC 1661 (3 с)
         private const val MAX_CONFIGURE = 10         // Max-Configure
         private const val ECHO_IDLE_MS = 15_000L     // тишина в линии до Echo-Request

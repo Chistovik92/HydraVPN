@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.7.18** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.7.19** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -55,7 +55,7 @@
 | Xray (альт. ядро) | Xray-core | `libXray.aar` (отдельный процесс `:xray`, мост — sing-box); с 0.7.3 встроен в каждый релизный full-APK, не BETA |
 | **SSTP** | userspace PPP/TLS | **готово на Kotlin** (LCP/PAP/MS-CHAPv2/IPCP + crypto-binding); нужен on-device тест |
 | **L2TP** | userspace PPP/UDP | **готово на Kotlin** (без IPsec/ESP); нужен on-device тест |
-| PPTP | — | честно недоступно (данные в GRE → нужен root; стек удалён из Android 12/13) |
+| PPTP | userspace PPP + GRE | **0.7.19:** Android через root-помощника (raw GRE), Windows через RAS; не проверено на сервере |
 | **WDTT** (beta) | нативный `libclient.so` | WG через TURN ВК; нужен нативный клиент + VK-auth |
 | **olcRTC** (beta) | подпроцесс `libolcrtc.so` + SOCKS5 → sing-box | TCP-over-WebRTC; Android, ПК, iOS (0.7.10); апстрим заархивирован |
 | **OpenFlux** (beta) | подпроцесс `libopenflux.so` + SOCKS5 → sing-box | клиент v0.4.2, `openflux://v1/`; Android, ПК, iOS |
@@ -178,7 +178,7 @@ desktop/src/lite/…           Hydra Classic (Swing, Windows 7/32-бит, Linux 
 ios/                         SwiftUI + Network Extension: Hydra/ (экраны), HydraTunnel/, HydraAWG/, Packages/HydraKit (общая логика), Packages/CiaDPI, Bridge/ (gomobile)
 scripts/                     release.sh, build-{awg,olcrtc,openflux,byedpi}.sh, check-updates.sh, package-*.sh, desktop-e2e.sh
 docs/   ROUTING · PROTOCOLS · SECURITY · BUILD · ARCHITECTURE · SERVICES · PANELS · ECOSYSTEM · MULTIPLATFORM · ROADMAP · HISTORY · HANDOFF_ROUTERS …
-CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.7.18 (главный источник контекста)
+CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.7.19 (главный источник контекста)
 ```
 
 ## Честные оговорки

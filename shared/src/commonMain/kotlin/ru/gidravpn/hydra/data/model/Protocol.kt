@@ -19,7 +19,7 @@ enum class Protocol(
 ) {
     SSTP      ("sstp",   "SSTP (TLS/PPP)",           Engine.USERSPACE),
     L2TP      ("l2tp",   "L2TP (PPP/UDP)",           Engine.USERSPACE),
-    PPTP      ("pptp",   "PPTP (N/A)",        Engine.UNAVAILABLE),
+    PPTP      ("pptp",   "PPTP (GRE, root)",         Engine.USERSPACE),
     VLESS     ("vless",  "VLESS (Xray/sing-box)",    Engine.SINGBOX, shortCode = "VL"),
     VMESS     ("vmess",  "VMess",                    Engine.SINGBOX, shortCode = "VM"),
     TROJAN    ("trojan", "Trojan",                   Engine.SINGBOX, shortCode = "TR"),

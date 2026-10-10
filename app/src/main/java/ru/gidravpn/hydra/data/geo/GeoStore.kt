@@ -79,6 +79,17 @@ class GeoStore(private val dir: File) {
 
     private val metaFile get() = File(dir, "meta.json")
 
+    /** Запись через временный файл: обрыв посреди записи не обнуляет список скачанных баз. */
+    private fun writeMeta(m: JSONObject) {
+        val tmp = File(metaFile.path + ".tmp")
+        tmp.writeText(m.toString())
+        try {
+            java.nio.file.Files.move(tmp.toPath(), metaFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+            java.nio.file.Files.move(tmp.toPath(), metaFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+
     private fun meta(): JSONObject = runCatching { JSONObject(metaFile.readText()) }.getOrDefault(JSONObject())
     private fun key(kind: GeoKind, name: String) = "${kind.dir}/$name"
     private fun fileFor(kind: GeoKind, name: String, source: Boolean) =
@@ -114,7 +125,7 @@ class GeoStore(private val dir: File) {
         val target = fileFor(kind, name, source)
         val oldFile = old?.let { fileFor(kind, name, it.optString("format") == "source") }
         if (old != null && old.optString("sha256") == sha && oldFile?.isFile == true) {
-            m.put(k, old.put("checked", now)); metaFile.writeText(m.toString())
+            m.put(k, old.put("checked", now)); writeMeta(m)
             return Installed(Outcome.UNCHANGED)
         }
         // Защита от подмены/обрезки: новая база не должна быть втрое меньше прежней того же формата.
@@ -133,7 +144,7 @@ class GeoStore(private val dir: File) {
         if (!tmp.renameTo(target)) { target.delete(); check(tmp.renameTo(target)) { "не удалось заменить ${target.name}" } }
         m.put(k, JSONObject().put("sha256", sha).put("size", bytes.size.toLong()).put("updated", now).put("checked", now)
             .put("source", from).put("format", if (source) "source" else "srs"))
-        metaFile.writeText(m.toString())
+        writeMeta(m)
         return Installed(Outcome.INSTALLED)
     }
 
@@ -153,7 +164,7 @@ class GeoStore(private val dir: File) {
         prev.delete()
         m.put(k, JSONObject().put("sha256", sha256(bytes)).put("size", bytes.size.toLong()).put("updated", System.currentTimeMillis())
             .put("checked", System.currentTimeMillis()).put("source", "rollback").put("format", if (prevIsSource) "source" else "srs"))
-        metaFile.writeText(m.toString())
+        writeMeta(m)
         return true
     }
 
@@ -162,7 +173,7 @@ class GeoStore(private val dir: File) {
         val e = m.optJSONObject(key(kind, name)) ?: return
         val f = fileFor(kind, name, e.optString("format") == "source")
         listOf(f, File(f.path + ".prev")).forEach { it.delete() }
-        m.remove(key(kind, name)); metaFile.writeText(m.toString())
+        m.remove(key(kind, name)); writeMeta(m)
     }
 
     /** Когда база последний раз сверялась с источником (для расписания); 0 — никогда. */
@@ -305,6 +316,15 @@ object DatConverter {
     /** Запись .dat длиннее этого — файл повреждён или враждебен (самый крупный набор geosite — единицы мегабайт). */
     private const val MAX_ENTRY = 64 * 1024 * 1024
 
+    /** InputStream.skip может пропустить меньше запрошенного (BufferedInputStream на границе буфера) - тогда разбор уезжает. */
+    private fun skipFully(s: InputStream, n: Long) {
+        var left = n
+        while (left > 0) {
+            val k = s.skip(left)
+            if (k > 0) left -= k else { if (s.read() < 0) error("обрыв файла .dat"); left-- }
+        }
+    }
+
     private fun readBytes(s: InputStream, n: Int): ByteArray {
         require(n in 0..MAX_ENTRY) { "повреждённый .dat: запись длиной $n" }
         val a = ByteArray(n); var o = 0
@@ -342,7 +362,7 @@ object DatConverter {
             if (type != 2) { if (type == 0) readVarint(s) else error("формат .dat не распознан"); continue }
             val len = readVarint(s)
             require(len in 0..MAX_ENTRY) { "повреждённый .dat: запись длиной $len" }
-            if (tag shr 3 != 1L) { s.skip(len); continue }
+            if (tag shr 3 != 1L) { skipFully(s, len); continue }
             val entry = readBytes(s, len.toInt())
             val f = fields(entry)
             val code = (f.firstOrNull { it.first == 1 }?.second as? ByteArray)?.toString(Charsets.UTF_8)?.lowercase()

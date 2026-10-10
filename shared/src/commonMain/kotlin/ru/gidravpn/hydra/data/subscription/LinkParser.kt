@@ -70,6 +70,7 @@ object LinkParser {
                 put("username", user)
                 q["allow_insecure"]?.let { put("allow_insecure", it == "1" || it == "true") }
                 q["tunnel_secret"]?.let { put("tunnel_secret", it) }  // L2TP tunnel-auth
+                q["mppe"]?.let { put("mppe", it) }  // PPTP: mppe=off - без шифрования
             }.toString(),
         )
     }
