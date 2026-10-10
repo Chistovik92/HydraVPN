@@ -13,7 +13,8 @@ extension RouteConfig {
         let groups: [[String: Any]] = self.groups.map {
             ["name": $0.name, "type": $0.type, "members": $0.members, "url": $0.url, "interval": $0.intervalSec]
         }
-        let dpi: [String: Any] = ["enabled": self.dpi.enabled, "strategy": self.dpi.strategy, "port": self.dpi.port, "direct_via_dpi": self.dpi.directViaDpi]
+        let dpi: [String: Any] = ["enabled": self.dpi.enabled, "strategy": self.dpi.strategy, "port": self.dpi.port, "direct_via_dpi": self.dpi.directViaDpi,
+                                  "fake_sni": self.dpi.fakeSni, "probe": self.dpi.probe.androidObject()]
         let root: [String: Any] = ["rules": rules, "groups": groups, "dpi": dpi]
         return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     }
@@ -36,7 +37,9 @@ extension RouteConfig {
             dpi = DpiSettings(enabled: x["enabled"] as? Bool ?? false,
                               strategy: (x["strategy"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? DpiStrategies.defaultStrategy,
                               port: (1024...65535).contains(port) ? port : DpiSettings.defaultPort,
-                              directViaDpi: x["direct_via_dpi"] as? Bool ?? true)
+                              directViaDpi: x["direct_via_dpi"] as? Bool ?? true,
+                              fakeSni: (x["fake_sni"] as? String).map { $0.trimmingCharacters(in: .whitespaces) }.flatMap { $0.isEmpty ? nil : $0 } ?? DpiStrategies.fakeSni,
+                              probe: DpiProbeSettings(androidObject: x["probe"] as? [String: Any]))
         }
     }
 

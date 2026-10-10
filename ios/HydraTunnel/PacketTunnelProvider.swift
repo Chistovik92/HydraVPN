@@ -10,6 +10,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private let store = HydraStore.shared()
     private var commandServer: LibboxCommandServer?
     private var boxService: LibboxBoxService?
+    /// Telegram через WebSocket (0.7.20): локальный SOCKS5, живёт столько же, сколько туннель.
+    private var tgWs: TgWsServer?
     private lazy var platform = TunnelPlatformInterface(self)
 
     override func startTunnel(options: [String: NSObject]?) async throws {
@@ -76,6 +78,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         store.appendLog("Туннель: остановка (\(reason.rawValue))")
         try? boxService?.close()
         boxService = nil
+        tgWs?.stop()
+        tgWs = nil
         HydraolcStop()
         HydrafluxStop()
         ByeDpiRunner.shared.stop()
@@ -124,13 +128,28 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 plan = plan.withoutDpi()
             } else {
                 do {
-                    try ByeDpiRunner.shared.start(args: DpiArgs.build(plan.dpi.strategy, port: plan.dpi.port), port: plan.dpi.port)
+                    try ByeDpiRunner.shared.start(args: DpiArgs.build(plan.dpi.strategy, port: plan.dpi.port, sni: plan.dpi.fakeSni), port: plan.dpi.port)
                     store.appendLog("ByeDPI: запущен (\(plan.dpi.strategy))")
                 } catch {
                     // Без обхода DPI соединение лучше, чем никакого.
                     store.appendLog("ByeDPI: не запущен, продолжаем без него — \(error.localizedDescription)")
                     plan = plan.withoutDpi()
                 }
+            }
+        }
+        if plan.needsTgWs {
+            // 0.7.20: Telegram через WebSocket - внутри расширения (подпроцессы iOS запрещает, как и для ByeDPI).
+            let tg = TgWsServer { [store] in store.appendLog($0) }
+            do {
+                try tg.start(port: UInt16(RouteTarget.tgwsPort))
+                // MTProto-прокси рядом со SOCKS5: ошибка порта - не повод отказываться от TG WS.
+                do { try tg.startMtProto(port: UInt16(RouteTarget.tgwsMtPort)) }
+                catch { store.appendLog("TG WS: MTProto-прокси не запущен (\(error.localizedDescription)) - работает только SOCKS5") }
+                tgWs = tg
+            } catch {
+                store.appendLog("TG WS: не запущен (\(error.localizedDescription)) - продолжаем без него")
+                tg.stop()
+                plan = plan.withoutTgWs()
             }
         }
         let geoStore = GeoStore(directory: store.geoDirectory)

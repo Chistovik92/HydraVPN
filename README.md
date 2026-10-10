@@ -5,7 +5,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.7.19** · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md)
+- Статус: **0.7.20** · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md)
 
 ## Скачать
 
@@ -90,8 +90,7 @@ Hydra Classic (Windows 7 / 32-бит) — тот же набор экранов 
   стратегии (как в [ByeByeDPI](https://github.com/romanvht/ByeByeDPI), но с понятным итогом «открылось 11 из 12»): 60 готовых или свой список
   стратегий, списки доменов (Cloudflare, Discord, Googlevideo, соцсети, Telegram, YouTube… и свои), пауза, число запросов, параллельность,
   таймаут и SNI фейк-пакетов (0.7.15); найденную стратегию видно и копируется целиком.
-- ✈️ **Telegram**: если не открывается даже через ByeDPI — **Telegram по WebSocket** (TG WS, 0.7.14; идея Flowseal/tg-ws-proxy и
-  DmitryKafturov/tg-ws-proxy), без своего сервера; кнопка **«Подключить Telegram к прокси»** (0.7.15) в настройках и на главном экране.
+- ✈️ **Telegram**: если не открывается даже через ByeDPI — **Telegram по WebSocket** (TG WS, 0.7.14), без своего сервера; кнопка **«Подключить Telegram к прокси»** (0.7.15) в настройках и на главном экране.
 - 🌐 **Geo-базы** как динамический слой (0.7.13): источники MetaCubeX, SagerNet, runetfreedom (в т. ч. `ru-blocked`), v2fly, свои списки;
   автообновление, проверка файла, откат; пресет «Заблокированное в РФ → обход DPI».
 - ✂️ **Раздельное туннелирование**: по приложениям (Android) или программам (ПК), по IP/доменам, по странам; пресет «Российские приложения напрямую».
@@ -113,8 +112,8 @@ Hydra Classic (Windows 7 / 32-бит) — тот же набор экранов 
 | AmneziaWG 1.0–3.x | ✅ | — | ✅ |
 | SSTP, L2TP (без IPsec) | ✅ нужен тест на сервере | — | PPP-стек есть, транспорт ждёт проверки |
 | olcRTC, OpenFlux (BETA) | ✅ | ✅ нужен свой узел/сервер (Classic — кроме Windows 7) | ✅ внутри расширения VPN (с 0.7.10, проверено сборкой) |
-| Обход DPI (ByeDPI) и мастер подбора | ✅ | ✅ (Classic — тоже) | ✅ внутри расширения VPN (интерфейс 0.7.13; настроек подбора 0.7.15 пока нет) |
-| Telegram по WebSocket (TG WS) | ✅ | ✅ (Classic — тоже) | — (в очереди) |
+| Обход DPI (ByeDPI) и мастер подбора | ✅ | ✅ (Classic — тоже) | ✅ внутри расширения VPN (вкладки и настройки подбора - с 0.7.20) |
+| Telegram по WebSocket (TG WS), MTProto-прокси | ✅ | ✅ (Classic — тоже) | ✅ внутри расширения VPN (с 0.7.20, проверено сборкой) |
 | PPTP (небезопасен) | ✅ только с root (GRE через `su`), нужен тест на сервере | ✅ только Windows (встроенный RAS) | — (нет GRE в расширении VPN) |
 
 Подробности и ограничения — [docs/PROTOCOLS.md](docs/PROTOCOLS.md), сервисы — [docs/SERVICES.md](docs/SERVICES.md).
@@ -176,7 +175,7 @@ HydraVPN/
 GPL-3.0 — см. [LICENSE](LICENSE) и [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 Компоненты: sing-box (GPL-3.0), Xray-core (MPL-2.0), amneziawg-go/wireguard-go (MIT),
 hev-socks5-tunnel (MIT), ByeDPI (MIT), OpenFlux (GPL-3.0), olcRTC (WTFPL); 60 стратегий и сайты проверки — из ByeByeDPI (GPL-3.0);
-Telegram по WebSocket — собственный код по идее Flowseal/tg-ws-proxy и DmitryKafturov/tg-ws-proxy (MIT). Бинарники ядер не распространяются в составе репозитория.
+Бинарники ядер не распространяются в составе репозитория.
 
 ## Дисклеймер
 

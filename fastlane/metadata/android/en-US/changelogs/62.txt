@@ -1,0 +1,1 @@
+0.7.20 - Telegram proxy fixes: TG WS now works with the plain transport of Telegram for Android and with IPv6, plus an MTProto proxy mode (tg://proxy). iOS gets Telegram over WebSocket, routing tabs, probe settings and the Telegram button.

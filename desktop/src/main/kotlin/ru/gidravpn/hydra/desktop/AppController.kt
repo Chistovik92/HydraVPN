@@ -1024,6 +1024,7 @@ class AppController(
             val tg = ru.gidravpn.hydra.data.tgws.TgWsProxy(log = { appendLog(it) })
             try {
                 tg.start(RouteTarget.TGWS_PORT)
+                runCatching { tg.startMtProto(RouteTarget.TGWS_MT_PORT) }.onFailure { appendLog("TG WS: MTProto-прокси не запущен (${it.message}) — работает только SOCKS5") }
                 runner.attachInProcess(AutoCloseable { tg.stop() })
             } catch (e: Exception) {
                 appendLog("TG WS: не запущен (${e.message}) — продолжаем без него")
@@ -1043,11 +1044,15 @@ class AppController(
     /** Передать Telegram локальный прокси Hydra: `tg://socks?…` (Telegram спросит, включить ли). Порт — TG WS, если он включён, иначе ByeDPI. */
     fun telegramProxyPort(): Int {
         val routes = _ui.value.data.settings.routing.routes
-        return if (ru.gidravpn.hydra.data.tgws.TgWsPreset.isApplied(routes.rules)) RouteTarget.TGWS_PORT else routes.dpi.port
+        return if (ru.gidravpn.hydra.data.tgws.TgWsPreset.isApplied(routes.rules)) RouteTarget.TGWS_MT_PORT else routes.dpi.port
     }
+    /** TG WS - MTProto-прокси (`tg://proxy` с секретом), всё остальное - SOCKS5 (`tg://socks`). */
+    fun telegramProxyLink(port: Int): String =
+        if (port == RouteTarget.TGWS_MT_PORT) ru.gidravpn.hydra.data.tgws.TgWsProxy.mtProxyLink(port) else ru.gidravpn.hydra.data.tgws.TgWsProxy.socksLink(port)
+
     fun openTelegramProxy(port: Int = telegramProxyPort()) {
         val ok = runCatching {
-            java.awt.Desktop.getDesktop().browse(java.net.URI("tg://socks?server=127.0.0.1&port=$port"))
+            java.awt.Desktop.getDesktop().browse(java.net.URI(telegramProxyLink(port)))
         }.isSuccess
         if (!ok) toast("Не удалось открыть Telegram: он не установлен или не принимает ссылки tg://")
     }

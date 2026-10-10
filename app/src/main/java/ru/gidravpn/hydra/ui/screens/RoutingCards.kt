@@ -586,7 +586,9 @@ internal fun TelegramProxyCard(vm: MainViewModel, compact: Boolean = false, prof
     val cfg by vm.routeConfig.collectAsState()
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val tg = TgWsPreset.isApplied(cfg.rules)
-    val port = if (tg) RouteTarget.TGWS_PORT else (profilePort ?: cfg.dpi.port)
+    val port = if (tg) RouteTarget.TGWS_MT_PORT else (profilePort ?: cfg.dpi.port)
+    // TG WS - MTProto-прокси (его без сбоев принимает и Telegram для Android), ByeDPI и профили - SOCKS5.
+    val link = if (tg) ru.gidravpn.hydra.data.tgws.TgWsProxy.mtProxyLink(port) else ru.gidravpn.hydra.data.tgws.TgWsProxy.socksLink(port)
     var missing by remember { mutableStateOf(false) }
     Card(Modifier.fillMaxWidth()) {
         if (!compact) {
@@ -594,9 +596,9 @@ internal fun TelegramProxyCard(vm: MainViewModel, compact: Boolean = false, prof
             Text(stringResource(R.string.tgp_sub), color = TextMuted, fontSize = 11.sp)
             Spacer(Modifier.height(8.dp))
         }
-        Text(stringResource(R.string.tgp_addr, port) + " · " + stringResource(if (tg) R.string.tgp_via_tgws else R.string.tgp_via_dpi), color = TextSecondary, fontSize = 12.sp)
+        Text(stringResource(if (tg) R.string.tgp_addr_mt else R.string.tgp_addr, port) + " · " + stringResource(if (tg) R.string.tgp_via_tgws else R.string.tgp_via_dpi), color = TextSecondary, fontSize = 12.sp)
         Spacer(Modifier.height(8.dp))
-        Chip(stringResource(R.string.tgp_button), false) { missing = !ru.gidravpn.hydra.ui.openTelegramProxy(ctx, port) }
+        Chip(stringResource(R.string.tgp_button), false) { missing = !ru.gidravpn.hydra.ui.openTelegramProxy(ctx, link) }
         if (missing) Text(stringResource(R.string.tgp_missing), color = Danger, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
         Text(stringResource(R.string.tgp_need_on), color = TextMuted, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
     }

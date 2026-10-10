@@ -35,6 +35,7 @@
     <string name="tgp_addr">Address 127.0.0.1:%1$d (SOCKS5)</string>
     <string name="tgp_via_tgws">Telegram over WebSocket</string>
     <string name="tgp_via_dpi">DPI bypass</string>
+    <string name="tgp_addr_mt">Address 127.0.0.1:%1$d (MTProto proxy)</string>
     <string name="tgp_need_on">The proxy works while Hydra is connected.</string>
     <string name="tgp_missing">Telegram is not installed.</string>
 </resources>

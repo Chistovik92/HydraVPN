@@ -50,7 +50,7 @@
     <string name="dpi_t_tgws">Telegram over WebSocket</string>
     <string name="tgws_title">Telegram over WebSocket</string>
     <string name="tgws_sub">When Telegram will not load even with DPI bypass</string>
-    <string name="tgws_note">Telegram traffic goes to its servers over a TLS WebSocket (kws*.web.telegram.org) instead of plain TCP, which providers throttle. Works without a server of your own. Idea and protocol: Flowseal/tg-ws-proxy and DmitryKafturov/tg-ws-proxy (MIT). Android and desktop.</string>
+    <string name="tgws_note">Telegram traffic goes to its servers over a TLS WebSocket (kws*.web.telegram.org) instead of plain TCP, which providers throttle. Works without a server of your own. Android and desktop.</string>
     <string name="tgws_preset">Telegram → WebSocket</string>
     <string name="tgws_wizard_hint">Telegram did not open with any DPI strategy. Try the WebSocket route instead:</string>
     <string name="servers_unreachable">unreachable</string>

@@ -3,7 +3,7 @@ import Foundation
 /// Настройки обхода DPI (0.7.13) — порт `DpiSettings`/`DpiArgs` с Android. Движок — ByeDPI (`ciadpi`, MIT): локальный SOCKS5,
 /// который режет и подделывает первые пакеты соединения так, что DPI провайдера не узнаёт запрещённый хост (SNI).
 public struct DpiSettings: Codable, Hashable, Sendable {
-    /// Порт локального SOCKS5 ByeDPI (OpenFlux/olcRTC — 10810/10809).
+    /// Порт локального SOCKS5 ByeDPI (OpenFlux/olcRTC - 10810/10809).
     public static let defaultPort = 10880
 
     public var enabled: Bool
@@ -11,9 +11,27 @@ public struct DpiSettings: Codable, Hashable, Sendable {
     public var port: Int
     /// Трафик «напрямую» идёт через обход DPI.
     public var directViaDpi: Bool
+    /// SNI «фейковых» пакетов: подставляется вместо `{sni}` в стратегии (0.7.15 на Android, 0.7.20 на iOS).
+    public var fakeSni: String
+    /// Настройки мастера подбора (0.7.15 на Android, 0.7.20 на iOS).
+    public var probe: DpiProbeSettings
 
-    public init(enabled: Bool = false, strategy: String = DpiStrategies.defaultStrategy, port: Int = DpiSettings.defaultPort, directViaDpi: Bool = true) {
+    public init(enabled: Bool = false, strategy: String = DpiStrategies.defaultStrategy, port: Int = DpiSettings.defaultPort,
+                directViaDpi: Bool = true, fakeSni: String = DpiStrategies.fakeSni, probe: DpiProbeSettings = DpiProbeSettings()) {
         self.enabled = enabled; self.strategy = strategy; self.port = port; self.directViaDpi = directViaDpi
+        self.fakeSni = fakeSni; self.probe = probe
+    }
+
+    // Состояние, сохранённое до 0.7.20, не содержит новых полей - читаем их с умолчаниями.
+    private enum CodingKeys: String, CodingKey { case enabled, strategy, port, directViaDpi, fakeSni, probe }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(enabled: try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? false,
+                  strategy: try c.decodeIfPresent(String.self, forKey: .strategy) ?? DpiStrategies.defaultStrategy,
+                  port: try c.decodeIfPresent(Int.self, forKey: .port) ?? DpiSettings.defaultPort,
+                  directViaDpi: try c.decodeIfPresent(Bool.self, forKey: .directViaDpi) ?? true,
+                  fakeSni: try c.decodeIfPresent(String.self, forKey: .fakeSni) ?? DpiStrategies.fakeSni,
+                  probe: try c.decodeIfPresent(DpiProbeSettings.self, forKey: .probe) ?? DpiProbeSettings())
     }
 }
 
@@ -43,8 +61,9 @@ public enum DpiArgs {
     }
 
     /// Строка стратегии без служебного: `{sni}` подставлен, опасные и «наши» ключи убраны.
-    public static func sanitize(_ strategy: String) -> [String] {
-        let replaced = strategy.replacingOccurrences(of: "{sni}", with: DpiStrategies.fakeSni)
+    public static func sanitize(_ strategy: String, sni: String = DpiStrategies.fakeSni) -> [String] {
+        let fake = sni.trimmingCharacters(in: .whitespaces)
+        let replaced = strategy.replacingOccurrences(of: "{sni}", with: fake.isEmpty ? DpiStrategies.fakeSni : fake)
         let toks = Array(shellSplit(replaced).drop(while: { !$0.hasPrefix("-") }))
         var out: [String] = []
         var i = 0
@@ -67,9 +86,9 @@ public enum DpiArgs {
     }
 
     /// Полный список аргументов для `ciadpi` (без имени программы).
-    public static func build(_ strategy: String, port: Int = DpiSettings.defaultPort, ip: String = "127.0.0.1") -> [String] {
+    public static func build(_ strategy: String, port: Int = DpiSettings.defaultPort, ip: String = "127.0.0.1", sni: String = DpiStrategies.fakeSni) -> [String] {
         let s = strategy.trimmingCharacters(in: .whitespaces).isEmpty ? DpiStrategies.defaultStrategy : strategy
-        return ["-i", ip, "-p", String(port)] + sanitize(s)
+        return ["-i", ip, "-p", String(port)] + sanitize(s, sni: sni)
     }
 
     public static func isUsable(_ strategy: String) -> Bool { !sanitize(strategy).isEmpty }
@@ -98,6 +117,15 @@ public struct DpiProbeResult: Hashable, Sendable, Identifiable {
 public enum DpiProbe {
     /// Быстрый режим — первые стратегии списка, полный — все.
     public static let quick = 15
+
+    /// Сайты по настройкам подбора (0.7.20): выбранные встроенные списки, свои списки и один свой сайт.
+    public static func sites(settings: DpiProbeSettings, extra: String) -> [(name: String, sites: [String])] {
+        var out = settings.selectedSites()
+        let e = extra.trimmingCharacters(in: .whitespaces)
+        if !e.isEmpty { out.append((name: "custom", sites: [e])) }
+        if out.isEmpty, let g = DpiStrategies.sites["general"] { out.append((name: "general", sites: g)) }
+        return out
+    }
 
     /// Сайты по группам для проверки: выбранные группы + свой сайт.
     public static func sites(groups: Set<String>, extra: String) -> [(name: String, sites: [String])] {

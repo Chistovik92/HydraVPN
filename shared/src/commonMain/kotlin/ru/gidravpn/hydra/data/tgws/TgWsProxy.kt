@@ -29,14 +29,14 @@ import javax.net.ssl.SSLSocketFactory
  * поднимает WebSocket поверх TLS до `kws<N>.web.telegram.org/apiws` и гонит по нему тот же MTProto-поток.
  * Номер ЦОД читается из 64-байтового «obfuscated init» клиента Telegram. Не-Telegram адреса проходят напрямую.
  *
- * Идея и протокол — Flowseal/tg-ws-proxy и DmitryKafturov/tg-ws-proxy (MIT, Python); здесь — собственный порт на JVM
- * (Android и ПК) без внешних зависимостей. Если WebSocket недоступен (302/ошибка) — откат на прямой TCP.
+ * Собственная реализация на JVM (Android и ПК) без внешних зависимостей. Если WebSocket недоступен (302/ошибка) — откат на прямой TCP.
  */
 class TgWsProxy(
     private val dcIps: Map<Int, String> = DEFAULT_DC_IPS,
     private val log: (String) -> Unit = {},
 ) {
     private var server: ServerSocket? = null
+    private var mtServer: ServerSocket? = null
     private val stopped = AtomicBoolean(true)
     private val pool = Executors.newCachedThreadPool { r -> Thread(r, "tgws").apply { isDaemon = true } }
     /** ЦОД, где WebSocket отвечает редиректом: ходим по TCP, не тратя время на заведомо мёртвый путь. */
@@ -72,11 +72,33 @@ class TgWsProxy(
         return s.localPort
     }
 
+    /** Дополнительно к SOCKS5: MTProto-прокси на [mtPort] (0.7.20). Ошибка порта - только запись в журнал, SOCKS5 остаётся. */
+    @Synchronized
+    fun startMtProto(mtPort: Int): Int {
+        mtServer?.let { return it.localPort }
+        val s = ServerSocket()
+        s.reuseAddress = true
+        s.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), mtPort))
+        mtServer = s
+        pool.execute {
+            while (!stopped.get()) {
+                val c = try { s.accept() } catch (_: IOException) { break }
+                if (!slots.tryAcquire()) { runCatching { c.close() }; continue }
+                active += c
+                pool.execute { try { handleMt(c) } finally { active -= c; slots.release() } }
+            }
+        }
+        log("TG WS: MTProto-прокси 127.0.0.1:${s.localPort}")
+        return s.localPort
+    }
+
     @Synchronized
     fun stop() {
         stopped.set(true)
         runCatching { server?.close() }
         server = null
+        runCatching { mtServer?.close() }
+        mtServer = null
         active.toList().forEach { runCatching { it.close() } }
         active.clear()
     }
@@ -96,18 +118,51 @@ class TgWsProxy(
 
             val req = inp.readFully(4)
             if (req[1].toInt() != 1) { out.write(reply(7)); return }
+            var v6: ByteArray? = null
             val dst = when (req[3].toInt()) {
                 1 -> InetAddress.getByAddress(inp.readFully(4)).hostAddress
                 3 -> String(inp.readFully(inp.read()), Charsets.UTF_8)
+                // 0.7.20: Telegram на устройстве с IPv6 проверяет и использует адреса ЦОД по IPv6 - раньше отвечали «адрес не поддерживается».
+                4 -> { val a = inp.readFully(16); v6 = a; InetAddress.getByAddress(a).hostAddress }
                 else -> { out.write(reply(8)); return }
             }
             val port = ((inp.read() shl 8) or inp.read())
 
-            if (!isTelegramIp(dst)) { passthrough(client, inp, out, dst, port, null); return }
+            val telegram = if (v6 != null) v6Dc(v6) != null else isTelegramIp(dst)
+            if (!telegram) { passthrough(client, inp, out, dst, port, null); return }
 
             out.write(reply(0)); out.flush()
-            var init = inp.readFully(64)
-            // HTTP-транспорт Telegram не поддерживается — клиент сам вернётся к MTProto.
+            // Первый байт отличает обфусцированный init (случайный: не 0xEF и не EEEEEEEE/DDDDDDDD) от «чистого» транспорта Telegram
+            // для Android (0.7.20): он без секрета прокси начинает поток с 0xEF (abridged) или 0xEEEEEEEE/0xDDDDDDDD (intermediate).
+            val b0 = inp.read(); if (b0 < 0) return
+            var plainTag = 0
+            var prefix = ByteArray(0)
+            var init: ByteArray? = null
+            if (b0 == 0xEF) { plainTag = TAG_ABRIDGED; prefix = byteArrayOf(0xEF.toByte()) }
+            else {
+                val h = byteArrayOf(b0.toByte()) + inp.readFully(3)
+                if (h.all { it == 0xEE.toByte() }) { plainTag = TAG_INTERMEDIATE; prefix = h }
+                else if (h.all { it == 0xDD.toByte() }) { plainTag = TAG_PADDED; prefix = h }
+                else init = h + inp.readFully(60)
+            }
+
+            if (init == null) {
+                val byIp = if (v6 != null) v6Dc(v6) else IP_TO_DC[dst]
+                val dc = byIp?.first
+                val media = byIp?.second ?: false
+                if (dc == null || dc !in dcIps) { tcpFallback(client, inp, out, dst, port, prefix, "неизвестный ЦОД"); return }
+                client.soTimeout = 0
+                val ws = openWs(dc, media)
+                if (ws == null) { tcpFallback(client, inp, out, dst, port, prefix, "WebSocket недоступен"); return }
+                wsConnections++
+                // Свою обфускацию строим сами: ретранслятор Telegram ждёт obfuscated2, а клиент говорит открытым текстом.
+                val obf = ObfClient(plainTag, if (media) -dc else dc)
+                ws.send(obf.init)
+                bridgePlain(client, inp, out, ws, obf, PlainFramer(plainTag))
+                return
+            }
+
+            // HTTP-транспорт Telegram не поддерживается - клиент сам вернётся к MTProto.
             if (init.startsWithAscii("POST ") || init.startsWithAscii("GET ") || init.startsWithAscii("HEAD ")) return
 
             var dc: Int?
@@ -116,31 +171,15 @@ class TgWsProxy(
             var patched = false
             if (parsed != null) { dc = parsed.first; media = parsed.second }
             else {
-                // Мобильные клиенты без секрета оставляют случайные байты ЦОД — берём по адресу и правим init.
-                val byIp = IP_TO_DC[dst]
+                // Мобильные клиенты без секрета оставляют случайные байты ЦОД - берём по адресу и правим init.
+                val byIp = if (v6 != null) v6Dc(v6) else IP_TO_DC[dst]
                 dc = byIp?.first; media = byIp?.second ?: false
                 if (dc != null && dc in dcIps) { init = patchInitDc(init, if (media) -dc else dc); patched = true }
             }
             if (dc == null || dc !in dcIps) { tcpFallback(client, inp, out, dst, port, init, "неизвестный ЦОД"); return }
 
             client.soTimeout = 0
-            val key = dc to media
-            val now = System.currentTimeMillis()
-            var ws: WebSocket? = null
-            if (key !in wsBlacklist) {
-                val timeout = if (now < (failUntil[key] ?: 0L)) 2_000 else 10_000
-                var allRedirects = true
-                domains@ for (domain in wsDomains(dc, media)) {
-                    for (ip in candidateIps(domain, dcIps.getValue(dc))) {
-                        try { ws = WebSocket.connect(ip, domain, timeout); allRedirects = false; break@domains }
-                        catch (e: WebSocket.Redirect) { log("TG WS: ЦОД$dc $domain ($ip) → редирект ${e.code}") }
-                        catch (e: Exception) { allRedirects = false; log("TG WS: ЦОД$dc $domain ($ip): ${e.message}") }
-                    }
-                }
-                if (ws == null) {
-                    if (allRedirects) wsBlacklist += key else failUntil[key] = now + 30_000
-                }
-            }
+            val ws = openWs(dc, media)
             if (ws == null) { tcpFallback(client, inp, out, dst, port, init, "WebSocket недоступен"); return }
 
             wsConnections++
@@ -151,6 +190,114 @@ class TgWsProxy(
         } finally {
             runCatching { client.close() }
         }
+    }
+
+    // ---- MTProto-прокси (0.7.20) --------------------------------------------------------------------------------
+
+    /**
+     * Telegram для Android при SOCKS5 шлёт не обфусцированный поток, а MTProto-прокси с секретом он принимает везде (так сделано и в
+     * Telegram Desktop). Протокол: клиент шлёт 64 байта init, ключ которых - SHA-256(init[8..40] + секрет); дальше поток идёт тем же шифром.
+     * Мы расшифровываем init, берём ЦОД и тег транспорта, открываем WebSocket до ЦОД со своим obfuscated2 ([ObfClient]) и перешифровываем поток.
+     */
+    private fun handleMt(client: Socket) {
+        try {
+            client.tcpNoDelay = true
+            client.soTimeout = 15_000
+            val inp = BufferedInputStream(client.getInputStream(), 65536)
+            val out = client.getOutputStream()
+            val hs = inp.readFully(64)
+            val cltDec = ctr(sha256(hs.copyOfRange(8, 40) + MT_SECRET), hs.copyOfRange(40, 56))
+            val plain = cltDec.update(hs)
+            val tag = ((plain[56].toInt() and 255) shl 24) or ((plain[57].toInt() and 255) shl 16) or ((plain[58].toInt() and 255) shl 8) or (plain[59].toInt() and 255)
+            if (tag !in VALID_PROTOS) { log("TG WS: MTProto-прокси: неверный секрет или протокол"); return }
+            val dcRaw = ((plain[60].toInt() and 255) or (plain[61].toInt() shl 8)).toShort().toInt()
+            val dc = kotlin.math.abs(dcRaw)
+            val media = dcRaw < 0
+            if (dc !in dcIps) { log("TG WS: MTProto-прокси: неизвестный ЦОД $dc"); return }
+            val rev = hs.copyOfRange(8, 56).reversedArray()
+            val cltEnc = ctr(sha256(rev.copyOfRange(0, 32) + MT_SECRET), rev.copyOfRange(32, 48))
+            client.soTimeout = 0
+
+            val obf = ObfClient(tag, dcRaw)
+            val ws = openWs(dc, media)
+            if (ws != null) {
+                wsConnections++
+                ws.send(obf.init)
+                bridgePlain(client, inp, out, ws, obf, PlainFramer(tag), cltDec, cltEnc)
+                return
+            }
+            // WebSocket недоступен - прямой TCP до ЦОД с тем же перешифрованием потока.
+            log("TG WS: MTProto-прокси: WebSocket недоступен → прямой TCP до ЦОД$dc")
+            tcpFallbacks++
+            val remote = Socket()
+            try {
+                remote.connect(InetSocketAddress(dcIps.getValue(dc), 443), 10_000)
+                remote.tcpNoDelay = true
+                remote.getOutputStream().apply { write(obf.init); flush() }
+                val up = Thread {
+                    try {
+                        val buf = ByteArray(65536)
+                        while (true) {
+                            val n = inp.read(buf); if (n < 0) break
+                            remote.getOutputStream().write(obf.encrypt(cltDec.update(buf, 0, n))); remote.getOutputStream().flush()
+                        }
+                    } catch (_: Exception) {
+                    } finally { runCatching { remote.close() }; runCatching { client.close() } }
+                }.apply { isDaemon = true; start() }
+                val buf = ByteArray(65536)
+                val rin = remote.getInputStream()
+                while (true) { val n = rin.read(buf); if (n < 0) break; out.write(cltEnc.update(obf.decrypt(buf.copyOf(n)))); out.flush() }
+                up.interrupt()
+            } finally { runCatching { remote.close() } }
+        } catch (_: Exception) {
+        } finally {
+            runCatching { client.close() }
+        }
+    }
+
+    private fun ctr(key: ByteArray, iv: ByteArray) = Cipher.getInstance("AES/CTR/NoPadding").apply {
+        init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), IvParameterSpec(iv))
+    }
+
+    private fun sha256(b: ByteArray) = java.security.MessageDigest.getInstance("SHA-256").digest(b)
+
+
+    /** WebSocket до ЦОД: сначала домены `kws*`, у каждого - адреса из DNS и запасной. Помнит редиректы и недавние сбои. */
+    private fun openWs(dc: Int, media: Boolean): WebSocket? {
+        val key = dc to media
+        if (key in wsBlacklist) return null
+        val now = System.currentTimeMillis()
+        val timeout = if (now < (failUntil[key] ?: 0L)) 2_000 else 10_000
+        var allRedirects = true
+        for (domain in wsDomains(dc, media)) {
+            for (ip in candidateIps(domain, dcIps.getValue(dc))) {
+                try { return WebSocket.connect(ip, domain, timeout).also { allRedirects = false } }
+                catch (e: WebSocket.Redirect) { log("TG WS: ЦОД$dc $domain ($ip) → редирект ${e.code}") }
+                catch (e: Exception) { allRedirects = false; log("TG WS: ЦОД$dc $domain ($ip): ${e.message}") }
+            }
+        }
+        if (allRedirects) wsBlacklist += key else failUntil[key] = now + 30_000
+        return null
+    }
+
+    /** Клиент говорит открытым MTProto: режем его по границам сообщений, шифруем своим потоком и в обратную сторону расшифровываем. */
+    private fun bridgePlain(client: Socket, inp: InputStream, out: OutputStream, ws: WebSocket, obf: ObfClient, framer: PlainFramer,
+                            cltDec: Cipher? = null, cltEnc: Cipher? = null) {
+        val up = Thread {
+            try {
+                val buf = ByteArray(65536)
+                while (true) {
+                    val n = inp.read(buf); if (n < 0) break
+                    val chunk = if (cltDec != null) cltDec.update(buf, 0, n) else buf.copyOf(n)
+                    for (m in framer.feed(chunk)) ws.send(obf.encrypt(m))
+                }
+            } catch (_: Exception) {
+            } finally { ws.close(); runCatching { client.close() } }
+        }.apply { isDaemon = true; start() }
+        try {
+            while (true) { val d = ws.recv() ?: break; val p = obf.decrypt(d); out.write(if (cltEnc != null) cltEnc.update(p) else p); out.flush() }
+        } catch (_: Exception) {
+        } finally { ws.close(); runCatching { client.close() }; up.interrupt() }
     }
 
     /**
@@ -273,6 +420,84 @@ class TgWsProxy(
         }
     }
 
+
+    /**
+     * Сеанс obfuscated2 со стороны клиента (0.7.20), когда настоящий клиент Telegram обфускацию не использует: свой init со случайными
+     * ключом и IV, тегом протокола и номером ЦОД; исходящий поток шифруется ключом из init, входящий - тем же, но развёрнутым (как в MTProxy).
+     */
+    class ObfClient(tag: Int, dc: Int) {
+        val init: ByteArray
+        private val enc: Cipher
+        private val dec: Cipher
+
+        init {
+            val rnd = SecureRandom()
+            val r = ByteArray(64)
+            while (true) {
+                rnd.nextBytes(r)
+                if ((r[0].toInt() and 255) == 0xEF) continue
+                val first = ((r[0].toInt() and 255) shl 24) or ((r[1].toInt() and 255) shl 16) or ((r[2].toInt() and 255) shl 8) or (r[3].toInt() and 255)
+                // Не похоже на HTTP и на открытые теги транспорта; байты 4..8 не нулевые.
+                if (first in BAD_FIRST || (r[4].toInt() == 0 && r[5].toInt() == 0 && r[6].toInt() == 0 && r[7].toInt() == 0)) continue
+                break
+            }
+            r[56] = (tag ushr 24).toByte(); r[57] = (tag ushr 16).toByte(); r[58] = (tag ushr 8).toByte(); r[59] = tag.toByte()
+            r[60] = (dc and 255).toByte(); r[61] = ((dc shr 8) and 255).toByte()
+            enc = ctr(r.copyOfRange(8, 40), r.copyOfRange(40, 56))
+            val ks = enc.update(ByteArray(64))
+            init = r.copyOf()
+            for (i in 56 until 64) init[i] = (r[i].toInt() xor ks[i].toInt()).toByte()
+            val rev = r.copyOfRange(8, 56).reversedArray()
+            dec = ctr(rev.copyOfRange(0, 32), rev.copyOfRange(32, 48))
+        }
+
+        fun encrypt(data: ByteArray): ByteArray = enc.update(data)
+        fun decrypt(data: ByteArray): ByteArray = dec.update(data)
+
+        private fun ctr(key: ByteArray, iv: ByteArray) = Cipher.getInstance("AES/CTR/NoPadding").apply {
+            init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), IvParameterSpec(iv))
+        }
+
+        private companion object {
+            val BAD_FIRST = setOf(0x44414548, 0x54534F50, 0x20544547, 0x4954504F, 0xDDDDDDDD.toInt(), 0xEEEEEEEE.toInt(), 0x02010316)
+        }
+    }
+
+    /** Границы сообщений открытого транспорта Telegram (abridged / intermediate / padded), с накоплением неполного хвоста между чтениями. */
+    class PlainFramer(private val tag: Int) {
+        private var buf = ByteArray(0)
+
+        fun feed(chunk: ByteArray): List<ByteArray> {
+            buf += chunk
+            val out = ArrayList<ByteArray>()
+            var pos = 0
+            while (true) {
+                val avail = buf.size - pos
+                val total: Int
+                if (tag == TAG_ABRIDGED) {
+                    if (avail < 1) break
+                    val f = buf[pos].toInt() and 0x7F          // старший бит - запрос быстрого подтверждения
+                    if (f == 0x7F) {
+                        if (avail < 4) break
+                        total = 4 + ((buf[pos + 1].toInt() and 255) or ((buf[pos + 2].toInt() and 255) shl 8) or ((buf[pos + 3].toInt() and 255) shl 16)) * 4
+                    } else total = 1 + f * 4
+                } else {
+                    if (avail < 4) break
+                    val len = ((buf[pos].toInt() and 255) or ((buf[pos + 1].toInt() and 255) shl 8) or ((buf[pos + 2].toInt() and 255) shl 16) or ((buf[pos + 3].toInt() and 127) shl 24))
+                    total = 4 + len
+                }
+                if (total <= 0 || total > MAX_MESSAGE) throw IOException("недопустимая длина сообщения MTProto: $total")
+                if (avail < total) break
+                out += buf.copyOfRange(pos, pos + total)
+                pos += total
+            }
+            buf = buf.copyOfRange(pos, buf.size)
+            return out
+        }
+
+        private companion object { const val MAX_MESSAGE = 16 * 1024 * 1024 }
+    }
+
     // ---- WebSocket --------------------------------------------------------------------------------------------
 
     internal class WebSocket private constructor(private val sock: Socket, private val inp: InputStream, private val out: OutputStream) {
@@ -385,7 +610,7 @@ class TgWsProxy(
     companion object {
         private const val MAX_CONNECTIONS = 256
 
-        /** Запасные адреса ЦОД для WebSocket (по README DmitryKafturov/tg-ws-proxy; проверено: `.220` и `.99` отвечают 101, `.51` у части провайдеров глухо блокируется); `203` — служебный, ходит как ЦОД 2. */
+        /** Запасные адреса ЦОД для WebSocket (проверено: `.220` и `.99` отвечают 101, `.51` у части провайдеров глухо блокируется); `203` — служебный, ходит как ЦОД 2. */
         val DEFAULT_DC_IPS: Map<Int, String> = mapOf(
             1 to "149.154.175.205", 2 to "149.154.167.220", 3 to "149.154.175.100",
             4 to "149.154.167.220", 5 to "149.154.171.5", 203 to "149.154.167.220",
@@ -423,6 +648,36 @@ class TgWsProxy(
             return if (media) listOf("kws$d-1.web.telegram.org", "kws$d.web.telegram.org")
             else listOf("kws$d.web.telegram.org", "kws$d-1.web.telegram.org")
         }
+
+
+        /**
+         * Адреса ЦОД Telegram по IPv6: `2001:b28:f23d:f00N::a` (N - номер ЦОД; для 2 и 4 - `2001:67c:4e8:f00N::a`, для 5 - `2001:b28:f23f:f005::a`);
+         * `::b` - media. null - не Telegram.
+         */
+        fun v6Dc(a: ByteArray): Pair<Int, Boolean>? {
+            if (a.size != 16) return null
+            fun g(i: Int) = ((a[2 * i].toInt() and 255) shl 8) or (a[2 * i + 1].toInt() and 255)
+            val known = g(0) == 0x2001 && ((g(1) == 0x0B28 && (g(2) == 0xF23D || g(2) == 0xF23F)) || (g(1) == 0x067C && g(2) == 0x04E8))
+            if (!known) return null
+            val dc = g(3) - 0xF000
+            if (dc !in 1..5) return null
+            for (i in 8 until 15) if (a[i].toInt() != 0) return null
+            return dc to ((a[15].toInt() and 255) == 0x0B)
+        }
+
+        /** Секрет MTProto-прокси: постоянный (слушатель только на 127.0.0.1; секрет нужен Telegram для ключа обфускации, а не для защиты). */
+        private val MT_SECRET: ByteArray = java.security.MessageDigest.getInstance("SHA-256").digest("HydraVPN TG WS".toByteArray()).copyOf(16)
+        val MT_SECRET_HEX: String get() = MT_SECRET.joinToString("") { "%02x".format(it) }
+
+        /** Ссылка для Telegram: `tg://proxy` с секретом `dd` (padded intermediate). */
+        fun mtProxyLink(port: Int): String = "tg://proxy?server=127.0.0.1&port=$port&secret=dd$MT_SECRET_HEX"
+
+        /** Ссылка для Telegram: SOCKS5 (ByeDPI и прочее). */
+        fun socksLink(port: Int): String = "tg://socks?server=127.0.0.1&port=$port"
+
+        private const val TAG_ABRIDGED = 0xEFEFEFEF.toInt()
+        private const val TAG_INTERMEDIATE = 0xEEEEEEEE.toInt()
+        private const val TAG_PADDED = 0xDDDDDDDD.toInt()
 
         fun isTelegramIp(ip: String): Boolean {
             if (ip.count { it == '.' } != 3) return false

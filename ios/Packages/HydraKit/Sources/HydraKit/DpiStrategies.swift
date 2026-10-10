@@ -76,5 +76,12 @@ public enum DpiStrategies {
         "discord": ["dis.gd", "discord.co", "discord.gg", "discord.app", "discord.com", "discord.dev", "discord.new", "discord.gift"],
         "telegram": ["telegram.org", "core.telegram.org", "web.telegram.org", "webk.telegram.org", "my.telegram.org", "translations.telegram.org", "instantview.telegram.org", "blog.telegram.org"],
         "general": ["rutracker.org", "nyaa.si", "rutor.org", "nnmclub.to", "speedtest.net", "ookla.com"],
+        "cloudflare": ["cloudflare.net", "cloudflare.com", "cloudflarecn.net", "cloudflare-ech.com"],
+        "googlevideo": ["rr1---sn-4axm-n8vs.googlevideo.com", "rr1---sn-gvnuxaxjvh-o8ge.googlevideo.com", "rr1---sn-ug5onuxaxjvh-p3ul.googlevideo.com", "rr1---sn-ug5onuxaxjvh-n8v6.googlevideo.com", "manifest.googlevideo.com"],
+        "social": ["snapchat.com", "snap.com", "linkedin.com", "facebook.com", "fb.com", "instagram.com", "x.com", "twitter.com", "tiktok.com"],
+        "turkiye": ["roblox.com", "wattpad.com", "pastebin.com", "4shared.com", "wikileaks.org"],
     ]
+
+    /// Порядок встроенных списков в интерфейсе (как в ByeByeDPI - по алфавиту).
+    public static let groupOrder = ["cloudflare", "discord", "general", "googlevideo", "social", "telegram", "turkiye", "youtube"]
 }
