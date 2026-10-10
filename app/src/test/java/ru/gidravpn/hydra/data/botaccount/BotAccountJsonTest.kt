@@ -56,6 +56,8 @@ class BotAccountJsonTest {
         assertEquals("http://localhost:8080", BotAccountJson.normalizeServer("http://localhost:8080"))
         assertNull(BotAccountJson.normalizeServer("http://localhost:8080", allowHttp = false))
         assertFalse(BotAccountJson.isLocalHost("8.8.8.8"))
+        assertFalse(BotAccountJson.isLocalHost("10.0.0.1.evil.com"))
+        assertFalse(BotAccountJson.isLocalHost("10.evil.0.1.2"))
         assertTrue(BotAccountJson.isLocalHost("172.20.0.1"))
         assertFalse(BotAccountJson.isLocalHost("172.40.0.1"))
     }

@@ -539,7 +539,7 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             var n = 0
             while (isActive && n < ReconnectPolicy.MAX_ATTEMPTS) {
                 val wait = ReconnectPolicy.backoffMs(n)
-                VpnState.log("Переподключение: попытка ${n + 1}/$ReconnectPolicy.MAX_ATTEMPTS через ${wait / 1000} с")
+                VpnState.log("Переподключение: попытка ${n + 1}/${ReconnectPolicy.MAX_ATTEMPTS} через ${wait / 1000} с")
                 // Ждём бэкофф, но раньше, если система сообщила о появившейся сети.
                 kotlinx.coroutines.withTimeoutOrNull(wait) { networkSignal.receive() }
                 if (!hasPhysicalNetwork()) {

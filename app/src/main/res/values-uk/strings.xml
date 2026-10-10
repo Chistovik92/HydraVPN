@@ -47,4 +47,6 @@
     <string name="hotspot_invalid">Порт — 1024–65535, логін не порожній, пароль щонайменше 6 символів.</string>
     <string name="hotspot_apply_note">Застосовується під час наступного підключення. Працює з протоколами sing-box і Xray Core; для SSTP, L2TP і AmneziaWG недоступно.</string>
     <string name="hotspot_warning">Будь-хто, хто знає пароль, може користуватися вашим з\'єднанням. Не вмикайте в публічних мережах.</string>
+    <string name="import_confirm_title">Імпортувати за посиланням?</string>
+    <string name="import_confirm_msg">Застосунок або сторінка хоче додати в Hydra елемент %1$s://. Продовжуйте, лише якщо довіряєте джерелу.</string>
 </resources>

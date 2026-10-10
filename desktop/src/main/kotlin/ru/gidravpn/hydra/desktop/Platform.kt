@@ -101,7 +101,8 @@ object Platform {
     }
 
     private fun bundled(name: String, env: String): File? {
-        System.getenv(env)?.let { File(it) }?.takeIf { it.isFile }?.let { return it }
+        // Переопределение через переменную — только для разработки: при запуске от администратора подмена исполняемого файла недопустима.
+        if (!ru.gidravpn.hydra.desktop.core.Elevation.admin) System.getenv(env)?.let { File(it) }?.takeIf { it.isFile }?.let { return it }
         val file = exe(name)
         val core = resourcesDir?.let { File(it, file) }?.takeIf { it.isFile } ?: return null
         if (os == Os.WINDOWS || core.canExecute() || core.setExecutable(true)) return core

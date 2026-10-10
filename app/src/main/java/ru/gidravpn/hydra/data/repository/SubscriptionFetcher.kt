@@ -17,6 +17,8 @@ class SubscriptionFetcher(
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
+        // https → http при редиректе раскрыл бы токен подписки и HWID по открытому каналу.
+        .followSslRedirects(false)
         .build()
 ) {
     data class Result(val profiles: List<ServerProfile>, val info: SubscriptionHeaders.Info)

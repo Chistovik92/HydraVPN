@@ -47,4 +47,6 @@
     <string name="hotspot_invalid">پورت باید ۱۰۲۴ تا ۶۵۵۳۵ باشد، نام کاربری خالی نباشد و رمز دست‌کم ۶ نویسه.</string>
     <string name="hotspot_apply_note">در اتصال بعدی اعمال می‌شود. با پروتکل‌های sing-box و Xray Core کار می‌کند؛ برای SSTP، L2TP و AmneziaWG در دسترس نیست.</string>
     <string name="hotspot_warning">هر کس رمز را بداند می‌تواند از اتصال شما استفاده کند. در شبکه‌های عمومی فعال نکنید.</string>
+    <string name="import_confirm_title">وارد کردن از پیوند؟</string>
+    <string name="import_confirm_msg">یک برنامه یا صفحه وب می‌خواهد مورد %1$s:// را به Hydra اضافه کند. فقط در صورت اعتماد به منبع ادامه دهید.</string>
 </resources>

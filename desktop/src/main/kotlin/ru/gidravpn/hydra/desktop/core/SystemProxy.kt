@@ -104,16 +104,16 @@ object SystemProxy {
          */
         fun startGuard(backup: File) {
             runCatching {
-                val script = File(Platform.runDir, "proxy-guard.ps1")
-                script.writeText(GUARD)
+                // Сценарий не лежит файлом: при запуске от администратора файл в каталоге пользователя могли бы подменить (0.7.17).
+                val head = "${'$'}ParentPid = ${ProcessHandle.current().pid()}; ${'$'}Backup = '${backup.absolutePath.replace("'", "''")}'; "
+                val encoded = java.util.Base64.getEncoder().encodeToString((head + GUARD).toByteArray(Charsets.UTF_16LE))
                 ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass",
-                    "-File", script.absolutePath, ProcessHandle.current().pid().toString(), backup.absolutePath)
+                    "-EncodedCommand", encoded)
                     .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
             }
         }
 
         private val GUARD = """
-            param([int]@ParentPid, [string]@Backup)
             try { Wait-Process -Id @ParentPid -ErrorAction Stop } catch {}
             Start-Sleep -Seconds 2
             if (-not (Test-Path @Backup)) { exit }
