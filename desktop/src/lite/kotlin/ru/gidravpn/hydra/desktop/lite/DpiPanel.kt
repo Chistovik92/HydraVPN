@@ -43,6 +43,7 @@ internal class DpiPanel(private val c: AppController) : Renderable {
         RouteTarget.PROXY -> "VPN"
         RouteTarget.DIRECT -> "Напрямую"
         RouteTarget.DPI -> "Обход DPI"
+        RouteTarget.TGWS -> "Telegram по WebSocket"
         RouteTarget.BLOCK -> "Блок"
         else -> RouteTarget.nodeId(t)?.let { id -> servers.firstOrNull { it.id == id }?.name } ?: groups.firstOrNull { it.tag == t }?.let { "◎ ${it.name}" } ?: t
     }
@@ -54,7 +55,7 @@ internal class DpiPanel(private val c: AppController) : Renderable {
         RouteKind.PROTOCOL to "Протокол", RouteKind.NETWORK to "Сеть (tcp/udp)", RouteKind.GEOIP to "Страна (IP)", RouteKind.GEOSITE to "Страна (домены)",
     )
     private fun nodes() = servers.filter { it.protocol?.engine == Engine.SINGBOX || it.protocol?.engine == Engine.OPENFLUX || it.protocol?.engine == Engine.OLCRTC }
-    private fun allTargets() = listOf(RouteTarget.PROXY, RouteTarget.DIRECT, RouteTarget.DPI, RouteTarget.BLOCK) + groups.map { it.tag } + nodes().map { RouteTarget.node(it.id) }
+    private fun allTargets() = listOf(RouteTarget.PROXY, RouteTarget.DIRECT, RouteTarget.DPI, RouteTarget.TGWS, RouteTarget.BLOCK) + groups.map { it.tag } + nodes().map { RouteTarget.node(it.id) }
 
     // ---- мастер подбора
     private val wizGroups = linkedMapOf(
@@ -140,7 +141,7 @@ internal class DpiPanel(private val c: AppController) : Renderable {
             row(button("Убрать выбранное") { ruleList.selectedValuesList.forEach { c.removeRouteRule(it) } }),
             row(JLabel("Условие:"), ruleKind, ruleValue),
             row(JLabel("Выход:"), ruleTarget, ruleNot, JLabel("метка «И»:"), ruleGroup),
-            row(button("Добавить правило") { addRule() }, button("Заблокированное в РФ → обход DPI") { c.applyBlockedRuPreset() }),
+            row(button("Добавить правило") { addRule() }, button("Заблокированное в РФ → обход DPI") { c.applyBlockedRuPreset() }, button("Telegram → WebSocket (вкл/выкл)") { c.toggleTgWsPreset() }),
         ),
         section("Группы выходов",
             note("Авто — самый быстрый живой выход с переключением при сбое; ручной — выбираете сами. Группа может быть целью правила."),

@@ -137,7 +137,7 @@
     <string name="set_tunnel">Туннель</string>
     <string name="set_security">Безопасность</string>
     <string name="set_security_sub">Kill Switch, автоподключение, блокировка</string>
-    <string name="set_routing">Маршрутизация</string>
+    <string name="set_routing">DNS, гео и профили</string>
     <string name="set_routing_sub">DNS, GeoIP по странам, фрагментация, MTU, IPv6, профили</string>
     <string name="set_split">Split-туннелинг</string>
     <string name="set_split_sub">Приложения через VPN / мимо VPN</string>

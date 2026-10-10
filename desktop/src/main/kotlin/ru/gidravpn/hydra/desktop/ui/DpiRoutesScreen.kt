@@ -32,7 +32,13 @@ import ru.gidravpn.hydra.data.geo.GeoKind
 import ru.gidravpn.hydra.data.geo.GeoSources
 import ru.gidravpn.hydra.data.model.Engine
 import ru.gidravpn.hydra.data.model.ServerProfile
+import ru.gidravpn.hydra.data.routing.RouteConfig
 import ru.gidravpn.hydra.data.routing.RouteGroup
+import ru.gidravpn.hydra.data.tgws.TgWsPreset
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.Icon
 import ru.gidravpn.hydra.data.routing.RouteKind
 import ru.gidravpn.hydra.data.routing.RouteRule
 import ru.gidravpn.hydra.data.routing.RouteTarget
@@ -54,20 +60,25 @@ private fun targetName(t: String, servers: List<ServerProfile>, groups: List<Rou
     RouteTarget.PROXY -> "VPN"
     RouteTarget.DIRECT -> "Напрямую"
     RouteTarget.DPI -> "Обход DPI"
+    RouteTarget.TGWS -> "Telegram по WebSocket"
     RouteTarget.BLOCK -> "Блок"
     else -> RouteTarget.nodeId(t)?.let { id -> servers.firstOrNull { it.id == id }?.name }
         ?: groups.firstOrNull { it.tag == t }?.let { "◎ ${it.name}" } ?: t
 }
 
-/** Обход DPI, полная маршрутизация и geo-базы (0.7.13) — разделы экрана «Маршрутизация». */
-internal fun androidx.compose.foundation.lazy.LazyListScope.dpiRoutesItems(c: AppController, ui: UiState) {
+/** Разделы вкладок «Маршрутизации» (0.7.14): на каждую вкладку — свой набор. */
+internal fun androidx.compose.foundation.lazy.LazyListScope.sitesRulesItems(c: AppController, ui: UiState) { item { RulesSection(c, ui, programs = false) } }
+internal fun androidx.compose.foundation.lazy.LazyListScope.programRulesItems(c: AppController, ui: UiState) { item { RulesSection(c, ui, programs = true) } }
+internal fun androidx.compose.foundation.lazy.LazyListScope.dpiItems(c: AppController, ui: UiState) {
     item { DpiWizardSection(c, ui) }
     item { DpiSection(c, ui) }
-    item { RulesSection(c, ui) }
+    item { TgWsSection(c, ui) }
+}
+internal fun androidx.compose.foundation.lazy.LazyListScope.exitsItems(c: AppController, ui: UiState) {
     item { GroupsSection(c, ui) }
     item { ChainsSection(c, ui) }
-    item { GeoLayerSection(c, ui) }
 }
+internal fun androidx.compose.foundation.lazy.LazyListScope.geoLayerItems(c: AppController, ui: UiState) { item { GeoLayerSection(c, ui) } }
 
 private val dpiAvailable get() = Platform.bundledByeDpi() != null
 
@@ -128,6 +139,7 @@ private fun DpiWizardSection(c: AppController, ui: UiState) {
 @Composable
 private fun DpiSection(c: AppController, ui: UiState) {
     val dpi = ui.data.settings.routing.routes.dpi
+    var picker by remember { mutableStateOf(false) }
     Section("Обход DPI для трафика напрямую") {
         Text("ByeDPI — локальный прокси: режет и подделывает первые пакеты соединения, чтобы DPI провайдера не узнал сайт. Это не VPN: ваш IP он не скрывает.",
             fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -135,31 +147,63 @@ private fun DpiSection(c: AppController, ui: UiState) {
             Text("Пускать трафик «напрямую» через ByeDPI", Modifier.weight(1f))
             Switch(checked = dpi.enabled, onCheckedChange = { v -> c.setDpi { it.copy(enabled = v) } }, enabled = dpiAvailable)
         }
+        val idx = DpiStrategies.PRESETS.indexOf(dpi.strategy)
+        Box {
+            OutlinedTextField(if (idx >= 0) "Готовая стратегия ${idx + 1} из ${DpiStrategies.PRESETS.size}" else "Своя", {}, Modifier.fillMaxWidth(),
+                readOnly = true, singleLine = true, label = { Text("Стратегия") }, trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) })
+            Box(Modifier.matchParentSize().clickable { picker = true })
+        }
+        Text(dpi.strategy, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
         var custom by remember(dpi.strategy) { mutableStateOf(dpi.strategy) }
-        OutlinedTextField(custom, { custom = it }, Modifier.fillMaxWidth(), label = { Text("Стратегия (аргументы ciadpi)") }, isError = !DpiArgs.isUsable(custom))
-        var showPresets by remember { mutableStateOf(false) }
+        OutlinedTextField(custom, { custom = it }, Modifier.fillMaxWidth(), label = { Text("Или впишите свою (аргументы ciadpi, для опытных)") }, isError = !DpiArgs.isUsable(custom))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { c.setDpi { it.copy(strategy = custom.trim().ifBlank { DpiStrategies.DEFAULT }) } }) { Text("Применить") }
-            OutlinedButton(onClick = { showPresets = !showPresets }) { Text("Готовые") }
             OutlinedButton(onClick = { c.addByeDpiProfile(dpi.strategy) }) { Text("Добавить профиль «Обход DPI»") }
         }
-        if (showPresets) DpiStrategies.PRESETS.forEachIndexed { i, s ->
-            Text("${i + 1}. $s", fontSize = 11.sp, color = if (s == dpi.strategy) Accent else MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().clickable { custom = s; c.setDpi { it.copy(strategy = s) } })
-        }
+        if (picker) PickDialog("Выберите стратегию", DpiStrategies.PRESETS, dpi.strategy, { i, s -> "${i + 1}. $s" },
+            { s -> c.setDpi { it.copy(strategy = s) }; picker = false }, { picker = false })
     }
 }
 
 @Composable
-private fun RulesSection(c: AppController, ui: UiState) {
+private fun TgWsSection(c: AppController, ui: UiState) {
+    val on = TgWsPreset.isApplied(ui.data.settings.routing.routes.rules)
+    Section("Telegram по WebSocket") {
+        Text("Когда Telegram не грузится даже с обходом DPI: его трафик идёт к серверам Telegram по WebSocket поверх TLS (kws*.web.telegram.org) " +
+            "вместо обычного TCP, который провайдеры душат. Свой сервер не нужен. Идея и протокол — Flowseal/tg-ws-proxy и DmitryKafturov/tg-ws-proxy (MIT).",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Пускать Telegram через WebSocket", Modifier.weight(1f))
+            Switch(checked = on, onCheckedChange = { c.toggleTgWsPreset() })
+        }
+    }
+}
+
+/** Варианты выхода для списка: VPN, напрямую, обход DPI, Telegram WS, блок, группы, серверы. */
+private fun exitOptions(cfg: RouteConfig, servers: List<ServerProfile>): List<Pair<String, String>> {
+    val nodes = servers.filter { it.protocol?.engine == Engine.SINGBOX || it.protocol?.engine == Engine.OPENFLUX || it.protocol?.engine == Engine.OLCRTC }
+    return (listOf(RouteTarget.PROXY, RouteTarget.DIRECT, RouteTarget.DPI, RouteTarget.TGWS, RouteTarget.BLOCK) + cfg.groups.map { it.tag } + nodes.map { RouteTarget.node(it.id) })
+        .map { it to targetName(it, servers, cfg.groups) }
+}
+
+/** Правила «что → через какой выход»: [programs] — по программам (ПК), иначе сайты, IP, страны, порты. */
+@Composable
+private fun RulesSection(c: AppController, ui: UiState, programs: Boolean) {
     val cfg = ui.data.settings.routing.routes
     val servers = ui.data.servers
-    val nodes = servers.filter { it.protocol?.engine == Engine.SINGBOX || it.protocol?.engine == Engine.OPENFLUX || it.protocol?.engine == Engine.OLCRTC }
-    Section("Правила маршрутизации") {
-        Text("Разные программы, сайты, адреса и страны — через разные выходы одновременно. Условия с одной меткой группы объединяются по «И», «НЕ» инвертирует условие.",
+    val presetRules = remember { TgWsPreset.rules().toSet() }
+    val rules = cfg.rules.filter { r -> r !in presetRules && if (programs) r.kind == RouteKind.PROCESS else (r.kind != RouteKind.PROCESS && r.kind != RouteKind.APP) }
+    val tgOn = !programs && TgWsPreset.isApplied(cfg.rules)
+    val exits = exitOptions(cfg, servers)
+    Section(if (programs) "Свой выход для программы" else "Правила для сайтов, IP, стран и портов") {
+        Text(if (programs) "Например: одна программа — через выбранный сервер или обход DPI, остальные — по режиму выше. Имя процесса (chrome.exe, firefox) или полный путь."
+            else "Что подходит → какой выход. Правила проверяются сверху вниз, срабатывает первое подходящее.",
             fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        val rules = cfg.rules.filter { it.kind != RouteKind.APP }
-        if (rules.isEmpty()) Text("Правил пока нет", fontSize = 12.sp)
+        if (rules.isEmpty() && !tgOn) Text("Правил пока нет", fontSize = 12.sp)
+        if (tgOn) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Telegram  →  ${targetName(RouteTarget.TGWS, servers, cfg.groups)}", Modifier.weight(1f), fontSize = 13.sp)
+            TextButton(onClick = { c.toggleTgWsPreset() }) { Text("Удалить", color = Danger) }
+        }
         rules.forEach { r ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text((if (r.invert) "НЕ " else "") + "${kindNames[r.kind]}  ${r.value}" + (if (r.group.isNotBlank()) " [${r.group}]" else "") +
@@ -167,32 +211,52 @@ private fun RulesSection(c: AppController, ui: UiState) {
                 TextButton(onClick = { c.removeRouteRule(r) }) { Text("Удалить", color = Danger) }
             }
         }
-        var kind by remember { mutableStateOf(RouteKind.PROCESS) }
+        var kind by remember { mutableStateOf(RouteKind.DOMAIN) }
         var value by remember { mutableStateOf("") }
         var target by remember { mutableStateOf(RouteTarget.DIRECT) }
         var invert by remember { mutableStateOf(false) }
         var group by remember { mutableStateOf("") }
-        ChipRow {
-            RouteKind.entries.filter { it != RouteKind.APP }.forEach { k ->
-                FilterChip(selected = kind == k, onClick = { kind = k }, label = { Text(kindNames.getValue(k)) })
+        var more by remember { mutableStateOf(false) }
+        val kinds = RouteKind.entries.filter { it != RouteKind.APP && it != RouteKind.PROCESS }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+            if (programs) {
+                OutlinedTextField(value, { value = it }, Modifier.weight(1f), singleLine = true, label = { Text("Программа: имя процесса или путь") })
+            } else {
+                DropField("Условие", kindNames.getValue(kind), kinds.map { it to kindNames.getValue(it) }, { kind = it }, Modifier.weight(0.45f), selected = kind)
+                OutlinedTextField(value, { value = it }, Modifier.weight(0.55f), singleLine = true, label = { Text(kindHints.getValue(kind)) })
             }
         }
-        OutlinedTextField(value, { value = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Значение (программа, домен, CIDR, порт, код страны)") })
-        ChipRow {
-            (listOf(RouteTarget.PROXY, RouteTarget.DIRECT, RouteTarget.DPI, RouteTarget.BLOCK) + cfg.groups.map { it.tag } + nodes.map { RouteTarget.node(it.id) }).forEach { t ->
-                FilterChip(selected = target == t, onClick = { target = t }, label = { Text(targetName(t, servers, cfg.groups)) })
+        DropField("Выход", targetName(target, servers, cfg.groups), exits, { target = it }, selected = target)
+        if (!programs) {
+            TextButton(onClick = { more = !more }) { Text((if (more) "▾ " else "▸ ") + "Дополнительно") }
+            if (more) {
+                Text("«НЕ» переворачивает условие. Правила с одной меткой склеиваются по «И» (например, порт 443 И страна).",
+                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = invert, onClick = { invert = !invert }, label = { Text("НЕ") })
+                    OutlinedTextField(group, { group = it }, Modifier.weight(1f), singleLine = true, label = { Text("Метка группы «И» (необязательно)") })
+                }
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = invert, onClick = { invert = !invert }, label = { Text("НЕ") })
-            OutlinedTextField(group, { group = it }, Modifier.weight(1f), singleLine = true, label = { Text("Метка группы «И» (необязательно)") })
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { if (value.isNotBlank()) { c.addRouteRule(RouteRule(kind, value.trim(), target, invert, group.trim())); value = "" } }) { Text("Добавить правило") }
-            OutlinedButton(onClick = { c.applyBlockedRuPreset() }) { Text("Заблокированное в РФ → обход DPI") }
+        ChipRow {
+            Button(onClick = {
+                if (value.isNotBlank()) { c.addRouteRule(RouteRule(if (programs) RouteKind.PROCESS else kind, value.trim(), target, invert, group.trim())); value = "" }
+            }) { Text("Добавить правило") }
+            if (!programs) {
+                OutlinedButton(onClick = { c.applyBlockedRuPreset() }) { Text("Заблокированное в РФ → обход DPI") }
+                OutlinedButton(onClick = { c.toggleTgWsPreset() }) { Text(if (tgOn) "Telegram → WebSocket ✓" else "Telegram → WebSocket") }
+            }
         }
     }
 }
+
+private val kindHints = mapOf(
+    RouteKind.DOMAIN to "Домен, например example.com", RouteKind.SUFFIX to "Окончание домена, например .ru", RouteKind.KEYWORD to "Слово в домене, например google",
+    RouteKind.REGEX to "Регулярное выражение для домена", RouteKind.CIDR to "Диапазон IP, например 149.154.160.0/20", RouteKind.SRC_CIDR to "IP клиента или диапазон (раздача в сеть)",
+    RouteKind.PORT to "Порт или диапазон: 443 или 6881-6889", RouteKind.PROTOCOL to "Протокол: tls, http, quic, dns…", RouteKind.NETWORK to "tcp или udp",
+    RouteKind.GEOIP to "Код страны или набор, например ru", RouteKind.GEOSITE to "Набор доменов, например category-ru, youtube",
+    RouteKind.APP to "Приложение", RouteKind.PROCESS to "Программа",
+)
 
 @Composable
 private fun GroupsSection(c: AppController, ui: UiState) {
@@ -212,20 +276,23 @@ private fun GroupsSection(c: AppController, ui: UiState) {
         var name by remember { mutableStateOf("") }
         var type by remember { mutableStateOf(RouteGroup.TYPE_URLTEST) }
         var members by remember { mutableStateOf(setOf<String>()) }
+        var picker by remember { mutableStateOf(false) }
+        val options = (listOf(RouteTarget.PROXY, RouteTarget.DIRECT, RouteTarget.DPI, RouteTarget.TGWS) + nodes.map { RouteTarget.node(it.id) })
+            .map { it to targetName(it, servers, cfg.groups) }
         OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Название группы") })
-        ChipRow {
-            FilterChip(selected = type == RouteGroup.TYPE_URLTEST, onClick = { type = RouteGroup.TYPE_URLTEST }, label = { Text("Авто") })
-            FilterChip(selected = type == RouteGroup.TYPE_SELECTOR, onClick = { type = RouteGroup.TYPE_SELECTOR }, label = { Text("Ручной") })
-        }
-        ChipRow {
-            (listOf(RouteTarget.PROXY, RouteTarget.DIRECT, RouteTarget.DPI) + nodes.map { RouteTarget.node(it.id) }).forEach { t ->
-                FilterChip(selected = t in members, onClick = { members = if (t in members) members - t else members + t },
-                    label = { Text(targetName(t, servers, cfg.groups)) })
-            }
+        val auto = "Авто — самый быстрый живой выход, с переключением при сбое"
+        val manual = "Ручной — выход выбираете вы"
+        DropField("Тип группы", if (type == RouteGroup.TYPE_URLTEST) auto else manual,
+            listOf(RouteGroup.TYPE_URLTEST to auto, RouteGroup.TYPE_SELECTOR to manual), { type = it }, selected = type)
+        Box {
+            OutlinedTextField(if (members.isEmpty()) "Нажмите, чтобы выбрать выходы" else members.joinToString { targetName(it, servers, cfg.groups) }, {}, Modifier.fillMaxWidth(),
+                readOnly = true, singleLine = true, label = { Text("Состав группы") }, trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) })
+            Box(Modifier.matchParentSize().clickable { picker = true })
         }
         Button(onClick = { if (name.isNotBlank() && members.isNotEmpty()) { c.addRouteGroup(RouteGroup(name.trim(), type, members.toList())); name = ""; members = emptySet() } }) {
             Text("Создать группу")
         }
+        if (picker) MultiPickDialog("Состав группы", options, members, { t -> members = if (t in members) members - t else members + t }, { picker = false })
     }
 }
 
@@ -239,15 +306,10 @@ private fun ChainsSection(c: AppController, ui: UiState) {
             fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (chainable.isEmpty()) Text("Добавьте сервер VLESS, VMess, Trojan или Shadowsocks.", fontSize = 12.sp)
         chainable.forEach { s ->
-            Text(s.name, fontWeight = FontWeight.Medium, fontSize = 13.sp)
             val via = viaOf(s)
-            ChipRow {
-                FilterChip(selected = via == null, onClick = { c.setServerVia(s, null) }, label = { Text("Напрямую") })
-                FilterChip(selected = via == RouteTarget.DPI, onClick = { c.setServerVia(s, RouteTarget.DPI) }, label = { Text("Обход DPI") })
-                nodes.filter { it.id != s.id }.take(8).forEach { n ->
-                    FilterChip(selected = via == RouteTarget.node(n.id), onClick = { c.setServerVia(s, RouteTarget.node(n.id)) }, label = { Text(n.name) })
-                }
-            }
+            val opts = listOf<String?>(null, RouteTarget.DPI) + nodes.filter { it.id != s.id }.map { RouteTarget.node(it.id) }
+            DropField<String?>(s.name, if (via == null) "Напрямую" else targetName(via, servers, emptyList()),
+                opts.map { it to (if (it == null) "Напрямую" else targetName(it, servers, emptyList())) }, { c.setServerVia(s, it) }, selected = via)
         }
         Text("UDP-протоколы (Hysteria2, TUIC, WireGuard) в цепочку не ставятся.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

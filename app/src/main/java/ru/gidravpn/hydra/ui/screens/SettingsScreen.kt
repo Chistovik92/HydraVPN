@@ -43,7 +43,7 @@ import ru.gidravpn.hydra.ui.theme.*
 import ru.gidravpn.hydra.vpn.HydraQsTileService
 
 /** Подэкраны Настроек — Split и Логи переехали сюда из верхнего уровня навигации. */
-private enum class SettingsSection { HUB, TUNNEL, SECURITY, ROUTING, SPLIT, DPI, GEO, HOTSPOT, LOGS, THEME, LANGUAGE, BACKUP, ABOUT }
+private enum class SettingsSection { HUB, TUNNEL, SECURITY, ROUTES, ROUTING, GEO, HOTSPOT, LOGS, THEME, LANGUAGE, BACKUP, ABOUT }
 
 @Composable
 fun SettingsScreen(vm: MainViewModel) {
@@ -59,8 +59,7 @@ fun SettingsScreen(vm: MainViewModel) {
         SettingsSection.TUNNEL -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { TunnelInfoContent(vm) }
         SettingsSection.SECURITY -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { SecurityContent(vm) }
         SettingsSection.ROUTING -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { RoutingContent(vm) }
-        SettingsSection.SPLIT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { SplitTunnelScreen(vm) }
-        SettingsSection.DPI -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { DpiRoutesScreen(vm) }
+        SettingsSection.ROUTES -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { RoutingHubScreen(vm) }
         SettingsSection.GEO -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { GeoScreen(vm) }
         SettingsSection.HOTSPOT -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { HotspotContent(vm) }
         SettingsSection.LANGUAGE -> SettingsSubScreen(onBack = { section = SettingsSection.HUB }) { LanguageContent() }
@@ -81,9 +80,8 @@ private fun SettingsHub(onSelect: (SettingsSection) -> Unit) {
 
         HubRow("🌐", stringResource(R.string.set_tunnel), stringResource(R.string.set_tunnel_sub), AccentViolet) { onSelect(SettingsSection.TUNNEL) }
         HubRow("🛡️", stringResource(R.string.set_security), stringResource(R.string.set_security_sub), Danger) { onSelect(SettingsSection.SECURITY) }
+        HubRow("🔀", stringResource(R.string.rh_hub_title), stringResource(R.string.rh_hub_sub), AccentCyan) { onSelect(SettingsSection.ROUTES) }
         HubRow("🧭", stringResource(R.string.set_routing), stringResource(R.string.set_routing_sub), AccentIndigo) { onSelect(SettingsSection.ROUTING) }
-        HubRow("🔀", stringResource(R.string.set_split), stringResource(R.string.set_split_sub), AccentCyan) { onSelect(SettingsSection.SPLIT) }
-        HubRow("🛡️", stringResource(R.string.set_dpi), stringResource(R.string.set_dpi_sub), AccentViolet) { onSelect(SettingsSection.DPI) }
         HubRow("🌍", stringResource(R.string.set_geo), stringResource(R.string.set_geo_sub), AccentIndigo) { onSelect(SettingsSection.GEO) }
         HubRow("📡", stringResource(R.string.hotspot_hub_title), stringResource(R.string.hotspot_hub_subtitle), AccentIndigo) { onSelect(SettingsSection.HOTSPOT) }
         HubRow("📋", stringResource(R.string.set_logs), stringResource(R.string.set_logs_sub), TextSecondary) { onSelect(SettingsSection.LOGS) }

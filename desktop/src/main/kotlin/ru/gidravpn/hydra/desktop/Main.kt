@@ -36,6 +36,12 @@ fun main(args: Array<String>) {
             val bytes = AppController::class.java.getResourceAsStream(iconRes)?.use { it.readBytes() } ?: iconBytes
             BitmapPainter(org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap())
         }
+        // Ярлыки («Пуск», рабочий стол, меню приложений) и Dock — тоже по выбору иконки, в фоне.
+        LaunchedEffect(iconRes) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                ru.gidravpn.hydra.desktop.core.LauncherIcon.apply(ui.data.settings.appIcon, ui.data.settings.theme)
+            }
+        }
         // Автозапуск при входе в систему — сразу в трей (если трей есть).
         var visible by remember { mutableStateOf(!(runCatching { java.awt.SystemTray.isSupported() }.getOrDefault(false) && ru.gidravpn.hydra.desktop.core.Autostart.MINIMIZED_ARG in args)) }
 

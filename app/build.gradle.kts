@@ -31,8 +31,8 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 55
-        versionName = "0.7.13"
+        versionCode = 56
+        versionName = "0.7.14"
         // Приватный DNS (DoH с токеном в пути) для вошедших через бота: секрет, в репозитории его нет.
         // Свойство Gradle `hydraPrivateDns` или переменная окружения HYDRA_PRIVATE_DNS; пусто — пункт скрыт.
         val privateDns = ((project.findProperty("hydraPrivateDns") as String?) ?: System.getenv("HYDRA_PRIVATE_DNS") ?: "")
@@ -122,10 +122,15 @@ android {
         from(rootProject.file("shared/src/commonMain/kotlin/ru/gidravpn/hydra/update"))
         into(layout.buildDirectory.dir("generated/sharedRouter/ru/gidravpn/hydra/update"))
     }
+    // TG WS (пакет ru.gidravpn.hydra.data.tgws, 0.7.14) — один и тот же движок на Android и на ПК.
+    val syncSharedTgWs = tasks.register<Sync>("syncSharedTgWs") {
+        from(rootProject.file("shared/src/commonMain/kotlin/ru/gidravpn/hydra/data/tgws"))
+        into(layout.buildDirectory.dir("generated/sharedRouter/ru/gidravpn/hydra/data/tgws"))
+    }
     // Копии должны появиться до любой задачи, читающей исходники (Kotlin, KSP/KAPT, lint).
     tasks.configureEach {
         if (!name.startsWith("syncShared") && (name.startsWith("compile") || name.startsWith("ksp") ||
-                name.startsWith("kapt") || name.startsWith("lint"))) dependsOn(syncSharedRouter, syncSharedUpdate)
+                name.startsWith("kapt") || name.startsWith("lint"))) dependsOn(syncSharedRouter, syncSharedUpdate, syncSharedTgWs)
     }
     sourceSets {
         getByName("main") {

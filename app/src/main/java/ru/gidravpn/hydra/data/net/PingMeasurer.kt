@@ -9,8 +9,9 @@ import java.net.Socket
 /** Замер задержки до сервера через время TCP-connect (ICMP недоступен без root). */
 object PingMeasurer {
     private const val TIMEOUT_MS = 3000
+    const val UNREACHABLE = -2
 
-    /** Возвращает мс до сервера, либо -1 при таймауте/ошибке. */
+    /** Возвращает мс до сервера, либо [UNREACHABLE] (-2) при таймауте/ошибке; -1 — «ещё не измеряли». */
     suspend fun measure(address: String, port: Int): Int = withContext(Dispatchers.IO) {
         runCatching {
             // use{}: при таймауте (а это самый частый исход для мёртвого сервера)
@@ -22,6 +23,6 @@ object PingMeasurer {
                 socket.connect(InetSocketAddress(address, port), TIMEOUT_MS)
                 ((System.nanoTime() - start) / 1_000_000).toInt()
             }
-        }.getOrDefault(-1)
+        }.getOrDefault(UNREACHABLE)
     }
 }

@@ -59,6 +59,10 @@ class CoreRunner(
     /** Дополнительные клиенты (0.7.13): ByeDPI и узлы маршрутизации на OpenFlux/olcRTC — каждому свой процесс и порт. */
     private val extra = mutableListOf<Handle>()
 
+    /** Службы внутри самого Hydra (TG WS, 0.7.14): живут столько же, сколько ядра; остановка — в [stop]. */
+    private val inProcess = mutableListOf<AutoCloseable>()
+    @Synchronized fun attachInProcess(c: AutoCloseable) { inProcess += c }
+
     /** Все запущенные ядра живы. */
     val isAlive: Boolean get() = singBox?.alive == true && (xray == null || xray?.alive == true)
 
@@ -145,6 +149,7 @@ class CoreRunner(
         xray = null
         extra.forEach { runCatching { it.stop() } }
         extra.clear()
+        synchronized(this) { inProcess.forEach { runCatching { it.close() } }; inProcess.clear() }
         sidecarSecrets.forEach { runCatching { it.delete() } }
         sidecarSecrets = emptyList()
     }

@@ -139,7 +139,7 @@
     <string name="set_tunnel_sub">Cores: turn on / off</string>
     <string name="set_security">Security</string>
     <string name="set_security_sub">Kill Switch, auto-connect, app lock</string>
-    <string name="set_routing">Routing</string>
+    <string name="set_routing">DNS, geo and profiles</string>
     <string name="set_routing_sub">DNS, GeoIP by country, fragmentation, MTU, IPv6, profiles</string>
     <string name="set_split">Split tunneling</string>
     <string name="set_split_sub">Apps through the VPN / bypassing it</string>

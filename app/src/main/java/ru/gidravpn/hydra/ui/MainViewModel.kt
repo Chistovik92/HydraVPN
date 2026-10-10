@@ -342,6 +342,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         updateGeoNow()
     }
 
+    /** Пресет «Telegram через WebSocket» (0.7.14): подсети Telegram → выход «tgws»; повторное нажатие снимает. */
+    fun toggleTgWsPreset() {
+        val rules = ru.gidravpn.hydra.data.tgws.TgWsPreset.rules()
+        updateRoutes {
+            if (ru.gidravpn.hydra.data.tgws.TgWsPreset.isApplied(it.rules)) it.copy(rules = it.rules - rules.toSet())
+            else it.copy(rules = (it.rules + rules).distinct())
+        }
+    }
+
     /** «Пустить этот сервер через …»: `dpi`, `node-<id>` или null. */
     fun setServerVia(server: ServerProfile, via: String?) = safeLaunch {
         repo.save(withVia(server, via))

@@ -91,6 +91,18 @@ internal object RoutePlanRuntime {
                 plan = plan.withoutDpi()
             }
         }
+        if (plan.needsTgWs) {
+            // 0.7.14: Telegram через WebSocket — свой SOCKS5 внутри приложения (его сокеты вне tun, как и у ByeDPI).
+            val tg = ru.gidravpn.hydra.data.tgws.TgWsProxy(log = onLog)
+            try {
+                tg.start(RouteTarget.TGWS_PORT)
+                sidecars += AutoCloseable { tg.stop() }
+            } catch (e: Exception) {
+                onLog("TG WS: не запущен, продолжаем без него — ${e.message}")
+                tg.stop()
+                plan = plan.withoutTgWs()
+            }
+        }
         val root = JSONObject(config)
         val geo = { kind: RouteKind, name: String -> GeoAssets.pathFor(ctx, kind == RouteKind.GEOSITE, name) }
         RoutePlanApplier.apply(root, plan, geo).forEach { onLog("Маршрутизация: $it") }
