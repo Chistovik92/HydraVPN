@@ -42,6 +42,10 @@ class TgWsProxy(
     /** ЦОД, где WebSocket отвечает редиректом: ходим по TCP, не тратя время на заведомо мёртвый путь. */
     private val wsBlacklist = ConcurrentHashMap.newKeySet<Pair<Int, Boolean>>()
     private val failUntil = ConcurrentHashMap<Pair<Int, Boolean>, Long>()
+    /** Живые клиентские соединения: [stop] закрывает их, иначе после «Отключить» Telegram продолжал бы идти мимо туннеля. */
+    private val active = ConcurrentHashMap.newKeySet<Socket>()
+    /** Потолок одновременных соединений: локальная программа не должна исчерпать потоки процесса Hydra. */
+    private val slots = java.util.concurrent.Semaphore(MAX_CONNECTIONS)
 
     val running get() = !stopped.get()
     @Volatile var wsConnections = 0L; private set
@@ -59,7 +63,9 @@ class TgWsProxy(
         pool.execute {
             while (!stopped.get()) {
                 val c = try { s.accept() } catch (_: IOException) { break }
-                pool.execute { handle(c) }
+                if (!slots.tryAcquire()) { runCatching { c.close() }; continue }
+                active += c
+                pool.execute { try { handle(c) } finally { active -= c; slots.release() } }
             }
         }
         log("TG WS: слушаю 127.0.0.1:${s.localPort}")
@@ -71,6 +77,8 @@ class TgWsProxy(
         stopped.set(true)
         runCatching { server?.close() }
         server = null
+        active.toList().forEach { runCatching { it.close() } }
+        active.clear()
     }
 
     // ---- SOCKS5 -----------------------------------------------------------------------------------------------
@@ -375,6 +383,8 @@ class TgWsProxy(
     }
 
     companion object {
+        private const val MAX_CONNECTIONS = 256
+
         /** Запасные адреса ЦОД для WebSocket (по README DmitryKafturov/tg-ws-proxy; проверено: `.220` и `.99` отвечают 101, `.51` у части провайдеров глухо блокируется); `203` — служебный, ходит как ЦОД 2. */
         val DEFAULT_DC_IPS: Map<Int, String> = mapOf(
             1 to "149.154.175.205", 2 to "149.154.167.220", 3 to "149.154.175.100",

@@ -220,18 +220,18 @@ object SingBoxConfigBuilder {
                 o.put("type", "vless").put("uuid", p.uuidOrPassword)
                 if (p.flow.isNotEmpty()) o.put("flow", p.flow)
                 o.put("tls", tlsBlock(p, extra, tlsFragment))
-                transportBlock(p)?.let { o.put("transport", it) }
+                transportBlock(p, extra)?.let { o.put("transport", it) }
             }
             Protocol.VMESS -> {
                 o.put("type", "vmess").put("uuid", p.uuidOrPassword)
                     .put("security", "auto").put("alter_id", extra.optInt("aid", 0))
                 if (p.security == "tls") o.put("tls", tlsBlock(p, extra, tlsFragment))
-                transportBlock(p)?.let { o.put("transport", it) }
+                transportBlock(p, extra)?.let { o.put("transport", it) }
             }
             Protocol.TROJAN -> {
                 o.put("type", "trojan").put("password", p.uuidOrPassword)
                 o.put("tls", tlsBlock(p, extra, tlsFragment))
-                transportBlock(p)?.let { o.put("transport", it) }
+                transportBlock(p, extra)?.let { o.put("transport", it) }
             }
             Protocol.SHADOWSOCKS -> {
                 o.put("type", "shadowsocks")
@@ -240,7 +240,7 @@ object SingBoxConfigBuilder {
             }
             Protocol.HYSTERIA2 -> {
                 o.put("type", "hysteria2").put("password", p.uuidOrPassword)
-                o.put("tls", tlsBlock(p, extra))
+                o.put("tls", tlsBlock(p, extra, quic = true))
                 if (extra.has("obfs")) o.put("obfs", JSONObject()
                     .put("type", "salamander").put("password", extra.optString("obfs_password")))
             }
@@ -260,7 +260,7 @@ object SingBoxConfigBuilder {
                 o.put("type", "tuic").put("uuid", p.uuidOrPassword)
                     .put("password", extra.optString("password"))
                     .put("congestion_control", extra.optString("congestion_control", "bbr"))
-                o.put("tls", tlsBlock(p, extra))
+                o.put("tls", tlsBlock(p, extra, quic = true))
             }
             else -> o.put("type", "direct")  // SSTP/L2TP/PPTP/AWG обрабатываются отдельными движками, не sing-box
         }
@@ -271,12 +271,15 @@ object SingBoxConfigBuilder {
         p: ServerProfile,
         extra: JSONObject,
         fragment: TlsFragmentMode = TlsFragmentMode.OFF,
+        quic: Boolean = false,
     ): JSONObject {
         val tls = JSONObject().put("enabled", true)
             .put("server_name", p.sni.ifBlank { p.address })
         if (p.alpn.isNotBlank()) tls.put("alpn", JSONArray(p.alpn.split(",").map { it.trim() }))
-        // uTLS отпечаток
-        tls.put("utls", JSONObject().put("enabled", true).put("fingerprint", p.fingerprint))
+        // uTLS отпечаток — только для TCP: у QUIC-протоколов (Hysteria2, TUIC) sing-box его не поддерживает.
+        if (!quic) tls.put("utls", JSONObject().put("enabled", true).put("fingerprint", p.fingerprint.ifBlank { "chrome" }))
+        // Ссылка с insecure=1 / allowInsecure=1 (самоподписанный сертификат сервера) — раньше флаг терялся.
+        if (extra.optBoolean("insecure", false)) tls.put("insecure", true)
         // REALITY
         if (p.security == "reality" && extra.has("reality_pbk")) {
             tls.put("reality", JSONObject()
@@ -292,9 +295,14 @@ object SingBoxConfigBuilder {
         return tls
     }
 
-    private fun transportBlock(p: ServerProfile): JSONObject? = when (p.transport) {
+    private fun transportBlock(p: ServerProfile, extra: JSONObject = JSONObject()): JSONObject? = when (p.transport) {
+        // Host (параметр ссылки host=) — за CDN он отличается от SNI; без заголовка соединение уходит не на тот сайт.
         "ws" -> JSONObject().put("type", "ws")
             .put("path", p.transportPath.ifBlank { "/" })
+            .apply { extra.optString("ws_host").takeIf { it.isNotBlank() }?.let { put("headers", JSONObject().put("Host", it)) } }
+        "httpupgrade" -> JSONObject().put("type", "httpupgrade")
+            .put("path", p.transportPath.ifBlank { "/" })
+            .apply { extra.optString("ws_host").takeIf { it.isNotBlank() }?.let { put("host", it) } }
         "grpc" -> JSONObject().put("type", "grpc")
             .put("service_name", p.transportPath)
         "http" -> JSONObject().put("type", "http").put("path", p.transportPath.ifBlank { "/" })

@@ -43,6 +43,19 @@ class DesktopConfigTest {
         assertNotNull(LinkParser.parseLine(link), "не разобралось: $link").copy(id = 1)
 
     @Test
+    fun `link parameters reach the config (ws Host, insecure, no uTLS for QUIC)`() {
+        val ws = DesktopConfig.build(parse(links.getValue("vless-ws-tls")), DesktopSettings(), Os.LINUX, api, null)
+        val wsOut = ws.getJSONArray("outbounds").getJSONObject(0)
+        assertEquals("cdn.example.com", wsOut.getJSONObject("transport").getJSONObject("headers").getString("Host"))
+        val hy = parse("hysteria2://pw@example.com:443?sni=example.com&insecure=1#HY")
+        val tls = DesktopConfig.build(hy, DesktopSettings(), Os.LINUX, api, null).getJSONArray("outbounds").getJSONObject(0).getJSONObject("tls")
+        assertTrue(tls.getBoolean("insecure"))
+        assertFalse(tls.has("utls"))
+        val tuic = parse("tuic://11111111-2222-3333-4444-555555555555:pw@example.com:443?sni=example.com&allow_insecure=1#T")
+        assertTrue(DesktopConfig.build(tuic, DesktopSettings(), Os.LINUX, api, null).getJSONArray("outbounds").getJSONObject(0).getJSONObject("tls").getBoolean("insecure"))
+    }
+
+    @Test
     fun `configs for every protocol, mode and OS`() {
         for ((name, link) in links) {
             val p = parse(link)

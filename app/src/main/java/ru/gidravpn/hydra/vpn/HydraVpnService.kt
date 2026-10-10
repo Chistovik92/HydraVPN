@@ -485,8 +485,14 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
         val split = ru.gidravpn.hydra.data.repository.SplitTunnelRepository(applicationContext)
             .settings.firstOrNull() ?: ru.gidravpn.hydra.data.model.SplitTunnel()
         when (split.mode) {
-            ru.gidravpn.hydra.data.model.SplitTunnelMode.INCLUDE ->
-                split.packages.forEach { pkg -> runCatching { builder.addAllowedApplication(pkg) } }
+            ru.gidravpn.hydra.data.model.SplitTunnelMode.INCLUDE -> {
+                val added = split.packages.count { pkg -> runCatching { builder.addAllowedApplication(pkg) }.isSuccess }
+                // Без разрешённых приложений VpnService заворачивает в туннель ВСЕ — а выбрано «только эти» (пусто или удалены).
+                if (added == 0) {
+                    VpnState.log("Раздельное туннелирование: в списке нет доступных приложений — в туннель идёт только Hydra")
+                    runCatching { builder.addAllowedApplication(packageName) }
+                }
+            }
             ru.gidravpn.hydra.data.model.SplitTunnelMode.EXCLUDE -> {
                 split.packages.forEach { pkg -> runCatching { builder.addDisallowedApplication(pkg) } }
                 runCatching { builder.addDisallowedApplication(packageName) } // собственный трафик — мимо VPN
@@ -521,6 +527,8 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
 
     override fun onRevoke() { stopTunnel() }
     override fun onDestroy() {
+        // Система может уничтожить сервис, не пройдя через stopTunnel(): ядро и tun не должны остаться без владельца.
+        runCatching { releaseTun() }
         unregisterNetworkWatcher()
         SocketGuard.detach()
         scope.cancel()

@@ -192,6 +192,35 @@ class SingBoxConfigBuilderTest {
         assertFalse(tls.has("record_fragment"))
     }
 
+    private fun proxyOut(cfg: JSONObject) = cfg.getJSONArray("outbounds").objects().single { it.getString("tag") == "proxy" }
+
+    @Test fun wsHostHeader() {
+        val p = profile.copy(transport = "ws", transportPath = "/ws", sni = "cdn.example.com", extra = JSONObject().put("ws_host", "ws.example.com").toString())
+        val o = proxyOut(dump("vless_ws_host", SingBoxConfigBuilder.build(p)))
+        assertEquals("ws.example.com", o.getJSONObject("transport").getJSONObject("headers").getString("Host"))
+        assertEquals("cdn.example.com", o.getJSONObject("tls").getString("server_name"))
+    }
+
+    @Test fun httpUpgradeTransport() {
+        val p = profile.copy(transport = "httpupgrade", transportPath = "/u", extra = JSONObject().put("ws_host", "h.example.com").toString())
+        val t = proxyOut(dump("vless_httpupgrade", SingBoxConfigBuilder.build(p))).getJSONObject("transport")
+        assertEquals("httpupgrade", t.getString("type"))
+        assertEquals("h.example.com", t.getString("host"))
+    }
+
+    @Test fun quicProtocolsHaveNoUtlsAndKeepInsecure() {
+        for (id in listOf("hysteria2", "tuic")) {
+            val p = profile.copy(protocolId = id, extra = JSONObject().put("insecure", true).put("password", "pw").toString())
+            val tls = proxyOut(dump("${id}_insecure", SingBoxConfigBuilder.build(p))).getJSONObject("tls")
+            assertFalse("$id: uTLS в QUIC не поддерживается", tls.has("utls"))
+            assertTrue("$id: insecure из ссылки должен дойти до конфига", tls.getBoolean("insecure"))
+        }
+    }
+
+    @Test fun tcpProtocolsKeepUtls() {
+        assertTrue(proxyOut(SingBoxConfigBuilder.build(profile)).getJSONObject("tls").has("utls"))
+    }
+
     @Test fun noFragmentOnQuicProtocols() {
         listOf("hysteria2", "tuic").forEach { id ->
             val tls = SingBoxConfigBuilder.build(
