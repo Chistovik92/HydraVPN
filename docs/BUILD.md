@@ -222,6 +222,21 @@ scripts/build-olcrtc.sh       # → app/libs/olcrtc/<abi>/libolcrtc.so
 scripts/build-openflux.sh     # → app/libs/openflux/<abi>/libopenflux.so (около 14 МБ на ABI)
 ```
 
+### 2.5б ByeDPI → `libciadpi.so` (0.7.13)
+
+Апстрим `hufrea/byedpi` (MIT, v0.17.3). `ciadpi` — Си-программа с локальным SOCKS5; запускается подпроцессом из `nativeLibraryDir`, как OpenFlux.
+
+```bash
+scripts/build-byedpi.sh       # → app/libs/byedpi/<abi>/libciadpi.so (NDK, 4 ABI)
+```
+
+- **ПК:** готовые бинари релиза (Windows x64, Linux x64/arm64 и их Classic-варианты) скачивает Gradle-задача `downloadByeDpi` с проверкой SHA-256
+  (`desktop/build.gradle.kts`); для macOS бинарей нет — собирается из исходников метки.
+- **iOS:** подпроцессы запрещены, поэтому исходники ByeDPI собраны статической библиотекой `ios/Packages/CiaDPI` (SwiftPM) и крутятся потоком внутри расширения.
+- **Telegram по WebSocket** своей сборки не требует: это обычный Kotlin-код `shared/.../data/tgws`; в `app/` он подтягивается копией задачей `syncSharedTgWs`
+  (как `router` и `update`), на ПК входит через `:shared`.
+- **Перед каждым релизом:** `scripts/check-updates.sh`; пересобирать `build-openflux.sh` и `build-olcrtc.sh` (устаревший клиент уже уходил в релиз 0.7.8–0.7.9).
+
 ### 2.6 Сборка приложения с ядрами (flavor `native`)
 
 ```bash

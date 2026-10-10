@@ -47,6 +47,10 @@ HydraVPN/
   «TUN» — весь трафик: Windows — перезапуск Hydra от администратора (UAC);
   Linux — копия ядра с `cap_net_admin` (однократно `pkexec setcap`); macOS — ядро от root
   через системный запрос пароля.
+- **Обход DPI и Telegram (0.7.13–0.7.15).** ByeDPI (`ciadpi`) — подпроцесс-`Sidecar` (бинарь релиза), порт 10880; TG WS — внутри процесса Hydra (`TgWsProxy`,
+  порт 10881; процесс Hydra в TUN исключён, как и ядра); план маршрутизации (`AppController.buildPlan`) поднимает нужное до sing-box, `CoreRunner` останавливает
+  при отключении. Вкладки «Маршрутов» — `RoutingScreen`/`DpiRoutesScreen`, выпадающие списки — `Dropdowns.kt`; Classic — Swing-панели. Значок — `Appearance.kt` + `core/LauncherIcon.kt`
+  (окно, трей, ярлыки Windows/Linux, Dock macOS). Подробно — `docs/ROUTING.md`.
 - **Проверка соединения** — после старта HTTP-запрос через outbound proxy (clash_api
   `/proxies/proxy/delay`). «Подключено» показывается только если он прошёл.
 - **Данные** — один JSON: `%APPDATA%\Hydra`, `~/Library/Application Support/Hydra`,

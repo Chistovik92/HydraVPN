@@ -25,6 +25,7 @@ Hydra распространяется под GPL-3.0 (см. [LICENSE](../LICENS
 |---|---|---|
 | ByeDPI (`ciadpi`, github.com/hufrea/byedpi, v0.17.3) | MIT | подпроцесс на Android/Windows/Linux/macOS; статическая библиотека `ios/Packages/CiaDPI` (исходники без изменений, кроме переименования `main` флагом компиляции) |
 | Список из 60 стратегий и сайты проверки (ByeByeDPI, github.com/romanvht/ByeByeDPI) | GPL-3.0 (как Hydra) | `DpiStrategies.kt` / `DpiStrategies.swift` |
+| Telegram по WebSocket (0.7.14): идея и протокол — Flowseal/tg-ws-proxy и DmitryKafturov/tg-ws-proxy (Python); ihtfw/tg-ws-proxy-android — подтверждение схемы на Android | MIT | собственный код на Kotlin `shared/.../data/tgws/TgWsProxy.kt`; исходники апстримов не копировались, список подсетей и адресов ЦОД сверен с ними |
 | Источники geo-баз: MetaCubeX/meta-rules-dat, SagerNet/sing-geoip и sing-geosite, runetfreedom/russia-v2ray-rules-dat, v2fly/geoip и domain-list-community | данные, скачиваются приложением у источников; сами файлы в репозиторий не входят (вшитые `.srs` — из meta-rules-dat) | `data/geo` |
 
 ## Библиотеки приложения (через Gradle/Maven)

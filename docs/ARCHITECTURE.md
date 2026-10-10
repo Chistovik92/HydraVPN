@@ -5,8 +5,9 @@
 ```
 ┌───────────────────────────────────────────────────────────┐
 │  UI (Jetpack Compose)                                       │
-│  HydraRoot → MainScreen / ServersScreen / SplitTunnelScreen │
-│            / LogsScreen / SettingsScreen (+BetaBadge)       │
+│  HydraRoot → Main / Servers / Profile / Routers / Settings  │
+│  Settings → Маршрутизация (RoutingHubScreen, 4 вкладки)     │
+│            / DNS и профили / Geo-базы / Логи / …            │
 └───────────────┬───────────────────────────────────────────┘
                 │ StateFlow
 ┌───────────────▼───────────────────────────────────────────┐
@@ -82,6 +83,21 @@ PPTP невозможен принципиально (GRE → raw-сокеты) 
   `SubscriptionFetcher.fetch` → `LinkParser.parseSubscription` → Room.
 - **SSTP/L2TP:** tun → `TunBridge` (SNAT+checksums) → `PppSession` →
   transport (TLS/UDP) → сервер; обратно — тем же путём.
+
+## Что добавилось после 0.6 (кратко)
+
+- **`:shared` (KMP, JVM-часть)** — общий код Android и ПК: модели, парсеры, билдеры конфигов sing-box/Xray, маршрутизация, обход DPI, Telegram
+  по WebSocket, клиенты бота и роутера, поиск обновлений. Приложение Android не подключает `:shared` целиком (дубли ломали слияние dex) и берёт нужное
+  копиями (`syncSharedRouter`, `syncSharedUpdate`, `syncSharedTgWs`; `routing`/`dpi` продублированы в `app/`). **Правя общий файл — правьте обе копии.**
+- **План маршрутизации** (`RouteConfig` → `RoutePlanFactory.build` → `RoutePlanApplier.apply`): конфиг sing-box строится как раньше, а правила, группы выходов,
+  цепочки (`detour`) и дополнительные выходы (`dpi`, `tgws`, узлы OpenFlux/olcRTC) накладываются на готовый JSON одной функцией — одинаково для Android, ПК и
+  (порт на Swift) iOS. Подпроцессы поднимает платформа: Android — `ByeDpi.kt` (`SocksProcess`), ПК — `AppController.buildPlan` + `CoreRunner`.
+- **Обход DPI** — ByeDPI (`ciadpi`) локальным SOCKS5; мастер подбора `DpiProbe` перебирает стратегии (`DpiStrategies`), настройки — `DpiProbeSettings`.
+- **Telegram по WebSocket** — `TgWsProxy` внутри процесса приложения (SOCKS5 :10881, его сокеты вне tun; на ПК процесс Hydra исключён из TUN).
+- **Geo-базы** — `GeoStore`: скачивание, проверка, атомарная замена, откат; sing-box читает `rule_set` типа `local`.
+- **Интерфейс маршрутизации** — Android: `RoutingHubScreen` (вкладки) + `RoutingCards` (карточки) + `DropdownField`/`PickerDialog`; ПК: `RoutingScreen` (вкладки) +
+  `DpiRoutesScreen` + `DropField`/`PickDialog`; Classic — Swing-панели.
+- **Платформы:** Windows/Linux/macOS (Compose Desktop, `desktop/`), Hydra Classic (Swing), iOS (`ios/`, SwiftUI + Network Extension). Подробно — `docs/MULTIPLATFORM.md`.
 
 ## Что доработать до продакшена
 

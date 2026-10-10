@@ -119,13 +119,27 @@
   Апстрим архивирован 14.09.2026. См. docs/SERVICES.md и docs/ECOSYSTEM.md.
 
 ### OpenFlux — TCP-туннель с транспортами (Yandex/MAX/Mail.ru/Cups)
-- Исполняемый `libopenflux.so` (`--role client --inbound socks5`) → SOCKS5 → sing-box → tun.
-  Ссылка `openflux://…` — соглашение Hydra. См. docs/ECOSYSTEM.md.
+- Исполняемый `libopenflux.so` (`--role client --inbound socks5`) → SOCKS5 → sing-box → tun. Ядро v0.4.2; ссылки — официальные
+  `openflux://v1/…` (с 0.7.11, старые читаются). См. docs/ECOSYSTEM.md.
+
+## Помощники без сервера: обход DPI и Telegram
+
+Это не протоколы туннеля, а локальные SOCKS5-прокси на `127.0.0.1`; ими пользуются правила, группы и цепочки (`docs/ROUTING.md`).
+
+### Обход DPI — ByeDPI (`ciadpi`)
+- Режет и подделывает первые пакеты соединения по **стратегии** (строка аргументов ciadpi); порт 10880. Это не VPN: IP не скрывается.
+- Профиль «Обход DPI» — ссылка `byedpi://?s=<стратегия, URL-кодированная>#<имя>` (tun/прокси → ByeDPI → интернет напрямую), либо выход `dpi`
+  в правилах, группах и цепочках, либо «трафик напрямую через обход». Мастер подбора и настройки подбора — `docs/ROUTING.md`.
+
+### Telegram по WebSocket (TG WS, 0.7.14)
+- SOCKS5 на порту 10881; соединения к подсетям Telegram идут не TCP, а WebSocket поверх TLS 1.2 до `kws<N>.web.telegram.org/apiws`, номер ЦОД читается из
+  MTProto-init клиента; прочий трафик проходит напрямую. Выход `tgws`, пресет «Telegram → WebSocket». Android и ПК.
 
 ## Лицензии встраиваемых компонентов
 - **sing-box** — GPL-3.0.
 - **Xray-core / libXray** — MPL-2.0.
 - **wireguard-go / amneziawg-go** — MIT (форк wireguard-go).
 - **hev-socks5-tunnel** — MIT (проверьте upstream перед дистрибуцией).
+- **ByeDPI** — MIT; **OpenFlux** — GPL-3.0; **olcRTC** — WTFPL; 60 стратегий и сайты проверки из ByeByeDPI — GPL-3.0.
 - Из-за GPL-3.0 у sing-box итоговое приложение распространяется под **GPL-3.0**
   (полный список — `THIRD_PARTY_NOTICES.md`).

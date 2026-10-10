@@ -15,6 +15,8 @@ Hydra is an open-source (GPL-3.0) VPN client for Android that speaks many protoc
 <li>Import from a link, clipboard, QR code (camera or photo) or a .conf file</li>
 <li>Split tunneling by apps and by IP / domain, GeoIP routing for ~250 countries (offline)</li>
 <li>DNS over HTTPS / TLS, TLS fragmentation against DPI, MTU and IPv6 modes</li>
+<li>One Routing screen: rules app / site / IP / country / port to an exit, exit groups (auto / manual), chains, geo databases updated in the app</li>
+<li>DPI bypass without a server (ByeDPI) with a strategy finder, and Telegram over WebSocket for when Telegram will not load</li>
 <li>Routing profiles such as “Home” and “Travel”</li>
 <li>Kill Switch, automatic reconnect, auto-connect on start and boot</li>
 <li>Quick Settings tile with the connected location, home screen widget, app shortcuts</li>

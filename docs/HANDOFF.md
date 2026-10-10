@@ -57,7 +57,11 @@
 | **L2TP** | userspace PPP/UDP | **готово на Kotlin** (без IPsec/ESP); нужен on-device тест |
 | PPTP | — | честно недоступно (данные в GRE → нужен root; стек удалён из Android 12/13) |
 | **WDTT** (beta) | нативный `libclient.so` | WG через TURN ВК; нужен нативный клиент + VK-auth |
-| **olcRTC** (beta) | gomobile + tun2socks | TCP-over-WebRTC; нужен `olcrtc.aar` + tun2socks |
+| **olcRTC** (beta) | подпроцесс `libolcrtc.so` + SOCKS5 → sing-box | TCP-over-WebRTC; Android, ПК, iOS (0.7.10); апстрим заархивирован |
+| **OpenFlux** (beta) | подпроцесс `libopenflux.so` + SOCKS5 → sing-box | клиент v0.4.2, `openflux://v1/`; Android, ПК, iOS |
+| **Обход DPI** (0.7.13) | ByeDPI (`ciadpi` v0.17.3), локальный SOCKS5 :10880 | профиль «Обход DPI», трафик «напрямую», выход `dpi`; мастер подбора; настройки подбора — 0.7.15; все платформы (iOS — внутри расширения) |
+| **Telegram по WebSocket** (0.7.14) | собственный Kotlin-порт tg-ws-proxy, SOCKS5 :10881 | Android и ПК; iOS — в очереди; подробно — `docs/ROUTING.md` |
+| **Geo-базы** (0.7.13) | `.srs` sing-box, загрузка в приложении | источники, зеркала, откат; все платформы |
 
 Ознакомительные/экспериментальные (WDTT, olcRTC) помечены в UI плашкой **BETA-доступ**
 (`Protocol.beta = true`, компонент `BetaBadge`).
@@ -68,11 +72,10 @@
 
 ## Открытые задачи (TODO)
 
-1. **Нативные ядра** (`docs/BUILD.md`). `libbox.aar` (sing-box 1.12.25) —
-   ✅ собран и лежит в `app/libs/`, full-APK на нём проверен вживую.
-   Остальные пока не собирались: `libXray.aar` (Xray), `amneziawg-go.aar` (AWG),
-   `olcrtc.aar` (gomobile), `libclient.so` (WDTT) — но само по себе их наличие
-   ничего не включит: Kotlin-интеграция этих движков не дописана (пункты 4-6).
+1. ✅ **Нативные ядра** (`docs/BUILD.md`) — все собраны и входят в full-APK (состояние на 0.7.15): `libbox.aar` (sing-box 1.12.25),
+   `libXray.aar` (Xray 26.9.30), AmneziaWG (`libwg-go.so`, v3.1.20260828), `libolcrtc.so`, `libopenflux.so` (v0.4.2), `libciadpi.so` (ByeDPI 0.17.3).
+   Сборка — `scripts/build-*.sh` (результаты в `app/libs/`, в git не входят); сверка версий — `scripts/check-updates.sh` перед каждым релизом;
+   WDTT не берём. Перед `release.sh` пересобирать OpenFlux и olcRTC (устаревший клиент уже уходил в релиз).
 2. **On-device проверка SSTP/L2TP**: согласование PPP, MS-CHAPv2, IPCP, SNAT/чек-суммы
    в `TunBridge`, SSTP crypto-binding против реального SoftEther/Mikrotik.
 3. ~~sing-box PlatformInterface: доопределить версионно-зависимые методы~~ —
@@ -145,36 +148,37 @@
     транзакция при обновлении подписки, double-checked locking в
     `AppDatabase.get()`). Живьём не проверено ничего, кроме ограничителя
     лога (6 unit-тестов, прогнаны).
+14. **Хвосты 0.7.13–0.7.15 (проверки и iOS)** — `docs/ROUTING.md`, «Ограничения», и `docs/ROADMAP.md`, «Очередь после 0.7.15»: перебор стратегий и TG WS на
+    живых провайдерах/Telegram, `tg://socks` в установленный Telegram, обновление ярлыков на чистой установке Windows/Linux, iOS-паритет (вкладки
+    «Маршрутизации», настройки подбора, TG WS), обновление скриншотов README.
 
 ## Карта кода
 
+Полная раскладка — `docs/ARCHITECTURE.md`; маршрутизация, обход DPI, TG WS и geo-базы — `docs/ROUTING.md` (там же таблица файлов).
+
 ```
-app/src/main/java/ru/gidravpn/hydra/
-  data/model/         Protocol.kt (все протоколы + флаг beta), ServerProfile,
-                      SplitTunnel (+ NetRuleType/NetworkRule — Фаза 2, IP/домены)
-  data/subscription/  LinkParser, WireGuardParser/ConfigBuilder, SingBoxConfigBuilder
-  data/net/           PingMeasurer (TCP-connect замер, Фаза 3)
-  data/repository/    ServerRepository, SplitTunnelRepository, ThemeRepository (DataStore)
-  vpn/                HydraVpnService, SocketGuard, VpnState
-  vpn/ppp/            Md4, MsChapV2, Ppp, PppSession, TunBridge  (общий userspace-PPP)
-  vpn/core/           VpnCore (интерфейс)
-  ui/theme/           Color.kt (HydraPalette + LocalHydraPalette + два инстанса
-                      AmbientPalette/StealthPalette), ThemeMode, Theme.kt, Type.kt
-  ui/LauncherIcon.kt  смена ярлыка через activity-alias (по тумблеру, off по умолч.)
-  ui/                 экраны (Main/Servers/Profile/SplitTunnel/Settings/Logs),
-                      components/Common (BetaBadge, Sparkline, humanBytes)
-  res/drawable/       ic_hydra_ambient / ic_hydra_stealth — гербы тем (в UI),
-                      ic_launcher_* / ic_launcher_stealth_* — адаптивные иконки
-                      Settings — хаб с подэкранами (см. фазу 1 роадмапа выше,
-                      включая под-экран «Тема» из Фазы 1.5),
-                      Split/Logs теперь рендерятся ВНУТРИ SettingsScreen, а не
-                      как отдельные top-level экраны
-app/src/native/.../vpn/core/   SingBoxCore(+Runtime), XrayCore(+ConfigBuilder),
-                               AmneziaWgCore, SstpCore, L2tpCore(+Transport), PptpCore,
-                               WdttCore, OlcRtcCore, NativeCoreFactory
-app/src/stub/.../vpn/core/     StubCore (NoopCore — симуляция для stub/CI)
-docs/   PROTOCOLS · SECURITY · BUILD · ARCHITECTURE · SERVICES · PANELS · CONTRIBUTING
-CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.6.1 (главный источник контекста)
+app/src/main/java/ru/gidravpn/hydra/          Android (Compose)
+  data/model/         Protocol, ServerProfile, SplitTunnel, EngineToggles …
+  data/subscription/  LinkParser, SingBoxConfigBuilder, XrayConfigBuilder, ByeDpiLink, GeoAssets …
+  data/routing/       RouteConfig, RoutePlan (правила, группы, цепочки, RoutePlanApplier) — копия shared
+  data/dpi/           DpiStrategies, DpiArgs, DpiProbe, DpiProbeSettings — копия shared
+  data/geo/           GeoStore, GeoModels, GeoRuntime (геобазы: источники, обновление, откат)
+  data/net/ data/repository/ data/db/ data/backup/ data/botaccount/ data/update/ data/work/ data/stats/ data/log/
+  vpn/                HydraVpnService, SocketGuard, VpnState; vpn/core: VpnCore, ByeDpiSidecar (SocksProcess), PhysicalNetwork
+  vpn/ppp/            userspace-PPP (SSTP/L2TP)
+  ui/                 HydraRoot, MainViewModel, LauncherIcon (activity-alias), TelegramProxy (tg://socks)
+  ui/screens/         Main, Servers, Profile, Routers, Settings (хаб), RoutingHubScreen + RoutingCards (вкладки маршрутизации),
+                      SplitTunnelScreen (строки приложений/правил), GeoScreen, LogsScreen, AccountStatusCard, BotAccountCard
+  ui/components/      Common (Card, DropdownField, PickerDialog, BetaBadge …); ui/theme/ — палитры
+app/src/native/…/vpn/core/   SingBoxCore, XrayCore, AmneziaWgCore, SstpCore, L2tpCore, PptpCore, OlcRtcCore, OpenFluxCore, ByeDpi (план маршрутов + подпроцессы + TG WS) …
+app/src/stub/…/vpn/core/     StubCore (симуляция для stub/CI)
+shared/src/commonMain/…/     общий JVM-код Android+ПК: data/{model,subscription,routing,dpi,tgws,geo,stats}, router, bot, update, vpn/ppp
+desktop/src/main/…           Compose Desktop: AppController, Store, Appearance (темы, значки), core/{CoreRunner, DesktopConfig, LauncherIcon, SelfUpdate …}, ui/{HydraApp, RoutingScreen, DpiRoutesScreen, Dropdowns, SettingsScreen …}, tray/
+desktop/src/lite/…           Hydra Classic (Swing, Windows 7/32-бит, Linux x86/armv7): HomePanel, ServersPanel, RoutingPanel, DpiPanel …
+ios/                         SwiftUI + Network Extension: Hydra/ (экраны), HydraTunnel/, HydraAWG/, Packages/HydraKit (общая логика), Packages/CiaDPI, Bridge/ (gomobile)
+scripts/                     release.sh, build-{awg,olcrtc,openflux,byedpi}.sh, check-updates.sh, package-*.sh, desktop-e2e.sh
+docs/   ROUTING · PROTOCOLS · SECURITY · BUILD · ARCHITECTURE · SERVICES · PANELS · ECOSYSTEM · MULTIPLATFORM · ROADMAP · HISTORY · HANDOFF_ROUTERS …
+CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.7.15 (главный источник контекста)
 ```
 
 ## Честные оговорки

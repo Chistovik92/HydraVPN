@@ -1,0 +1,1 @@
+0.7.15: DPI-bypass probe settings like ByeByeDPI (pause, requests, parallelism, timeout, fake SNI, domain lists, own strategy list), full strategy view and all results, "Connect Telegram to the proxy" button. 0.7.14: one Routing screen with tabs and dropdowns, Telegram over WebSocket, 4 launcher icons on desktop.

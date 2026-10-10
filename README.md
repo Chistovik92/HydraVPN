@@ -61,13 +61,15 @@ iOS не даёт приложению поставить себя само: о�
 
 Hydra Classic (Windows 7 / 32-бит) — тот же набор экранов на Swing; iOS собирается только в macOS-CI, снимков с устройства пока нет.
 
+> Снимки «Маршрутизация» и «Раздельное туннелирование» сняты до 0.7.14: теперь это вкладки одного раздела «Маршрутизация» (обновление снимков — в очереди, см. ROADMAP).
+
 ---
 
 ## Возможности
 
 - 🎛 **Единый клиент** для нескольких семейств протоколов (что где доступно — таблица ниже):
   sing-box (VLESS/REALITY, VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard), Xray, AmneziaWG 1.0–3.x,
-  SSTP и L2TP (userspace-PPP на Kotlin, без root), olcRTC и OpenFlux (BETA).
+  SSTP и L2TP (userspace-PPP на Kotlin, без root), olcRTC и OpenFlux (BETA); обход DPI — ByeDPI на всех платформах.
 - 👤 **Аккаунт бота «Радар» (Hydra VPN)** — вход по одноразовому коду («VPN» → «Подключить приложение»):
   подписки, выданные в боте, заводятся сами и обновляются раз в 6 часов; смена ссылки у панели обновляет ту
   же подписку, выключенные в боте помечаются; на главном экране — срок и трафик. Токен хранится в Android
@@ -79,9 +81,22 @@ Hydra Classic (Windows 7 / 32-бит) — тот же набор экранов 
 - 📥 **Импорт**: подписки (base64/список) из панелей x-ui / 3x-ui / PasarGuard / Remnawave / Marzban, одиночные
   ссылки (`vless:// vmess:// trojan:// ss:// hysteria2:// tuic:// wireguard:// awg:// sstp:// l2tp://`), `.conf`
   WireGuard/AmneziaWG, QR (камера, фото), буфер обмена, deep-links; HWID для панелей.
-- ✂️ **Раздельное туннелирование**: по приложениям (Android) или программам (ПК), по IP/доменам, по странам.
-- 🧭 **Маршрутизация**: DoH/DoT/UDP-DNS, GeoIP по ~250 странам офлайн, фрагментация TLS, MTU, IPv6,
-  **профили маршрутизации** («Дом», «Поездка»).
+- 🧭 **Маршрутизация** (0.7.13–0.7.14, [docs/ROUTING.md](docs/ROUTING.md)): один раздел с вкладками — **Приложения/Программы**
+  (кто идёт через VPN и свой выход для приложения), **Сайты и IP**, **Обход DPI**, **Выходы**. Правила «приложение / домен / IP / страна /
+  порт / протокол → выход» с «И»/«НЕ», группы выходов («авто» и «ручной»), цепочки «сервер через обход DPI или через другой сервер»,
+  узлы на OpenFlux и olcRTC; выбор из выпадающих списков. DoH/DoT/UDP-DNS, фрагментация TLS, MTU, IPv6, **профили маршрутизации**
+  («Дом», «Поездка»).
+- 🛡 **Обход DPI без сервера** (ByeDPI, `ciadpi`): профиль «Обход DPI», трафик «напрямую» через обход, выход `dpi` в правилах. **Мастер подбора**
+  стратегии (как в [ByeByeDPI](https://github.com/romanvht/ByeByeDPI), но с понятным итогом «открылось 11 из 12»): 60 готовых или свой список
+  стратегий, списки доменов (Cloudflare, Discord, Googlevideo, соцсети, Telegram, YouTube… и свои), пауза, число запросов, параллельность,
+  таймаут и SNI фейк-пакетов (0.7.15); найденную стратегию видно и копируется целиком.
+- ✈️ **Telegram**: если не открывается даже через ByeDPI — **Telegram по WebSocket** (TG WS, 0.7.14; идея Flowseal/tg-ws-proxy и
+  DmitryKafturov/tg-ws-proxy), без своего сервера; кнопка **«Подключить Telegram к прокси»** (0.7.15) в настройках и на главном экране.
+- 🌐 **Geo-базы** как динамический слой (0.7.13): источники MetaCubeX, SagerNet, runetfreedom (в т. ч. `ru-blocked`), v2fly, свои списки;
+  автообновление, проверка файла, откат; пресет «Заблокированное в РФ → обход DPI».
+- ✂️ **Раздельное туннелирование**: по приложениям (Android) или программам (ПК), по IP/доменам, по странам; пресет «Российские приложения напрямую».
+- 🎨 **Темы и значки** (0.7.9, 0.7.14): Ambient · Stealth · AMOLED · Material You (Android); значок приложения — 4 варианта и на ПК, с обновлением
+  ярлыков Windows/Linux.
 - 🛡 **Безопасность**: Kill Switch, переподключение, блокировка приложения отпечатком/PIN/Face ID, скрытие
   ключей на экране.
 - 📱 **Вне приложения**: плитка и виджет (Android), виджет и Пункт управления (iOS), трей, автозапуск и раздача
@@ -98,6 +113,8 @@ Hydra Classic (Windows 7 / 32-бит) — тот же набор экранов 
 | AmneziaWG 1.0–3.x | ✅ | — | ✅ |
 | SSTP, L2TP (без IPsec) | ✅ нужен тест на сервере | — | PPP-стек есть, транспорт ждёт проверки |
 | olcRTC, OpenFlux (BETA) | ✅ | ✅ нужен свой узел/сервер (Classic — кроме Windows 7) | ✅ внутри расширения VPN (с 0.7.10, проверено сборкой) |
+| Обход DPI (ByeDPI) и мастер подбора | ✅ | ✅ (Classic — тоже) | ✅ внутри расширения VPN (интерфейс 0.7.13; настроек подбора 0.7.15 пока нет) |
+| Telegram по WebSocket (TG WS) | ✅ | ✅ (Classic — тоже) | — (в очереди) |
 | PPTP | — недоступно (GRE требует root) | — | — |
 
 Подробности и ограничения — [docs/PROTOCOLS.md](docs/PROTOCOLS.md), сервисы — [docs/SERVICES.md](docs/SERVICES.md).
@@ -129,6 +146,7 @@ HydraVPN/
 ├── app/       Android (Compose): UI → MainViewModel → репозитории (Room, DataStore) → HydraVpnService → VpnCore
 │              (SingBoxCore, XrayCore, AmneziaWgCore, SstpCore/L2tpCore, OlcRtc/OpenFlux, NoopCore для stub)
 ├── shared/    Kotlin Multiplatform: модели, парсеры ссылок, билдеры конфигов sing-box/Xray, PPP-протокол,
+│              маршрутизация (data/routing), обход DPI (data/dpi), Telegram по WebSocket (data/tgws), geo-базы (data/geo),
 │              клиент роутера (router), клиент бота (bot), поиск и загрузка обновлений (update)
 ├── desktop/   Compose Desktop (Windows/Linux/macOS): sing-box и Xray процессами, TUN/прокси, kill switch
 └── ios/       SwiftUI + Network Extension (Libbox), AmneziaWG-расширение, виджеты; общая логика — Packages/HydraKit
@@ -140,6 +158,7 @@ HydraVPN/
 ## Документация
 
 - [docs/PROTOCOLS.md](docs/PROTOCOLS.md) — протоколы, форматы ссылок, ограничения
+- [docs/ROUTING.md](docs/ROUTING.md) — маршрутизация, обход DPI (ByeDPI), подбор стратегий, Telegram по WebSocket, geo-базы
 - [docs/SERVICES.md](docs/SERVICES.md) — сервисы и интеграции (SoftEther, WDTT, olcRTC)
 - [docs/PANELS.md](docs/PANELS.md) — совместимость с панелями подписок
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/MULTIPLATFORM.md](docs/MULTIPLATFORM.md) — устройство проекта
@@ -156,7 +175,8 @@ HydraVPN/
 
 GPL-3.0 — см. [LICENSE](LICENSE) и [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 Компоненты: sing-box (GPL-3.0), Xray-core (MPL-2.0), amneziawg-go/wireguard-go (MIT),
-hev-socks5-tunnel (MIT). Бинарники ядер не распространяются в составе репозитория.
+hev-socks5-tunnel (MIT), ByeDPI (MIT), OpenFlux (GPL-3.0), olcRTC (WTFPL); 60 стратегий и сайты проверки — из ByeByeDPI (GPL-3.0);
+Telegram по WebSocket — собственный код по идее Flowseal/tg-ws-proxy и DmitryKafturov/tg-ws-proxy (MIT). Бинарники ядер не распространяются в составе репозитория.
 
 ## Дисклеймер
 

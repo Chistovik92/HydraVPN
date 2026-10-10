@@ -53,10 +53,25 @@
   Docs; кодек zstd, опциональное шифрование AES-256-GCM. Апстрим — GPL-3.0.
 - **Как устроено:** `libopenflux.so` (`--role client --inbound socks5`) подпроцессом, SOCKS5 →
   sing-box → tun — как у официального OpenFluxAndroid. Нужен узел `openflux --role exit`.
-- **Ссылка:** `openflux://<transport>?url=…&maxToken=…&maxUid=…&codec=…&key=…#имя` — соглашение
-  Hydra (у апстрима ссылок нет).
+- **Ссылка:** официальная `openflux://v1/<base64url(DEFLATE(JSON))>` (ядро 0.4.x; в Hydra с 0.7.11). Старый формат Hydra
+  `openflux://<transport>?url=…#имя` читается.
 - **Статус:** BETA. Сборка — `scripts/build-openflux.sh`. Подробности — docs/ECOSYSTEM.md.
 - В UI помечен плашкой BETA.
+
+## Локальные помощники (без сервера)
+
+### Обход DPI — ByeDPI
+- **Что это:** `ciadpi` (MIT) — локальный SOCKS5, режет и подделывает первые пакеты соединения, чтобы DPI провайдера не узнал сайт. Не VPN: IP не скрывает.
+- **Как устроено:** подпроцесс на Android/ПК (`libciadpi.so`, бинарь релиза), статическая библиотека в расширении VPN на iOS; порт 10880. Профиль «Обход DPI»,
+  выход `dpi`, цепочки; **мастер подбора** (60 стратегий или свой список, списки доменов, настройки — 0.7.15). Подробно — `docs/ROUTING.md`.
+- **Статус:** работает на всех платформах; помогает ли на конкретном провайдере РФ — зависит от провайдера (проверялось на эмуляторе и ПК вне РФ).
+
+### Telegram по WebSocket
+- **Что это:** локальный SOCKS5 (порт 10881), который гонит MTProto-поток Telegram по WebSocket поверх TLS 1.2 до `kws<N>.web.telegram.org` вместо TCP,
+  который провайдеры душат. Свой сервер не нужен. Идея — Flowseal/tg-ws-proxy и DmitryKafturov/tg-ws-proxy (MIT), код — свой.
+- **Как включить:** пресет «Telegram → WebSocket» (Обход DPI) или правило «подсети Telegram → Telegram по WebSocket»; кнопка «Подключить Telegram к прокси»
+  (0.7.15) передаёт приложению Telegram адрес прокси.
+- **Статус:** Android и ПК; iOS — в очереди. Рукопожатие WebSocket проверено вживую, сессия Telegram на телефоне — нет.
 
 ## Честные ограничения (для поддержки)
 
@@ -67,3 +82,5 @@
 | SSTP+PAP | Нет crypto-binding (PAP не даёт CMK) | MS-CHAPv2 |
 | WDTT | Не интегрирован (обход VK-капчи) | AmneziaWG / WireGuard на своём сервере |
 | olcRTC / OpenFlux | Нужен свой сервер (`olcrtc srv` / `openflux --role exit`); BETA | См. docs/ECOSYSTEM.md |
+| Обход DPI (ByeDPI) | Помогает не везде: зависит от провайдера; на включённом VPN подбор идёт через VPN | «Подобрать обход за меня» с отключённым VPN; своя стратегия |
+| Telegram по WebSocket | Только Android и ПК; прокси живёт, пока Hydra подключена; звонки (UDP) идут как обычно | ByeDPI или VPN на своём сервере |
