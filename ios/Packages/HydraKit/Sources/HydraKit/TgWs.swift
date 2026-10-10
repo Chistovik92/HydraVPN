@@ -2,7 +2,7 @@ import Foundation
 
 /// «Telegram через WebSocket» - чистая часть (кодеки, таблицы адресов), порт `TgWsProxy` с Android/ПК (0.7.14), на iOS с 0.7.20.
 /// Сам SOCKS5-сервер на Network.framework живёт в расширении VPN (`ios/HydraTunnel/TgWsServer.swift`): здесь только то, что
-/// проверяется тестами на любой ОС. Идея и протокол - Flowseal/tg-ws-proxy и DmitryKafturov/tg-ws-proxy (MIT).
+/// проверяется тестами на любой ОС.
 public enum TgWs {
     /// Запасные адреса ЦОД для WebSocket; `203` - служебный, ходит как ЦОД 2.
     public static let defaultDcIps: [Int: String] = [
@@ -20,7 +20,7 @@ public enum TgWs {
         return (base, UInt32(truncatingIfNeeded: UInt64(base) + size - 1))
     }
 
-    private static let validProtos: Set<UInt32> = [0xEFEF_EFEF, 0xEEEE_EEEE, 0xDDDD_DDDD]
+    static let validProtos: Set<UInt32> = [0xEFEF_EFEF, 0xEEEE_EEEE, 0xDDDD_DDDD]
 
     /// IP → (ЦОД, media). Таблица из tg-ws-proxy; для клиентов без секрета, у которых байты ЦОД в init случайные.
     public static let ipToDc: [String: (dc: Int, media: Bool)] = {
@@ -112,6 +112,149 @@ public enum TgWs {
             if prev < chunk.count { parts.append(Array(chunk[prev...])) }
             return parts
         }
+    }
+
+    // MARK: MTProto-прокси (0.7.20)
+
+    /// Порт MTProto-прокси TG WS: `tg://proxy` с секретом - так Telegram для Android подключается без сбоев.
+    public static let mtPort = 10870
+
+    /// Секрет постоянный: слушатель только на 127.0.0.1, а секрет нужен Telegram для ключа обфускации, не для защиты.
+    public static let mtSecret: [UInt8] = Array(Sha256.hash(Array("HydraVPN TG WS".utf8)).prefix(16))
+    public static var mtSecretHex: String { mtSecret.map { String(format: "%02x", $0) }.joined() }
+
+    /// Ссылка для Telegram: MTProto-прокси с секретом `dd` (padded intermediate).
+    public static func mtProxyLink(port: Int = mtPort) -> String { "tg://proxy?server=127.0.0.1&port=\(port)&secret=dd\(mtSecretHex)" }
+
+    /// Ссылка для Telegram: SOCKS5 (ByeDPI и прочее).
+    public static func socksLink(port: Int) -> String { "tg://socks?server=127.0.0.1&port=\(port)" }
+
+    /// Рукопожатие клиента MTProto-прокси: 64 байта, ключ = SHA-256(init[8..<40] + секрет), IV = init[40..<56]; дальше поток тем же шифром.
+    public final class MtSession {
+        public let tag: UInt32
+        /// Номер ЦОД со знаком: отрицательный - media.
+        public let dcRaw: Int
+        public let clientDec: AesCtr
+        public let clientEnc: AesCtr
+
+        public init?(handshake hs: [UInt8]) {
+            guard hs.count == 64 else { return nil }
+            let dec = AesCtr(key: Sha256.hash(Array(hs[8..<40]) + TgWs.mtSecret), iv: Array(hs[40..<56]))
+            let plain = dec.process(hs)
+            var t: UInt32 = 0
+            for i in 56..<60 { t = (t << 8) | UInt32(plain[i]) }
+            guard TgWs.validProtos.contains(t) else { return nil }
+            tag = t
+            let lo = UInt16(plain[60])
+            let hi = UInt16(plain[61]) << 8
+            dcRaw = Int(Int16(bitPattern: lo | hi))
+            let rev = Array(hs[8..<56].reversed())
+            clientDec = dec
+            clientEnc = AesCtr(key: Sha256.hash(Array(rev[0..<32]) + TgWs.mtSecret), iv: Array(rev[32..<48]))
+        }
+    }
+
+    // MARK: Открытый транспорт и IPv6 (0.7.20)
+
+    public static let tagAbridged: UInt32 = 0xEFEF_EFEF
+    public static let tagIntermediate: UInt32 = 0xEEEE_EEEE
+    public static let tagPadded: UInt32 = 0xDDDD_DDDD
+
+    /// Адреса ЦОД Telegram по IPv6: `2001:b28:f23d:f00N::a` (для 2 и 4 - `2001:67c:4e8:f00N::a`, для 5 - `2001:b28:f23f:f005::a`); `::b` - media.
+    public static func v6Dc(_ a: [UInt8]) -> (dc: Int, media: Bool)? {
+        guard a.count == 16 else { return nil }
+        func g(_ i: Int) -> Int { (Int(a[2 * i]) << 8) | Int(a[2 * i + 1]) }
+        let a1 = g(1), a2 = g(2)
+        let known = g(0) == 0x2001 && ((a1 == 0x0B28 && (a2 == 0xF23D || a2 == 0xF23F)) || (a1 == 0x067C && a2 == 0x04E8))
+        guard known else { return nil }
+        let dc = g(3) - 0xF000
+        guard (1...5).contains(dc) else { return nil }
+        for i in 8..<15 where a[i] != 0 { return nil }
+        return (dc, a[15] == 0x0B)
+    }
+
+    /// Сеанс obfuscated2 со стороны клиента для клиентов Telegram, которые обфускацию не используют (Android без секрета прокси):
+    /// свой init со случайными ключом и IV, тегом протокола и номером ЦОД; исходящий поток шифруется ключом из init, входящий - развёрнутым.
+    public final class ObfClient {
+        public let initBytes: [UInt8]
+        private let enc: AesCtr
+        private let dec: AesCtr
+
+        public init(tag: UInt32, dc: Int) {
+            var r = [UInt8](repeating: 0, count: 64)
+            let bad: Set<UInt32> = [0x4441_4548, 0x5453_4F50, 0x2054_4547, 0x4954_504F, 0xDDDD_DDDD, 0xEEEE_EEEE, 0x0201_0316]
+            while true {
+                for i in 0..<64 { r[i] = UInt8.random(in: 0...255) }
+                if r[0] == 0xEF { continue }
+                let first = (UInt32(r[0]) << 24) | (UInt32(r[1]) << 16) | (UInt32(r[2]) << 8) | UInt32(r[3])
+                if bad.contains(first) || (r[4] == 0 && r[5] == 0 && r[6] == 0 && r[7] == 0) { continue }
+                break
+            }
+            r[56] = UInt8(truncatingIfNeeded: tag >> 24); r[57] = UInt8(truncatingIfNeeded: tag >> 16)
+            r[58] = UInt8(truncatingIfNeeded: tag >> 8); r[59] = UInt8(truncatingIfNeeded: tag)
+            r[60] = UInt8(truncatingIfNeeded: dc); r[61] = UInt8(truncatingIfNeeded: dc >> 8)
+            enc = AesCtr(key: Array(r[8..<40]), iv: Array(r[40..<56]))
+            let ks = enc.keystream(64)
+            var sent = r
+            for i in 56..<64 { sent[i] = r[i] ^ ks[i] }
+            initBytes = sent
+            let rev = Array(r[8..<56].reversed())
+            dec = AesCtr(key: Array(rev[0..<32]), iv: Array(rev[32..<48]))
+        }
+
+        public func encrypt(_ data: [UInt8]) -> [UInt8] { enc.process(data) }
+        public func decrypt(_ data: [UInt8]) -> [UInt8] { dec.process(data) }
+    }
+
+    /// Границы сообщений открытого транспорта (abridged / intermediate / padded) с накоплением неполного хвоста между чтениями.
+    public struct PlainFramer {
+        public enum FramingError: Error { case badLength }
+        private let tag: UInt32
+        private var buf: [UInt8] = []
+        public init(tag: UInt32) { self.tag = tag }
+
+        public mutating func feed(_ chunk: [UInt8]) throws -> [[UInt8]] {
+            buf += chunk
+            var out: [[UInt8]] = []
+            var pos = 0
+            while true {
+                let avail = buf.count - pos
+                var total: Int
+                if tag == TgWs.tagAbridged {
+                    if avail < 1 { break }
+                    let f = Int(buf[pos] & 0x7F)                // старший бит - запрос быстрого подтверждения
+                    if f == 0x7F {
+                        if avail < 4 { break }
+                        total = 4 + (Int(buf[pos + 1]) | (Int(buf[pos + 2]) << 8) | (Int(buf[pos + 3]) << 16)) * 4
+                    } else { total = 1 + f * 4 }
+                } else {
+                    if avail < 4 { break }
+                    let len = Int(buf[pos]) | (Int(buf[pos + 1]) << 8) | (Int(buf[pos + 2]) << 16) | (Int(buf[pos + 3] & 0x7F) << 24)
+                    total = 4 + len
+                }
+                if total <= 0 || total > 16 * 1024 * 1024 { throw FramingError.badLength }
+                if avail < total { break }
+                out.append(Array(buf[pos..<pos + total]))
+                pos += total
+            }
+            buf = Array(buf[pos...])
+            return out
+        }
+    }
+}
+
+extension Sha256 {
+    /// Сырые 32 байта хеша поверх `hex` из Geo.swift (там уже есть проверенный SHA-256 без CryptoKit).
+    static func hash(_ message: [UInt8]) -> [UInt8] {
+        let h = hex(Data(message))
+        var out: [UInt8] = []
+        var i = h.startIndex
+        while i < h.endIndex {
+            let j = h.index(i, offsetBy: 2)
+            out.append(UInt8(h[i..<j], radix: 16) ?? 0)
+            i = j
+        }
+        return out
     }
 }
 

@@ -174,7 +174,7 @@ private fun TgWsSection(c: AppController, ui: UiState) {
     val on = TgWsPreset.isApplied(ui.data.settings.routing.routes.rules)
     Section("Telegram по WebSocket") {
         Text("Когда Telegram не грузится даже с обходом DPI: его трафик идёт к серверам Telegram по WebSocket поверх TLS (kws*.web.telegram.org) " +
-            "вместо обычного TCP, который провайдеры душат. Свой сервер не нужен. Идея и протокол — Flowseal/tg-ws-proxy и DmitryKafturov/tg-ws-proxy (MIT).",
+            "вместо обычного TCP, который провайдеры душат. Свой сервер не нужен. ",
             fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Пускать Telegram через WebSocket", Modifier.weight(1f))
@@ -512,7 +512,7 @@ private fun DpiProbeSettingsSection(c: AppController, ui: UiState) {
     }
 }
 
-/** Передать Telegram локальный прокси Hydra (`tg://socks?…`): Telegram спросит, включить ли. Прокси работает, пока Hydra подключена. */
+/** Передать Telegram локальный прокси Hydra (`tg://proxy?…` для TG WS, `tg://socks?…` для остального): Telegram спросит, включить ли. Прокси работает, пока Hydra подключена. */
 @Composable
 internal fun TelegramProxySection(c: AppController, ui: UiState, compact: Boolean = false) {
     val port = remember(ui.data.settings.routing.routes) { c.telegramProxyPort() }
@@ -520,7 +520,7 @@ internal fun TelegramProxySection(c: AppController, ui: UiState, compact: Boolea
     val body: @Composable () -> Unit = {
         if (!compact) Text("Передаёт Telegram прокси, который Hydra поднимает на этом компьютере. Telegram спросит, включить ли прокси.",
             fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("Адрес 127.0.0.1:$port (SOCKS5) · ${if (tg) "Telegram по WebSocket" else "обход DPI"}", fontSize = 12.sp)
+        Text("Адрес 127.0.0.1:$port (${if (tg) "MTProto-прокси" else "SOCKS5"}) · ${if (tg) "Telegram по WebSocket" else "обход DPI"}", fontSize = 12.sp)
         Button(onClick = { c.openTelegramProxy(port) }) { Text("Подключить Telegram к прокси") }
         Text("Прокси работает, пока Hydra подключена.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

@@ -68,7 +68,7 @@
 
 ### Telegram по WebSocket
 - **Что это:** локальный SOCKS5 (порт 10881), который гонит MTProto-поток Telegram по WebSocket поверх TLS 1.2 до `kws<N>.web.telegram.org` вместо TCP,
-  который провайдеры душат. Свой сервер не нужен. Идея — Flowseal/tg-ws-proxy и DmitryKafturov/tg-ws-proxy (MIT), код — свой.
+  который провайдеры душат. Свой сервер не нужен.
 - **Как включить:** пресет «Telegram → WebSocket» (Обход DPI) или правило «подсети Telegram → Telegram по WebSocket»; кнопка «Подключить Telegram к прокси»
   (0.7.15) передаёт приложению Telegram адрес прокси.
 - **Статус:** Android и ПК; iOS — в очереди. Рукопожатие WebSocket проверено вживую, сессия Telegram на телефоне — нет.

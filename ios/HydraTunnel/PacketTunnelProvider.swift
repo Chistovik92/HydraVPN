@@ -142,6 +142,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             let tg = TgWsServer { [store] in store.appendLog($0) }
             do {
                 try tg.start(port: UInt16(RouteTarget.tgwsPort))
+                // MTProto-прокси рядом со SOCKS5: ошибка порта - не повод отказываться от TG WS.
+                do { try tg.startMtProto(port: UInt16(RouteTarget.tgwsMtPort)) }
+                catch { store.appendLog("TG WS: MTProto-прокси не запущен (\(error.localizedDescription)) - работает только SOCKS5") }
                 tgWs = tg
             } catch {
                 store.appendLog("TG WS: не запущен (\(error.localizedDescription)) - продолжаем без него")

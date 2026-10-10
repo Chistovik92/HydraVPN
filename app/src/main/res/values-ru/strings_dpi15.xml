@@ -35,6 +35,7 @@
     <string name="tgp_addr">Адрес 127.0.0.1:%1$d (SOCKS5)</string>
     <string name="tgp_via_tgws">Telegram по WebSocket</string>
     <string name="tgp_via_dpi">обход DPI</string>
+    <string name="tgp_addr_mt">Адрес 127.0.0.1:%1$d (MTProto-прокси)</string>
     <string name="tgp_need_on">Прокси работает, пока Hydra подключена.</string>
     <string name="tgp_missing">Telegram не установлен.</string>
 </resources>

@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.7.19** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.7.20** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -178,10 +178,14 @@ desktop/src/lite/…           Hydra Classic (Swing, Windows 7/32-бит, Linux 
 ios/                         SwiftUI + Network Extension: Hydra/ (экраны), HydraTunnel/, HydraAWG/, Packages/HydraKit (общая логика), Packages/CiaDPI, Bridge/ (gomobile)
 scripts/                     release.sh, build-{awg,olcrtc,openflux,byedpi}.sh, check-updates.sh, package-*.sh, desktop-e2e.sh
 docs/   ROUTING · PROTOCOLS · SECURITY · BUILD · ARCHITECTURE · SERVICES · PANELS · ECOSYSTEM · MULTIPLATFORM · ROADMAP · HISTORY · HANDOFF_ROUTERS …
-CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.7.19 (главный источник контекста)
+CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.7.20 (главный источник контекста)
 ```
 
 ## Честные оговорки
+
+- **0.7.20 — TG WS и iOS-паритет.** Проверено: юнит-тесты ПК и HydraKit (83), живые тесты против серверов Telegram (`HYDRA_LIVE_TGWS=1`): ответ DC в режимах obfuscated,
+  открытый abridged и MTProto-прокси; iOS CI собрал приложение и расширение. **Не проверено:** сессия Telegram на телефоне Android (причина «Недоступен» установлена по поведению
+  клиента и живым тестам на ПК) и на устройстве iOS; `TgWsServer` на Network.framework в бою; скриншоты README не обновлены.
 
 - **0.7.19 — PPTP.** Проверено: юнит-тесты ПК (`PptpTest`: вектор RC4, MPPE stateful/stateless, GRE, сообщения, сквозной тест клиента с поддельным сервером), компиляция
   native-варианта Android (`compileNativeDebugKotlin`), Classic. **Не проверено:** реальный сервер PPTP (режимы и ключи MPPE сверены по RFC 3078/3079 и поведению pppd — возможны расхождения),

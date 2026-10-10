@@ -75,6 +75,87 @@ final class TgWsTests: XCTestCase {
         XCTAssertEqual(one.split(c2.process(msg(2))).count, 1)
     }
 
+
+    func testOwnInitIsReadableAndStreamsInterop() {
+        for dc in [2, -4, 203] {
+            let obf = TgWs.ObfClient(tag: TgWs.tagAbridged, dc: dc)
+            let parsed = TgWs.dcFromInit(obf.initBytes)
+            XCTAssertEqual(parsed?.dc, abs(dc)); XCTAssertEqual(parsed?.media, dc < 0)
+            // Ретранслятор: ключ и IV из init, поток после 64 байт init.
+            let rx = AesCtr(key: Array(obf.initBytes[8..<40]), iv: Array(obf.initBytes[40..<56]))
+            _ = rx.keystream(64)
+            let msg = (0..<40).map { UInt8($0) }
+            XCTAssertEqual(rx.process(obf.encrypt(msg)), msg)
+            // Обратный поток: ключ - развёрнутые байты 8..56 исходного (расшифрованного) init.
+            let ks = AesCtr(key: Array(obf.initBytes[8..<40]), iv: Array(obf.initBytes[40..<56])).keystream(64)
+            var plain = obf.initBytes
+            for i in 56..<64 { plain[i] ^= ks[i] }
+            let rev = Array(plain[8..<56].reversed())
+            let tx = AesCtr(key: Array(rev[0..<32]), iv: Array(rev[32..<48]))
+            let reply = (0..<24).map { UInt8($0 &* 3) }
+            XCTAssertEqual(obf.decrypt(tx.process(reply)), reply)
+        }
+    }
+
+    func testFramerCutsAbridgedAndIntermediate() throws {
+        func m(_ words: Int) -> [UInt8] { [UInt8(words)] + [UInt8](repeating: 7, count: words * 4) }
+        var fr = TgWs.PlainFramer(tag: TgWs.tagAbridged)
+        let all = m(2) + m(3)
+        XCTAssertEqual(try fr.feed(Array(all[0..<11])).map(\.count), [9])        // вторая - ещё неполная
+        XCTAssertEqual(try fr.feed(Array(all[11...])).map(\.count), [13])        // хвост достроен
+        var big = TgWs.PlainFramer(tag: TgWs.tagAbridged)
+        XCTAssertEqual(try big.feed([0x7F, 0x40, 0, 0] + [UInt8](repeating: 0, count: 256)).map(\.count), [260])
+        func im(_ n: Int) -> [UInt8] { [UInt8(n), 0, 0, 0] + [UInt8](repeating: 1, count: n) }
+        var fi = TgWs.PlainFramer(tag: TgWs.tagIntermediate)
+        XCTAssertEqual(try fi.feed(im(8) + im(20)).map(\.count), [12, 24])
+    }
+
+    func testIpv6DatacenterAddresses() {
+        func v6(_ groups: [UInt16]) -> [UInt8] { groups.flatMap { [UInt8($0 >> 8), UInt8($0 & 0xFF)] } }
+        XCTAssertEqual(TgWs.v6Dc(v6([0x2001, 0x067C, 0x04E8, 0xF002, 0, 0, 0, 0x0A]))?.dc, 2)
+        XCTAssertEqual(TgWs.v6Dc(v6([0x2001, 0x067C, 0x04E8, 0xF002, 0, 0, 0, 0x0B]))?.media, true)
+        XCTAssertEqual(TgWs.v6Dc(v6([0x2001, 0x0B28, 0xF23F, 0xF005, 0, 0, 0, 0x0A]))?.dc, 5)
+        XCTAssertNil(TgWs.v6Dc(v6([0x2001, 0x0DB8, 0, 0, 0, 0, 0, 1])))
+        XCTAssertNil(TgWs.v6Dc(v6([0x2001, 0x067C, 0x04E8, 0xF009, 0, 0, 0, 0x0A])))
+    }
+
+
+    func testSha256KnownVectors() {
+        func hex(_ b: [UInt8]) -> String { b.map { String(format: "%02x", $0) }.joined() }
+        XCTAssertEqual(hex(Sha256.hash(Array("abc".utf8))), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+        XCTAssertEqual(hex(Sha256.hash([])), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+        XCTAssertEqual(hex(Sha256.hash(Array("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq".utf8))),
+                       "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1")
+    }
+
+    func testMtProxyHandshakeAndStreams() {
+        // Клиент Telegram: init с ключом SHA-256(init[8..<40] + секрет), тег dd (padded intermediate), ЦОД -4 (media).
+        var r = (0..<64).map { UInt8(($0 &* 29 &+ 5) & 0xFF) }
+        r[0] = 0x12; r[4] = 1
+        let enc = AesCtr(key: Sha256.hash(Array(r[8..<40]) + TgWs.mtSecret), iv: Array(r[40..<56]))
+        let ks = enc.keystream(64)
+        let tail: [UInt8] = [0xDD, 0xDD, 0xDD, 0xDD, 0xFC, 0xFF, 1, 2]       // ЦОД -4 как int16 LE
+        var hs = r
+        for i in 0..<8 { hs[56 + i] = tail[i] ^ ks[56 + i] }
+        guard let s = TgWs.MtSession(handshake: hs) else { return XCTFail("рукопожатие не принято") }
+        XCTAssertEqual(s.tag, TgWs.tagPadded)
+        XCTAssertEqual(s.dcRaw, -4)
+        // Поток клиента → прокси.
+        let msg = (0..<32).map { UInt8($0 &+ 1) }
+        XCTAssertEqual(s.clientDec.process(enc.process(msg)), msg)
+        // Поток прокси → клиент: клиент расшифровывает ключом из развёрнутых байт init.
+        let rev = Array(r[8..<56].reversed())
+        let clientRx = AesCtr(key: Sha256.hash(Array(rev[0..<32]) + TgWs.mtSecret), iv: Array(rev[32..<48]))
+        let reply = (0..<20).map { UInt8($0 &* 5) }
+        XCTAssertEqual(clientRx.process(s.clientEnc.process(reply)), reply)
+        // Чужой секрет или тег - отказ.
+        var bad = hs; bad[60] ^= 0xFF; bad[56] ^= 0xFF
+        XCTAssertNil(TgWs.MtSession(handshake: bad))
+        XCTAssertNil(TgWs.MtSession(handshake: [1, 2, 3]))
+        XCTAssertTrue(TgWs.mtProxyLink().hasPrefix("tg://proxy?server=127.0.0.1&port=10870&secret=dd"))
+        XCTAssertEqual(TgWs.mtSecretHex.count, 32)
+    }
+
     func testTelegramAddresses() {
         XCTAssertTrue(TgWs.isTelegramIp("149.154.167.51"))
         XCTAssertTrue(TgWs.isTelegramIp("91.108.4.1"))

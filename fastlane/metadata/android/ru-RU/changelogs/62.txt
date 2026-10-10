@@ -1,0 +1,1 @@
+0.7.20 - прокси Telegram: TG WS работает с открытым транспортом Telegram для Android и с IPv6, добавлен режим MTProto-прокси (tg://proxy). На iOS - Telegram по WebSocket, вкладки маршрутизации, настройки подбора и кнопка Telegram.

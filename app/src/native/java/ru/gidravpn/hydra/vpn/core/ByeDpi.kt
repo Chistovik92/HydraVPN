@@ -96,6 +96,7 @@ internal object RoutePlanRuntime {
             val tg = ru.gidravpn.hydra.data.tgws.TgWsProxy(log = onLog)
             try {
                 tg.start(RouteTarget.TGWS_PORT)
+                runCatching { tg.startMtProto(RouteTarget.TGWS_MT_PORT) }.onFailure { onLog("TG WS: MTProto-прокси не запущен (${it.message}) - работает только SOCKS5") }
                 sidecars += AutoCloseable { tg.stop() }
             } catch (e: Exception) {
                 onLog("TG WS: не запущен, продолжаем без него — ${e.message}")

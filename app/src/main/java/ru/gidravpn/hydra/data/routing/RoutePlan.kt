@@ -37,6 +37,8 @@ object RouteTarget {
     /** «Telegram через WebSocket» (0.7.14): локальный SOCKS5 [ru.gidravpn.hydra.data.tgws.TgWsProxy]. */
     const val TGWS = "tgws"
     const val TGWS_PORT = 10881
+    /** MTProto-прокси того же TG WS (0.7.20): `tg://proxy` с секретом - его без сбоев принимает и Telegram для Android. */
+    const val TGWS_MT_PORT = 10870
     const val BLOCK = "block"
     private const val NODE_PREFIX = "node-"
     private const val GROUP_PREFIX = "grp-"

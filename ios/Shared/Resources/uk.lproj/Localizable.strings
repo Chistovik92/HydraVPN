@@ -172,6 +172,7 @@
 "tgp_addr" = "Адрес 127.0.0.1:%1$ld (SOCKS5)";
 "tgp_via_tgws" = "Telegram по WebSocket";
 "tgp_via_dpi" = "обход DPI";
+"tgp_addr_mt" = "Адреса 127.0.0.1:%1$ld (MTProto-проксі)";
 "tgp_need_on" = "Прокси работает, пока Hydra подключена.";
 "tgp_missing" = "Telegram не установлен.";
 "widget_description" = "Локація, стан і кнопка підключення";
@@ -286,7 +287,7 @@
 "dpi_t_tgws" = "Telegram по WebSocket";
 "tgws_title" = "Telegram по WebSocket";
 "tgws_sub" = "Когда Telegram не грузится даже с обходом DPI";
-"tgws_note" = "Трафик Telegram идёт к его серверам по WebSocket поверх TLS (kws*.web.telegram.org) вместо обычного TCP, который провайдеры душат. Свой сервер не нужен. Идея и протокол — Flowseal/tg-ws-proxy и DmitryKafturov/tg-ws-proxy (MIT). Android и ПК.";
+"tgws_note" = "Трафик Telegram идёт к его серверам по WebSocket поверх TLS (kws*.web.telegram.org) вместо обычного TCP, который провайдеры душат. Свой сервер не нужен. Android и ПК.";
 "tgws_preset" = "Telegram → WebSocket";
 "tgws_wizard_hint" = "Telegram не открылся ни с одной стратегией DPI. Попробуйте путь через WebSocket:";
 "servers_unreachable" = "недоступно";

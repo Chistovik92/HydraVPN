@@ -12,6 +12,7 @@ final class TgWsServer: @unchecked Sendable {
     private let queue = DispatchQueue(label: "ru.gidravpn.hydra.tgws")
     private let log: @Sendable (String) -> Void
     private var listener: NWListener?
+    private var mtListener: NWListener?
     private let lock = NSLock()
     private var active = Set<ObjectIdentifier>()
     private var conns: [ObjectIdentifier: NWConnection] = [:]
@@ -23,6 +24,17 @@ final class TgWsServer: @unchecked Sendable {
 
     /// Поднимает слушатель на 127.0.0.1; бросает, если порт не удалось занять.
     func start(port: UInt16) throws {
+        listener = try makeListener(port) { [weak self] c in self?.accept(c, mtProto: false) }
+        log("TG WS: слушаю 127.0.0.1:\(port)")
+    }
+
+    /// MTProto-прокси (0.7.20): `tg://proxy` с секретом - так Telegram для Android подключается без сбоев.
+    func startMtProto(port: UInt16) throws {
+        mtListener = try makeListener(port) { [weak self] c in self?.accept(c, mtProto: true) }
+        log("TG WS: MTProto-прокси 127.0.0.1:\(port)")
+    }
+
+    private func makeListener(_ port: UInt16, _ onConnection: @escaping (NWConnection) -> Void) throws -> NWListener {
         let params = NWParameters.tcp
         params.requiredInterfaceType = .loopback
         let l = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
@@ -35,23 +47,23 @@ final class TgWsServer: @unchecked Sendable {
             default: break
             }
         }
-        l.newConnectionHandler = { [weak self] c in self?.accept(c) }
+        l.newConnectionHandler = onConnection
         l.start(queue: queue)
         if ready.wait(timeout: .now() + 3) == .timedOut { l.cancel(); throw NSError(domain: "TgWs", code: 1, userInfo: [NSLocalizedDescriptionKey: "слушатель не запустился"]) }
         if let e = box.error { l.cancel(); throw e }
-        listener = l
-        log("TG WS: слушаю 127.0.0.1:\(port)")
+        return l
     }
 
     private final class StartBox: @unchecked Sendable { var error: NWError? }
 
     func stop() {
         listener?.cancel(); listener = nil
+        mtListener?.cancel(); mtListener = nil
         lock.lock(); let all = Array(conns.values); conns.removeAll(); active.removeAll(); lock.unlock()
         all.forEach { $0.cancel() }
     }
 
-    private func accept(_ c: NWConnection) {
+    private func accept(_ c: NWConnection, mtProto: Bool) {
         let id = ObjectIdentifier(c)
         lock.lock()
         let full = active.count >= Self.maxConnections
@@ -60,9 +72,52 @@ final class TgWsServer: @unchecked Sendable {
         if full { c.cancel(); return }
         Task { [weak self] in
             guard let self else { return }
-            await self.handle(c)
+            if mtProto { await self.handleMt(c) } else { await self.handle(c) }
             c.cancel()
             self.lock.lock(); self.active.remove(id); self.conns.removeValue(forKey: id); self.lock.unlock()
+        }
+    }
+
+    // MARK: MTProto-прокси (0.7.20)
+
+    /// Клиент говорит MTProto-прокси с секретом: расшифровываем init, берём ЦОД и тег, открываем WebSocket до ЦОД со своим obfuscated2
+    /// и перешифровываем поток (как в `TgWsProxy.handleMt` на Android и ПК).
+    private func handleMt(_ client: NWConnection) async {
+        do {
+            try await client.ready(queue)
+            let hs = try await client.readExactly(64)
+            guard let s = TgWs.MtSession(handshake: hs) else { log("TG WS: MTProto-прокси: неверный секрет или протокол"); return }
+            let dc = abs(s.dcRaw)
+            let media = s.dcRaw < 0
+            guard let fallbackIp = TgWs.defaultDcIps[dc] else { log("TG WS: MTProto-прокси: неизвестный ЦОД \(dc)"); return }
+            let obf = TgWs.ObfClient(tag: s.tag, dc: s.dcRaw)
+            if let ws = await openWs(dc: dc, media: media) {
+                try await ws.send(Data(obf.initBytes))
+                await bridgePlain(client, ws, obf, TgWs.PlainFramer(tag: s.tag), cltDec: s.clientDec, cltEnc: s.clientEnc)
+                return
+            }
+            // WebSocket недоступен - прямой TCP до ЦОД с тем же перешифрованием потока.
+            log("TG WS: MTProto-прокси: WebSocket недоступен → прямой TCP до ЦОД\(dc)")
+            let remote = NWConnection(host: NWEndpoint.Host(fallbackIp), port: 443, using: .tcp)
+            try await remote.ready(queue)
+            defer { remote.cancel() }
+            try await remote.writeAll(obf.initBytes)
+            await withTaskGroup(of: Void.self) { g in
+                g.addTask {
+                    while let d = try? await client.readSome(), !d.isEmpty {
+                        if (try? await remote.writeAll(obf.encrypt(s.clientDec.process(Array(d))))) == nil { break }
+                    }
+                    remote.cancel()
+                }
+                g.addTask {
+                    while let d = try? await remote.readSome(), !d.isEmpty {
+                        if (try? await client.writeAll(s.clientEnc.process(obf.decrypt(Array(d))))) == nil { break }
+                    }
+                    client.cancel()
+                }
+            }
+        } catch {
+            // Клиент закрыл соединение или оборвалось - штатно.
         }
     }
 
@@ -79,62 +134,128 @@ final class TgWsServer: @unchecked Sendable {
             let req = try await client.readExactly(4)
             guard req[1] == 1 else { try await client.writeAll(Self.reply(7)); return }
             let dst: String
+            var v6: [UInt8]?
             switch req[3] {
             case 1: dst = try await client.readExactly(4).map { String($0) }.joined(separator: ".")
             case 3:
                 let n = try await client.readExactly(1)[0]
                 dst = String(decoding: try await client.readExactly(Int(n)), as: UTF8.self)
+            case 4:
+                // Telegram на устройстве с IPv6 использует адреса ЦОД по IPv6.
+                let a = try await client.readExactly(16)
+                v6 = a
+                dst = Self.ipv6String(a)
             default: try await client.writeAll(Self.reply(8)); return
             }
             let p = try await client.readExactly(2)
             let port = (Int(p[0]) << 8) | Int(p[1])
 
-            if !TgWs.isTelegramIp(dst) { try await passthrough(client, dst: dst, port: port, first: nil, reply: true); return }
+            let isTelegram: Bool = v6.map { TgWs.v6Dc($0) != nil } ?? TgWs.isTelegramIp(dst)
+            if !isTelegram { try await passthrough(client, dst: dst, port: port, first: nil, reply: true); return }
 
             try await client.writeAll(Self.reply(0))
-            var initBytes = Array(try await client.readExactly(64))
+            // Первый байт отличает обфусцированный init (случайный) от «чистого» транспорта Telegram для Android:
+            // 0xEF (abridged) или 0xEEEEEEEE / 0xDDDDDDDD (intermediate).
+            let b0 = try await client.readExactly(1)[0]
+            var plainTag: UInt32?
+            var prefix: [UInt8] = []
+            var initBytes: [UInt8]?
+            if b0 == 0xEF { plainTag = TgWs.tagAbridged; prefix = [0xEF] }
+            else {
+                let h = [b0] + (try await client.readExactly(3))
+                if h.allSatisfy({ $0 == 0xEE }) { plainTag = TgWs.tagIntermediate; prefix = h }
+                else if h.allSatisfy({ $0 == 0xDD }) { plainTag = TgWs.tagPadded; prefix = h }
+                else { initBytes = h + (try await client.readExactly(60)) }
+            }
+            let byIp: (dc: Int, media: Bool)? = v6.flatMap { TgWs.v6Dc($0) } ?? TgWs.ipToDc[dst]
+
+            if let tag = plainTag {
+                guard let b = byIp, TgWs.defaultDcIps[b.dc] != nil else {
+                    try await tcpFallback(client, dst: dst, port: port, first: Data(prefix), why: "неизвестный ЦОД"); return
+                }
+                guard let ws = await openWs(dc: b.dc, media: b.media) else {
+                    try await tcpFallback(client, dst: dst, port: port, first: Data(prefix), why: "WebSocket недоступен"); return
+                }
+                // Ретранслятор Telegram ждёт obfuscated2, а клиент говорит открытым текстом - обфускацию строим сами.
+                let obf = TgWs.ObfClient(tag: tag, dc: b.media ? -b.dc : b.dc)
+                try await ws.send(Data(obf.initBytes))
+                await bridgePlain(client, ws, obf, TgWs.PlainFramer(tag: tag))
+                return
+            }
+
+            guard var initB = initBytes else { return }
             // HTTP-транспорт Telegram не поддерживается - клиент сам вернётся к MTProto.
-            if ["POST ", "GET ", "HEAD "].contains(where: { initBytes.starts(with: Array($0.utf8)) }) { return }
+            if ["POST ", "GET ", "HEAD "].contains(where: { initB.starts(with: Array($0.utf8)) }) { return }
 
             var dc: Int?
             var media = false
             var patched = false
-            if let parsed = TgWs.dcFromInit(initBytes) { dc = parsed.dc; media = parsed.media }
-            else if let byIp = TgWs.ipToDc[dst] {
+            if let parsed = TgWs.dcFromInit(initB) { dc = parsed.dc; media = parsed.media }
+            else if let b = byIp {
                 // Мобильные клиенты без секрета оставляют случайные байты ЦОД - берём по адресу и правим init.
-                dc = byIp.dc; media = byIp.media
-                if TgWs.defaultDcIps[byIp.dc] != nil { initBytes = TgWs.patchInitDc(initBytes, dc: media ? -byIp.dc : byIp.dc); patched = true }
+                dc = b.dc; media = b.media
+                if TgWs.defaultDcIps[b.dc] != nil { initB = TgWs.patchInitDc(initB, dc: media ? -b.dc : b.dc); patched = true }
             }
             guard let dcn = dc, TgWs.defaultDcIps[dcn] != nil else {
-                try await tcpFallback(client, dst: dst, port: port, first: Data(initBytes), why: "неизвестный ЦОД"); return
+                try await tcpFallback(client, dst: dst, port: port, first: Data(initB), why: "неизвестный ЦОД"); return
             }
-
-            let key = "\(dcn):\(media)"
-            var ws: WebSocketConn?
-            lock.lock(); let black = wsBlacklist.contains(key); let failing = (failUntil[key] ?? .distantPast) > Date(); lock.unlock()
-            if !black {
-                var allRedirects = true
-                let timeout: TimeInterval = failing ? 2 : 10
-                outer: for domain in TgWs.wsDomains(dc: dcn, media: media) {
-                    for ip in await candidateIps(domain, fallback: TgWs.defaultDcIps[dcn]!) {
-                        do { ws = try await WebSocketConn.connect(ip: ip, domain: domain, timeout: timeout, queue: queue); allRedirects = false; break outer }
-                        catch WebSocketConn.Failure.redirect(let code) { log("TG WS: ЦОД\(dcn) \(domain) (\(ip)) → редирект \(code)") }
-                        catch { allRedirects = false; log("TG WS: ЦОД\(dcn) \(domain) (\(ip)): \(error.localizedDescription)") }
-                    }
-                }
-                if ws == nil {
-                    lock.lock()
-                    if allRedirects { wsBlacklist.insert(key) } else { failUntil[key] = Date().addingTimeInterval(30) }
-                    lock.unlock()
-                }
+            guard let ws = await openWs(dc: dcn, media: media) else {
+                try await tcpFallback(client, dst: dst, port: port, first: Data(initB), why: "WebSocket недоступен"); return
             }
-            guard let ws else { try await tcpFallback(client, dst: dst, port: port, first: Data(initBytes), why: "WebSocket недоступен"); return }
-
-            let splitter = patched ? TgWs.MsgSplitter(initBytes: initBytes) : nil
-            try await ws.send(Data(initBytes))
+            let splitter = patched ? TgWs.MsgSplitter(initBytes: initB) : nil
+            try await ws.send(Data(initB))
             await bridge(client, ws, splitter)
         } catch {
             // Клиент закрыл соединение или оборвалось - штатно.
+        }
+    }
+
+    /// WebSocket до ЦОД: сначала домены `kws*`, у каждого - адреса из DNS и запасной. Помнит редиректы и недавние сбои.
+    private func openWs(dc: Int, media: Bool) async -> WebSocketConn? {
+        let key = "\(dc):\(media)"
+        lock.lock(); let black = wsBlacklist.contains(key); let failing = (failUntil[key] ?? .distantPast) > Date(); lock.unlock()
+        if black { return nil }
+        var allRedirects = true
+        let timeout: TimeInterval = failing ? 2 : 10
+        for domain in TgWs.wsDomains(dc: dc, media: media) {
+            for ip in await candidateIps(domain, fallback: TgWs.defaultDcIps[dc]!) {
+                do { return try await WebSocketConn.connect(ip: ip, domain: domain, timeout: timeout, queue: queue) }
+                catch WebSocketConn.Failure.redirect(let code) { log("TG WS: ЦОД\(dc) \(domain) (\(ip)) → редирект \(code)") }
+                catch { allRedirects = false; log("TG WS: ЦОД\(dc) \(domain) (\(ip)): \(error.localizedDescription)") }
+            }
+        }
+        lock.lock()
+        if allRedirects { wsBlacklist.insert(key) } else { failUntil[key] = Date().addingTimeInterval(30) }
+        lock.unlock()
+        return nil
+    }
+
+    private static func ipv6String(_ a: [UInt8]) -> String {
+        stride(from: 0, to: 16, by: 2).map { String((Int(a[$0]) << 8) | Int(a[$0 + 1]), radix: 16) }.joined(separator: ":")
+    }
+
+    /// Клиент говорит открытым MTProto: режем по границам сообщений, шифруем своим потоком; ответы расшифровываем.
+    private func bridgePlain(_ client: NWConnection, _ ws: WebSocketConn, _ obf: TgWs.ObfClient, _ framer: TgWs.PlainFramer,
+                             cltDec: AesCtr? = nil, cltEnc: AesCtr? = nil) async {
+        await withTaskGroup(of: Void.self) { g in
+            g.addTask {
+                var framer = framer
+                while let d = try? await client.readSome(), !d.isEmpty {
+                    let chunk: [UInt8] = cltDec.map { $0.process(Array(d)) } ?? Array(d)
+                    guard let messages = try? framer.feed(chunk) else { break }
+                    for m in messages {
+                        if (try? await ws.send(Data(obf.encrypt(m)))) == nil { ws.close(); return }
+                    }
+                }
+                ws.close()
+            }
+            g.addTask {
+                while let m = try? await ws.receive() {
+                    let p = obf.decrypt(m)
+                    if (try? await client.writeAll(cltEnc.map { $0.process(p) } ?? p)) == nil { break }
+                }
+                ws.close(); client.cancel()
+            }
         }
     }
 

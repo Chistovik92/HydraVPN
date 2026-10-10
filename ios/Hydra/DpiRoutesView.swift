@@ -260,11 +260,13 @@ struct DpiRoutesView: View {
 
     /// `tg://socks`: Telegram сам спросит, включить ли прокси. Порт - TG WS, если он включён, иначе ByeDPI.
     private var telegramSection: some View {
-        let port: Int = tgWsApplied ? RouteTarget.tgwsPort : cfg.dpi.port
+        // TG WS - MTProto-прокси (его без сбоев принимает и Telegram для Android), ByeDPI - SOCKS5.
+        let port: Int = tgWsApplied ? RouteTarget.tgwsMtPort : cfg.dpi.port
+        let link: String = tgWsApplied ? TgWs.mtProxyLink(port: port) : TgWs.socksLink(port: port)
         return Section(header: Text(L("tgp_title")), footer: Text(L("tgp_sub"))) {
-            Text(L("tgp_addr", port)).font(.footnote)
+            Text(L(tgWsApplied ? "tgp_addr_mt" : "tgp_addr", port)).font(.footnote)
             Button(L("tgp_button")) {
-                guard let url = URL(string: "tg://socks?server=127.0.0.1&port=\(port)") else { return }
+                guard let url = URL(string: link) else { return }
                 UIApplication.shared.open(url) { ok in if !ok { tgMissing = true } }
             }
             Text(tgWsApplied ? L("tgp_via_tgws") : L("tgp_via_dpi")).font(.caption).foregroundStyle(Color.hydraMuted)

@@ -77,9 +77,6 @@ policy-local/dummy), установщик `snolpkg`, клиент `snolcNG` (д�
 |---|---|---|---|
 | [hufrea/byedpi](https://github.com/hufrea/byedpi) | MIT | `ciadpi`: локальный SOCKS5, режет и подделывает первые пакеты соединения | движок обхода DPI (0.7.13); v0.17.3, подпроцесс на Android/ПК, статическая библиотека `CiaDPI` на iOS |
 | [romanvht/ByeByeDPI](https://github.com/romanvht/ByeByeDPI) | GPL-3.0 | Android-приложение вокруг ByeDPI: «Проверка прокси» (перебор стратегий по спискам доменов), настройки подбора | эталон мастера подбора: 60 стратегий и сайты проверки взяты оттуда; в 0.7.15 — те же настройки (пауза, запросы, параллельность, таймаут, SNI, списки, свой список стратегий) |
-| [Flowseal/tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy) | MIT | Python: локальный прокси для Telegram Desktop — WebSocket поверх TLS до `kws<N>.web.telegram.org/apiws`; режимы MTProto-прокси (порт 1443, fake-TLS) и SOCKS5, запасной путь через Cloudflare-домены, трей Windows/macOS/Linux | идея и протокол TG WS (0.7.14); код не копировался. Режим MTProto-прокси и Cloudflare-путь — в очереди (ROADMAP) |
-| [DmitryKafturov/tg-ws-proxy](https://github.com/DmitryKafturov/tg-ws-proxy) | MIT | более ранняя ветка того же: SOCKS5 на `127.0.0.1:1080`, `--dc-ip DC:IP` (по умолчанию ЦОД 2 и 4 — `149.154.167.220`), откат на прямой TCP при редиректе | таблица адресов ЦОД и подсетей Telegram, чтение номера ЦОД из init |
-| [ihtfw/tg-ws-proxy-android](https://github.com/ihtfw/tg-ws-proxy-android) | MIT | Kotlin-порт для Android: SOCKS5 на `127.0.0.1:1080`, пул WebSocket по ЦОД (4), буферы 256 КБ | подтверждение схемы на Android; пул соединений — идея на будущее |
 
 Что проверено вживую (10.10.2026): `kws2.web.telegram.org` принимает **только TLS 1.2** (на 1.3 — alert `protocol_version`); WebSocket-апгрейд `/apiws`
 с подпротоколом `binary` отвечает `101`; адрес `149.154.167.51` у провайдера сборочной машины глухо блокировался, а `.220` и `.99` (DNS домена)

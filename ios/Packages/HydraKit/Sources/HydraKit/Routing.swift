@@ -19,6 +19,8 @@ public enum RouteTarget {
     /// «Telegram через WebSocket» (0.7.20): локальный SOCKS5 внутри расширения VPN (`TgWsProxy`).
     public static let tgws = "tgws"
     public static let tgwsPort = 10881
+    /// MTProto-прокси того же TG WS (`tg://proxy` с секретом).
+    public static let tgwsMtPort = 10870
     public static let block = "block"
 
     public static func node(_ id: Int64) -> String { "node-\(id)" }
