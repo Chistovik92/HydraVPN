@@ -57,7 +57,9 @@ fun RoutingHubScreen(vm: MainViewModel) {
                     Text(stringResource(R.string.dpi_intro), color = TextMuted, fontSize = 12.sp)
                     DpiWizardCard(vm)
                     DpiEngineCard(vm)
+                    DpiProbeSettingsCard(vm)
                     TgWsCard(vm)
+                    TelegramProxyCard(vm)
                 }
                 RouteTab.EXITS -> TabColumn(vm) {
                     Text(stringResource(R.string.rh_exits_intro), color = TextMuted, fontSize = 12.sp)

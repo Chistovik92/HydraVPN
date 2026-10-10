@@ -217,7 +217,7 @@ internal class DpiPanel(private val c: AppController) : Renderable {
 
     private fun startProbe() {
         val picked = wizGroups.filter { it.value.isSelected }.keys
-        c.probeDpi(picked, wizSite.text, wizFull.isSelected)
+        c.probeDpi(wizSite.text, wizFull.isSelected, picked)
     }
 
     private fun addRule() {

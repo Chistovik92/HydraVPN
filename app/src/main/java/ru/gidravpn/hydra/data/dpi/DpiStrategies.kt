@@ -81,5 +81,13 @@ object DpiStrategies {
         "discord" to listOf("dis.gd", "discord.co", "discord.gg", "discord.app", "discord.com", "discord.dev", "discord.new", "discord.gift"),
         "telegram" to listOf("telegram.org", "core.telegram.org", "web.telegram.org", "webk.telegram.org", "my.telegram.org", "translations.telegram.org", "instantview.telegram.org", "blog.telegram.org"),
         "general" to listOf("rutracker.org", "nyaa.si", "rutor.org", "nnmclub.to", "speedtest.net", "ookla.com"),
+        // 0.7.15: остальные списки ByeByeDPI
+        "cloudflare" to listOf("cloudflare.net", "cloudflare.com", "cloudflarecn.net", "cloudflare-ech.com"),
+        "googlevideo" to listOf("rr1---sn-4axm-n8vs.googlevideo.com", "rr1---sn-gvnuxaxjvh-o8ge.googlevideo.com", "rr1---sn-ug5onuxaxjvh-p3ul.googlevideo.com", "rr1---sn-ug5onuxaxjvh-n8v6.googlevideo.com", "manifest.googlevideo.com"),
+        "social" to listOf("snapchat.com", "snap.com", "linkedin.com", "facebook.com", "fb.com", "instagram.com", "x.com", "twitter.com", "tiktok.com"),
+        "turkiye" to listOf("roblox.com", "wattpad.com", "pastebin.com", "4shared.com", "wikileaks.org"),
     )
+
+    /** Порядок встроенных списков в интерфейсе (как в ByeByeDPI — по алфавиту). */
+    val GROUP_ORDER = listOf("cloudflare", "discord", "general", "googlevideo", "social", "telegram", "turkiye", "youtube")
 }

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dpi_ps_title">Настройки подбора</string>
+    <string name="dpi_ps_sub">Как проверять стратегии. Больше запросов и пауза — стабильнее, больше параллельных запросов — быстрее.</string>
+    <string name="dpi_ps_sec">с</string>
+    <string name="dpi_ps_delay">Ожидание между проверками</string>
+    <string name="dpi_ps_delay_hint">Увеличение значения повышает стабильность на слабой сети</string>
+    <string name="dpi_ps_requests">Количество запросов к домену</string>
+    <string name="dpi_ps_requests_hint">Сайт считается открытым, если ответило большинство попыток. Больше — точнее, но дольше</string>
+    <string name="dpi_ps_parallel">Максимум параллельных запросов</string>
+    <string name="dpi_ps_parallel_hint">Больше — быстрее, но может снизить стабильность</string>
+    <string name="dpi_ps_timeout">Таймаут ответа домена</string>
+    <string name="dpi_ps_timeout_hint">Больше — медленнее, но стабильнее и точнее</string>
+    <string name="dpi_ps_sni">SNI фейк-пакетов</string>
+    <string name="dpi_ps_sni_hint">Подставляется вместо {sni} в стратегиях — и при проверке, и в обычной работе</string>
+    <string name="dpi_ps_lists">Списки доменов</string>
+    <string name="dpi_ps_none">Ничего не выбрано</string>
+    <string name="dpi_ps_list_add">Добавить список</string>
+    <string name="dpi_ps_list_name">Название списка</string>
+    <string name="dpi_ps_list_domains">Домены, по одному в строке</string>
+    <string name="dpi_ps_list_save">Сохранить список</string>
+    <string name="dpi_ps_own">Свой список стратегий</string>
+    <string name="dpi_ps_own_hint">По одной стратегии в строке, строки с # пропускаются. Пока включено, встроенные 60 не проверяются</string>
+    <string name="dpi_res_all">Показать все результаты (%1$d)</string>
+    <string name="dpi_res_less">Свернуть</string>
+    <string name="dpi_res_copy">Копировать стратегию</string>
+    <string name="dpi_res_copied">Скопировано</string>
+    <string name="dpi_g_cloudflare">Cloudflare</string>
+    <string name="dpi_g_googlevideo">Googlevideo</string>
+    <string name="dpi_g_social">Соцсети</string>
+    <string name="dpi_g_turkiye">Türkiye</string>
+    <string name="tgp_title">Telegram через локальный прокси</string>
+    <string name="tgp_sub">Передаёт Telegram прокси, который Hydra поднимает на этом устройстве. Telegram спросит, включить ли прокси.</string>
+    <string name="tgp_button">Подключить Telegram к прокси</string>
+    <string name="tgp_addr">Адрес 127.0.0.1:%1$d (SOCKS5)</string>
+    <string name="tgp_via_tgws">Telegram по WebSocket</string>
+    <string name="tgp_via_dpi">обход DPI</string>
+    <string name="tgp_need_on">Прокси работает, пока Hydra подключена.</string>
+    <string name="tgp_missing">Telegram не установлен.</string>
+</resources>

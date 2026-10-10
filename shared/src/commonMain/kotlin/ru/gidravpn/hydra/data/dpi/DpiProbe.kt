@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -50,10 +51,14 @@ object DpiProbe {
     }
 
     /** Достижимость всех сайтов групп через уже запущенный прокси на [port]. */
-    private suspend fun measure(strategy: String, groups: Map<String, List<String>>, port: Int, timeoutMs: Int, concurrency: Int): Result =
+    private suspend fun measure(strategy: String, groups: Map<String, List<String>>, port: Int, timeoutMs: Int, concurrency: Int, requests: Int = 1): Result =
         coroutineScope {
             val sem = Semaphore(concurrency)
-            val checks = groups.map { (g, sites) -> g to sites.map { s -> async { sem.withPermit { reachable(s, port, timeoutMs) } } } }
+            // Сайт открыт, если ответило большинство из [requests] попыток (при одной — она сама).
+            val need = requests / 2 + 1
+            val checks = groups.map { (g, sites) ->
+                g to sites.map { s -> async { var ok = 0; repeat(requests) { if (sem.withPermit { reachable(s, port, timeoutMs) }) ok++ }; ok >= need } }
+            }
             val per = checks.map { (g, list) -> Group(g, list.awaitAll().count { it }, list.size) }
             Result(strategy, per.sumOf { it.ok }, per.sumOf { it.total }, per)
         }
@@ -73,6 +78,11 @@ object DpiProbe {
         timeoutMs: Int = 3500,
         concurrency: Int = 16,
         stopAtFull: Boolean = true,
+        requests: Int = 1,
+        /** Пауза между проверками стратегий, мс. */
+        delayMs: Long = 0,
+        /** SNI для `{sni}` в стратегиях. */
+        sni: String = DpiStrategies.FAKE_SNI,
         start: (List<String>) -> AutoCloseable,
         onBaseline: (Result) -> Unit = {},
         onResult: (Int, Int, Result) -> Unit = { _, _, _ -> },
@@ -83,7 +93,7 @@ object DpiProbe {
                 try {
                     // Прогрев: первое соединение в свежем процессе (классы, DNS, TLS) медленнее остальных и ложно «не открывается».
                     groups.values.firstOrNull()?.firstOrNull()?.let { reachable(it, port, timeoutMs * 2) }
-                    measure("", groups, port, timeoutMs * 2, concurrency)
+                    measure("", groups, port, timeoutMs * 2, concurrency, requests)
                 } finally { runCatching { p.close() } }
             },
             onFailure = { Result("", 0, groups.values.sumOf { it.size }) },
@@ -93,13 +103,14 @@ object DpiProbe {
         val out = mutableListOf<Result>()
         for ((i, s) in strategies.withIndex()) {
             ensureActive()
-            val r = runCatching { start(DpiArgs.build(s, port)) }.fold(
-                onSuccess = { p -> try { measure(s, groups, port, timeoutMs, concurrency) } finally { runCatching { p.close() } } },
+            val r = runCatching { start(DpiArgs.build(s, port, sni = sni)) }.fold(
+                onSuccess = { p -> try { measure(s, groups, port, timeoutMs, concurrency, requests) } finally { runCatching { p.close() } } },
                 onFailure = { Result(s, 0, groups.values.sumOf { it.size }) },
             )
             out += r
             onResult(i + 1, strategies.size, r)
             if (stopAtFull && r.total > 0 && r.ok == r.total) break
+            if (delayMs > 0 && i < strategies.size - 1) delay(delayMs)
         }
         out.sortedByDescending { it.ratio }
     }

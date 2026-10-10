@@ -313,6 +313,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setDpi(change: (DpiSettings) -> DpiSettings) = updateRoutes { it.copy(dpi = change(it.dpi)) }
+    /** Настройки подбора стратегии (0.7.15): пауза, число запросов, параллельность, таймаут, списки доменов, свои стратегии. */
+    fun setProbe(change: (ru.gidravpn.hydra.data.dpi.DpiProbeSettings) -> ru.gidravpn.hydra.data.dpi.DpiProbeSettings) = setDpi { it.copy(probe = change(it.probe)) }
     fun addRouteRule(rule: RouteRule) = updateRoutes { it.copy(rules = it.rules + rule) }
     fun removeRouteRule(rule: RouteRule) = updateRoutes { it.copy(rules = it.rules - rule) }
     fun addRouteGroup(g: ru.gidravpn.hydra.data.routing.RouteGroup) = updateRoutes { it.copy(groups = it.groups.filterNot { x -> x.tag == g.tag } + g) }
@@ -379,26 +381,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * Мастер подбора обхода: [groups] — что разблокировать (ключи [DpiStrategies.SITES]), [extraSite] — свой сайт,
      * [full] — все стратегии (иначе первые [DpiProbe.QUICK]). Лучшие результаты копятся в [dpiProbe].
      */
-    fun probeDpi(groups: Set<String>, extraSite: String, full: Boolean) {
+    fun probeDpi(extraSite: String, full: Boolean) {
         if (probeJob?.isActive == true) return
         probeJob = safeLaunch {
             val ctx = getApplication<Application>()
-            val sites = linkedMapOf<String, List<String>>()
-            groups.forEach { g -> DpiStrategies.SITES[g]?.let { sites[g] = it } }
+            val dpi = routeConfig.value.dpi
+            val ps = dpi.probe
+            // Списки и стратегии — из настроек подбора (0.7.15): встроенные и свои списки доменов, свой список стратегий.
+            val sites = LinkedHashMap(ps.selectedSites())
             extraSite.trim().takeIf { it.isNotEmpty() }?.let { sites["custom"] = listOf(it) }
             if (sites.isEmpty()) sites["general"] = DpiStrategies.SITES.getValue("general")
-            val list = if (full) DpiStrategies.PRESETS else DpiStrategies.PRESETS.take(DpiProbe.QUICK)
+            val own = ps.strategyLines().takeIf { ps.customStrategiesOn && it.isNotEmpty() }
+            val list = own ?: if (full) DpiStrategies.PRESETS else DpiStrategies.PRESETS.take(DpiProbe.QUICK)
             _probe.value = DpiProbeUi(running = true, total = list.size)
             val port = DpiSettings.DEFAULT_PORT + 1
             try {
                 val res = DpiProbe.run(list, sites, port,
+                    timeoutMs = ps.timeoutSec * 1000, concurrency = ps.parallel, requests = ps.requests, delayMs = ps.delaySec * 1000L, sni = dpi.fakeSni,
                     start = { args -> ru.gidravpn.hydra.vpn.core.SocksProcess(ctx, "ByeDPI", ByeDpiSidecar.BINARY, args, port).also { it.start() } },
                     onBaseline = { b -> _probe.value = _probe.value.copy(baseline = b) },
                     onResult = { i, n, r ->
-                        val top = (_probe.value.results + r).sortedByDescending { it.ratio }.take(3)
-                        _probe.value = _probe.value.copy(done = i, total = n, results = top)
+                        // Копим все результаты (не только тройку лучших): в окне их можно просмотреть целиком и выбрать любой.
+                        _probe.value = _probe.value.copy(done = i, total = n, results = (_probe.value.results + r).sortedByDescending { it.ratio })
                     })
-                _probe.value = _probe.value.copy(running = false, finished = true, results = res.take(3))
+                _probe.value = _probe.value.copy(running = false, finished = true, results = res)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {

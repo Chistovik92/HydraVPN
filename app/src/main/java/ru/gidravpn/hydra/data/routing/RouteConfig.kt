@@ -33,7 +33,7 @@ data class RouteConfig(
         })
         put("dpi", JSONObject()
             .put("enabled", dpi.enabled).put("strategy", dpi.strategy).put("port", dpi.port)
-            .put("direct_via_dpi", dpi.directViaDpi))
+            .put("direct_via_dpi", dpi.directViaDpi).put("fake_sni", dpi.fakeSni).put("probe", dpi.probe.toJson()))
     }.toString()
 
     companion object {
@@ -61,6 +61,8 @@ data class RouteConfig(
                     strategy = d.optString("strategy", DpiStrategies.DEFAULT).ifBlank { DpiStrategies.DEFAULT },
                     port = d.optInt("port", DpiSettings.DEFAULT_PORT).takeIf { it in 1024..65535 } ?: DpiSettings.DEFAULT_PORT,
                     directViaDpi = d.optBoolean("direct_via_dpi", true),
+                    fakeSni = d.optString("fake_sni", DpiStrategies.FAKE_SNI).trim().ifEmpty { DpiStrategies.FAKE_SNI },
+                    probe = ru.gidravpn.hydra.data.dpi.DpiProbeSettings.fromJson(d.optJSONObject("probe")),
                 ),
             )
         }.getOrDefault(RouteConfig())

@@ -73,7 +73,7 @@ class SocksProcess(
 
 /** Локальный ByeDPI (`ciadpi`, MIT): SOCKS5, который режет и подделывает первые пакеты соединения. Бинарь собирает scripts/build-byedpi.sh. */
 class ByeDpiSidecar(ctx: Context, settings: DpiSettings, onLog: (String) -> Unit) : AutoCloseable {
-    private val proc = SocksProcess(ctx, "ByeDPI", BINARY, DpiArgs.build(settings.strategy, settings.port), settings.port, 5_000, emptyList(), onLog)
+    private val proc = SocksProcess(ctx, "ByeDPI", BINARY, DpiArgs.build(settings.strategy, settings.port, sni = settings.fakeSni), settings.port, 5_000, emptyList(), onLog)
     fun start() = proc.start()
     fun stop() = proc.close()
     override fun close() = proc.close()

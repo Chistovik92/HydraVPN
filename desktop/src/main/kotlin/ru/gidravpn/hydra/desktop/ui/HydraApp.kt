@@ -253,6 +253,13 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
                 Stat("↑ ${speed(ui.upSpeed)}", "всего ${bytes(ui.upTotal)}")
             }
         }
+        // 0.7.15: подключено и в Hydra есть локальный прокси для Telegram (TG WS или ByeDPI) — кнопка «Подключить Telegram к прокси».
+        val routes = settings.routing.routes
+        if (ui.status == Status.CONNECTED && (routes.dpi.enabled || ru.gidravpn.hydra.data.tgws.TgWsPreset.isApplied(routes.rules) ||
+                ui.selected?.protocolId == ru.gidravpn.hydra.data.model.Protocol.BYEDPI.id)) {
+            Spacer(Modifier.height(16.dp))
+            Box(Modifier.widthIn(max = 520.dp)) { TelegramProxySection(c, ui, compact = true) }
+        }
         if (ui.needsElevation) {
             Spacer(Modifier.height(16.dp))
             Card(Modifier.widthIn(max = 520.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
