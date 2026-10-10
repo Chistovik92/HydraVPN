@@ -83,7 +83,8 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         requestNotificationPermissionIfNeeded()
-        unlocked = savedInstanceState?.getBoolean("unlocked") == true
+        // Не восстанавливаем unlocked из savedInstanceState: он переживает смерть процесса, а таймер перезапирания (stoppedAt) — нет.
+        unlocked = false
 
         // Импорт по deep-link (vless:// и т.п.) и ярлыки на иконке.
         handleIntent(intent)
@@ -117,7 +118,7 @@ class MainActivity : FragmentActivity() {
                 when {
                     lock == null -> LockScreen(onUnlock = null)          // настройка ещё читается
                     lock == true && !unlocked -> LockScreen(onUnlock = ::authenticate)
-                    else -> HydraRoot(vm, openServers = openServers, onOpenServersHandled = { openServers = false })
+                    else -> { androidx.compose.runtime.LaunchedEffect(Unit) { flushPending() }; HydraRoot(vm, openServers = openServers, onOpenServersHandled = { openServers = false }) }
                 }
             }
         }
@@ -169,7 +170,18 @@ class MainActivity : FragmentActivity() {
         if (intent.getBooleanExtra(EXTRA_OPEN_SERVERS, false) || intent.action == ACTION_SERVERS) openServers = true
     }
 
+    private var pendingIntent: Intent? = null
+
+    /** Действия извне (ярлык, deep-link, «Поделиться») выполняются только при снятой блокировке. */
+    private fun flushPending() {
+        val p = pendingIntent ?: return
+        if (vm.appLock.value == true && !unlocked) return
+        pendingIntent = null
+        handleIntent(p)
+    }
+
     private fun handleIntent(intent: Intent?) {
+        if (intent != null && intent.action != ACTION_SERVERS && vm.appLock.value != false && !unlocked) { pendingIntent = intent; return }
         when (intent?.action) {
             // Ярлык «Подключить / Отключить» — тот же путь, что у большой кнопки (с VPN-согласием).
             ACTION_TOGGLE -> { vm.toggle(); return }
@@ -188,7 +200,18 @@ class MainActivity : FragmentActivity() {
             return
         }
         val data = intent?.data?.toString() ?: return
-        if ("://" in data) vm.importAuto(listOf(data))
+        if ("://" in data) {
+            // Ссылка из браузера или чужого приложения: без подтверждения любая страница могла бы подсунуть сервер или подписку.
+            val scheme = data.substringBefore("://")
+            runCatching {
+                android.app.AlertDialog.Builder(this)
+                    .setTitle(getString(R.string.import_confirm_title))
+                    .setMessage(getString(R.string.import_confirm_msg, scheme))
+                    .setPositiveButton(android.R.string.ok) { _, _ -> vm.importAuto(listOf(data)) }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }.onFailure { /* окно недоступно — не импортируем молча */ }
+        }
     }
 
     private fun requestVpnPermission() {

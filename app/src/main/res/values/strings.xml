@@ -47,4 +47,6 @@
     <string name="hotspot_invalid">Port must be 1024–65535, login not empty, password at least 6 characters.</string>
     <string name="hotspot_apply_note">Applied on the next connection. Works with sing-box and Xray Core protocols; not available for SSTP, L2TP and AmneziaWG.</string>
     <string name="hotspot_warning">Anyone who knows the password can use your connection. Do not enable this on public networks.</string>
+    <string name="import_confirm_title">Import from link?</string>
+    <string name="import_confirm_msg">An app or web page wants to add a %1$s:// item to Hydra. Continue only if you trust the source.</string>
 </resources>

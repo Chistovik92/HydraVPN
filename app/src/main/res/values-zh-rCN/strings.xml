@@ -47,4 +47,6 @@
     <string name="hotspot_invalid">端口须为 1024–65535，用户名不能为空，密码至少 6 个字符。</string>
     <string name="hotspot_apply_note">下次连接时生效。适用于 sing-box 和 Xray Core 协议；SSTP、L2TP 和 AmneziaWG 不可用。</string>
     <string name="hotspot_warning">任何知道密码的人都能使用你的连接。请勿在公共网络中启用。</string>
+    <string name="import_confirm_title">从链接导入？</string>
+    <string name="import_confirm_msg">某个应用或网页想向 Hydra 添加 %1$s:// 项目。仅在信任来源时继续。</string>
 </resources>

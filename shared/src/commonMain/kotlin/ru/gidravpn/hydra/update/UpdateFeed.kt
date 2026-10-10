@@ -151,7 +151,8 @@ object UpdateFeed {
             }
             if (asset.size > 0 && done != asset.size) throw IOException("файл скачан не полностью ($done из ${asset.size} байт)")
             val hex = md.digest().joinToString("") { "%02x".format(it) }
-            if (asset.sha256 != null && !hex.equals(asset.sha256, ignoreCase = true)) {
+            if (asset.sha256 == null) throw IOException("у файла нет контрольной суммы — установка отклонена")
+            if (!hex.equals(asset.sha256, ignoreCase = true)) {
                 throw IOException("контрольная сумма не совпала — файл не будет установлен")
             }
             dest.delete()

@@ -423,14 +423,16 @@ class SstpCore : VpnCore {
             ctx.socketFactory
         } else HttpsURLConnection.getDefaultSSLSocketFactory()
 
-        val ssl = factory.createSocket(raw, raw.inetAddress.hostAddress, raw.port, true) as SSLSocket
+        val ssl = factory.createSocket(raw, sni.ifBlank { profile.address }, raw.port, true) as SSLSocket
         ssl.enabledProtocols = arrayOf("TLSv1.3", "TLSv1.2")
-        if (!insecure) {
-            val host = sni.ifBlank { profile.address }
-            val params = ssl.sslParameters
-            params.serverNames = listOf(javax.net.ssl.SNIHostName(host))
-            ssl.sslParameters = params
-        }
+        val host = sni.ifBlank { profile.address }
+        val params = ssl.sslParameters
+        // SNI нужен и при allow_insecure (сервер за общим фронтом иначе отдаст не тот сертификат).
+        // IP-адрес в SNI не кладут (RFC 6066).
+        if (!host.all { it.isDigit() || it == '.' || it == ':' }) params.serverNames = listOf(javax.net.ssl.SNIHostName(host))
+        // Без этого проверялась только цепочка CA, но не имя хоста: сертификат любого публичного CA пропускал MITM.
+        if (!insecure) params.endpointIdentificationAlgorithm = "HTTPS"
+        ssl.sslParameters = params
         return ssl
     }
 

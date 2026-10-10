@@ -115,8 +115,8 @@ public enum BotJSON {
 
     static func isLocalHost(_ host: String) -> Bool {
         if host == "localhost" || host.hasSuffix(".local") { return true }
-        let p = host.split(separator: ".").compactMap { Int($0) }
-        guard p.count == 4, p.allSatisfy({ (0...255).contains($0) }) else { return false }
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false); let p = parts.compactMap { Int($0) }
+        guard parts.count == 4, p.count == 4, p.allSatisfy({ (0...255).contains($0) }) else { return false }
         return p[0] == 10 || p[0] == 127 || (p[0] == 192 && p[1] == 168) || (p[0] == 172 && (16...31).contains(p[1]))
     }
 
