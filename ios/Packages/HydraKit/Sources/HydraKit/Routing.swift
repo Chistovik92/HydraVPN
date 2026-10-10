@@ -16,6 +16,9 @@ public enum RouteTarget {
     public static let proxy = "proxy"
     public static let direct = "direct"
     public static let dpi = "dpi"
+    /// «Telegram через WebSocket» (0.7.20): локальный SOCKS5 внутри расширения VPN (`TgWsProxy`).
+    public static let tgws = "tgws"
+    public static let tgwsPort = 10881
     public static let block = "block"
 
     public static func node(_ id: Int64) -> String { "node-\(id)" }
@@ -104,6 +107,19 @@ public struct RoutePlan: @unchecked Sendable {
             nodes.contains { $0.via == RouteTarget.dpi } || groups.contains { $0.members.contains(RouteTarget.dpi) }
     }
 
+    /// Нужен ли локальный TG WS: правило или группа с выходом «tgws».
+    public var needsTgWs: Bool {
+        rules.contains { $0.target == RouteTarget.tgws } || groups.contains { $0.members.contains(RouteTarget.tgws) }
+    }
+
+    /// План без TG WS: если он не запустился, соединение всё равно поднимается.
+    public func withoutTgWs() -> RoutePlan {
+        var p = self
+        p.rules = rules.filter { $0.target != RouteTarget.tgws }
+        p.groups = groups.map { g in var h = g; h.members = g.members.filter { $0 != RouteTarget.tgws }; return h }
+        return p
+    }
+
     /// План без всего, что опирается на ByeDPI: если он не запустился, соединение всё равно поднимается.
     public func withoutDpi() -> RoutePlan {
         var p = self
@@ -119,6 +135,10 @@ public struct RoutePlan: @unchecked Sendable {
 public enum RoutePlanApplier {
     private static let chainable: Set<String> = ["vless", "vmess", "trojan", "shadowsocks", "socks", "http", "ssh"]
     private static let domainish: Set<RouteKind> = [.domain, .suffix, .keyword, .regex, .geosite]
+
+    public static func tgWsOutbound(port: Int = RouteTarget.tgwsPort) -> [String: Any] {
+        ["type": "socks", "tag": RouteTarget.tgws, "server": "127.0.0.1", "server_port": port, "version": "5"]
+    }
 
     public static func dpiOutbound(port: Int) -> [String: Any] {
         ["type": "socks", "tag": RouteTarget.dpi, "server": "127.0.0.1", "server_port": port, "version": "5"]
@@ -141,6 +161,7 @@ public enum RoutePlanApplier {
         func index(_ tag: String) -> Int? { outbounds.firstIndex { ($0["tag"] as? String) == tag } }
 
         if plan.needsDpi { add(dpiOutbound(port: plan.dpi.port)) }
+        if plan.needsTgWs { add(tgWsOutbound()) }
         plan.nodes.forEach { add($0.outbound) }
 
         // Цепочки: «выход → через выход»; глубина любая, петли отсекаются.

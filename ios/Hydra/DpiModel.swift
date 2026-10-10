@@ -16,13 +16,15 @@ final class DpiWizardModel: ObservableObject {
 
     private var task: Task<Void, Never>?
 
-    func start(groups: Set<String>, extra: String, full: Bool) {
+    func start(settings: DpiProbeSettings, sni: String, extra: String, full: Bool) {
         guard !running else { return }
-        let sites = DpiProbe.sites(groups: groups, extra: extra)
-        let list = full ? DpiStrategies.presets : Array(DpiStrategies.presets.prefix(DpiProbe.quick))
+        let sites = DpiProbe.sites(settings: settings, extra: extra)
+        // Свои стратегии (если включены и не пусты) заменяют встроенные 60.
+        let own = settings.strategyLines()
+        let list = (settings.customStrategiesOn && !own.isEmpty) ? own : (full ? DpiStrategies.presets : Array(DpiStrategies.presets.prefix(DpiProbe.quick)))
         running = true; finished = false; error = nil; baseline = nil; results = []; done = 0; total = list.count
         task = Task { [weak self] in
-            await self?.run(list, sites)
+            await self?.run(list, sites, settings, sni)
         }
     }
 
@@ -32,40 +34,62 @@ final class DpiWizardModel: ObservableObject {
         running = false
     }
 
-    private func run(_ list: [String], _ sites: [(name: String, sites: [String])]) async {
+    private func run(_ list: [String], _ sites: [(name: String, sites: [String])], _ settings: DpiProbeSettings, _ sni: String) async {
         let totalSites = sites.reduce(0) { $0 + $1.sites.count }
         let basePort = DpiSettings.defaultPort + 1
+        let timeout = TimeInterval(settings.timeoutSec)
         func probe(_ strategy: String, args: [String], port: Int, timeout: TimeInterval) async -> DpiProbeResult {
             do { try ByeDpiRunner.shared.start(args: args, port: port) }
             catch { return DpiProbeResult(strategy: strategy, ok: 0, total: totalSites) }
             defer { ByeDpiRunner.shared.stop() }
             var groups: [DpiProbeResult.Group] = []
             for g in sites {
-                let ok = await withTaskGroup(of: Bool.self) { tg -> Int in
-                    for s in g.sites { tg.addTask { await Self.reachable(s, port: port, timeout: timeout) } }
-                    var n = 0
-                    for await r in tg where r { n += 1 }
-                    return n
-                }
+                let ok = await Self.countReachable(g.sites, port: port, timeout: timeout, requests: settings.requests, parallel: settings.parallel)
                 groups.append(.init(name: g.name, ok: ok, total: g.sites.count))
             }
             return DpiProbeResult(strategy: strategy, ok: groups.reduce(0) { $0 + $1.ok }, total: totalSites, groups: groups)
         }
 
         // Прогрев: первое соединение в свежем процессе медленнее остальных и ложно «не открывается».
-        baseline = await probe("", args: ["-i", "127.0.0.1", "-p", String(basePort)], port: basePort, timeout: 7)
+        baseline = await probe("", args: ["-i", "127.0.0.1", "-p", String(basePort)], port: basePort, timeout: max(7, timeout))
         var all: [DpiProbeResult] = []
         for (i, s) in list.enumerated() {
             if Task.isCancelled { break }
             let port = basePort + 1 + (i % 20)
-            let r = await probe(s, args: DpiArgs.build(s, port: port), port: port, timeout: 3.5)
+            let r = await probe(s, args: DpiArgs.build(s, port: port, sni: sni), port: port, timeout: timeout)
             all.append(r)
             done = i + 1
-            results = Array(all.sorted { $0.ratio > $1.ratio }.prefix(3))
+            // Все результаты: в окне их можно просмотреть целиком (0.7.20, как на Android с 0.7.15).
+            results = all.sorted { $0.ratio > $1.ratio }
             if r.total > 0 && r.ok == r.total { break }   // нашлась стратегия, открывающая всё
+            if settings.delaySec > 0, i + 1 < list.count { try? await Task.sleep(nanoseconds: UInt64(settings.delaySec) * 1_000_000_000) }
         }
         running = false
         finished = !Task.isCancelled
+    }
+
+    /// Сколько сайтов открылось: не больше `parallel` запросов одновременно, каждый сайт спрашивается `requests` раз.
+    nonisolated static func countReachable(_ sites: [String], port: Int, timeout: TimeInterval, requests: Int, parallel: Int) async -> Int {
+        await withTaskGroup(of: Bool.self) { tg -> Int in
+            var next = 0, running = 0, ok = 0
+            while next < sites.count || running > 0 {
+                while next < sites.count && running < max(1, parallel) {
+                    let s = sites[next]; next += 1; running += 1
+                    tg.addTask { await Self.reachableMajority(s, port: port, timeout: timeout, requests: requests) }
+                }
+                if let r = await tg.next() { running -= 1; if r { ok += 1 } }
+            }
+            return ok
+        }
+    }
+
+    /// Сайт открыт, если ответило большинство из `requests` попыток.
+    nonisolated static func reachableMajority(_ site: String, port: Int, timeout: TimeInterval, requests: Int) async -> Bool {
+        var good = 0
+        for _ in 0..<max(1, requests) {
+            if await reachable(site, port: port, timeout: timeout) { good += 1 }
+        }
+        return good * 2 > max(1, requests)
     }
 
     /// Любой HTTP-ответ (даже 403/404) — сайт достижим: ClientHello дошёл.

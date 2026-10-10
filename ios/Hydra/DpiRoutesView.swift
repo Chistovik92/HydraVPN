@@ -7,7 +7,12 @@ struct DpiRoutesView: View {
     @EnvironmentObject var model: AppModel
     @StateObject private var wizard = DpiWizardModel()
 
-    @State private var picked: Set<String> = ["youtube", "discord", "telegram"]
+    @State private var tab = 0
+    @State private var showAll = false
+    @State private var copied = false
+    @State private var tgMissing = false
+    @State private var listName = ""
+    @State private var listDomains = ""
     @State private var extraSite = ""
     @State private var full = false
     @State private var strategy = ""
@@ -33,11 +38,25 @@ struct DpiRoutesView: View {
 
     var body: some View {
         List {
-            wizardSection
-            dpiSection
-            rulesSection
-            groupsSection
-            chainsSection
+            Section {
+                Picker("", selection: $tab) {
+                    Text(L("rh_tab_dpi")).tag(0)
+                    Text(L("rh_tab_sites")).tag(1)
+                    Text(L("rh_tab_exits")).tag(2)
+                }.pickerStyle(.segmented)
+            }
+            if tab == 0 {
+                wizardSection
+                probeSettingsSection
+                dpiSection
+                telegramSection
+            } else if tab == 1 {
+                rulesSection
+            } else {
+                tgWsSection
+                groupsSection
+                chainsSection
+            }
         }
         .navigationTitle(L("set_dpi"))
         .onAppear { strategy = cfg.dpi.strategy }
@@ -55,6 +74,7 @@ struct DpiRoutesView: View {
         case RouteTarget.proxy: L("dpi_t_proxy")
         case RouteTarget.direct: L("dpi_t_direct")
         case RouteTarget.dpi: L("dpi_t_dpi")
+        case RouteTarget.tgws: L("dpi_t_tgws")
         case RouteTarget.block: L("dpi_t_block")
         default:
             RouteTarget.nodeId(t).flatMap { id in servers.first { $0.id == id }?.name }
@@ -99,15 +119,35 @@ struct DpiRoutesView: View {
     }
 
     private var allTargets: [String] {
-        [RouteTarget.proxy, RouteTarget.direct, RouteTarget.dpi, RouteTarget.block] + cfg.groups.map(\.tag) + nodes.map { RouteTarget.node($0.id) }
+        [RouteTarget.proxy, RouteTarget.direct, RouteTarget.dpi, RouteTarget.tgws, RouteTarget.block] + cfg.groups.map(\.tag) + nodes.map { RouteTarget.node($0.id) }
     }
 
     // MARK: - мастер подбора
 
+    private var probe: DpiProbeSettings { cfg.dpi.probe }
+
+    /// Настройки подбора не влияют на туннель - переподключать его при их изменении не нужно.
+    private func setProbe(_ f: (inout DpiProbeSettings) -> Void) {
+        model.mutate { var r = $0.routing.routeConfig; var p = r.dpi.probe; f(&p); r.dpi.probe = p; $0.routing.routes = r }
+    }
+
+    private var probeGroupNames: [String] { DpiStrategies.groupOrder + probe.custom.map(\.name) }
+
+    /// Telegram выбран для проверки, но не открылся ни с одной стратегией - предлагаем путь через WebSocket.
+    private var telegramNotOpened: Bool {
+        guard probe.groups.contains("telegram") else { return false }
+        for r in wizard.results { for g in r.groups where g.name == "telegram" && g.ok > 0 { return false } }
+        return true
+    }
+
+    private var shownResults: [DpiProbeResult] { showAll ? wizard.results : Array(wizard.results.prefix(3)) }
+
     private var wizardSection: some View {
         Section(header: Text(L("dpi_wiz_title")), footer: Text(L("dpi_wiz_sub"))) {
-            ForEach(["youtube", "discord", "telegram", "general"], id: \.self) { g in
-                Toggle(groupLabel(g), isOn: Binding(get: { picked.contains(g) }, set: { on in if on { picked.insert(g) } else { picked.remove(g) } }))
+            ForEach(probeGroupNames, id: \.self) { g in
+                Toggle(groupLabel(g), isOn: Binding(get: { probe.groups.contains(g) }, set: { on in
+                    setProbe { if on { $0.groups.insert(g) } else { $0.groups.remove(g) } }
+                }))
             }
             TextField(L("dpi_wiz_site"), text: $extraSite).textInputAutocapitalization(.never).autocorrectionDisabled()
             Picker("", selection: $full) {
@@ -120,40 +160,143 @@ struct DpiRoutesView: View {
                 ProgressView(value: Double(wizard.done), total: Double(max(wizard.total, 1)))
                 Text(L("dpi_wiz_progress", wizard.done, wizard.total)).font(.caption).foregroundStyle(Color.hydraMuted)
             } else {
-                Button(L("dpi_wiz_start")) { wizard.start(groups: picked, extra: extraSite, full: full) }
+                Button(L("dpi_wiz_start")) { showAll = false; wizard.start(settings: probe, sni: cfg.dpi.fakeSni, extra: extraSite, full: full) }
             }
             if let e = wizard.error { Text(e).font(.caption).foregroundStyle(.red) }
             if let b = wizard.baseline {
                 Text(b.percent >= 95 ? L("dpi_wiz_base_ok", b.percent) : L("dpi_wiz_base", b.percent))
                     .font(.caption).foregroundStyle(b.percent >= 95 ? Color.green : Color.hydraMuted)
             }
-            ForEach(Array(wizard.results.enumerated()), id: \.element.id) { i, r in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L("dpi_wiz_variant", i + 1, r.ok, r.total, r.percent)).font(.subheadline.weight(.semibold))
-                    Text(r.groups.map { "\(groupLabel($0.name)) \($0.ok)/\($0.total)" }.joined(separator: " · ")).font(.caption).foregroundStyle(Color.hydraMuted)
-                    Text(r.strategy).font(.caption2).foregroundStyle(Color.hydraMuted).lineLimit(2)
-                    HStack {
-                        Button(L("dpi_wiz_use")) {
-                            setRoutes { $0.dpi.enabled = true; $0.dpi.strategy = r.strategy }
-                            strategy = r.strategy
-                        }.buttonStyle(.borderedProminent)
-                        Button(L("dpi_wiz_save")) { addProfile(r.strategy) }.buttonStyle(.bordered)
-                    }
-                }
+            ForEach(Array(shownResults.enumerated()), id: \.element.id) { i, r in
+                resultRow(i, r)
+            }
+            if wizard.results.count > 3 {
+                Button(showAll ? L("dpi_res_less") : L("dpi_res_all", wizard.results.count)) { showAll.toggle() }.buttonStyle(.borderless)
             }
             if wizard.finished {
                 Text((wizard.results.first?.ok ?? 0) == 0 ? L("dpi_wiz_none") : L("dpi_wiz_done")).font(.caption).foregroundStyle(Color.hydraMuted)
+                if telegramNotOpened {
+                    Text(L("tgws_wizard_hint")).font(.caption).foregroundStyle(.orange)
+                    Button(L("tgws_preset")) { setRoutes { c in
+                        for r in TgWsPreset.rules() where !c.rules.contains(r) { c.rules.append(r) }
+                    } }
+                }
             }
+        }
+    }
+
+    /// Строка результата: полная строка стратегии выделяется и копируется (как на Android с 0.7.15).
+    private func resultRow(_ i: Int, _ r: DpiProbeResult) -> some View {
+        let summary: String = r.groups.map { groupLabel($0.name) + " " + String($0.ok) + "/" + String($0.total) }.joined(separator: " · ")
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(L("dpi_wiz_variant", i + 1, r.ok, r.total, r.percent)).font(.subheadline.weight(.semibold))
+            Text(summary).font(.caption).foregroundStyle(Color.hydraMuted)
+            Text(r.strategy).font(.caption2.monospaced()).foregroundStyle(Color.hydraMuted).textSelection(.enabled)
+            HStack {
+                Button(L("dpi_wiz_use")) {
+                    setRoutes { $0.dpi.enabled = true; $0.dpi.strategy = r.strategy }
+                    strategy = r.strategy
+                }.buttonStyle(.borderedProminent)
+                Button(L("dpi_wiz_save")) { addProfile(r.strategy) }.buttonStyle(.bordered)
+                Button(copied ? L("dpi_res_copied") : L("dpi_res_copy")) {
+                    UIPasteboard.general.string = r.strategy
+                    copied = true
+                }.buttonStyle(.bordered)
+            }
+        }
+    }
+
+    // MARK: - настройки подбора (0.7.20)
+
+    private func stepperRow(_ title: String, _ hint: String, _ value: Int, _ range: ClosedRange<Int>, unit: String?, _ set: @escaping (inout DpiProbeSettings, Int) -> Void) -> some View {
+        let label: String = unit.map { "\(title): \(value) \($0)" } ?? "\(title): \(value)"
+        return VStack(alignment: .leading, spacing: 2) {
+            Stepper(label, value: Binding(get: { value }, set: { v in setProbe { set(&$0, v) } }), in: range)
+            Text(hint).font(.caption2).foregroundStyle(Color.hydraMuted)
+        }
+    }
+
+    private var probeSettingsSection: some View {
+        Section(header: Text(L("dpi_ps_title")), footer: Text(L("dpi_ps_sub"))) {
+            stepperRow(L("dpi_ps_delay"), L("dpi_ps_delay_hint"), probe.delaySec, 0...30, unit: L("dpi_ps_sec")) { $0.delaySec = $1 }
+            stepperRow(L("dpi_ps_requests"), L("dpi_ps_requests_hint"), probe.requests, 1...5, unit: nil) { $0.requests = $1 }
+            stepperRow(L("dpi_ps_parallel"), L("dpi_ps_parallel_hint"), probe.parallel, 1...50, unit: nil) { $0.parallel = $1 }
+            stepperRow(L("dpi_ps_timeout"), L("dpi_ps_timeout_hint"), probe.timeoutSec, 1...20, unit: L("dpi_ps_sec")) { $0.timeoutSec = $1 }
+            VStack(alignment: .leading, spacing: 2) {
+                TextField(L("dpi_ps_sni"), text: Binding(get: { cfg.dpi.fakeSni }, set: { v in
+                    model.mutate { var r = $0.routing.routeConfig; r.dpi.fakeSni = v; $0.routing.routes = r }
+                })).textInputAutocapitalization(.never).autocorrectionDisabled()
+                Text(L("dpi_ps_sni_hint")).font(.caption2).foregroundStyle(Color.hydraMuted)
+            }
+            ForEach(probe.custom, id: \.name) { c in
+                Text(c.name + " · " + String(c.domains.count)).font(.footnote)
+                    .swipeActions { Button(role: .destructive) { setProbe { p in p.custom.removeAll { $0.name == c.name }; p.groups.remove(c.name) } } label: { Text(L("profiles_delete")) } }
+            }
+            TextField(L("dpi_ps_list_name"), text: $listName).textInputAutocapitalization(.never).autocorrectionDisabled()
+            TextField(L("dpi_ps_list_domains"), text: $listDomains, axis: .vertical).lineLimit(2...6)
+                .textInputAutocapitalization(.never).autocorrectionDisabled().font(.footnote.monospaced())
+            Button(L("dpi_ps_list_save")) {
+                let n = listName.trimmingCharacters(in: .whitespaces)
+                let domains: [String] = listDomains.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                guard !n.isEmpty, !domains.isEmpty, !DpiStrategies.groupOrder.contains(n) else { return }
+                setProbe { p in
+                    p.custom.removeAll { $0.name == n }
+                    p.custom.append(CustomSiteList(name: n, domains: domains))
+                    p.groups.insert(n)
+                }
+                listName = ""; listDomains = ""
+            }
+            Toggle(L("dpi_ps_own"), isOn: Binding(get: { probe.customStrategiesOn }, set: { v in setProbe { $0.customStrategiesOn = v } }))
+            if probe.customStrategiesOn {
+                TextField(L("dpi_ps_own_hint"), text: Binding(get: { probe.customStrategies }, set: { v in setProbe { $0.customStrategies = v } }), axis: .vertical)
+                    .lineLimit(3...10).textInputAutocapitalization(.never).autocorrectionDisabled().font(.caption.monospaced())
+            }
+        }
+    }
+
+    // MARK: - Telegram
+
+    private var tgWsApplied: Bool { TgWsPreset.isApplied(cfg.rules) }
+
+    /// `tg://socks`: Telegram сам спросит, включить ли прокси. Порт - TG WS, если он включён, иначе ByeDPI.
+    private var telegramSection: some View {
+        let port: Int = tgWsApplied ? RouteTarget.tgwsPort : cfg.dpi.port
+        return Section(header: Text(L("tgp_title")), footer: Text(L("tgp_sub"))) {
+            Text(L("tgp_addr", port)).font(.footnote)
+            Button(L("tgp_button")) {
+                guard let url = URL(string: "tg://socks?server=127.0.0.1&port=\(port)") else { return }
+                UIApplication.shared.open(url) { ok in if !ok { tgMissing = true } }
+            }
+            Text(tgWsApplied ? L("tgp_via_tgws") : L("tgp_via_dpi")).font(.caption).foregroundStyle(Color.hydraMuted)
+            Text(L("tgp_need_on")).font(.caption).foregroundStyle(Color.hydraMuted)
+            if tgMissing { Text(L("tgp_missing")).font(.caption).foregroundStyle(.orange) }
+        }
+    }
+
+    private var tgWsSection: some View {
+        Section(header: Text(L("tgws_title")), footer: Text(L("tgws_note"))) {
+            Toggle(L("tgws_preset"), isOn: Binding(get: { tgWsApplied }, set: { on in
+                setRoutes { c in
+                    let preset = TgWsPreset.rules()
+                    if on { for r in preset where !c.rules.contains(r) { c.rules.append(r) } }
+                    else { c.rules.removeAll { preset.contains($0) } }
+                }
+            }))
+            Text(L("tgws_sub")).font(.caption).foregroundStyle(Color.hydraMuted)
         }
     }
 
     private func groupLabel(_ g: String) -> String {
         switch g {
-        case "youtube": L("dpi_g_youtube")
-        case "discord": L("dpi_g_discord")
-        case "telegram": L("dpi_g_telegram")
-        case "general": L("dpi_g_general")
-        default: L("dpi_wiz_custom")
+        case "youtube": return L("dpi_g_youtube")
+        case "discord": return L("dpi_g_discord")
+        case "telegram": return L("dpi_g_telegram")
+        case "general": return L("dpi_g_general")
+        case "cloudflare": return L("dpi_g_cloudflare")
+        case "googlevideo": return L("dpi_g_googlevideo")
+        case "social": return L("dpi_g_social")
+        case "turkiye": return L("dpi_g_turkiye")
+        default: return g
         }
     }
 
