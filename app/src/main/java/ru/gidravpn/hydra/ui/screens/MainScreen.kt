@@ -125,6 +125,15 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
         ConnectionInfo(state, server?.name, stats, speed, since)
         Spacer(Modifier.height(20.dp))
 
+        // 0.7.15: когда подключено и в Hydra есть локальный прокси для Telegram (TG WS или ByeDPI) — кнопка «Подключить Telegram к прокси».
+        val routeCfg by vm.routeConfig.collectAsState()
+        val tgProxy = routeCfg.dpi.enabled || ru.gidravpn.hydra.data.tgws.TgWsPreset.isApplied(routeCfg.rules) ||
+            server?.protocolId == ru.gidravpn.hydra.data.model.Protocol.BYEDPI.id
+        if (state == ConnectionState.CONNECTED && tgProxy) {
+            TelegramProxyCard(vm, compact = true, profilePort = server?.takeIf { it.protocolId == ru.gidravpn.hydra.data.model.Protocol.BYEDPI.id }?.port)
+            Spacer(Modifier.height(20.dp))
+        }
+
         // Превью конфигурации
         Card(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

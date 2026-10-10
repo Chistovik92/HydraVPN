@@ -945,7 +945,7 @@ class AppController(
                 appendLog("ByeDPI: порт ${plan.dpi.port} занят — продолжаем без обхода DPI")
                 plan = plan.withoutDpi()
             } else {
-                extras += Sidecar("ByeDPI", exe, DpiArgs.build(plan.dpi.strategy, plan.dpi.port), plan.dpi.port, readyTimeoutMs = 8_000)
+                extras += Sidecar("ByeDPI", exe, DpiArgs.build(plan.dpi.strategy, plan.dpi.port, sni = plan.dpi.fakeSni), plan.dpi.port, readyTimeoutMs = 8_000)
             }
         }
         if (plan.needsTgWs) {
@@ -966,6 +966,20 @@ class AppController(
     // ------------------------------------------------------------------ обход DPI и маршрутизация (0.7.13)
     fun updateRoutes(block: (RouteConfig) -> RouteConfig) = updateRouting { it.copy(routes = block(it.routes)) }
     fun setDpi(block: (DpiSettings) -> DpiSettings) = updateRoutes { it.copy(dpi = block(it.dpi)) }
+    /** Настройки подбора стратегии (0.7.15). */
+    fun setProbe(block: (ru.gidravpn.hydra.data.dpi.DpiProbeSettings) -> ru.gidravpn.hydra.data.dpi.DpiProbeSettings) = setDpi { it.copy(probe = block(it.probe)) }
+
+    /** Передать Telegram локальный прокси Hydra: `tg://socks?…` (Telegram спросит, включить ли). Порт — TG WS, если он включён, иначе ByeDPI. */
+    fun telegramProxyPort(): Int {
+        val routes = _ui.value.data.settings.routing.routes
+        return if (ru.gidravpn.hydra.data.tgws.TgWsPreset.isApplied(routes.rules)) RouteTarget.TGWS_PORT else routes.dpi.port
+    }
+    fun openTelegramProxy(port: Int = telegramProxyPort()) {
+        val ok = runCatching {
+            java.awt.Desktop.getDesktop().browse(java.net.URI("tg://socks?server=127.0.0.1&port=$port"))
+        }.isSuccess
+        if (!ok) toast("Не удалось открыть Telegram: он не установлен или не принимает ссылки tg://")
+    }
     fun addRouteRule(r: RouteRule) = updateRoutes { it.copy(rules = (it.rules + r).distinct().take(Rules.MAX_RULES)) }
     fun removeRouteRule(r: RouteRule) = updateRoutes { it.copy(rules = it.rules - r) }
     fun addRouteGroup(g: RouteGroup) = updateRoutes { it.copy(groups = it.groups.filterNot { x -> x.tag == g.tag } + g) }
@@ -1061,23 +1075,28 @@ class AppController(
      * Мастер подбора обхода: [groups] — что разблокировать (ключи [DpiStrategies.SITES]), [extraSite] — свой сайт,
      * [full] — все стратегии (иначе первые [DpiProbe.QUICK]).
      */
-    fun probeDpi(groups: Set<String>, extraSite: String, full: Boolean) {
+    fun probeDpi(extraSite: String, full: Boolean, groupsOverride: Set<String>? = null) {
         if (probeJob?.isActive == true) return
         val exe = Platform.bundledByeDpi() ?: return toast("ByeDPI не входит в эту сборку Hydra")
         probeJob = scope.launch(Dispatchers.IO) {
-            val sites = linkedMapOf<String, List<String>>()
-            groups.forEach { g -> DpiStrategies.SITES[g]?.let { sites[g] = it } }
+            // Списки и стратегии — из настроек подбора (0.7.15): встроенные и свои списки доменов, свой список стратегий.
+            val dpi = _ui.value.data.settings.routing.routes.dpi
+            val ps = if (groupsOverride != null) dpi.probe.copy(groups = groupsOverride) else dpi.probe
+            val sites = LinkedHashMap(ps.selectedSites())
             extraSite.trim().takeIf { it.isNotEmpty() }?.let { sites["custom"] = listOf(it) }
             if (sites.isEmpty()) sites["general"] = DpiStrategies.SITES.getValue("general")
-            val list = if (full) DpiStrategies.PRESETS else DpiStrategies.PRESETS.take(DpiProbe.QUICK)
+            val own = ps.strategyLines().takeIf { ps.customStrategiesOn && it.isNotEmpty() }
+            val list = own ?: if (full) DpiStrategies.PRESETS else DpiStrategies.PRESETS.take(DpiProbe.QUICK)
             dpiProbe.value = DpiProbeUi(running = true, total = list.size)
             val port = freePort()
             try {
                 val res = DpiProbe.run(list, sites, port,
+                    timeoutMs = ps.timeoutSec * 1000, concurrency = ps.parallel, requests = ps.requests, delayMs = ps.delaySec * 1000L, sni = dpi.fakeSni,
                     start = { args -> startCiadpi(exe, args, port) },
                     onBaseline = { b -> dpiProbe.update { it.copy(baseline = b) } },
-                    onResult = { i, n, r -> dpiProbe.update { it.copy(done = i, total = n, results = (it.results + r).sortedByDescending { x -> x.ratio }.take(3)) } })
-                dpiProbe.update { it.copy(running = false, finished = true, results = res.take(3)) }
+                    // Копим все результаты, а не только тройку лучших: в окне их можно просмотреть целиком.
+                    onResult = { i, n, r -> dpiProbe.update { it.copy(done = i, total = n, results = (it.results + r).sortedByDescending { x -> x.ratio }) } })
+                dpiProbe.update { it.copy(running = false, finished = true, results = res) }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {

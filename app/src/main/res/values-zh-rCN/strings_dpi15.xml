@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dpi_ps_title">Probe settings</string>
+    <string name="dpi_ps_sub">How strategies are checked. More requests and a longer pause are steadier; more parallel requests are faster.</string>
+    <string name="dpi_ps_sec">s</string>
+    <string name="dpi_ps_delay">Pause between checks</string>
+    <string name="dpi_ps_delay_hint">Higher is steadier on a weak connection</string>
+    <string name="dpi_ps_requests">Requests per domain</string>
+    <string name="dpi_ps_requests_hint">A site counts as open when most attempts succeed. Higher is more accurate but slower</string>
+    <string name="dpi_ps_parallel">Parallel requests</string>
+    <string name="dpi_ps_parallel_hint">Higher is faster but may be less stable</string>
+    <string name="dpi_ps_timeout">Domain response timeout</string>
+    <string name="dpi_ps_timeout_hint">Higher is slower but steadier and more accurate</string>
+    <string name="dpi_ps_sni">SNI for fake packets</string>
+    <string name="dpi_ps_sni_hint">Substituted for {sni} in strategies, both in the check and in real use</string>
+    <string name="dpi_ps_lists">Domain lists</string>
+    <string name="dpi_ps_none">Nothing selected</string>
+    <string name="dpi_ps_list_add">Add a list</string>
+    <string name="dpi_ps_list_name">List name</string>
+    <string name="dpi_ps_list_domains">Domains, one per line</string>
+    <string name="dpi_ps_list_save">Save list</string>
+    <string name="dpi_ps_own">Own list of strategies</string>
+    <string name="dpi_ps_own_hint">One strategy per line, lines with # are skipped. While on, the built-in 60 are not checked</string>
+    <string name="dpi_res_all">Show all results (%1$d)</string>
+    <string name="dpi_res_less">Show fewer</string>
+    <string name="dpi_res_copy">Copy strategy</string>
+    <string name="dpi_res_copied">Copied</string>
+    <string name="dpi_g_cloudflare">Cloudflare</string>
+    <string name="dpi_g_googlevideo">Googlevideo</string>
+    <string name="dpi_g_social">Social</string>
+    <string name="dpi_g_turkiye">Türkiye</string>
+    <string name="tgp_title">Telegram through the local proxy</string>
+    <string name="tgp_sub">Hands Telegram the proxy Hydra runs on this device. Telegram will ask to turn the proxy on.</string>
+    <string name="tgp_button">Connect Telegram to the proxy</string>
+    <string name="tgp_addr">Address 127.0.0.1:%1$d (SOCKS5)</string>
+    <string name="tgp_via_tgws">Telegram over WebSocket</string>
+    <string name="tgp_via_dpi">DPI bypass</string>
+    <string name="tgp_need_on">The proxy works while Hydra is connected.</string>
+    <string name="tgp_missing">Telegram is not installed.</string>
+</resources>

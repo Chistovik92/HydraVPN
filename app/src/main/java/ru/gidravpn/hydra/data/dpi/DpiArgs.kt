@@ -14,6 +14,9 @@ data class DpiSettings(
     val port: Int = DEFAULT_PORT,
     val directViaDpi: Boolean = true,
     val proxyViaDpi: Boolean = false,
+    /** SNI для «фейковых» пакетов — подставляется вместо `{sni}` в стратегии (0.7.15). */
+    val fakeSni: String = DpiStrategies.FAKE_SNI,
+    val probe: DpiProbeSettings = DpiProbeSettings(),
 ) {
     companion object {
         /** Порт локального SOCKS5 ByeDPI (OpenFlux — 10810, olcRTC — 10808, Xray — 10809). */
@@ -46,8 +49,8 @@ object DpiArgs {
     }
 
     /** Строка стратегии без служебного: `{sni}` подставлен, опасные и «наши» ключи убраны. */
-    fun sanitize(strategy: String): List<String> {
-        val toks = shellSplit(strategy.replace("{sni}", DpiStrategies.FAKE_SNI)).dropWhile { !it.startsWith("-") }
+    fun sanitize(strategy: String, sni: String = DpiStrategies.FAKE_SNI): List<String> {
+        val toks = shellSplit(strategy.replace("{sni}", sni.trim().ifEmpty { DpiStrategies.FAKE_SNI })).dropWhile { !it.startsWith("-") }
         val out = mutableListOf<String>()
         var i = 0
         while (i < toks.size) {
@@ -66,8 +69,8 @@ object DpiArgs {
     }
 
     /** Полный список аргументов для `ciadpi` (без имени программы). */
-    fun build(strategy: String, port: Int = DpiSettings.DEFAULT_PORT, ip: String = "127.0.0.1"): List<String> =
-        listOf("-i", ip, "-p", port.toString()) + sanitize(strategy.ifBlank { DpiStrategies.DEFAULT })
+    fun build(strategy: String, port: Int = DpiSettings.DEFAULT_PORT, ip: String = "127.0.0.1", sni: String = DpiStrategies.FAKE_SNI): List<String> =
+        listOf("-i", ip, "-p", port.toString()) + sanitize(strategy.ifBlank { DpiStrategies.DEFAULT }, sni)
 
     /** Строка нормальная, если после очистки осталось хоть что-то (ciadpi без аргументов — просто прокси без обхода). */
     fun isUsable(strategy: String): Boolean = sanitize(strategy).isNotEmpty()

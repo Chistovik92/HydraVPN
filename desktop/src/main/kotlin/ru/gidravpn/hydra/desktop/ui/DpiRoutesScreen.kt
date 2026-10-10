@@ -1,6 +1,11 @@
 package ru.gidravpn.hydra.desktop.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -72,7 +77,9 @@ internal fun androidx.compose.foundation.lazy.LazyListScope.programRulesItems(c:
 internal fun androidx.compose.foundation.lazy.LazyListScope.dpiItems(c: AppController, ui: UiState) {
     item { DpiWizardSection(c, ui) }
     item { DpiSection(c, ui) }
+    item { DpiProbeSettingsSection(c, ui) }
     item { TgWsSection(c, ui) }
+    item { TelegramProxySection(c, ui) }
 }
 internal fun androidx.compose.foundation.lazy.LazyListScope.exitsItems(c: AppController, ui: UiState) {
     item { GroupsSection(c, ui) }
@@ -92,22 +99,25 @@ private fun DpiWizardSection(c: AppController, ui: UiState) {
             Text("ByeDPI (ciadpi) не вошёл в эту сборку — подбор недоступен.", color = Warn, fontSize = 12.sp)
             return@Section
         }
-        var picked by remember { mutableStateOf(setOf("youtube", "discord", "telegram")) }
+        val ps = ui.data.settings.routing.routes.dpi.probe
         var extra by remember { mutableStateOf("") }
         var full by remember { mutableStateOf(false) }
-        val labels = mapOf("youtube" to "YouTube", "discord" to "Discord", "telegram" to "Telegram", "general" to "Общие", "custom" to "Свой сайт")
-        ChipRow {
-            listOf("youtube", "discord", "telegram", "general").forEach { g ->
-                FilterChip(selected = g in picked, onClick = { picked = if (g in picked) picked - g else picked + g }, label = { Text(labels.getValue(g)) })
-            }
+        var listsDialog by remember { mutableStateOf(false) }
+        var showAll by remember { mutableStateOf(false) }
+        val chosen = ps.selectedSites().keys.map { groupNames[it] ?: it }.joinToString(", ").ifEmpty { "Ничего не выбрано" }
+        Box {
+            OutlinedTextField(chosen, {}, Modifier.fillMaxWidth(), readOnly = true, singleLine = true, label = { Text("Списки доменов") },
+                trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) })
+            Box(Modifier.matchParentSize().clickable { listsDialog = true })
         }
+        if (listsDialog) SiteListsDialog(c, ui) { listsDialog = false }
         OutlinedTextField(extra, { extra = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Свой сайт (необязательно), например example.com") })
         ChipRow {
             FilterChip(selected = !full, onClick = { full = false }, label = { Text("Быстро (около минуты)") })
             FilterChip(selected = full, onClick = { full = true }, label = { Text("Тщательно (все стратегии)") })
         }
         if (probe.running) OutlinedButton(onClick = { c.cancelProbe() }) { Text("Остановить") }
-        else Button(onClick = { c.probeDpi(picked, extra, full) }) { Text("Начать подбор") }
+        else Button(onClick = { c.probeDpi(extra, full) }) { Text("Начать подбор") }
         if (ui.active && ui.data.settings.mode == ru.gidravpn.hydra.desktop.ConnectionMode.TUN)
             Text("Идёт подключение в режиме TUN: проверка пойдёт через VPN. Отключитесь для честного результата.", color = Warn, fontSize = 12.sp)
         if (probe.running) {
@@ -119,16 +129,8 @@ private fun DpiWizardSection(c: AppController, ui: UiState) {
             Text(if (b.percent >= 95) "Без обхода уже открывается ${b.percent}% сайтов — скорее всего, обход вам не нужен." else "Без обхода открывается только ${b.percent}% сайтов.",
                 fontSize = 12.sp, color = if (b.percent >= 95) Accent else MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        probe.results.forEachIndexed { i, r ->
-            Section("Вариант ${i + 1} — открылось ${r.ok} из ${r.total} (${r.percent}%)") {
-                Text(r.groups.joinToString(" · ") { "${labels[it.name] ?: it.name} ${it.ok}/${it.total}" }, fontSize = 12.sp)
-                Text(r.strategy, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { c.useDpiStrategy(r.strategy) }) { Text("Использовать") }
-                    OutlinedButton(onClick = { c.addByeDpiProfile(r.strategy) }) { Text("Сохранить профилем") }
-                }
-            }
-        }
+        (if (showAll) probe.results else probe.results.take(3)).forEachIndexed { i, r -> StrategyResult(c, i, r, best = i == 0) }
+        if (probe.results.size > 3) OutlinedButton(onClick = { showAll = !showAll }) { Text(if (showAll) "Свернуть" else "Показать все результаты (${probe.results.size})") }
         if (probe.finished) Text(
             if (probe.results.firstOrNull()?.ok ?: 0 == 0) "Ничего не помогло. Попробуйте «Тщательно» или другое подключение."
             else "Готово. «Использовать» включает обход для трафика напрямую; «Сохранить профилем» добавляет отдельный профиль «Обход DPI».",
@@ -153,7 +155,9 @@ private fun DpiSection(c: AppController, ui: UiState) {
                 readOnly = true, singleLine = true, label = { Text("Стратегия") }, trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) })
             Box(Modifier.matchParentSize().clickable { picker = true })
         }
-        Text(dpi.strategy, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        androidx.compose.foundation.text.selection.SelectionContainer {
+            Text(dpi.strategy, fontSize = 11.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         var custom by remember(dpi.strategy) { mutableStateOf(dpi.strategy) }
         OutlinedTextField(custom, { custom = it }, Modifier.fillMaxWidth(), label = { Text("Или впишите свою (аргументы ciadpi, для опытных)") }, isError = !DpiArgs.isUsable(custom))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -389,4 +393,136 @@ private fun GeoLayerSection(c: AppController, ui: UiState) {
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 0.7.15: настройки подбора как в ByeByeDPI, полный просмотр стратегий, Telegram → локальный прокси
+// ---------------------------------------------------------------------------------------------------------------------
+
+private val groupNames = mapOf(
+    "youtube" to "YouTube", "discord" to "Discord", "telegram" to "Telegram", "general" to "Общие",
+    "cloudflare" to "Cloudflare", "googlevideo" to "Googlevideo", "social" to "Соцсети", "turkiye" to "Türkiye", "custom" to "Свой сайт",
+)
+
+/** Окно «Списки доменов»: галочки у встроенных и своих списков, «Добавить список», удаление своих. */
+@Composable
+private fun SiteListsDialog(c: AppController, ui: UiState, onDismiss: () -> Unit) {
+    val ps = ui.data.settings.routing.routes.dpi.probe
+    var adding by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
+    var domains by remember { mutableStateOf("") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Списки доменов") },
+        text = {
+            androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 460.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(DpiStrategies.GROUP_ORDER.size) { i ->
+                    val g = DpiStrategies.GROUP_ORDER[i]
+                    SiteListRow(groupNames[g] ?: g, DpiStrategies.SITES[g].orEmpty(), g in ps.groups, null) {
+                        c.setProbe { p -> p.copy(groups = if (g in p.groups) p.groups - g else p.groups + g) }
+                    }
+                }
+                items(ps.custom.size) { i ->
+                    val x = ps.custom[i]
+                    SiteListRow(x.name, x.domains, x.name in ps.groups, { c.setProbe { p -> p.copy(custom = p.custom - x, groups = p.groups - x.name) } }) {
+                        c.setProbe { p -> p.copy(groups = if (x.name in p.groups) p.groups - x.name else p.groups + x.name) }
+                    }
+                }
+                item {
+                    if (adding) Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Название списка") })
+                        OutlinedTextField(domains, { domains = it }, Modifier.fillMaxWidth(), minLines = 3, label = { Text("Домены, по одному в строке") })
+                        Button(onClick = {
+                            val list = domains.split('\n', ' ', ',', ';').map { it.trim().removePrefix("https://").removePrefix("http://").substringBefore('/') }.filter { it.isNotEmpty() }.distinct()
+                            val n = name.trim()
+                            if (n.isNotEmpty() && list.isNotEmpty() && n.lowercase() !in DpiStrategies.GROUP_ORDER && n !in groupNames.values) {
+                                c.setProbe { p -> p.copy(custom = p.custom.filterNot { it.name == n } + ru.gidravpn.hydra.data.dpi.CustomSiteList(n, list), groups = p.groups + n) }
+                                name = ""; domains = ""; adding = false
+                            }
+                        }) { Text("Сохранить список") }
+                    } else OutlinedButton(onClick = { adding = true }) { Text("Добавить список") }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Готово") } },
+    )
+}
+
+@Composable
+private fun SiteListRow(title: String, domains: List<String>, on: Boolean, onDelete: (() -> Unit)?, onToggle: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onToggle), verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.material3.Checkbox(on, null)
+        androidx.compose.foundation.layout.Column(Modifier.weight(1f).padding(start = 8.dp)) {
+            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text(domains.take(4).joinToString(", ") + if (domains.size > 4) ", …" else "", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (onDelete != null) TextButton(onClick = onDelete) { Text("Удалить", color = Danger) }
+    }
+}
+
+/** Результат подбора целиком: сводка по спискам, ПОЛНАЯ строка стратегии (выделяется), «Использовать», «Сохранить профилем», «Копировать». */
+@Composable
+private fun StrategyResult(c: AppController, i: Int, r: ru.gidravpn.hydra.data.dpi.DpiProbe.Result, best: Boolean) {
+    val clip = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    Section((if (best) "★ " else "") + "Вариант ${i + 1} — открылось ${r.ok} из ${r.total} (${r.percent}%)") {
+        Text(r.groups.joinToString(" · ") { "${groupNames[it.name] ?: it.name} ${it.ok}/${it.total}" }, fontSize = 12.sp)
+        androidx.compose.foundation.text.selection.SelectionContainer {
+            Text(r.strategy, fontSize = 11.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        ChipRow {
+            Button(onClick = { c.useDpiStrategy(r.strategy) }) { Text("Использовать") }
+            OutlinedButton(onClick = { c.addByeDpiProfile(r.strategy) }) { Text("Сохранить профилем") }
+            OutlinedButton(onClick = { clip.setText(androidx.compose.ui.text.AnnotatedString(r.strategy)); copied = true }) { Text(if (copied) "Скопировано" else "Копировать") }
+        }
+    }
+}
+
+/** «Настройки подбора» — те же параметры, что в ByeByeDPI: пауза, число запросов, параллельность, таймаут, SNI, свой список стратегий. */
+@Composable
+private fun DpiProbeSettingsSection(c: AppController, ui: UiState) {
+    val dpi = ui.data.settings.routing.routes.dpi
+    val ps = dpi.probe
+    var sni by remember(dpi.fakeSni) { mutableStateOf(dpi.fakeSni) }
+    var own by remember(ps.customStrategies) { mutableStateOf(ps.customStrategies) }
+    Section("Настройки подбора") {
+        Text("Как проверять стратегии. Больше запросов и пауза — стабильнее, больше параллельных запросов — быстрее.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        DropField("Ожидание между проверками", "${ps.delaySec} с", (0..10).map { it to "$it с" }, { v -> c.setProbe { it.copy(delaySec = v) } }, selected = ps.delaySec)
+        Text("Увеличение значения повышает стабильность на слабой сети", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        DropField("Количество запросов к домену", "${ps.requests}", (1..5).map { it to "$it" }, { v -> c.setProbe { it.copy(requests = v) } }, selected = ps.requests)
+        Text("Сайт считается открытым, если ответило большинство попыток. Больше — точнее, но дольше", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        DropField("Максимум параллельных запросов", "${ps.parallel}", listOf(1, 2, 4, 8, 12, 16, 20, 32, 50).map { it to "$it" }, { v -> c.setProbe { it.copy(parallel = v) } }, selected = ps.parallel)
+        Text("Больше — быстрее, но может снизить стабильность", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        DropField("Таймаут ответа домена", "${ps.timeoutSec} с", (1..15).map { it to "$it с" }, { v -> c.setProbe { it.copy(timeoutSec = v) } }, selected = ps.timeoutSec)
+        Text("Больше — медленнее, но стабильнее и точнее", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedTextField(sni, { sni = it.trim() }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("SNI фейк-пакетов") })
+        Text("Подставляется вместо {sni} в стратегиях — и при проверке, и в обычной работе", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Button(onClick = { c.setDpi { it.copy(fakeSni = sni.ifBlank { DpiStrategies.FAKE_SNI }) } }) { Text("Применить") }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Свой список стратегий")
+                Text("По одной в строке, строки с # пропускаются. Пока включено, встроенные 60 не проверяются.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked = ps.customStrategiesOn, onCheckedChange = { v -> c.setProbe { it.copy(customStrategiesOn = v) } })
+        }
+        if (ps.customStrategiesOn) {
+            OutlinedTextField(own, { own = it }, Modifier.fillMaxWidth(), minLines = 4)
+            Button(onClick = { c.setProbe { it.copy(customStrategies = own) } }) { Text("Применить список") }
+        }
+    }
+}
+
+/** Передать Telegram локальный прокси Hydra (`tg://socks?…`): Telegram спросит, включить ли. Прокси работает, пока Hydra подключена. */
+@Composable
+internal fun TelegramProxySection(c: AppController, ui: UiState, compact: Boolean = false) {
+    val port = remember(ui.data.settings.routing.routes) { c.telegramProxyPort() }
+    val tg = TgWsPreset.isApplied(ui.data.settings.routing.routes.rules)
+    val body: @Composable () -> Unit = {
+        if (!compact) Text("Передаёт Telegram прокси, который Hydra поднимает на этом компьютере. Telegram спросит, включить ли прокси.",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Адрес 127.0.0.1:$port (SOCKS5) · ${if (tg) "Telegram по WebSocket" else "обход DPI"}", fontSize = 12.sp)
+        Button(onClick = { c.openTelegramProxy(port) }) { Text("Подключить Telegram к прокси") }
+        Text("Прокси работает, пока Hydra подключена.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    Section("Telegram через локальный прокси") { body() }
 }
