@@ -3,9 +3,8 @@ package ru.gidravpn.hydra.data.model
 /**
  * Семейства протоколов, поддерживаемые клиентом.
  *
- * SSTP и L2TP — userspace-реализации на Kotlin (PPP-стек vpn/ppp),
- * не требуют нативных .aar. PPTP честно недоступен (GRE → root;
- * стек удалён из Android 12/13) — см. docs/PROTOCOLS.md.
+ * SSTP, L2TP и PPTP — userspace-реализации на Kotlin (PPP-стек vpn/ppp), не требуют нативных .aar.
+ * PPTP (0.7.19) на Android работает только с root (GRE через raw-сокет), на ПК — Windows (RAS) — см. docs/PROTOCOLS.md.
  *
  * Ознакомительные/экспериментальные протоколы ([WDTT], [OLCRTC])
  * помечены [beta] = true и отображаются в UI с плашкой BETA.
@@ -19,7 +18,7 @@ enum class Protocol(
 ) {
     SSTP      ("sstp",   "SSTP (TLS/PPP)",           Engine.USERSPACE),
     L2TP      ("l2tp",   "L2TP (PPP/UDP)",           Engine.USERSPACE),
-    PPTP      ("pptp",   "PPTP (N/A)",        Engine.UNAVAILABLE),
+    PPTP      ("pptp",   "PPTP (GRE, root)",         Engine.USERSPACE),
     VLESS     ("vless",  "VLESS (Xray/sing-box)",    Engine.SINGBOX, shortCode = "VL"),
     VMESS     ("vmess",  "VMess",                    Engine.SINGBOX, shortCode = "VM"),
     TROJAN    ("trojan", "Trojan",                   Engine.SINGBOX, shortCode = "TR"),
@@ -61,11 +60,11 @@ enum class Protocol(
  *  - [SINGBOX] — sing-box (libbox.aar): proxy-протоколы + WireGuard;
  *  - [XRAY] — Xray-core (libXray.aar + tun2socks);
  *  - [AWG] — amneziawg-go.aar (обфусцированный WireGuard);
- *  - [USERSPACE] — чистый Kotlin (PPP-стек): SSTP, L2TP;
+ *  - [USERSPACE] — чистый Kotlin (PPP-стек): SSTP, L2TP, PPTP;
  *  - [WDTT] — нативный libclient.so (WG через TURN, VK-auth) — beta;
  *  - [OLCRTC] — исполняемый libolcrtc.so, подпроцесс + SOCKS5 → sing-box (TCP over WebRTC) — beta;
  *  - [OPENFLUX] — исполняемый libopenflux.so, подпроцесс + SOCKS5 → sing-box — beta;
  *  - [BYEDPI] — исполняемый libciadpi.so (ByeDPI), подпроцесс + SOCKS5 → sing-box: обход DPI без сервера;
- *  - [UNAVAILABLE] — протокол невозможен на Android (PPTP/GRE).
+ *  - [UNAVAILABLE] — зарезервировано для протоколов, невозможных на платформе (сейчас не используется).
  */
 enum class Engine { SINGBOX, XRAY, AWG, USERSPACE, WDTT, OLCRTC, OPENFLUX, BYEDPI, UNAVAILABLE }

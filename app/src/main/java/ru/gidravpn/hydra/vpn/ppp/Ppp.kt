@@ -17,6 +17,8 @@ object Ppp {
     const val PROTO_CHAP = 0xC223
     const val PROTO_IPCP = 0x8021
     const val PROTO_CCP = 0x80FD
+    /** Сжатие/шифрование (MPPE): внутри - зашифрованный кадр PPP. */
+    const val PROTO_COMP = 0x00FD
 
     // Коды LCP/IPCP (RFC 1661)
     const val CODE_CONF_REQ = 1

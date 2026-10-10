@@ -154,7 +154,7 @@
 
     <!-- Tunnel info -->
     <string name="tunnel_sstp_l2tp">Pure Kotlin, no native .aar: PPP stack (LCP, MS-CHAPv2, IPCP), SSTP over TLS with crypto-binding, L2TP over UDP (no IPsec/ESP). Needs on-device testing.</string>
-    <string name="tunnel_pptp">Unavailable: GRE (IP protocol 47) needs raw sockets/root, and the stack was removed from Android 12/13. Alternatives: SSTP, L2TP, WireGuard.</string>
+    <string name="tunnel_pptp">Needs root: GRE (IP protocol 47) requires a raw socket, so PPTP works only on rooted devices (Hydra asks for su). Weak crypto (MS-CHAPv2, MPPE/RC4) - prefer SSTP, L2TP or WireGuard. Add mppe=off to the link to disable encryption (not recommended).</string>
     <string name="tunnel_xray">Transport: XTLS Vision / WS / gRPC. Flow: xtls-rprx-vision. Engine: libXray.aar.</string>
     <string name="tunnel_singbox">Protocols: VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5. Engine: libbox.aar.</string>
     <string name="tunnel_wg">Plain WireGuard runs through sing-box (libbox.aar). AmneziaWG 1.0/1.5/2.0 uses its own engine, amneziawg-go.aar: Jc/Jmin/Jmax/S1/S2/H1–H4 obfuscation and I1–I5 markers. .conf/uapi generation is ready.</string>

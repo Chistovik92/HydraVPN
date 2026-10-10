@@ -1,0 +1,1 @@
+0.7.18 - links keep their parameters (WebSocket Host header, insecure flag, httpupgrade), no uTLS for Hysteria2/TUIC, split tunnelling "only these apps" with an empty list, the VPN service releases the tunnel on destroy, TG WS closes connections on stop.

@@ -1,0 +1,1 @@
+0.7.17 - security fixes from a code review: SSTP now verifies the server host name, the app lock no longer survives a process kill, links from other apps ask before importing, updates without a checksum are refused, a local-address check bug fixed.

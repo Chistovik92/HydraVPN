@@ -5,7 +5,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.7.18** · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md)
+- Статус: **0.7.19** · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md)
 
 ## Скачать
 
@@ -115,7 +115,7 @@ Hydra Classic (Windows 7 / 32-бит) — тот же набор экранов 
 | olcRTC, OpenFlux (BETA) | ✅ | ✅ нужен свой узел/сервер (Classic — кроме Windows 7) | ✅ внутри расширения VPN (с 0.7.10, проверено сборкой) |
 | Обход DPI (ByeDPI) и мастер подбора | ✅ | ✅ (Classic — тоже) | ✅ внутри расширения VPN (интерфейс 0.7.13; настроек подбора 0.7.15 пока нет) |
 | Telegram по WebSocket (TG WS) | ✅ | ✅ (Classic — тоже) | — (в очереди) |
-| PPTP | — недоступно (GRE требует root) | — | — |
+| PPTP (небезопасен) | ✅ только с root (GRE через `su`), нужен тест на сервере | ✅ только Windows (встроенный RAS) | — (нет GRE в расширении VPN) |
 
 Подробности и ограничения — [docs/PROTOCOLS.md](docs/PROTOCOLS.md), сервисы — [docs/SERVICES.md](docs/SERVICES.md).
 
@@ -167,7 +167,7 @@ HydraVPN/
 - [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md) — olcRTC / OpenFlux / snolc / AmneziaWG: апстримы, статус, клиенты
 - [docs/HANDOFF_ROUTERS.md](docs/HANDOFF_ROUTERS.md) — управление роутером: контракт API и что проверено
 - [desktop/README.md](desktop/README.md) · [ios/README.md](ios/README.md) — клиенты для ПК и iOS
-- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.7.18
+- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.7.19
 - [docs/HISTORY.md](docs/HISTORY.md) — хронология версий с датами и коммитами, журнал идей
 - [docs/LEGACY.md](docs/LEGACY.md) — 32-битные и старые системы: Android x86/TV, Hydra Classic (Windows 7, 32-бит), Windows XP
 

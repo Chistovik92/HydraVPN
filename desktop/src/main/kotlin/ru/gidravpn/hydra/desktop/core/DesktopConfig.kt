@@ -6,6 +6,7 @@ import ru.gidravpn.hydra.data.model.DnsEndpoint
 import ru.gidravpn.hydra.data.geo.GeoKind
 import ru.gidravpn.hydra.data.geo.GeoStore
 import ru.gidravpn.hydra.data.model.Engine
+import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.routing.RouteKind
 import ru.gidravpn.hydra.data.routing.RoutePlan
 import ru.gidravpn.hydra.data.routing.RoutePlanApplier
@@ -39,13 +40,14 @@ object DesktopConfig {
         IllegalArgumentException("Протокол «${profile.protocol?.displayName ?: profile.protocolId}» на ПК пока не поддерживается")
 
     /** На ПК работают протоколы ядер sing-box и Xray (Xray обслуживает их подмножество), а также olcRTC и OpenFlux (0.7.4, BETA). */
-    fun isSupported(p: ServerProfile): Boolean = p.protocol?.engine in SUPPORTED_ENGINES
+    fun isSupported(p: ServerProfile): Boolean =
+        p.protocol?.engine in SUPPORTED_ENGINES || (p.protocol == Protocol.PPTP && WindowsPptp.available)
 
     private val SUPPORTED_ENGINES = setOf(Engine.SINGBOX, Engine.OLCRTC, Engine.OPENFLUX, Engine.BYEDPI)
 
     /** Кто обслужит профиль с текущими тумблерами движков; null — подходящий движок выключен. */
     fun engineFor(p: ServerProfile, settings: DesktopSettings, xrayAvailable: Boolean): EngineToggles.Kind? =
-        if (!isSupported(p)) null else settings.engines.engineFor(p.protocol, xrayAvailable)
+        if (!isSupported(p) || p.protocol == Protocol.PPTP) null else settings.engines.engineFor(p.protocol, xrayAvailable)
 
     data class Api(val port: Int, val secret: String)
 
@@ -76,7 +78,7 @@ object DesktopConfig {
         geoStore: GeoStore? = null,
         onWarn: (String) -> Unit = {},
     ): JSONObject {
-        if (!isSupported(profile)) throw UnsupportedProtocol(profile)
+        if (!isSupported(profile) || profile.protocol == Protocol.PPTP) throw UnsupportedProtocol(profile)
         val r = settings.routing
 
         val split = SplitTunnel(netMode = r.netMode, netRules = r.netRules)

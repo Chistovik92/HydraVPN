@@ -154,7 +154,7 @@
 
     <!-- Tunnel info -->
     <string name="tunnel_sstp_l2tp">Чистий Kotlin, без нативних .aar: PPP-стек (LCP, MS-CHAPv2, IPCP), SSTP поверх TLS із crypto-binding, L2TP поверх UDP (без IPsec/ESP). Потребує перевірки на пристрої.</string>
-    <string name="tunnel_pptp">Недоступно: GRE (IP-протокол 47) потребує raw-сокетів/root, а стек прибрали з Android 12/13. Альтернативи: SSTP, L2TP, WireGuard.</string>
+    <string name="tunnel_pptp">Потрібен root: GRE (IP-протокол 47) вимагає raw-сокета, тому PPTP працює лише на пристроях із root (Hydra запросить su). Слабкий захист (MS-CHAPv2, MPPE/RC4) - краще SSTP, L2TP або WireGuard. Параметр mppe=off у посиланні вимикає шифрування (не рекомендовано).</string>
     <string name="tunnel_xray">Транспорт: XTLS Vision / WS / gRPC. Flow: xtls-rprx-vision. Рушій: libXray.aar.</string>
     <string name="tunnel_singbox">Протоколи: VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5. Рушій: libbox.aar.</string>
     <string name="tunnel_wg">Звичайний WireGuard працює через sing-box (libbox.aar). AmneziaWG 1.0/1.5/2.0 — власний рушій amneziawg-go.aar: обфускація Jc/Jmin/Jmax/S1/S2/H1–H4 і маркери I1–I5. Генерація .conf/uapi готова.</string>

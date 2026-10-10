@@ -99,7 +99,12 @@ jobs:
           core="$(ls desktop/build/hydra-app-resources/${{ matrix.target }}/sing-box* | head -1)"
           xray="$(ls desktop/build/hydra-app-resources/${{ matrix.target }}/xray* | head -1)"
           openflux="$(ls desktop/build/hydra-app-resources/${{ matrix.target }}/openflux* | head -1)"
-          bash scripts/desktop-e2e.sh "$core" desktop/build/singbox-configs ${{ matrix.os }} all "$xray" "$openflux"
+          # Внешняя сеть раннера GitHub временами пропадает (i/o timeout до Google, «services aren't available») - один повтор.
+          bash scripts/desktop-e2e.sh "$core" desktop/build/singbox-configs ${{ matrix.os }} all "$xray" "$openflux" || {
+            echo "::warning::e2e не прошёл, повтор через 20 с (возможен сбой сети раннера)"
+            sleep 20
+            bash scripts/desktop-e2e.sh "$core" desktop/build/singbox-configs ${{ matrix.os }} all "$xray" "$openflux"
+          }
 
       - name: Пакеты + дымовой запуск
         if: inputs.package

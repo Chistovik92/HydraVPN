@@ -154,7 +154,7 @@
 
     <!-- Tunnel info -->
     <string name="tunnel_sstp_l2tp">Kotlin خالص، بدون ‎.aar‎ بومی: پشته PPP (LCP، MS-CHAPv2، IPCP)، SSTP روی TLS با crypto-binding، L2TP روی UDP (بدون IPsec/ESP). به آزمایش روی دستگاه نیاز دارد.</string>
-    <string name="tunnel_pptp">در دسترس نیست: GRE (پروتکل IP شماره ۴۷) به سوکت خام/روت نیاز دارد و این پشته از Android 12/13 حذف شده است. جایگزین‌ها: SSTP، L2TP، WireGuard.</string>
+    <string name="tunnel_pptp">نیازمند روت: GRE (پروتکل IP شماره ۴۷) به سوکت خام نیاز دارد، پس PPTP فقط روی دستگاه‌های روت‌شده کار می‌کند. امنیت ضعیف (MS-CHAPv2 و MPPE/RC4) - SSTP، L2TP یا WireGuard بهتر است. پارامتر mppe=off رمزنگاری را خاموش می‌کند (توصیه نمی‌شود).</string>
     <string name="tunnel_xray">انتقال: XTLS Vision / WS / gRPC. Flow: xtls-rprx-vision. موتور: libXray.aar.</string>
     <string name="tunnel_singbox">پروتکل‌ها: VLESS، VMess، Trojan، Shadowsocks، Hysteria2، TUIC v5. موتور: libbox.aar.</string>
     <string name="tunnel_wg">WireGuard معمولی از طریق sing-box (libbox.aar) اجرا می‌شود. AmneziaWG 1.0/1.5/2.0 موتور خودش را دارد، amneziawg-go.aar: مبهم‌سازی Jc/Jmin/Jmax/S1/S2/H1–H4 و نشانگرهای I1–I5. تولید ‎.conf/uapi‎ آماده است.</string>

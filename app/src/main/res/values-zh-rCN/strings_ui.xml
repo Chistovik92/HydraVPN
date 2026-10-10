@@ -154,7 +154,7 @@
 
     <!-- Tunnel info -->
     <string name="tunnel_sstp_l2tp">纯 Kotlin，无原生 .aar：PPP 协议栈（LCP、MS-CHAPv2、IPCP），基于 TLS 的 SSTP（带 crypto-binding），基于 UDP 的 L2TP（无 IPsec/ESP）。需要在设备上测试。</string>
-    <string name="tunnel_pptp">不可用：GRE（IP 协议 47）需要原始套接字/root，且该协议栈已从 Android 12/13 移除。替代方案：SSTP、L2TP、WireGuard。</string>
+    <string name="tunnel_pptp">需要 root：GRE（IP 协议 47）需要原始套接字，因此 PPTP 仅在已 root 的设备上可用（Hydra 会请求 su）。加密较弱（MS-CHAPv2、MPPE/RC4），建议使用 SSTP、L2TP 或 WireGuard。链接中加入 mppe=off 可关闭加密（不推荐）。</string>
     <string name="tunnel_xray">传输：XTLS Vision / WS / gRPC。Flow：xtls-rprx-vision。引擎：libXray.aar。</string>
     <string name="tunnel_singbox">协议：VLESS、VMess、Trojan、Shadowsocks、Hysteria2、TUIC v5。引擎：libbox.aar。</string>
     <string name="tunnel_wg">普通 WireGuard 通过 sing-box（libbox.aar）运行。AmneziaWG 1.0/1.5/2.0 使用自己的引擎 amneziawg-go.aar：Jc/Jmin/Jmax/S1/S2/H1–H4 混淆和 I1–I5 标记。.conf/uapi 生成已就绪。</string>

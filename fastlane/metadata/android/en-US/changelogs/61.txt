@@ -1,0 +1,1 @@
+0.7.19 - PPTP (GRE + MPPE): on Android it needs root (GRE goes through a root helper), on Windows it uses the built-in RAS client. PPTP is weak crypto - prefer SSTP or WireGuard.

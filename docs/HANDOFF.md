@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.7.18** (`app/build.gradle.kts` → `versionName`)
+- Текущая версия: **0.7.19** (`app/build.gradle.kts` → `versionName`)
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -55,7 +55,7 @@
 | Xray (альт. ядро) | Xray-core | `libXray.aar` (отдельный процесс `:xray`, мост — sing-box); с 0.7.3 встроен в каждый релизный full-APK, не BETA |
 | **SSTP** | userspace PPP/TLS | **готово на Kotlin** (LCP/PAP/MS-CHAPv2/IPCP + crypto-binding); нужен on-device тест |
 | **L2TP** | userspace PPP/UDP | **готово на Kotlin** (без IPsec/ESP); нужен on-device тест |
-| PPTP | — | честно недоступно (данные в GRE → нужен root; стек удалён из Android 12/13) |
+| PPTP | userspace PPP + GRE | **0.7.19:** Android через root-помощника (raw GRE), Windows через RAS; не проверено на сервере |
 | **WDTT** (beta) | нативный `libclient.so` | WG через TURN ВК; нужен нативный клиент + VK-auth |
 | **olcRTC** (beta) | подпроцесс `libolcrtc.so` + SOCKS5 → sing-box | TCP-over-WebRTC; Android, ПК, iOS (0.7.10); апстрим заархивирован |
 | **OpenFlux** (beta) | подпроцесс `libopenflux.so` + SOCKS5 → sing-box | клиент v0.4.2, `openflux://v1/`; Android, ПК, iOS |
@@ -178,10 +178,22 @@ desktop/src/lite/…           Hydra Classic (Swing, Windows 7/32-бит, Linux 
 ios/                         SwiftUI + Network Extension: Hydra/ (экраны), HydraTunnel/, HydraAWG/, Packages/HydraKit (общая логика), Packages/CiaDPI, Bridge/ (gomobile)
 scripts/                     release.sh, build-{awg,olcrtc,openflux,byedpi}.sh, check-updates.sh, package-*.sh, desktop-e2e.sh
 docs/   ROUTING · PROTOCOLS · SECURITY · BUILD · ARCHITECTURE · SERVICES · PANELS · ECOSYSTEM · MULTIPLATFORM · ROADMAP · HISTORY · HANDOFF_ROUTERS …
-CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.7.18 (главный источник контекста)
+CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.7.19 (главный источник контекста)
 ```
 
 ## Честные оговорки
+
+- **0.7.19 — PPTP.** Проверено: юнит-тесты ПК (`PptpTest`: вектор RC4, MPPE stateful/stateless, GRE, сообщения, сквозной тест клиента с поддельным сервером), компиляция
+  native-варианта Android (`compileNativeDebugKotlin`), Classic. **Не проверено:** реальный сервер PPTP (режимы и ключи MPPE сверены по RFC 3078/3079 и поведению pppd — возможны расхождения),
+  устройство с root (`GreRelay`: `SOCK_RAW`, SO_MARK, SELinux), Windows RAS на живом сервере. iOS, Linux и macOS - PPTP недоступен (iOS: нет GRE в расширении VPN).
+  Мёртвый код заготовки не удалён.
+
+- **0.7.18 — ссылки без потерь параметров, устойчивость туннеля.** Проверено: юнит-тесты (ws `Host`, `httpupgrade`, `insecure`, QUIC без uTLS), компиляция. **Не проверено:** изменения
+  `HydraVpnService` на устройстве (раздельное туннелирование «только эти», `onDestroy`); `xhttp` не поддержан (sing-box), kill switch в TUN на ПК по-прежнему не работает.
+
+- **0.7.17 — безопасность по итогам ревизии.** Проверено: юнит-тесты `:app`/`:desktop`, сборка native в `scripts/release.sh`, подпись релизным ключом. **Не проверено на устройстве:** SSTP
+  с проверкой имени хоста, диалог подтверждения импорта, повторная блокировка после смерти процесса, `-EncodedCommand` стража на Windows при принудительном завершении Hydra.
+  Каталог с ACL для конфигов ядер при запуске от администратора - не сделан.
 
 - **0.7.16 — системный прокси не зависает, запуск от администратора.** Проверено: сборка и юнит-тесты ПК (обычная Hydra и Classic), текст PowerShell-«стража» на Windows 11
   (процесс завершён → копия применена и удалена, реестр не менялся). **Не проверено:** перезапуск через UAC (нужно подтверждение на экране), «страж» при

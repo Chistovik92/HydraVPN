@@ -65,6 +65,7 @@ import ru.gidravpn.hydra.desktop.core.Ping
 import ru.gidravpn.hydra.desktop.core.Rules
 import ru.gidravpn.hydra.desktop.core.Subscriptions
 import ru.gidravpn.hydra.desktop.core.SystemProxy
+import ru.gidravpn.hydra.desktop.core.WindowsPptp
 import ru.gidravpn.hydra.desktop.core.Updates
 import ru.gidravpn.hydra.router.RouterManager
 import java.io.File
@@ -168,6 +169,8 @@ class AppController(
             // Прошлый запуск мог упасть с включённым системным прокси или оставить ядра.
             SystemProxy.restore()
             CoreRunner.killStale()
+            // Прошлый запуск мог упасть при поднятом PPTP: подключение «Hydra PPTP» с сохранённым именем снимаем.
+            if (WindowsPptp.available) scope.launch(Dispatchers.IO) { WindowsPptp.disconnect() }
             scope.launch(Dispatchers.IO) {
                 // Подписки — сейчас и затем раз в полчаса проверяем, не пора ли.
                 while (isActive) {
@@ -654,12 +657,56 @@ class AppController(
         if (!DesktopConfig.isSupported(profile)) {
             return toast("«${profile.protocol?.displayName ?: profile.protocolId}» на ПК пока недоступен — выберите другой сервер")
         }
+        if (profile.protocol == ru.gidravpn.hydra.data.model.Protocol.PPTP) return connectPptp(profile)
         val engine = DesktopConfig.engineFor(profile, settings, xrayAvailable)
             ?: return toast("Для «${profile.protocol?.displayName}» не включено ни одно ядро — Настройки → Движки")
         userStopped = false
         reconnectAttempt = 0
         _ui.update { it.copy(log = emptyList(), upTotal = 0, downTotal = 0) }
         launchSession(profile, settings, engine, "Подключение…")
+    }
+
+    /**
+     * PPTP (Windows, 0.7.19): системное подключение RAS - ядра Hydra не участвуют. Слежение за обрывом: раз в 5 с
+     * проверяется состояние подключения; автопереподключения нет (PPTP на плохом канале рвётся часто - решает пользователь).
+     */
+    private fun connectPptp(profile: ServerProfile) {
+        userStopped = false
+        reconnectAttempt = 0
+        val sessionId = ++session
+        _ui.update {
+            it.copy(log = emptyList(), upTotal = 0, downTotal = 0, status = Status.CONNECTING, statusText = "Подключение PPTP (Windows)…",
+                connectedId = profile.id, engine = null, upSpeed = 0, downSpeed = 0, delayMs = null, needsElevation = false, blocked = false)
+        }
+        scope.launch(Dispatchers.IO) {
+            connLock.withLock {
+                if (session != sessionId) return@withLock
+                WindowsPptp.connect(profile)
+                    .onSuccess {
+                        if (session != sessionId) { WindowsPptp.disconnect(); return@onSuccess }
+                        appendLog("PPTP: подключено через встроенный клиент Windows")
+                        _ui.update { it.copy(status = Status.CONNECTED, statusText = "Подключено · PPTP (Windows, весь трафик ОС)") }
+                        watchPptp(sessionId)
+                    }
+                    .onFailure { e ->
+                        WindowsPptp.disconnect()
+                        if (session == sessionId) _ui.update { it.copy(status = Status.ERROR, statusText = e.message ?: e.toString(), connectedId = null) }
+                    }
+            }
+        }
+    }
+
+    private fun watchPptp(sessionId: Int) = scope.launch(Dispatchers.IO) {
+        while (isActive && session == sessionId && !userStopped) {
+            delay(5_000)
+            if (session != sessionId || userStopped) return@launch
+            if (!WindowsPptp.isConnected()) {
+                appendLog("PPTP: соединение потеряно")
+                WindowsPptp.disconnect()
+                _ui.update { if (session != sessionId) it else it.copy(status = Status.ERROR, statusText = "PPTP: соединение потеряно", connectedId = null) }
+                return@launch
+            }
+        }
     }
 
     private fun launchSession(profile: ServerProfile, settings: DesktopSettings, engine: EngineToggles.Kind, text: String) {
@@ -815,6 +862,7 @@ class AppController(
             connLock.withLock {
                 SystemProxy.restore()
                 runner.stop()
+                if (WindowsPptp.active) WindowsPptp.disconnect()
             }
             _ui.update { it.copy(status = Status.DISCONNECTED, statusText = "Не подключено", connectedId = null,
                 upSpeed = 0, downSpeed = 0, delayMs = null, blocked = false) }
@@ -890,6 +938,7 @@ class AppController(
         session++
         SystemProxy.restore()
         runner.stop()
+        if (WindowsPptp.active) WindowsPptp.disconnect()
     }
 
     // sing-box красит лог ANSI-кодами даже в пайп (опции отключения в 1.12 нет).
