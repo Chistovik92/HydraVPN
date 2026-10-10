@@ -23,29 +23,37 @@ object SystemProxy {
 
     private val backupFile get() = File(Platform.runDir, "proxy-backup.json")
 
+    /** Прокси Hydra сейчас стоит в системе (есть резервная копия прежних настроек). */
+    val engaged: Boolean get() = backupFile.exists()
+
     /** Включает прокси 127.0.0.1:[port]. Ошибка — текст для UI (соединение при этом работает). */
     fun enable(port: Int): Result<Unit> = runCatching {
-        if (!backupFile.exists()) backupFile.writeText(backup().toString())
+        if (!backupFile.exists()) {
+            backupFile.writeText(backup().put("pid", ProcessHandle.current().pid()).put("port", port).toString())
+        }
         when (Platform.os) {
-            Os.WINDOWS -> Windows.set(true, "127.0.0.1:$port")
+            Os.WINDOWS -> { Windows.set(true, "127.0.0.1:$port"); Windows.startGuard(backupFile) }
             Os.MACOS -> MacOs.enable(port)
             Os.LINUX -> Linux.enable(port)
         }
     }
 
-    /** Возвращает сохранённые настройки; без резервной копии — ничего не трогает. */
+    /**
+     * Возвращает сохранённые настройки; без резервной копии — ничего не трогает. Копия удаляется только
+     * после успеха: раньше сбой отката (нет сессии dbus, занят реестр) стирал её, и прокси оставался навсегда.
+     */
     fun restore() {
         val f = backupFile
         if (!f.exists()) return
-        runCatching {
-            val b = JSONObject(f.readText())
+        val b = runCatching { JSONObject(f.readText()) }.getOrDefault(JSONObject())
+        val ok = runCatching {
             when (Platform.os) {
                 Os.WINDOWS -> Windows.restore(b)
                 Os.MACOS -> MacOs.restore(b)
                 Os.LINUX -> Linux.restore(b)
             }
-        }
-        f.delete()
+        }.isSuccess
+        if (ok) f.delete()
     }
 
     private fun backup(): JSONObject = when (Platform.os) {
@@ -54,7 +62,7 @@ object SystemProxy {
         Os.LINUX -> Linux.backup()
     }
 
-    private const val BYPASS = "localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.2*;172.30.*;172.31.*;192.168.*;<local>"
+    private const val BYPASS = "localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*;<local>"
 
     // ---------------------------------------------------------------- Windows
     private object Windows {
@@ -82,11 +90,46 @@ object SystemProxy {
             wininet.InternetSetOptionW(null, 37, null, 0)
         }
 
-        fun restore(b: JSONObject) = set(
-            b.optInt("enable", 0) == 1,
-            b.optString("server", ""),
-            b.optString("override", ""),
-        )
+        fun restore(b: JSONObject) {
+            // Копия, снятая поверх нашего же прокси (сбой прошлого запуска), вернула бы мёртвый 127.0.0.1 — выключаем.
+            val server = b.optString("server", "")
+            val was = b.optInt("enable", 0) == 1
+            val ours = was && server == "127.0.0.1:" + b.optInt("port", -1)
+            set(was && !ours, server, b.optString("override", ""))
+        }
+
+        /**
+         * Страж (0.7.16): скрытый PowerShell ждёт выхода Hydra и, если резервная копия этого экземпляра осталась
+         * (завершение процесса, сбой, выключение ПК), сам возвращает прокси. Копия чужого pid не трогается.
+         */
+        fun startGuard(backup: File) {
+            runCatching {
+                val script = File(Platform.runDir, "proxy-guard.ps1")
+                script.writeText(GUARD)
+                ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass",
+                    "-File", script.absolutePath, ProcessHandle.current().pid().toString(), backup.absolutePath)
+                    .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
+            }
+        }
+
+        private val GUARD = """
+            param([int]@ParentPid, [string]@Backup)
+            try { Wait-Process -Id @ParentPid -ErrorAction Stop } catch {}
+            Start-Sleep -Seconds 2
+            if (-not (Test-Path @Backup)) { exit }
+            @b = Get-Content @Backup -Raw | ConvertFrom-Json
+            if (@b.pid -ne @ParentPid) { exit }
+            @k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
+            @on = [int]@b.enable
+            if (@on -eq 1 -and @b.server -eq ('127.0.0.1:' + @b.port)) { @on = 0 }
+            Set-ItemProperty @k ProxyEnable @on
+            Set-ItemProperty @k ProxyServer ([string]@b.server)
+            Set-ItemProperty @k ProxyOverride ([string]@b.override)
+            Add-Type -Namespace H -Name W -MemberDefinition '[DllImport("wininet.dll")] public static extern bool InternetSetOption(IntPtr h, int o, IntPtr b, int l);'
+            [H.W]::InternetSetOption([IntPtr]::Zero, 39, [IntPtr]::Zero, 0) | Out-Null
+            [H.W]::InternetSetOption([IntPtr]::Zero, 37, [IntPtr]::Zero, 0) | Out-Null
+            Remove-Item @Backup -Force
+        """.trimIndent().replace("@", "${'$'}")
 
         private fun readInt(name: String) = runCatching {
             Advapi32Util.registryGetIntValue(WinReg.HKEY_CURRENT_USER, KEY, name)
@@ -125,14 +168,21 @@ object SystemProxy {
         }
 
         fun restore(b: JSONObject) {
-            b.keys().forEach { svc ->
-                val o = b.getJSONObject(svc)
+            // Службы, появившиеся после включения (кабель вместо Wi-Fi), в копии отсутствуют — гасим только наш 127.0.0.1.
+            services().filter { !b.has(it) }.forEach { svc ->
+                kinds.forEach { k ->
+                    val out = exec("networksetup", "-get$k", svc).lines().map { it.trim() }
+                    if ("Enabled: Yes" in out && "Server: 127.0.0.1" in out) execChecked("networksetup", "-set${k}state", svc, "off")
+                }
+            }
+            b.keys().asSequence().toList().forEach { svc ->
+                val o = b.optJSONObject(svc) ?: return@forEach
                 kinds.forEach { k ->
                     val p = o.optJSONObject(k) ?: return@forEach
                     if (p.optBoolean("enabled") && p.optString("server").isNotEmpty()) {
-                        exec("networksetup", "-set$k", svc, p.optString("server"), p.optString("port"))
+                        execChecked("networksetup", "-set$k", svc, p.optString("server"), p.optString("port"))
                     } else {
-                        exec("networksetup", "-set${k}state", svc, "off")
+                        execChecked("networksetup", "-set${k}state", svc, "off")
                     }
                 }
             }
@@ -147,9 +197,24 @@ object SystemProxy {
         private val kwrite get() = listOf("kwriteconfig6", "kwriteconfig5").firstOrNull(::which)
         private val kread get() = listOf("kreadconfig6", "kreadconfig5").firstOrNull(::which)
 
+        private val schemas = listOf("http", "https", "socks")
+        private val kdeKeys = listOf("httpProxy", "httpsProxy", "socksProxy")
+
+        /** Раньше сохранялся только режим: ручной прокси пользователя (хост, порт, исключения) терялся — теперь всё. */
         fun backup(): JSONObject = JSONObject().apply {
-            if (hasGsettings) put("gnomeMode", exec("gsettings", "get", G, "mode").trim().trim('\''))
-            kread?.let { put("kdeType", exec(it, "--file", "kioslaverc", "--group", "Proxy Settings", "--key", "ProxyType").trim()) }
+            if (hasGsettings) {
+                put("gnomeMode", exec("gsettings", "get", G, "mode").trim().trim('\''))
+                put("gnomeIgnore", exec("gsettings", "get", G, "ignore-hosts").trim())
+                schemas.forEach { sc ->
+                    put("gnome_$sc", JSONObject()
+                        .put("host", exec("gsettings", "get", "$G.$sc", "host").trim())
+                        .put("port", exec("gsettings", "get", "$G.$sc", "port").trim()))
+                }
+            }
+            kread?.let { r ->
+                put("kdeType", exec(r, "--file", "kioslaverc", "--group", "Proxy Settings", "--key", "ProxyType").trim())
+                kdeKeys.forEach { put("kde_$it", exec(r, "--file", "kioslaverc", "--group", "Proxy Settings", "--key", it).trim()) }
+            }
         }
 
         fun enable(port: Int) {
@@ -176,9 +241,22 @@ object SystemProxy {
         }
 
         fun restore(b: JSONObject) {
-            if (hasGsettings) exec("gsettings", "set", G, "mode", b.optString("gnomeMode").ifEmpty { "none" })
+            if (hasGsettings) {
+                schemas.forEach { sc ->
+                    b.optJSONObject("gnome_$sc")?.let { o ->
+                        o.optString("host").takeIf { it.isNotEmpty() }?.let { execChecked("gsettings", "set", "$G.$sc", "host", it) }
+                        o.optString("port").takeIf { it.isNotEmpty() }?.let { execChecked("gsettings", "set", "$G.$sc", "port", it) }
+                    }
+                }
+                b.optString("gnomeIgnore").takeIf { it.isNotEmpty() }?.let { execChecked("gsettings", "set", G, "ignore-hosts", it) }
+                execChecked("gsettings", "set", G, "mode", b.optString("gnomeMode").ifEmpty { "none" })
+            }
             kwrite?.let { kw ->
-                exec(kw, "--file", "kioslaverc", "--group", "Proxy Settings", "--key", "ProxyType", b.optString("kdeType").ifEmpty { "0" })
+                fun k(key: String, v: String) =
+                    if (v.isEmpty()) exec(kw, "--file", "kioslaverc", "--group", "Proxy Settings", "--key", key, "--delete")
+                    else exec(kw, "--file", "kioslaverc", "--group", "Proxy Settings", "--key", key, v)
+                kdeKeys.forEach { k(it, b.optString("kde_$it")) }
+                k("ProxyType", b.optString("kdeType").ifEmpty { "0" })
                 kdeReparse()
             }
         }

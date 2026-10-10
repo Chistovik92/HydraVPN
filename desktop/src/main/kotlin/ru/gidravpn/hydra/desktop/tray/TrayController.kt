@@ -65,6 +65,9 @@ class TrayController(
         val menu = PopupMenu()
         MenuItem("Открыть Hydra").also { it.addActionListener { onOpen() }; menu.add(it) }
         toggleItem = MenuItem("Подключить").also { it.addActionListener { toggle() }; menu.add(it) }
+        if (controller.elevationAvailable && !controller.isElevated) {
+            MenuItem("Перезапустить от администратора").also { it.addActionListener { controller.relaunchElevated() }; menu.add(it) }
+        }
         menu.addSeparator()
         MenuItem("Выход").also { it.addActionListener { onQuit() }; menu.add(it) }
         val ti = TrayIcon(image, "Hydra", menu).apply { isImageAutoSize = true }

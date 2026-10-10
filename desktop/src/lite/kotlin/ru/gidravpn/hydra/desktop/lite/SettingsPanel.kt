@@ -107,6 +107,14 @@ internal class SettingsPanel(private val c: AppController) : Renderable {
             singBox, xray, preferXray, olcRtc, openFlux, enginesNote),
         section("Безопасность", kill, reconnect, autoConnect, login),
         section("Прокси", row(JLabel("Порт:"), port), sysProxy),
+        section("Права администратора",
+            note(when {
+                !c.elevationAvailable -> "Целиком Hydra от администратора перезапускается только в Windows: на Linux и macOS права для TUN запрашиваются у системы при подключении."
+                c.isElevated -> "Hydra запущена от администратора."
+                else -> "Hydra запущена с обычными правами. Права нужны для режима TUN; для системного прокси не обязательны. " +
+                    "Подключение после перезапуска восстановится само."
+            }),
+            button("Перезапустить от администратора") { c.relaunchElevated() }.apply { isVisible = c.elevationAvailable && !c.isElevated }),
         section("Раздача VPN в локальную сеть",
             note("Другие устройства сети (телефон, ТВ, приставка, старый компьютер) смогут ходить через этот VPN, указав прокси с логином и паролем. " +
                 "Порт открывается на всех сетевых адаптерах — брандмауэр ОС может спросить разрешение."),
