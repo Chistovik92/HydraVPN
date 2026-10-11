@@ -22,6 +22,8 @@ kotlin {
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-common")
                 implementation("org.json:json:20240303")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+                // SSH для «Моих серверов» (0.8.0): форк JSch, BSD; ed25519/curve25519 на Android — через BouncyCastle в app
+                implementation("com.github.mwiede:jsch:0.2.20")
             }
         }
         val androidMain by getting {
