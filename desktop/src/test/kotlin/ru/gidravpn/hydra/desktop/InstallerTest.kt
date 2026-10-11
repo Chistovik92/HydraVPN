@@ -12,6 +12,10 @@ class InstallerTest {
         val files = mutableMapOf<String, ByteArray>()
         override fun exec(command: String, onLine: (String) -> Unit): ExecResult {
             cmds += command
+            Regex("^mv -f '(.*)' '(.*)'$").find(command)?.let { m ->
+                files[m.groupValues[2]] = files.remove(m.groupValues[1])!!
+                return ExecResult(0, "")
+            }
             if (failOn != null && command.contains(failOn)) { onLine("boom"); return ExecResult(1, "boom") }
             if (command.startsWith("sha256sum ")) {
                 val p = command.removePrefix("sha256sum ").trim('\'')

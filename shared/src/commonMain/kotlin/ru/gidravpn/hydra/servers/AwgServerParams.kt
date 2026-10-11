@@ -29,7 +29,7 @@ object AwgServerParams {
         if (gen >= AwgGeneration.V3) {
             m["headerprotectionkey"] = X25519.randomKeyB64(rnd)
             m["contentpaddingaddition"] = rnd.nextInt(64).toString()
-            m["randomtrailers"] = "true"
+            m["randomtrailers"] = "on" // awg setconf понимает только on/off/0/1
         }
         return m
     }

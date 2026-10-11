@@ -87,12 +87,19 @@ class Installer(
 
     private fun exec(step: Step): String? {
         step.upload?.let {
-            ssh.upload(it.data, it.path, it.mode)
+            // во временный файл и атомарный mv: работающий бинарь поверх не перезаписать («Text file busy»)
+            val tmp = it.path + ".hydra-new"
+            ssh.upload(it.data, tmp, it.mode)
             if (it.sha256 != null) {
-                val r = ssh.exec("sha256sum ${shq(it.path)}")
+                val r = ssh.exec("sha256sum ${shq(tmp)}")
                 val got = r.out.trim().substringBefore(' ')
-                if (!got.equals(it.sha256, true)) return "Контрольная сумма ${it.path} не совпала (ожидалась ${it.sha256.take(12)}…, на сервере ${got.take(12)}…)"
+                if (!got.equals(it.sha256, true)) {
+                    ssh.exec("rm -f ${shq(tmp)}")
+                    return "Контрольная сумма ${it.path} не совпала (ожидалась ${it.sha256.take(12)}…, на сервере ${got.take(12)}…)"
+                }
             }
+            val mv = ssh.exec("mv -f ${shq(tmp)} ${shq(it.path)}")
+            if (!mv.ok) return "Не удалось записать ${it.path}: ${mv.out.trim()}"
         }
         val cmd = step.command ?: return null
         val r = ssh.exec(cmd) { onEvent(InstallEvent.Output(redactor.clean(it))) }

@@ -42,6 +42,11 @@ class AwgServerTest {
         }
     }
 
+    @Test fun booleansAreOnOff() {
+        val p = AwgServerParams.generate(AwgGeneration.V3)
+        assertEquals("on", p["randomtrailers"])
+    }
+
     @Test fun configsContainParamsAndPeers() {
         val spec = AwgServerSpec.create("203.0.113.5", 51820, AwgGeneration.V2_0)
         val c = AwgServerSpec.newClient("phone", spec.nextAddress(emptyList())!!)

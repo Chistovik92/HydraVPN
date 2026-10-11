@@ -52,6 +52,7 @@ object AwgInstallPlan {
         val iface = spec.iface
         val confPath = "$CONF_DIR/$iface.conf"
         return buildList {
+            add(Step("stop-old", "Остановить прежнюю службу (если есть)", "systemctl stop $SERVICE 2>/dev/null; true"))
             add(Step("dirs", "Создать каталоги", "mkdir -p $CONF_DIR && chmod 700 $CONF_DIR", rollback = null))
             for ((name, mode) in listOf("amneziawg-go" to 493, "awg" to 493, "awg-quick" to 493)) {
                 val f = bundle.file(name)
