@@ -97,6 +97,8 @@ data class HydraState(
     val profiles: List<RoutingProfile> = emptyList(),
     /** Роутеры HydraVPN for Router (ссылка сопряжения: адрес, токен, TLS-отпечаток). */
     val routers: List<RouterLink> = emptyList(),
+    /** Свои серверы (0.8.0): отпечаток SSH и ключи AmneziaWG; пароль/ключ входа не хранятся. */
+    val myServers: List<ru.gidravpn.hydra.servers.MyServer> = emptyList(),
     /** Аккаунт бота «Радар»: адрес, токен устройства (файл только для владельца), имя. null — не подключено. */
     val bot: BotLink? = null,
 )
@@ -152,6 +154,7 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
             .put("settings", settingsToJson(s.settings))
             .put("profiles", JSONArray(s.profiles.map { JSONObject().put("name", it.name).put("routing", routingToJson(it.routing)) }))
             .put("routers", JSONArray(s.routers.map { JSONObject().put("name", it.name).put("link", it.toUri()) }))
+            .put("myServers", JSONArray(s.myServers.map { it.toJson() }))
             .put("bot", s.bot?.let { JSONObject().put("server", it.server).put("token", it.token).put("username", it.username).put("panels", it.panels ?: JSONObject.NULL) } ?: JSONObject.NULL)
 
         fun fromJson(o: JSONObject): HydraState = HydraState(
@@ -165,6 +168,7 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
                 if (server.isBlank() || token.isBlank()) null
                 else BotLink(server, token, b.optString("username"), if (b.isNull("panels")) null else b.optInt("panels"))
             },
+            myServers = o.optJSONArray("myServers").objects().mapNotNull { runCatching { ru.gidravpn.hydra.servers.MyServer.fromJson(it) }.getOrNull() }.distinctBy { it.id },
             routers = o.optJSONArray("routers").objects().mapNotNull { r ->
                 RouterLink.parse(r.optString("link"))?.let { l -> l.copy(name = r.optString("name").trim().take(40).ifEmpty { l.host }) }
             }.distinctBy { it.baseUrl },

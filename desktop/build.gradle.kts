@@ -28,7 +28,7 @@ val appVersion: String = Regex("versionName\\s*=\\s*\"([^\"]+)\"")
     .find(rootProject.file("app/build.gradle.kts").readText())!!.groupValues[1]
 
 // jpackage принимает только MAJOR.MINOR.PATCH (0.6.22.2 → 0.6.22).
-val pkgVersion: String = appVersion.split('.').take(3)
+val pkgVersion: String = appVersion.substringBefore('-').split('.').take(3)
     .map { part -> part.filter(Char::isDigit).ifEmpty { "0" } }
     .let { it + List(3 - it.size) { "0" } }
     .joinToString(".")

@@ -53,6 +53,8 @@ fun HydraRoot(
 ) {
     // rememberSaveable: вкладка переживает поворот экрана и пересоздание процесса.
     var tab by rememberSaveable { mutableStateOf(Tab.MAIN) }
+    // «Мои серверы» (0.8.0) открываются поверх вкладки «Серверы» и не занимают место в нижней навигации.
+    var myServers by rememberSaveable { mutableStateOf(false) }
     // «Назад» с любой вкладки возвращает на Главную, а не закрывает приложение.
     androidx.activity.compose.BackHandler(enabled = tab != Tab.MAIN) { tab = Tab.MAIN }
     val themeMode by vm.themeMode.collectAsState()
@@ -73,7 +75,8 @@ fun HydraRoot(
                     Box(Modifier.widthIn(max = 720.dp).fillMaxSize()) {
                         when (tab) {
                             Tab.MAIN -> MainScreen(vm, onGoServers = { tab = Tab.SERVERS })
-                            Tab.SERVERS -> ServersScreen(vm, onSelected = { tab = Tab.MAIN })
+                            Tab.SERVERS -> if (myServers) MyServersScreen(vm, onBack = { myServers = false })
+                                else ServersScreen(vm, onSelected = { tab = Tab.MAIN }, onMyServers = { myServers = true })
                             Tab.PROFILE -> ProfileScreen(vm)
                             Tab.ROUTERS -> RoutersScreen(vm)
                             Tab.SETTINGS -> SettingsScreen(vm)

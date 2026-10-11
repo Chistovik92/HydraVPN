@@ -118,7 +118,7 @@ private fun colorSchemeFor(theme: AppTheme) = theme.colors().let { c ->
     )
 }
 
-private enum class Tab(val title: String) { HOME("Главная"), SERVERS("Серверы"), SUBS("Подписки"), ROUTING("Маршруты"), ROUTERS("Роутеры"), SETTINGS("Настройки"), LOG("Журнал") }
+private enum class Tab(val title: String) { HOME("Главная"), SERVERS("Серверы"), SUBS("Подписки"), ROUTING("Маршруты"), ROUTERS("Роутеры"), MYSERVERS("Мои серверы"), SETTINGS("Настройки"), LOG("Журнал") }
 
 @Composable
 fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTab: Int = 0) {
@@ -143,6 +143,7 @@ fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTa
                                     Tab.SUBS -> Icons.Default.Share
                                     Tab.ROUTING -> Icons.Default.Place
                                     Tab.ROUTERS -> Icons.Default.Build
+                                    Tab.MYSERVERS -> Icons.Default.Add
                                     Tab.SETTINGS -> Icons.Default.Settings
                                     Tab.LOG -> Icons.Default.Info
                                 }, contentDescription = t.title)
@@ -159,6 +160,7 @@ fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTa
                         Tab.SUBS -> SubscriptionsScreen(c, ui)
                         Tab.ROUTING -> RoutingScreen(c, ui)
                         Tab.ROUTERS -> RoutersScreen(c, ui)
+                        Tab.MYSERVERS -> MyServersScreen(c, ui)
                         Tab.SETTINGS -> SettingsScreen(c, ui)
                         Tab.LOG -> LogScreen(c, ui)
                     }

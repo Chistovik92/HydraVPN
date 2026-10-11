@@ -44,7 +44,7 @@ case "$TARGET" in
     for type in deb rpm; do
       mkdir -p "$BIN/$type"
       "$JPACKAGE" --type "$type" --app-image "$APP_DIR" --dest "$BIN/$type" \
-        --name Hydra --app-version "$VERSION" --vendor "Hydra VPN" \
+        --name Hydra --app-version "${VERSION%%-*}" --vendor "Hydra VPN" \
         --description "Hydra VPN client" --license-file LICENSE \
         --icon desktop/build/icons/hydra.png \
         --linux-package-name hydra-vpn --linux-deb-maintainer "Hydra VPN <dev@shadowlink.local>" \

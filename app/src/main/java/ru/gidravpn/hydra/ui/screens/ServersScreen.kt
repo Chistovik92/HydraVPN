@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
@@ -59,7 +60,7 @@ import androidx.compose.ui.graphics.Color
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
+fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit, onMyServers: () -> Unit = {}) {
     val servers by vm.servers.collectAsState()
     val subscriptions by vm.subscriptions.collectAsState()
     val selectedId by vm.selectedId.collectAsState()
@@ -141,6 +142,7 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit) {
                 Text(stringResource(R.string.tab_servers), fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
                 Text(stringResource(R.string.srv_summary, servers.size, subscriptions.size), color = TextMuted, fontSize = 12.sp)
             }
+            HeaderIcon(Icons.Filled.Dns, stringResource(R.string.ms_open)) { onMyServers() }
             HeaderIcon(Icons.Filled.Search, stringResource(R.string.srv_search), active = searchOpen) {
                 searchOpen = !searchOpen; if (!searchOpen) query = ""
             }

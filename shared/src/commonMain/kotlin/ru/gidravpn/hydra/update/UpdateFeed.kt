@@ -68,7 +68,15 @@ object UpdateFeed {
             val d = r.getOrElse(i) { 0 } - c.getOrElse(i) { 0 }
             if (d != 0) return d > 0
         }
-        return false
+        // Одинаковые номера: выпуск новее своего пре-релиза (0.8.0 > 0.8.0-rc1), пре-релизы между собой — по номеру rc.
+        fun pre(v: String) = Regex("-(?:rc|beta|alpha)(\\d*)", RegexOption.IGNORE_CASE).find(v)?.let { it.groupValues[1].toIntOrNull() ?: 0 }
+        val rp = pre(remote)
+        val cp = pre(current)
+        return when {
+            rp == null && cp != null -> true
+            rp != null && cp != null -> rp > cp
+            else -> false
+        }
     }
 
     // ------------------------------------------------------------ выбор файла

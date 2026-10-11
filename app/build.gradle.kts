@@ -31,8 +31,8 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 62
-        versionName = "0.7.20"
+        versionCode = 63
+        versionName = "0.8.0-rc1"
         // Приватный DNS (DoH с токеном в пути) для вошедших через бота: секрет, в репозитории его нет.
         // Свойство Gradle `hydraPrivateDns` или переменная окружения HYDRA_PRIVATE_DNS; пусто — пункт скрыт.
         val privateDns = ((project.findProperty("hydraPrivateDns") as String?) ?: System.getenv("HYDRA_PRIVATE_DNS") ?: "")
@@ -132,10 +132,15 @@ android {
         from(rootProject.file("shared/src/commonMain/kotlin/ru/gidravpn/hydra/vpn/pptp"))
         into(layout.buildDirectory.dir("generated/sharedRouter/ru/gidravpn/hydra/vpn/pptp"))
     }
+    // «Мои серверы» (пакет ru.gidravpn.hydra.servers, 0.8.0): SSH, установщик AmneziaWG — общие с ПК.
+    val syncSharedServers = tasks.register<Sync>("syncSharedServers") {
+        from(rootProject.file("shared/src/commonMain/kotlin/ru/gidravpn/hydra/servers"))
+        into(layout.buildDirectory.dir("generated/sharedRouter/ru/gidravpn/hydra/servers"))
+    }
     // Копии должны появиться до любой задачи, читающей исходники (Kotlin, KSP/KAPT, lint).
     tasks.configureEach {
         if (!name.startsWith("syncShared") && (name.startsWith("compile") || name.startsWith("ksp") ||
-                name.startsWith("kapt") || name.startsWith("lint"))) dependsOn(syncSharedRouter, syncSharedUpdate, syncSharedTgWs, syncSharedPptp)
+                name.startsWith("kapt") || name.startsWith("lint"))) dependsOn(syncSharedRouter, syncSharedUpdate, syncSharedTgWs, syncSharedPptp, syncSharedServers)
     }
     sourceSets {
         getByName("main") {
@@ -183,6 +188,8 @@ android {
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // jsch и bcprov (0.8.0) оба кладут OSGi-манифесты — в APK они не нужны
+        resources.excludes += "/META-INF/versions/**/OSGI-INF/MANIFEST.MF"
         // Требование AGP при android:extractNativeLibs="true" (см. AndroidManifest.xml).
         jniLibs.useLegacyPackaging = true
     }
@@ -354,6 +361,10 @@ dependencies {
 
     // DataStore (настройки протоколов)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // SSH для «Моих серверов» (0.8.0). BouncyCastle нужен JSch на Android: ed25519/curve25519/chacha20 там не встроены.
+    implementation("com.github.mwiede:jsch:0.2.20")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
 
     // Сеть (загрузка подписок)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
