@@ -68,15 +68,21 @@ object UpdateFeed {
             val d = r.getOrElse(i) { 0 } - c.getOrElse(i) { 0 }
             if (d != 0) return d > 0
         }
-        // Одинаковые номера: выпуск новее своего пре-релиза (0.8.0 > 0.8.0-rc1), пре-релизы между собой — по номеру rc.
-        fun pre(v: String) = Regex("-(?:rc|beta|alpha)(\\d*)", RegexOption.IGNORE_CASE).find(v)?.let { it.groupValues[1].toIntOrNull() ?: 0 }
-        val rp = pre(remote)
-        val cp = pre(current)
+        // Одинаковые номера: a < b < rcN < выпуск (0.8.0 > 0.8.0-rc1 > 0.8.0-b > 0.8.0-a); «-stub» и «-dev» пре-релизами не считаются.
+        val rp = preKey(remote)
+        val cp = preKey(current)
         return when {
             rp == null && cp != null -> true
             rp != null && cp != null -> rp > cp
             else -> false
         }
+    }
+
+    /** Вес пре-релиза: стадия (a=0, b=1, rc=2) * 1000 + номер; null — обычный выпуск. */
+    internal fun preKey(v: String): Int? {
+        val m = Regex("-(alpha|beta|rc|a|b)(\\d*)(?=$|-)", RegexOption.IGNORE_CASE).find(v) ?: return null
+        val stage = when (m.groupValues[1].lowercase()) { "a", "alpha" -> 0; "b", "beta" -> 1; else -> 2 }
+        return stage * 1000 + (m.groupValues[2].toIntOrNull() ?: 0)
     }
 
     // ------------------------------------------------------------ выбор файла

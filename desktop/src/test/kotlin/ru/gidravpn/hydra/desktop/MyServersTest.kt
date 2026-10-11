@@ -149,6 +149,11 @@ class PreReleaseVersionTest {
         kotlin.test.assertTrue(!newer("0.8.0-rc1", "0.8.0-rc1"))
         kotlin.test.assertTrue(newer("0.8.0-rc1", "0.7.20"))
         kotlin.test.assertTrue(!newer("0.7.20", "0.8.0-rc1"))
+        // альфа < бета < rc < выпуск (схема версий, ROADMAP)
+        kotlin.test.assertTrue(newer("0.8.1-b", "0.8.1-a") && newer("0.8.1-rc1", "0.8.1-b2") && newer("0.8.1", "0.8.1-rc3"))
+        kotlin.test.assertTrue(!newer("0.8.1-a", "0.8.1-b") && !newer("0.8.1-b", "0.8.1-rc1") && !newer("0.8.1-a", "0.8.1-a"))
+        kotlin.test.assertTrue(newer("0.8.1-a2", "0.8.1-a") && newer("0.8.1-a", "0.8.0"))
+        kotlin.test.assertTrue(newer("0.8.1", "0.8.1-a-stub") && !newer("0.8.1-a", "0.8.1-a-stub"))
         // старые суффиксы не стали пре-релизами
         kotlin.test.assertTrue(!newer("0.7.20", "0.7.20-stub"))
         kotlin.test.assertTrue(newer("0.7.21", "0.7.20-stub"))
