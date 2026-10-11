@@ -22,9 +22,11 @@ class ServerForm(
     val mailru: String = "",
     val cupsonline: String = "",
     val autoupdate: Boolean = true,
+    /** Панель 3x-ui: порт доступа (инбаунд VLESS+Reality), по умолчанию 443. */
+    val accessPort: Int = 443,
 )
 
-enum class ServerKind { AMNEZIAWG, OPENFLUX }
+enum class ServerKind { AMNEZIAWG, OPENFLUX, PANEL_3XUI }
 
 enum class Stage { IDLE, CONFIRM_FINGERPRINT, READY, RUNNING, DONE, FAILED }
 
@@ -60,6 +62,7 @@ class MyServersManager(
     private var form: ServerForm? = null
     private var session: SshSession? = null
     private var installer: Installer? = null
+    private var xuiTag = ""
 
     private fun log(l: String) = _ui.update { it.copy(log = (it.log + l).takeLast(400)) }
     private fun fail(msg: String) {
@@ -90,9 +93,15 @@ class MyServersManager(
             try {
                 val s = SshConnector.connect(f.target, fp); session = s
                 val pre = service.preflight(s, if (f.kind == ServerKind.AMNEZIAWG) f.awgPort else 0)
-                val preview = if (f.kind == ServerKind.AMNEZIAWG)
-                    service.planPreview(AwgServerSpec.create(f.target.host, f.awgPort, f.generation), pre, f.openFirewall)
-                else service.planPreviewOfx(OfxNodeSpec(f.target.host, f.channel, 0, "•".repeat(64), f.vyandex, f.mailru, f.cupsonline, f.autoupdate))
+                val preview = when (f.kind) {
+                    ServerKind.AMNEZIAWG -> service.planPreview(AwgServerSpec.create(f.target.host, f.awgPort, f.generation), pre, f.openFirewall)
+                    ServerKind.OPENFLUX -> service.planPreviewOfx(OfxNodeSpec(f.target.host, f.channel, 0, "•".repeat(64), f.vyandex, f.mailru, f.cupsonline, f.autoupdate))
+                    ServerKind.PANEL_3XUI -> {
+                        _ui.update { it.copy(progress = "Узнаю последнюю версию 3x-ui…") }
+                        xuiTag = XuiPanel.latestTag()
+                        service.planPreviewXui(xuiTag, f.openFirewall, pre)
+                    }
+                }
                 _ui.update { it.copy(stage = Stage.READY, busy = false, preflight = pre, plan = preview, progress = "") }
             } catch (e: Exception) { fail("Вход не удался: ${e.message}") }
         }
@@ -107,14 +116,17 @@ class MyServersManager(
         _ui.update { it.copy(stage = Stage.RUNNING, busy = true, log = emptyList(), error = null) }
         scope.launch(Dispatchers.IO) {
             val mk: (SshSession, Collection<String>) -> Installer = { ssh, secrets -> Installer(ssh, secrets, ::onEvent).also { installer = it } }
-            val res = if (f.kind == ServerKind.AMNEZIAWG)
-                service.deployAwg(s, f.target, fp, f.name, f.generation, f.awgPort, f.openFirewall, pre, mk)
-            else service.deployOfx(s, f.target, fp, f.name, f.channel, f.vyandex, f.mailru, f.cupsonline, f.autoupdate, mk, ::log)
+            val res = when (f.kind) {
+                ServerKind.AMNEZIAWG -> service.deployAwg(s, f.target, fp, f.name, f.generation, f.awgPort, f.openFirewall, pre, mk)
+                ServerKind.OPENFLUX -> service.deployOfx(s, f.target, fp, f.name, f.channel, f.vyandex, f.mailru, f.cupsonline, f.autoupdate, mk, ::log)
+                ServerKind.PANEL_3XUI -> service.deployXui(s, f.target, fp, f.name, xuiTag, f.accessPort, f.openFirewall, pre, mk, ::log)
+            }
             when (res) {
                 is DeployResult.Ok -> {
                     save(servers() + res.server)
                     res.server.awg?.let { spec -> importConf(res.server.name, spec.clientConf(res.server.clients.first())) }
                     res.server.ofx?.let { importConf(res.server.name, it.shareLink(res.server.name)) }
+                    res.links.forEach { importConf(res.server.name, it) }
                     closeSession(); form = null
                     _ui.update { it.copy(stage = Stage.DONE, busy = false, progress = "Готово: сервер добавлен в «Серверы»") }
                 }
@@ -160,7 +172,23 @@ class MyServersManager(
         }
     }
 
-    fun removeClient(id: String, login: SshTarget, name: String) = withServer(id, login) { s, _, inst -> service.removeClient(s, name, inst) }
+    fun removeClient(id: String, login: SshTarget, name: String) = withServer(id, login) { s, ssh, inst ->
+        if (s.panel != null) { service.removePanelClient(ssh, s, name); s.copy(panel = s.panel) } else service.removeClient(s, name, inst)
+    }
+
+    /** Панель: новый клиент (ссылка показывается в окне, можно добавить в «Серверы»). */
+    fun addPanelClient(id: String, login: SshTarget, email: String) = withServer(id, login) { s, ssh, _ ->
+        val links = service.addPanelClient(ssh, s, email)
+        if (links.isNullOrEmpty()) null else { _ui.update { it.copy(shown = email to links.joinToString("
+")) }; s }
+    }
+
+    /** Панель: ссылки уже созданного клиента. */
+    fun showPanelLinks(id: String, login: SshTarget, email: String) = withServer(id, login) { s, ssh, _ ->
+        val links = service.panelLinks(ssh, s, email)
+        if (links.isEmpty()) null else { _ui.update { it.copy(shown = email to links.joinToString("
+")) }; s }
+    }
 
     /** Удалить сервер: со своей машины снимаем службу и файлы, из приложения — запись. */
     fun uninstall(id: String, login: SshTarget) {
@@ -169,8 +197,9 @@ class MyServersManager(
         scope.launch(Dispatchers.IO) {
             try {
                 SshConnector.connect(login, srv.fingerprint).use { ssh ->
-                    val inst = Installer(ssh, listOf(login.password.orEmpty(), srv.ofx?.key.orEmpty()), ::onEvent)
-                    if (if (srv.ofx != null) service.uninstallOfx(srv, inst) else service.uninstall(srv, inst)) save(servers().filterNot { it.id == id })
+                    val inst = Installer(ssh, listOf(login.password.orEmpty(), srv.ofx?.key.orEmpty(), srv.panel?.token.orEmpty(), srv.panel?.password.orEmpty()), ::onEvent)
+                    val done = when { srv.ofx != null -> service.uninstallOfx(srv, inst); srv.panel != null -> service.uninstallXui(inst); else -> service.uninstall(srv, inst) }
+                    if (done) save(servers().filterNot { it.id == id })
                     else _ui.update { it.copy(error = it.error ?: "Не удалось удалить") }
                 }
             } catch (e: Exception) { _ui.update { it.copy(error = "Ошибка SSH: ${e.message}") } }

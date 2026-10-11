@@ -18,6 +18,8 @@ data class MyServer(
     val awg: AwgServerSpec? = null,
     /** Узел OpenFlux (0.8.0); у сервера либо [awg], либо [ofx]. */
     val ofx: OfxNodeSpec? = null,
+    /** Панель 3x-ui (0.8.1-a); токен API и пароль хранятся так же, как ключи AmneziaWG. */
+    val panel: PanelInstance? = null,
     val clients: List<AwgClient> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
 ) {
@@ -31,6 +33,7 @@ data class MyServer(
                     .put("subnet", a.subnet).put("dns", a.dns).put("mtu", a.mtu).put("iface", a.iface))
             }
             ofx?.let { o.put("ofx", it.toJson()) }
+            panel?.let { o.put("panel", it.toJson()) }
             o.put("clients", JSONArray(clients.map {
                 JSONObject().put("name", it.name).put("priv", it.privateKey).put("pub", it.publicKey)
                     .put("psk", it.presharedKey).put("addr", it.address)
@@ -51,7 +54,7 @@ data class MyServer(
             val cl = o.optJSONArray("clients") ?: JSONArray()
             return MyServer(
                 o.getString("id"), o.getString("name"), o.getString("host"), o.optInt("sshPort", 22),
-                o.optString("sshUser", "root"), o.getString("fingerprint"), awg, o.optJSONObject("ofx")?.let(OfxNodeSpec::fromJson),
+                o.optString("sshUser", "root"), o.getString("fingerprint"), awg, o.optJSONObject("ofx")?.let(OfxNodeSpec::fromJson), o.optJSONObject("panel")?.let(PanelInstance::fromJson),
                 (0 until cl.length()).map { cl.getJSONObject(it) }.map {
                     AwgClient(it.getString("name"), it.getString("priv"), it.getString("pub"), it.getString("psk"), it.getString("addr"))
                 },
