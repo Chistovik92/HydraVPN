@@ -188,6 +188,8 @@ android {
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // jsch и bcprov (0.8.0) оба кладут OSGi-манифесты — в APK они не нужны
+        resources.excludes += "/META-INF/versions/**/OSGI-INF/MANIFEST.MF"
         // Требование AGP при android:extractNativeLibs="true" (см. AndroidManifest.xml).
         jniLibs.useLegacyPackaging = true
     }
