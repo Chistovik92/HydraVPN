@@ -48,7 +48,7 @@ class MyServersViewModel(app: Application) : AndroidViewModel(app) {
             // Только в debug-сборке: пакет из каталога приложения (проверка без опубликованного релиза).
             val dev = File(app.filesDir, "awg-bundle/$arch")
             if (BuildConfig.DEBUG && dev.isDirectory) AwgBundleLoader.fromDir(arch, dev)
-            else AwgBundleLoader.download(BuildConfig.VERSION_NAME.substringBefore('-'), arch)
+            else AwgBundleLoader.download(BuildConfig.VERSION_NAME.removeSuffix("-stub"), arch)
         },
         importConf = { name, conf -> importConf(name, conf) },
     )

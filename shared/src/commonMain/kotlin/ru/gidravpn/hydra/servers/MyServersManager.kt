@@ -15,7 +15,16 @@ class ServerForm(
     val generation: AwgGeneration = AwgGeneration.V2_0,
     val awgPort: Int = 51820,
     val openFirewall: Boolean = false,
+    val kind: ServerKind = ServerKind.AMNEZIAWG,
+    /** Узел OpenFlux: имя канала и необязательные транспорты (direct есть всегда). */
+    val channel: String = "hydra",
+    val vyandex: String = "",
+    val mailru: String = "",
+    val cupsonline: String = "",
+    val autoupdate: Boolean = true,
 )
+
+enum class ServerKind { AMNEZIAWG, OPENFLUX }
 
 enum class Stage { IDLE, CONFIRM_FINGERPRINT, READY, RUNNING, DONE, FAILED }
 
@@ -80,8 +89,10 @@ class MyServersManager(
         scope.launch(Dispatchers.IO) {
             try {
                 val s = SshConnector.connect(f.target, fp); session = s
-                val pre = service.preflight(s, f.awgPort)
-                val preview = service.planPreview(AwgServerSpec.create(f.target.host, f.awgPort, f.generation), pre, f.openFirewall)
+                val pre = service.preflight(s, if (f.kind == ServerKind.AMNEZIAWG) f.awgPort else 0)
+                val preview = if (f.kind == ServerKind.AMNEZIAWG)
+                    service.planPreview(AwgServerSpec.create(f.target.host, f.awgPort, f.generation), pre, f.openFirewall)
+                else service.planPreviewOfx(OfxNodeSpec(f.target.host, f.channel, 0, "•".repeat(64), f.vyandex, f.mailru, f.cupsonline, f.autoupdate))
                 _ui.update { it.copy(stage = Stage.READY, busy = false, preflight = pre, plan = preview, progress = "") }
             } catch (e: Exception) { fail("Вход не удался: ${e.message}") }
         }
@@ -95,13 +106,15 @@ class MyServersManager(
         val fp = _ui.value.fingerprint
         _ui.update { it.copy(stage = Stage.RUNNING, busy = true, log = emptyList(), error = null) }
         scope.launch(Dispatchers.IO) {
-            val res = service.deployAwg(s, f.target, fp, f.name, f.generation, f.awgPort, f.openFirewall, pre) { ssh, secrets ->
-                Installer(ssh, secrets, ::onEvent).also { installer = it }
-            }
+            val mk: (SshSession, Collection<String>) -> Installer = { ssh, secrets -> Installer(ssh, secrets, ::onEvent).also { installer = it } }
+            val res = if (f.kind == ServerKind.AMNEZIAWG)
+                service.deployAwg(s, f.target, fp, f.name, f.generation, f.awgPort, f.openFirewall, pre, mk)
+            else service.deployOfx(s, f.target, fp, f.name, f.channel, f.vyandex, f.mailru, f.cupsonline, f.autoupdate, mk, ::log)
             when (res) {
                 is DeployResult.Ok -> {
                     save(servers() + res.server)
                     res.server.awg?.let { spec -> importConf(res.server.name, spec.clientConf(res.server.clients.first())) }
+                    res.server.ofx?.let { importConf(res.server.name, it.shareLink(res.server.name)) }
                     closeSession(); form = null
                     _ui.update { it.copy(stage = Stage.DONE, busy = false, progress = "Готово: сервер добавлен в «Серверы»") }
                 }
@@ -156,7 +169,8 @@ class MyServersManager(
         scope.launch(Dispatchers.IO) {
             try {
                 SshConnector.connect(login, srv.fingerprint).use { ssh ->
-                    if (service.uninstall(srv, Installer(ssh, listOf(login.password.orEmpty()), ::onEvent))) save(servers().filterNot { it.id == id })
+                    val inst = Installer(ssh, listOf(login.password.orEmpty(), srv.ofx?.key.orEmpty()), ::onEvent)
+                    if (if (srv.ofx != null) service.uninstallOfx(srv, inst) else service.uninstall(srv, inst)) save(servers().filterNot { it.id == id })
                     else _ui.update { it.copy(error = it.error ?: "Не удалось удалить") }
                 }
             } catch (e: Exception) { _ui.update { it.copy(error = "Ошибка SSH: ${e.message}") } }
@@ -169,6 +183,7 @@ class MyServersManager(
 
     fun clientConf(id: String, clientName: String): String? {
         val s = servers().firstOrNull { it.id == id } ?: return null
+        s.ofx?.let { return it.shareLink(s.name) }
         val c = s.clients.firstOrNull { it.name == clientName } ?: return null
         return s.awg?.clientConf(c)
     }

@@ -31,7 +31,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
         val inst = installer(ssh, listOf(spec.privateKey, first.privateKey, first.presharedKey, target.password.orEmpty(), target.privateKey.orEmpty()))
         val ok = inst.run(AwgInstallPlan.steps(spec, listOf(first), bundle, openFirewall, pre.firewall))
         if (!ok) return DeployResult.Failed("Установка остановлена")
-        return DeployResult.Ok(MyServer(UUID.randomUUID().toString(), name, target.host, target.port, target.user, fingerprint, spec, listOf(first)))
+        return DeployResult.Ok(MyServer(UUID.randomUUID().toString(), name, target.host, target.port, target.user, fingerprint, awg = spec, clients = listOf(first)))
     }
 
     fun addClient(ssh: SshSession, s: MyServer, name: String, installer: Installer): Pair<MyServer, AwgClient>? {
@@ -52,6 +52,35 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
 
     fun uninstall(s: MyServer, installer: Installer): Boolean = s.awg?.let { installer.run(AwgInstallPlan.uninstallSteps(it)) } ?: false
 
+
+    /** Что будет выполнено при установке узла OpenFlux — для показа до запуска (порт выберет `plan` на сервере). */
+    fun planPreviewOfx(spec: OfxNodeSpec): List<Step> = OpenFluxNode.fetchSteps() +
+        Step("ofx-plan", "Спросить у скрипта план установки и порт (ничего не меняет)", "sh ${OpenFluxNode.SCRIPT} plan") +
+        OpenFluxNode.applySteps(spec)
+
+    fun deployOfx(
+        ssh: SshSession, target: SshTarget, fingerprint: String, name: String, channel: String,
+        vyandex: String, mailru: String, cupsonline: String, autoupdate: Boolean,
+        installer: (SshSession, Collection<String>) -> Installer, onLog: (String) -> Unit,
+    ): DeployResult {
+        val key = OfxNodeSpec.newKey()
+        var spec = OfxNodeSpec(target.host, channel, 0, key, vyandex, mailru, cupsonline, autoupdate)
+        val inst = installer(ssh, listOf(key, target.password.orEmpty(), target.privateKey.orEmpty()))
+        if (!inst.run(OpenFluxNode.fetchSteps())) return DeployResult.Failed("Установка остановлена")
+        // plan: только чтение; порт выбирает скрипт (свободный и не занятый другими каналами)
+        val cfg = "/tmp/.hydra-ofx-plan.cfg"
+        ssh.upload(spec.config(false).toByteArray(), cfg, 384)
+        val plan = ssh.exec(OpenFluxNode.planCommand(cfg))
+        val port = OpenFluxNode.portOfPlan(plan.out)
+            ?: return DeployResult.Failed(OpenFluxNode.errorOf(plan.out) ?: "Скрипт не предложил порт: ${plan.out.trim().takeLast(200)}")
+        onLog("Порт узла: $port/tcp")
+        spec = spec.copy(port = port)
+        if (!inst.run(OpenFluxNode.applySteps(spec))) return DeployResult.Failed("Установка остановлена")
+        return DeployResult.Ok(MyServer(UUID.randomUUID().toString(), name, target.host, target.port, target.user, fingerprint, ofx = spec))
+    }
+
+    fun uninstallOfx(s: MyServer, installer: Installer): Boolean =
+        s.ofx?.let { installer.run(OpenFluxNode.removeSteps(it.channel)) } ?: false
     private fun Map<String, BundleFile>.withDummy(): Map<String, BundleFile> =
         listOf("amneziawg-go", "awg", "awg-quick").associateWith { BundleFile(it, ByteArray(0), "") }
 }

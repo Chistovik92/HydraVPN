@@ -134,7 +134,7 @@ object PreflightCheck {
         append("echo OS=\$(. /etc/os-release 2>/dev/null && echo \"\$PRETTY_NAME\"); ")
         append("echo UID=\$(id -u); ")
         append("echo SYSTEMD=\$([ -d /run/systemd/system ] && echo 1 || echo 0); ")
-        append("echo PORTBUSY=\$( (ss -lunH 2>/dev/null; ss -ltnH 2>/dev/null) | grep -c \":$port \"); ")
+        if (port > 0) append("echo PORTBUSY=$( (ss -lunH 2>/dev/null; ss -ltnH 2>/dev/null) | grep -c \":$port \"); ") else append("echo PORTBUSY=0; ")
         append("echo NET=\$( (curl -fsS -m 6 -o /dev/null https://github.com 2>/dev/null || wget -q -T 6 -O /dev/null https://github.com 2>/dev/null) && echo 1 || echo 0); ")
         append("echo FW=\$(if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q active; then echo ufw; ")
         append("elif command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then echo firewalld; else echo none; fi)")

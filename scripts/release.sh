@@ -245,7 +245,8 @@ git push origin "$TAG"
 if "$GH" release view "$TAG" >/dev/null 2>&1; then
   "$GH" release upload "$TAG" "${FULL_APKS[@]}" "$STUB_APK" --clobber
 else
-  "$GH" release create "$TAG" "${FULL_APKS[@]}" "$STUB_APK" --draft \
+  PRE=(); [[ "$VERSION" == *-* ]] && PRE=(--prerelease)   # 0.8.0-rc1 и т. п.: пре-релиз, не «последний»
+  "$GH" release create "$TAG" "${FULL_APKS[@]}" "$STUB_APK" --draft ${PRE[@]+"${PRE[@]}"} \
     --title "Hydra $VERSION" --notes-file "$NOTES_FILE"
 fi
 echo "    черновик $TAG с APK создан; остальные платформы собирает release.yml"

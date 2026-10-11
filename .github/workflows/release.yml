@@ -122,4 +122,10 @@ jobs:
           echo "Все платформы на месте, ядро в full-APK есть."
 
       - name: Опубликовать
-        run: gh release edit "$TAG" --draft=false --latest --repo "$GITHUB_REPOSITORY"
+        run: |
+          # Пре-релиз (0.8.0-rc1) публикуется как пре-релиз и не становится «последним»: приложения предлагают обновление только до выпусков.
+          if [[ "$VERSION" == *-* ]]; then
+            gh release edit "$TAG" --draft=false --prerelease --repo "$GITHUB_REPOSITORY"
+          else
+            gh release edit "$TAG" --draft=false --prerelease=false --latest --repo "$GITHUB_REPOSITORY"
+          fi
