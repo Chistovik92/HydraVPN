@@ -51,7 +51,21 @@ object SshConnector {
     fun fingerprint(key: ByteArray): String =
         "SHA256:" + Base64.getEncoder().withoutPadding().encodeToString(java.security.MessageDigest.getInstance("SHA-256").digest(key))
 
+    private val androidInit: Unit by lazy {
+        // На Android нет встроенных ed25519/curve25519/chacha20: используем реализации JSch на BouncyCastle (лёгкий API,
+        // без регистрации провайдера, поэтому не конфликтует с урезанным BC системы). На ПК (JDK 15+) не трогаем.
+        val android = System.getProperty("java.vendor")?.contains("Android", true) == true || System.getProperty("java.vm.name")?.contains("Dalvik", true) == true
+        if (android && runCatching { Class.forName("com.jcraft.jsch.bc.XDH") }.isSuccess) {
+            JSch.setConfig("keypairgen.eddsa", "com.jcraft.jsch.bc.KeyPairGenEdDSA")
+            JSch.setConfig("ssh-ed25519", "com.jcraft.jsch.bc.SignatureEd25519")
+            JSch.setConfig("ssh-ed448", "com.jcraft.jsch.bc.SignatureEd448")
+            JSch.setConfig("xdh", "com.jcraft.jsch.bc.XDH")
+            JSch.setConfig("chacha20-poly1305@openssh.com", "com.jcraft.jsch.bc.ChaCha20Poly1305")
+        }
+    }
+
     private fun newSession(t: SshTarget, repo: HostKeyRepository): Session {
+        androidInit
         val jsch = JSch()
         jsch.hostKeyRepository = repo
         t.privateKey?.let { jsch.addIdentity("hydra", it.toByteArray(), null, t.keyPassphrase?.toByteArray()) }

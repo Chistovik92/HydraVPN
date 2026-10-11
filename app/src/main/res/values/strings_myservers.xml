@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- «Мои серверы» (0.8.0). Английский — по умолчанию; русский — values-ru; остальные языки пока на английском. -->
+<resources>
+    <string name="ms_title">My servers</string>
+    <string name="ms_open">My servers</string>
+    <string name="ms_back">Back</string>
+    <string name="ms_intro">Your own AmneziaWG server, deployed from the app over SSH. The SSH password is never saved; only the server key fingerprint is pinned.</string>
+    <string name="ms_empty">No servers yet. You need a VPS with Debian/Ubuntu (root, systemd) reachable over SSH.</string>
+    <string name="ms_add">Add server</string>
+    <string name="ms_close">Close</string>
+    <string name="ms_wizard_title">New AmneziaWG server</string>
+    <string name="ms_name">Name</string>
+    <string name="ms_name_default">My server</string>
+    <string name="ms_host">Server address (IP or name)</string>
+    <string name="ms_ssh_port">SSH port</string>
+    <string name="ms_user">User</string>
+    <string name="ms_password">Password</string>
+    <string name="ms_key">Or private SSH key (text, instead of password)</string>
+    <string name="ms_generation">Generation</string>
+    <string name="ms_awg_port">UDP port</string>
+    <string name="ms_open_fw">Open the port in ufw/firewalld (only if the firewall is on)</string>
+    <string name="ms_connect">Connect</string>
+    <string name="ms_gen_1_0">1.0: Jc, Jmin, Jmax, S1, S2, H1–H4. Works with any AmneziaWG client.</string>
+    <string name="ms_gen_1_5">1.5: parameters as in 1.0 (signature packets I1–I5 are not set); compatible with 1.0 and 1.5 clients.</string>
+    <string name="ms_gen_2_0">2.0: + S3, S4 and H1–H4 ranges. Needs a 2.0+ client (Hydra is fine).</string>
+    <string name="ms_gen_3">3.x: + HeaderProtectionKey, content padding, random trailers. Needs a 3.x client (Hydra is fine).</string>
+    <string name="ms_fp_text">SSH host key fingerprint. Compare it with your hosting panel (or run ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub on the server); later connections are allowed only with this key.</string>
+    <string name="ms_trust">Trust and sign in</string>
+    <string name="ms_cancel">Cancel</string>
+    <string name="ms_server_info">Server: %1$s · %2$s · root=%3$s · systemd=%4$s · port free=%5$s · internet=%6$s · firewall=%7$s</string>
+    <string name="ms_yes">yes</string>
+    <string name="ms_no">no</string>
+    <string name="ms_plan">What will be run on the server:</string>
+    <string name="ms_upload_to">upload → %1$s</string>
+    <string name="ms_install">Install</string>
+    <string name="ms_stop">Stop</string>
+    <string name="ms_done">Done</string>
+    <string name="ms_fingerprint">SSH fingerprint: %1$s</string>
+    <string name="ms_server_line">%1$s:%2$d · AmneziaWG %3$s · UDP %4$d</string>
+    <string name="ms_show_conf">Config</string>
+    <string name="ms_delete">Delete</string>
+    <string name="ms_add_client">Add client</string>
+    <string name="ms_uninstall">Delete server</string>
+    <string name="ms_forget">Remove from list</string>
+    <string name="ms_new_client">New client</string>
+    <string name="ms_client_name">Name (Latin letters)</string>
+    <string name="ms_next">Next</string>
+    <string name="ms_uninstall_q">Delete server “%1$s”?</string>
+    <string name="ms_uninstall_msg">The hydra-awg service, config and AmneziaWG binaries will be stopped and removed on %1$s. Client profiles will stop working.</string>
+    <string name="ms_login_for">Sign in to %1$s@%2$s:%3$d (credentials are not saved)</string>
+    <string name="ms_or_key">or SSH key</string>
+    <string name="ms_run">Run</string>
+    <string name="ms_client_title">Client “%1$s”</string>
+    <string name="ms_client_hint">A .conf file: Hydra imports it directly; the official AmneziaWG app takes it as a file.</string>
+    <string name="ms_copy">Copy</string>
+    <string name="ms_copied">Config copied</string>
+    <string name="ms_add_to_servers">Add to Servers</string>
+    <string name="ms_added">Server “%1$s” added</string>
+    <string name="ms_act_remove_client">Remove client “%1$s”</string>
+    <string name="ms_act_add_client">Add client “%1$s”</string>
+</resources>
