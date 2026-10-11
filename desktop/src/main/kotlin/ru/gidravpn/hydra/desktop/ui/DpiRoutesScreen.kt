@@ -15,6 +15,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import ru.gidravpn.hydra.desktop.Status
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -525,4 +528,38 @@ internal fun TelegramProxySection(c: AppController, ui: UiState, compact: Boolea
         Text("Прокси работает, пока Hydra подключена.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     Section("Telegram через локальный прокси") { body() }
+}
+
+/**
+ * Карточка Telegram на главном экране (0.8.0): всегда на виду. Переключатель «Telegram по WebSocket» и кнопка
+ * «Подключить Telegram к прокси» — для TG WS или обхода DPI (ByeDPI); без подключения кнопка неактивна, и сказано почему.
+ */
+@Composable
+internal fun TelegramHomeCard(c: AppController, ui: UiState) {
+    val routes = ui.data.settings.routing.routes
+    val tgOn = TgWsPreset.isApplied(routes.rules)
+    val byeDpi = routes.dpi.enabled || ui.selected?.protocolId == ru.gidravpn.hydra.data.model.Protocol.BYEDPI.id
+    val hasProxy = tgOn || byeDpi
+    val connected = ui.status == Status.CONNECTED
+    val port = remember(routes) { c.telegramProxyPort() }
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Telegram", style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Telegram по WebSocket (TG WS)", Modifier.weight(1f))
+                Switch(checked = tgOn, onCheckedChange = { c.toggleTgWsPreset() })
+            }
+            if (hasProxy) {
+                Text("Адрес 127.0.0.1:$port (${if (tgOn) "MTProto-прокси" else "SOCKS5"}) · ${if (tgOn) "Telegram по WebSocket" else "обход DPI"}",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text("Включите TG WS (или обход DPI во вкладке «Маршруты»), и Telegram будет подключаться через локальный прокси Hydra.",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Button(onClick = { c.openTelegramProxy(port) }, enabled = hasProxy && connected) { Text("Подключить Telegram к прокси") }
+            if (hasProxy && !connected) {
+                Text("Сначала подключитесь: прокси работает, пока Hydra подключена.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
 }

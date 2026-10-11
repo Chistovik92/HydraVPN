@@ -57,8 +57,8 @@ fun AppTheme.colors(): ThemeColors = when (this) {
         danger = 0xFFEF4444, warn = 0xFFEAB308,
     )
     AppTheme.AMOLED -> ThemeColors(
-        bg = 0xFF000000, surface = 0xFF000000, surfaceVariant = 0xFF0A0F11,
-        text = 0xFFF1F5F9, textSecondary = 0xFF94A3B8,
+        bg = 0xFF000000, surface = 0xFF000000, surfaceVariant = 0xFF111A1D,
+        text = 0xFFFFFFFF, textSecondary = 0xFFCBD5E1,
         accent = 0xFF00E599, onAccent = 0xFF00281A, accentSecondary = 0xFF38BDF8,
         danger = 0xFFEF4444, warn = 0xFFEAB308,
     )
