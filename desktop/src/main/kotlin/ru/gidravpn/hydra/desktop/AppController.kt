@@ -141,6 +141,18 @@ class AppController(
         toast = ::toast,
     )
 
+    /** Свои серверы (0.8.0): мастер развёртывания и управление по SSH. Пакет с бинарями берётся из релиза Hydra той же версии. */
+    val myServers = ru.gidravpn.hydra.servers.MyServersManager(
+        scope,
+        servers = { _ui.value.data.myServers },
+        save = { list -> mutate { it.copy(myServers = list) } },
+        bundleFor = { arch ->
+            System.getenv("HYDRA_AWG_BUNDLE")?.let { ru.gidravpn.hydra.servers.AwgBundleLoader.fromDir(arch, File(it)) }
+                ?: ru.gidravpn.hydra.servers.AwgBundleLoader.download(Platform.version, arch)
+        },
+        importConf = { name, conf -> import(conf); toast("Сервер «$name» добавлен") },
+    )
+
     /** Номер сеанса ядра: колбэки и корутины старого сеанса ничего не меняют. */
     @Volatile private var session = 0
     /** Пользователь сам отключился — выход ядра не ошибка и не повод переподключаться. */

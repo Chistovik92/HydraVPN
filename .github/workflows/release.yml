@@ -28,12 +28,29 @@ jobs:
     with:
       package: true
 
+  awg-server:
+    # Серверные бинари AmneziaWG для «Моих серверов» (0.8.0): статические, три архитектуры.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - name: Кросс-компиляторы
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf zip
+      - name: Сборка
+        run: scripts/build-awg-server.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hydra-awg-server
+          path: dist/awg-release/*
+
   ios:
     uses: ./.github/workflows/ios.yml
     secrets: inherit
 
   publish:
-    needs: [ desktop, ios ]
+    needs: [ desktop, ios, awg-server ]
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
@@ -86,6 +103,8 @@ jobs:
             "Hydra-desktop-$VERSION-macos-arm64.dmg" "Hydra-desktop-$VERSION-macos-x64.dmg" \
             "Hydra-desktop-$VERSION-windows-x86-classic.zip" "Hydra-desktop-$VERSION-windows-x64-classic.zip" \
             "Hydra-desktop-$VERSION-linux-x86-classic.tar.gz" "Hydra-desktop-$VERSION-linux-armv7-classic.tar.gz" \
+            "Hydra-awg-server-$VERSION-amd64.zip" "Hydra-awg-server-$VERSION-arm64.zip" "Hydra-awg-server-$VERSION-armv7.zip" \
+            "Hydra-awg-server-$VERSION-amd64.zip.sha256" "Hydra-awg-server-$VERSION-arm64.zip.sha256" "Hydra-awg-server-$VERSION-armv7.zip.sha256" \
             "Hydra-ios-$VERSION-unsigned.ipa"; do
             if ! grep -qxF "$f" <<<"$have"; then echo "::error::нет $f"; missing=1; fi
           done

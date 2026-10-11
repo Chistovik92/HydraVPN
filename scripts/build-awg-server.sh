@@ -43,3 +43,13 @@ done
 
 ( cd "$OUT" && find . -type f ! -name SHA256SUMS | sort | xargs sha256sum > SHA256SUMS )
 echo "Готово: $OUT"; cat "$OUT/SHA256SUMS"
+
+# Пакеты для релиза: Hydra-awg-server-<версия>-<arch>.zip + .sha256 (их качает приложение, 0.8.0)
+VERSION="${VERSION:-$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)}"
+REL="$ROOT/dist/awg-release"; rm -rf "$REL"; mkdir -p "$REL"
+for arch in "${ARCHS[@]}"; do
+  z="$REL/Hydra-awg-server-$VERSION-$arch.zip"
+  ( cd "$OUT/$arch" && zip -q -X -j "$z" amneziawg-go awg awg-quick )
+  ( cd "$REL" && sha256sum "$(basename "$z")" > "$(basename "$z").sha256" )
+done
+echo "Пакеты релиза: $REL"; ls -l "$REL"
