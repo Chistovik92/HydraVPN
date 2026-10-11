@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -40,6 +41,8 @@ import ru.gidravpn.hydra.servers.AwgGeneration
 import ru.gidravpn.hydra.servers.MyServer
 import ru.gidravpn.hydra.servers.MyServersManager
 import ru.gidravpn.hydra.servers.ServerForm
+import ru.gidravpn.hydra.servers.ServerKind
+import ru.gidravpn.hydra.servers.OfxNodeSpec
 import ru.gidravpn.hydra.servers.SshTarget
 import ru.gidravpn.hydra.servers.Stage
 
@@ -99,7 +102,7 @@ internal fun MyServersScreen(c: AppController, ui: UiState) {
         AlertDialog(
             onDismissRequest = { confirm = null },
             title = { Text(n.title + "?") },
-            text = { Text("На сервере ${n.server.host} будут остановлены и удалены служба hydra-awg, конфиг и бинарники AmneziaWG. Профили клиентов перестанут работать.") },
+            text = { Text(if (n.server.ofx != null) "На сервере ${n.server.host} будут удалены канал узла OpenFlux, его служба и конфигурация. Профили, использующие этот узел, перестанут работать." else "На сервере ${n.server.host} будут остановлены и удалены служба hydra-awg, конфиг и бинарники AmneziaWG. Профили клиентов перестанут работать.") },
             confirmButton = { TextButton(onClick = { confirm = null; login = n }) { Text("Далее", color = Danger) } },
             dismissButton = { TextButton(onClick = { confirm = null }) { Text("Отмена") } },
         )
@@ -133,10 +136,11 @@ private fun ServerCard(
     srv: MyServer, m: MyServersManager, busy: Boolean,
     onAddClient: () -> Unit, onShow: (String) -> Unit, onRemoveClient: (String) -> Unit, onUninstall: () -> Unit, onForget: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(srv.name, style = MaterialTheme.typography.titleMedium)
-            Text("${srv.host}:${srv.sshPort} · AmneziaWG ${srv.awg?.generation?.label ?: "—"} · UDP ${srv.awg?.port ?: "—"}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(if (srv.ofx != null) "${srv.host}:${srv.sshPort} · узел OpenFlux «${srv.ofx!!.channel}» · порт ${srv.ofx!!.port}/tcp"
+                else "${srv.host}:${srv.sshPort} · AmneziaWG ${srv.awg?.generation?.label ?: "—"} · UDP ${srv.awg?.port ?: "—"}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Отпечаток SSH: ${srv.fingerprint}", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
             srv.clients.forEach { cl ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -145,8 +149,9 @@ private fun ServerCard(
                     TextButton(onClick = { onRemoveClient(cl.name) }, enabled = !busy && srv.clients.size > 1) { Text("Удалить", color = Danger) }
                 }
             }
+            if (srv.ofx != null) OutlinedButton(onClick = { onShow("") }) { Text("Ссылка openflux://") }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onAddClient, enabled = !busy) { Text("Добавить клиента") }
+                if (srv.ofx == null) OutlinedButton(onClick = onAddClient, enabled = !busy) { Text("Добавить клиента") }
                 OutlinedButton(onClick = onUninstall, enabled = !busy) { Text("Удалить сервер", color = Danger) }
                 TextButton(onClick = onForget, enabled = !busy) { Text("Убрать из списка") }
             }
@@ -165,16 +170,25 @@ private fun WizardCard(m: MyServersManager, s: ru.gidravpn.hydra.servers.MyServe
     var gen by remember { mutableStateOf(AwgGeneration.V2_0) }
     var awgPort by remember { mutableStateOf("51820") }
     var openFw by remember { mutableStateOf(false) }
+    var kind by remember { mutableStateOf(ServerKind.AMNEZIAWG) }
+    var channel by remember { mutableStateOf("hydra") }
+    var yandex by remember { mutableStateOf("") }
+    var mailru by remember { mutableStateOf("") }
 
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Новый сервер AmneziaWG", style = MaterialTheme.typography.titleMedium)
+            Text(if (kind == ServerKind.AMNEZIAWG) "Новый сервер AmneziaWG" else "Новый узел OpenFlux", style = MaterialTheme.typography.titleMedium)
             if (s.busy) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CircularProgressIndicator(Modifier.width(18.dp).height(18.dp), strokeWidth = 2.dp); Text(s.progress, fontSize = 13.sp)
             }
             when (s.stage) {
                 Stage.IDLE, Stage.FAILED -> {
                     s.error?.let { Text(it, color = Danger, fontSize = 13.sp) }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Что ставим:", fontSize = 13.sp)
+                        FilterChip(selected = kind == ServerKind.AMNEZIAWG, onClick = { kind = ServerKind.AMNEZIAWG }, label = { Text("AmneziaWG") })
+                        FilterChip(selected = kind == ServerKind.OPENFLUX, onClick = { kind = ServerKind.OPENFLUX }, label = { Text("Узел OpenFlux") })
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(name, { name = it.take(40) }, Modifier.weight(1f), singleLine = true, label = { Text("Название") })
                         OutlinedTextField(host, { host = it.trim() }, Modifier.weight(1f), singleLine = true, label = { Text("Адрес сервера (IP или имя)") })
@@ -186,12 +200,19 @@ private fun WizardCard(m: MyServersManager, s: ru.gidravpn.hydra.servers.MyServe
                             visualTransformation = PasswordVisualTransformation(), label = { Text("Пароль") })
                     }
                     OutlinedTextField(key, { key = it }, Modifier.fillMaxWidth().height(90.dp), label = { Text("Или закрытый SSH-ключ (текст, вместо пароля)") })
+                    if (kind == ServerKind.AMNEZIAWG) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("Поколение:", fontSize = 13.sp)
                         AwgGeneration.entries.forEach { g -> FilterChip(selected = gen == g, onClick = { gen = g }, label = { Text(g.label) }) }
                         OutlinedTextField(awgPort, { awgPort = it.filter(Char::isDigit).take(5) }, Modifier.width(120.dp), singleLine = true, label = { Text("UDP-порт") })
                     }
                     Text(genHint(gen), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                    Text("Узел (exit) OpenFlux ставится скриптом официального мастера «Своя нода» закреплённого коммита с проверкой SHA-256; порт выберет скрипт. Транспорты Яндекс / Mail.ru — по желанию, direct есть всегда.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedTextField(channel, { channel = it.lowercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' }.take(31) }, Modifier.width(260.dp), singleLine = true, label = { Text("Имя канала (a-z, 0-9, дефис)") })
+                    OutlinedTextField(yandex, { yandex = it.trim() }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Документ Яндекса https://docs.yandex.ru/edit/d/… (необязательно)") })
+                    OutlinedTextField(mailru, { mailru = it.trim() }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Публичный документ Mail.ru https://cloud.mail.ru/public/… (необязательно)") })
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(openFw, { openFw = it }); Text("Открыть порт в ufw/firewalld (только если файрвол включён)", fontSize = 13.sp)
                     }
@@ -199,10 +220,11 @@ private fun WizardCard(m: MyServersManager, s: ru.gidravpn.hydra.servers.MyServe
                     val aport = awgPort.toIntOrNull() ?: 0
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
-                            enabled = !s.busy && MyServersManager.validHost(host) && port in 1..65535 && aport in 1024..65535 && (password.isNotEmpty() || key.isNotBlank()),
+                            enabled = !s.busy && MyServersManager.validHost(host) && port in 1..65535 && (kind == ServerKind.OPENFLUX && OfxNodeSpec.validChannel(channel) || kind == ServerKind.AMNEZIAWG && aport in 1024..65535) && (password.isNotEmpty() || key.isNotBlank()),
                             onClick = {
                                 m.begin(ServerForm(name.ifBlank { host }, SshTarget(host, port, user.ifBlank { "root" },
-                                    password.takeIf { key.isBlank() && it.isNotEmpty() }, key.takeIf { it.isNotBlank() }), gen, aport, openFw))
+                                    password.takeIf { key.isBlank() && it.isNotEmpty() }, key.takeIf { it.isNotBlank() }), gen, aport, openFw,
+                                    kind, channel, yandex, mailru))
                             },
                         ) { Text("Подключиться") }
                         TextButton(onClick = onClose) { Text("Закрыть") }
@@ -262,7 +284,7 @@ private fun genHint(g: AwgGeneration) = when (g) {
 
 @Composable
 private fun LogBox(lines: List<String>) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         SelectionContainer {
             Column(Modifier.padding(8.dp).height(180.dp).verticalScroll(rememberScrollState(Int.MAX_VALUE))) {
                 lines.takeLast(200).forEach { Text(it, fontFamily = FontFamily.Monospace, fontSize = 11.sp) }

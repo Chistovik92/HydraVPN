@@ -73,7 +73,7 @@ class ScreenshotsTest {
             ),
             logs = listOf(RouterLogEntry("2026-10-02T12:00:01Z", "info", "subscription main refreshed: 12 nodes"), RouterLogEntry("2026-10-02T12:00:05Z", "info", "dns: 77.88.8.8 ok")),
         ))
-        val names = listOf("home", "servers", "subscriptions", "routing", "routers", "settings", "log")
+        val names = listOf("home", "servers", "subscriptions", "routing", "routers", "myservers", "settings", "log")
         for ((tab, name) in names.withIndex()) {
             val scene = ImageComposeScene(1100, 720, Density(1f)) {
                 val ui by c.ui.collectAsState()
@@ -93,6 +93,27 @@ class ScreenshotsTest {
             }
             scene.render(0)
             File(out, "desktop-home-${t.name.lowercase()}.png").writeBytes(scene.render(1_000_000_000L).encodeToData(EncodedImageFormat.PNG)!!.bytes)
+            scene.close()
+        }
+        // Все вкладки в AMOLED (читаемость текста на чёрном).
+        c.updateSettings { it.copy(theme = AppTheme.AMOLED) }
+        for ((tab, name) in names.withIndex()) {
+            val scene = ImageComposeScene(1100, 720, Density(1f)) {
+                val ui by c.ui.collectAsState()
+                HydraApp(c, ui, onRelaunchAdmin = {}, startTab = tab)
+            }
+            scene.render(0)
+            File(out, "desktop-amoled-$name.png").writeBytes(scene.render(1_000_000_000L).encodeToData(EncodedImageFormat.PNG)!!.bytes)
+            scene.close()
+        }
+        // Главная в полную высоту: карточка Telegram и кнопка администратора под основным содержимым.
+        run {
+            val scene = ImageComposeScene(1100, 1150, Density(1f)) {
+                val ui by c.ui.collectAsState()
+                HydraApp(c, ui, onRelaunchAdmin = {}, startTab = 0)
+            }
+            scene.render(0)
+            File(out, "desktop-amoled-home-tall.png").writeBytes(scene.render(1_000_000_000L).encodeToData(EncodedImageFormat.PNG)!!.bytes)
             scene.close()
         }
         scope.cancel()

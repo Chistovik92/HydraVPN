@@ -57,4 +57,13 @@
     <string name="ms_added">Сервер «%1$s» добавлен</string>
     <string name="ms_act_remove_client">Удалить клиента «%1$s»</string>
     <string name="ms_act_add_client">Добавить клиента «%1$s»</string>
+    <string name="ms_wizard_title_ofx">Новый узел OpenFlux</string>
+    <string name="ms_kind_ofx">Узел OpenFlux</string>
+    <string name="ms_ofx_hint">Узел (exit) ставится скриптом официального мастера «Своя нода» закреплённого коммита с проверкой SHA-256; порт выберет скрипт. Транспорты Яндекс / Mail.ru — по желанию, direct есть всегда.</string>
+    <string name="ms_ofx_channel">Имя канала (a-z, 0-9, дефис)</string>
+    <string name="ms_ofx_yandex">Документ Яндекса https://docs.yandex.ru/edit/d/… (необязательно)</string>
+    <string name="ms_ofx_mailru">Публичный документ Mail.ru (необязательно)</string>
+    <string name="ms_ofx_line">%1$s:%2$d · узел OpenFlux «%3$s» · порт %4$d/tcp</string>
+    <string name="ms_ofx_link">Ссылка openflux://</string>
+    <string name="ms_uninstall_msg_ofx">На %1$s будут удалены канал узла OpenFlux, его служба и конфигурация. Профили, использующие этот узел, перестанут работать.</string>
 </resources>

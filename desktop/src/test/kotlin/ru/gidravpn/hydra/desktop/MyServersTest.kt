@@ -167,7 +167,7 @@ class OfxNodeClientLiveTest {
         val link = System.getenv("HYDRA_OFX_LINK") ?: java.io.File("build/ofx-link.txt").takeIf { it.isFile }?.readText()
         val exe = listOf("openflux.exe", "openflux").flatMap { n -> java.io.File("build/hydra-app-resources").listFiles()?.map { java.io.File(it, n) }.orEmpty() }
             .firstOrNull { it.isFile }
-        org.junit.Assume.assumeTrue(link != null && exe != null)
+        org.junit.Assume.assumeTrue(System.getenv("HYDRA_OFX_CLIENT") != null && link != null && exe != null)
         val profile = ru.gidravpn.hydra.data.subscription.LinkParser.parseLine(link!!)!!
         val key = java.io.File.createTempFile("ofkey", ".txt").apply { deleteOnExit() }
         key.writeText(profile.uuidOrPassword)
