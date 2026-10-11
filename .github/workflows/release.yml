@@ -39,7 +39,7 @@ jobs:
       - name: Кросс-компиляторы
         run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf zip
       - name: Сборка
-        run: scripts/build-awg-server.sh
+        run: bash scripts/build-awg-server.sh
       - uses: actions/upload-artifact@v4
         with:
           name: hydra-awg-server
