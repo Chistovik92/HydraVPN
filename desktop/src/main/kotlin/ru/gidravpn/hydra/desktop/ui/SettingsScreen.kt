@@ -124,6 +124,11 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
                     "Если ядро остановилось, Hydra переподключится: через 2, 4, 8, 16, 30 с… до 10 попыток.") {
                     v -> c.updateSettings { it.copy(autoReconnect = v) }
                 }
+                ToggleRow("Трафик Hydra через VPN", s.appThroughVpn,
+                    "SSH к вашим серверам, загрузка подписок и обновления идут через туннель, пока VPN включён, — так открываются и серверы, " +
+                        "недоступные без VPN. Применяется при следующем подключении.") {
+                    v -> c.updateSettings { it.copy(appThroughVpn = v) }
+                }
                 ToggleRow("Подключаться при запуске Hydra", s.autoConnect, "К выбранному серверу, сразу после старта.") {
                     v -> c.updateSettings { it.copy(autoConnect = v) }
                 }

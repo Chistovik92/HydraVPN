@@ -481,6 +481,18 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             }
         }
 
+        // 0.8.0-rc3: собственный трафик Hydra (SSH «Моих серверов», подписки, обновления) идёт через туннель, иначе сервер,
+        // недоступный без VPN, не открывался и при включённом VPN. Вне туннеля приложение остаётся, только если без этого петля.
+        val appInTunnel = ru.gidravpn.hydra.data.repository.VpnSettingsRepository(applicationContext)
+            .appThroughVpn.firstOrNull() != false && run {
+            val routeCfg = ru.gidravpn.hydra.data.repository.RoutingRepository(applicationContext).routeConfig.firstOrNull()
+                ?: ru.gidravpn.hydra.data.routing.RouteConfig()
+            val serverRepo = ru.gidravpn.hydra.data.repository.ServerRepository(applicationContext)
+            !ru.gidravpn.hydra.vpn.core.AppTunnelPolicy.needsAppBypass(profile, routeCfg) { id -> kotlinx.coroutines.runBlocking { serverRepo.byId(id) } }
+        }
+        VpnState.log(if (appInTunnel) "Трафик самой Hydra (SSH, подписки) идёт через туннель"
+            else "Трафик самой Hydra идёт мимо туннеля (настройка выключена или режим с подпроцессами)")
+
         // Раздельное туннелирование (DataStore → правила VpnService.Builder)
         val split = ru.gidravpn.hydra.data.repository.SplitTunnelRepository(applicationContext)
             .settings.firstOrNull() ?: ru.gidravpn.hydra.data.model.SplitTunnel()
@@ -491,14 +503,14 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
                 if (added == 0) {
                     VpnState.log("Раздельное туннелирование: в списке нет доступных приложений — в туннель идёт только Hydra")
                     runCatching { builder.addAllowedApplication(packageName) }
-                }
+                } else if (appInTunnel) runCatching { builder.addAllowedApplication(packageName) }
             }
             ru.gidravpn.hydra.data.model.SplitTunnelMode.EXCLUDE -> {
                 split.packages.forEach { pkg -> runCatching { builder.addDisallowedApplication(pkg) } }
-                runCatching { builder.addDisallowedApplication(packageName) } // собственный трафик — мимо VPN
+                if (!appInTunnel) runCatching { builder.addDisallowedApplication(packageName) } // собственный трафик — мимо VPN
             }
             ru.gidravpn.hydra.data.model.SplitTunnelMode.OFF ->
-                runCatching { builder.addDisallowedApplication(packageName) } // не заворачиваем собственный трафик
+                if (!appInTunnel) runCatching { builder.addDisallowedApplication(packageName) } // не заворачиваем собственный трафик
         }
 
         val pfd = builder.establish() ?: error("Не удалось поднять tun (нет разрешения VPN?)")

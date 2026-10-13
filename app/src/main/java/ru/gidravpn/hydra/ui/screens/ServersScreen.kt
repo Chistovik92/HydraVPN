@@ -266,7 +266,9 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit, onMyServers: () -> 
     }
     if (showManual) AddServerDialog(
         onDismiss = { showManual = false },
-        onSave = { n, a, p, proto -> vm.addServer(n, a, p, proto); showManual = false }
+        onSaveProfile = { vm.addServer(it); showManual = false },
+        onSaveConf = { conf, name -> vm.importAuto(listOf(conf), name); showManual = false },
+        onOpenImport = { showManual = false; showImport = true }
     )
     if (showImport) ImportDialog(
         onDismiss = { showImport = false },
@@ -561,59 +563,13 @@ private fun GradientButton(text: String, modifier: Modifier = Modifier, onClick:
 }
 
 @Composable
-private fun OutlinedActionButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+internal fun OutlinedActionButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
         modifier.clip(RoundedCornerShape(12.dp)).background(CardBg)
             .border(1.dp, Border, RoundedCornerShape(12.dp))
             .clickableNoRipple(onClick).padding(vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) { Text(text, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
-}
-
-@Composable
-private fun AddServerDialog(onDismiss: () -> Unit, onSave: (String, String, Int, Protocol) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var addr by remember { mutableStateOf("") }
-    var port by remember { mutableStateOf("443") }
-    var proto by remember { mutableStateOf(Protocol.VLESS) }
-    var expanded by remember { mutableStateOf(false) }
-    val defaultServerName = stringResource(R.string.default_server_name)
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Surface,
-        title = { Text(stringResource(R.string.servers_new_title), color = TextPrimary) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Field(stringResource(R.string.field_name), name) { name = it }
-                Field(stringResource(R.string.field_address), addr) { addr = it }
-                Field(stringResource(R.string.field_port), port) { port = it.filter(Char::isDigit) }
-                Box {
-                    OutlinedActionButton(stringResource(R.string.servers_protocol, proto.displayName) + if (proto.beta) " [BETA]" else "", Modifier.fillMaxWidth()) { expanded = true }
-                    DropdownMenu(expanded, { expanded = false }) {
-                        Protocol.entries.forEach { p ->
-                            DropdownMenuItem(text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(p.displayName)
-                                    if (p.beta) {
-                                        Spacer(Modifier.width(6.dp))
-                                        BetaBadge()
-                                    }
-                                }
-                            },
-                                onClick = { proto = p; expanded = false })
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onSave(name.ifBlank { defaultServerName }, addr, port.toIntOrNull() ?: 443, proto) }) {
-                Text(stringResource(R.string.action_save), color = AccentCyan)
-            }
-        },
-        dismissButton = { TextButton(onDismiss) { Text(stringResource(R.string.action_cancel), color = TextMuted) } }
-    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -635,7 +591,7 @@ private fun ImportDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.import_hint),
                     color = TextMuted, fontSize = 12.sp)
-                Field(stringResource(R.string.import_link_field), value) { value = it }
+                MultilineField(stringResource(R.string.import_link_field), value) { value = it }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text(stringResource(R.string.import_paste), color = AccentCyan, fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,

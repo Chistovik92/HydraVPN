@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.DisposableEffect
+import ru.gidravpn.hydra.desktop.core.AppNet
 import ru.gidravpn.hydra.desktop.tray.TrayController
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -25,6 +26,7 @@ fun main(args: Array<String>) {
         javax.swing.JOptionPane.showMessageDialog(null, "Hydra уже запущена.", "Hydra", javax.swing.JOptionPane.INFORMATION_MESSAGE)
         exitProcess(0)
     }
+    AppNet.install()
     application(exitProcessOnExit = true) {
         val scope = rememberCoroutineScope()
         val controller = remember { AppController(scope) }

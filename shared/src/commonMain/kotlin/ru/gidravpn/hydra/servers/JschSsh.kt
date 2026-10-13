@@ -83,6 +83,8 @@ object SshConnector {
             override fun showMessage(m: String?) {}
         }
         s.setServerAliveInterval(20_000)
+        // ПК в режиме «прокси»: SSH идёт через локальный SOCKS5 ядра, иначе сервер, закрытый без VPN, не открылся бы и с VPN.
+        AppProxy.port.takeIf { it > 0 }?.let { s.setProxy(com.jcraft.jsch.ProxySOCKS5("127.0.0.1", it)) }
         return s
     }
 

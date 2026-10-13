@@ -53,6 +53,7 @@ import ru.gidravpn.hydra.data.subscription.OlcRtcConfigBuilder
 import ru.gidravpn.hydra.data.subscription.OpenFluxArgs
 import ru.gidravpn.hydra.data.subscription.OpenFluxLink
 import ru.gidravpn.hydra.data.subscription.XrayConfigBuilder
+import ru.gidravpn.hydra.desktop.core.AppNet
 import ru.gidravpn.hydra.desktop.core.Autostart
 import ru.gidravpn.hydra.desktop.core.ClashApi
 import ru.gidravpn.hydra.desktop.core.CoreRunner
@@ -762,7 +763,9 @@ class AppController(
             // 0.7.13: правила, группы, цепочки, обход DPI — дополнительные клиенты (ByeDPI, узлы на OpenFlux/olcRTC) поднимаются до sing-box.
             extras = mutableListOf()
             val plan = buildPlan(profile, settings, extras)
-            val bypass = listOfNotNull(Platform.processExecutable, bridge?.takeIf { engine == EngineToggles.Kind.XRAY }?.let { Platform.bundledXray()?.absolutePath }, sidecar?.exe?.absolutePath) +
+            // 0.8.0-rc3: Hydra идёт в туннель, кроме случая, когда внутри неё живёт TG WS (его сокеты вернулись бы в tun).
+            val appInTunnel = settings.appThroughVpn && plan?.needsTgWs != true
+            val bypass = listOfNotNull(Platform.processExecutable.takeUnless { appInTunnel }, bridge?.takeIf { engine == EngineToggles.Kind.XRAY }?.let { Platform.bundledXray()?.absolutePath }, sidecar?.exe?.absolutePath) +
                 extras.map { it.exe.absolutePath }
             val config = DesktopConfig.build(profile, settings, Platform.os, api, Platform.geoDir(), bridge, bypass, plan, Platform.geoStore) { appendLog("Маршрутизация: $it") }
             runner.start(sessionId, config.toString(2), settings.mode, xrayConfig, bridge?.port ?: 0, sidecar, extras)
@@ -779,6 +782,8 @@ class AppController(
             if (session == sessionId && settings.mode == ConnectionMode.PROXY && settings.setSystemProxy) {
                 SystemProxy.enable(settings.proxyPort).onFailure { toast("Системный прокси не установлен: ${it.message}") }
             }
+            // Режим «прокси»: SSH, подписки и обновления Hydra — в локальный прокси ядра (в TUN отдельно ничего не нужно).
+            if (session == sessionId && settings.mode == ConnectionMode.PROXY && appInTunnel) AppNet.use(settings.proxyPort)
             _ui.update { it.copy(blocked = false) }
             verify(clash, sessionId, settings, engine)
             if (session == sessionId && runner.isAlive) watchNetwork(sessionId, profile, engine)

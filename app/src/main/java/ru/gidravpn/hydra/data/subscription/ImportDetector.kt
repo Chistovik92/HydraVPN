@@ -46,11 +46,12 @@ object ImportDetector {
             return Result.SubscriptionUrl(text.substringBefore('#'), nameFrom(text))
         }
 
-        // 3. JSON целиком.
-        if (text.startsWith("{") || text.startsWith("[")) return Result.Unsupported(Reason.JSON_CONFIG)
+        // 3. JSON целиком. Цельный .conf тоже начинается с «[» («[Interface]») — это не JSON-массив.
+        val isConf = "[Interface]" in text
+        if (!isConf && (text.startsWith("{") || text.startsWith("["))) return Result.Unsupported(Reason.JSON_CONFIG)
 
         // 4. Серверы: цельный .conf (у него нет "://"), либо ссылки списком / base64-подписка.
-        val profiles = if ("[Interface]" in text) {
+        val profiles = if (isConf) {
             listOfNotNull(runCatching { LinkParser.parseLine(text) }.getOrNull())
         } else {
             LinkParser.parseSubscription(text)
