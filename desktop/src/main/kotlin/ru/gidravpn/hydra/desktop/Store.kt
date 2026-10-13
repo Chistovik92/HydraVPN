@@ -74,6 +74,8 @@ data class DesktopSettings(
     // Безопасность.
     val killSwitch: Boolean = false,
     val autoReconnect: Boolean = true,
+    /** 0.8.0-rc3: SSH «Моих серверов», подписки и обновления идут через туннель, пока VPN включён. */
+    val appThroughVpn: Boolean = true,
     val autoConnect: Boolean = false,
     val launchAtLogin: Boolean = false,
     // Раздача VPN в локальную сеть (хотспот-прокси Android).
@@ -259,7 +261,7 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
             .put("routing", routingToJson(s.routing))
             .put("singBoxEnabled", s.singBoxEnabled).put("xrayEnabled", s.xrayEnabled).put("preferXray", s.preferXray)
             .put("olcRtcEnabled", s.olcRtcEnabled).put("openFluxEnabled", s.openFluxEnabled)
-            .put("killSwitch", s.killSwitch).put("autoReconnect", s.autoReconnect)
+            .put("killSwitch", s.killSwitch).put("autoReconnect", s.autoReconnect).put("appThroughVpn", s.appThroughVpn)
             .put("autoConnect", s.autoConnect).put("launchAtLogin", s.launchAtLogin)
             .put("lanShare", JSONObject().put("enabled", s.lanShare.enabled).put("port", s.lanShare.port)
                 .put("username", s.lanShare.username).put("password", s.lanShare.password))
@@ -283,6 +285,7 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
                 preferXray = o.optBoolean("preferXray", false),
                 killSwitch = o.optBoolean("killSwitch", false),
                 autoReconnect = o.optBoolean("autoReconnect", true),
+                appThroughVpn = o.optBoolean("appThroughVpn", true),
                 autoConnect = o.optBoolean("autoConnect", false),
                 launchAtLogin = o.optBoolean("launchAtLogin", false),
                 lanShare = HotspotSettings(

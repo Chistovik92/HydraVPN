@@ -66,7 +66,7 @@ fun MyServersScreen(vm: MainViewModel, onBack: () -> Unit, mvm: MyServersViewMod
     val addedFmt = stringResource(R.string.ms_added, "%s")
     DisposableEffect(Unit) {
         mvm.importConf = { name, conf ->
-            vm.importAuto(listOf(conf))
+            vm.importAuto(listOf(conf), name)
             android.os.Handler(android.os.Looper.getMainLooper()).post { Toast.makeText(ctx, addedFmt.format(name), Toast.LENGTH_SHORT).show() }
         }
         onDispose { mvm.importConf = { _, _ -> } }
@@ -149,7 +149,7 @@ fun MyServersScreen(vm: MainViewModel, onBack: () -> Unit, mvm: MyServersViewMod
             confirmButton = {
                 Row {
                     TextButton({ clip.setText(AnnotatedString(conf)); Toast.makeText(ctx, copied, Toast.LENGTH_SHORT).show() }) { Text(stringResource(R.string.ms_copy), color = AccentCyan) }
-                    TextButton({ vm.importAuto(listOf(conf)); m.hideShown() }) { Text(stringResource(R.string.ms_add_to_servers), color = AccentCyan) }
+                    TextButton({ vm.importAuto(listOf(conf), name); m.hideShown() }) { Text(stringResource(R.string.ms_add_to_servers), color = AccentCyan) }
                 }
             },
             dismissButton = { TextButton({ m.hideShown() }) { Text(stringResource(R.string.ms_close), color = TextMuted) } },

@@ -78,6 +78,14 @@
     <string name="field_name">Название</string>
     <string name="field_address">Адрес</string>
     <string name="field_port">Порт</string>
+    <string name="field_uuid">UUID</string>
+    <string name="field_password">Пароль</string>
+    <string name="field_username">Пользователь</string>
+    <string name="field_cipher">Шифр (метод)</string>
+    <string name="field_sni">SNI (имя сервера, необязательно)</string>
+    <string name="manual_conf_field">Содержимое .conf</string>
+    <string name="manual_conf_hint">Вставьте конфиг WireGuard / AmneziaWG целиком: от [Interface] до конца [Peer].</string>
+    <string name="manual_link_only">Этот протокол добавляется только по ссылке или подписке — откройте «Импорт».</string>
     <string name="servers_protocol">Протокол: %1$s</string>
     <string name="default_subscription_name">Подписка</string>
     <string name="import_title">Импорт</string>
@@ -163,6 +171,8 @@
 
     <!-- Security -->
     <string name="sec_killswitch_desc">Если попытка подключения обрывается с ошибкой, туннель не откатывается на прямое соединение — трафик блокируется, пока вы не отключите VPN вручную. Не защищает от системного отзыва VPN (другое VPN-приложение, «Отключить» в системных настройках) — для полной гарантии на уровне ОС включите ниже «Блокировать соединения без VPN».</string>
+    <string name="sec_app_through">Трафик Hydra через VPN</string>
+    <string name="sec_app_through_desc">SSH к вашим серверам, загрузка подписок и обновления идут через туннель, пока VPN включён, — так открываются и серверы, недоступные без VPN. В режимах с подпроцессами (ByeDPI, OpenFlux, olcRTC, Xray) Hydra остаётся вне туннеля. Применяется при следующем подключении.</string>
     <string name="sec_auto_app">Автоподключение при запуске приложения</string>
     <string name="sec_auto_app_desc">Открыли Hydra — она сама поднимет туннель к последнему серверу, если системное согласие на VPN уже выдавалось раньше.</string>
     <string name="sec_auto_boot">Автоподключение при загрузке устройства</string>

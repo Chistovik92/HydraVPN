@@ -119,6 +119,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
     fun setAutoReconnect(enabled: Boolean) = safeLaunch { vpnSettingsRepo.setAutoReconnect(enabled) }
 
+    val appThroughVpn: StateFlow<Boolean> = vpnSettingsRepo.appThroughVpn
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    fun setAppThroughVpn(enabled: Boolean) = safeLaunch { vpnSettingsRepo.setAppThroughVpn(enabled) }
+
     val autoConnectOnAppStart: StateFlow<Boolean> = vpnSettingsRepo.autoConnectOnAppStart
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     fun setAutoConnectOnAppStart(enabled: Boolean) = safeLaunch { vpnSettingsRepo.setAutoConnectOnAppStart(enabled) }
@@ -583,12 +587,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun addServer(name: String, address: String, port: Int, protocol: Protocol) =
+    /** Ручное добавление (0.8.0-rc3): профиль собирает [ru.gidravpn.hydra.data.subscription.ManualServer], тут только сохранение. */
+    fun addServer(profile: ServerProfile) =
         safeLaunch {
-            repo.save(ServerProfile(
-                name = name, address = address, port = port, protocolId = protocol.id
-            ))
-            VpnState.log("Сервер \"$name\" добавлен")
+            repo.save(profile)
+            VpnState.log("Сервер \"${profile.name}\" добавлен")
         }
 
     // ----- 0.6.18: умный импорт (ссылка / подписка / .conf / QR / фото) -----
@@ -624,7 +627,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
                 is ru.gidravpn.hydra.data.subscription.ImportDetector.Result.Servers -> {
-                    val n = runCatching { repo.importProfiles(r.profiles) }.getOrDefault(0)
+                    // Имя, заданное пользователем (мастер «Мои серверы»), главнее имени из самого .conf/ссылки.
+                    val named = if (r.profiles.size == 1 && !subName.isNullOrBlank()) r.profiles.map { it.copy(name = subName) } else r.profiles
+                    val n = runCatching { repo.importProfiles(named) }.getOrDefault(0)
                     VpnState.log("Импортировано серверов: $n")
                     lines += if (n == 1) s(ru.gidravpn.hydra.R.string.import_done_one, r.profiles.first().name)
                     else s(ru.gidravpn.hydra.R.string.import_done_servers, n)

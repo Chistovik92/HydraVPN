@@ -146,6 +146,7 @@ class CoreRunner(
     /** Сначала sing-box (снимает маршруты tun), потом Xray. */
     @Synchronized
     fun stop() {
+        AppNet.clear()   // трафик Hydra снова напрямую: прокси ядра больше нет
         singBox?.stop()
         singBox = null
         xray?.stop()

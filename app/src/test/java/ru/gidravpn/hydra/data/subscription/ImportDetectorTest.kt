@@ -36,6 +36,14 @@ class ImportDetectorTest {
         assertEquals(Result.Unsupported(Reason.JSON_CONFIG), ImportDetector.classify("{\"outbounds\": []}"))
     }
 
+    /** 0.8.0-rc3: «[Interface]» начинается с «[» — раньше такой .conf принимали за JSON-массив и отказывали. */
+    @Test fun wholeConfIsNotJson() {
+        val conf = "[Interface]\nPrivateKey = cAcYDmj/60j51takU8V8aFtdOx1qyOfMKXuF2xyCeEs=\nAddress = 10.8.1.2/32\nJc = 7\n\n" +
+            "[Peer]\nPublicKey = abc=\nEndpoint = 203.0.113.5:51820\nAllowedIPs = 0.0.0.0/0\n"
+        val r = ImportDetector.classify(conf)
+        assertTrue(r.toString(), r != Result.Unsupported(Reason.JSON_CONFIG))
+    }
+
     @Test fun garbageAndEmpty() {
         assertEquals(Result.Empty, ImportDetector.classify("  \n "))
         assertTrue(ImportDetector.classify("hello world") is Result.Unsupported)

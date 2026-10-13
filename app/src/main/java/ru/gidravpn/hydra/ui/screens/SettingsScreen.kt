@@ -235,6 +235,14 @@ description = stringResource(R.string.sec_killswitch_desc),
             onCheckedChange = { vm.setAutoReconnect(it) }
         )
 
+        val appThrough by vm.appThroughVpn.collectAsState()
+        SecurityToggleCard(
+            title = stringResource(R.string.sec_app_through),
+            description = stringResource(R.string.sec_app_through_desc),
+            checked = appThrough,
+            onCheckedChange = { vm.setAppThroughVpn(it) }
+        )
+
         SecurityToggleCard(
             title = stringResource(R.string.sec_auto_app),
 description = stringResource(R.string.sec_auto_app_desc),

@@ -19,6 +19,7 @@ class VpnSettingsRepository(private val context: Context) {
     private val KEY_AUTOCONNECT_BOOT = booleanPreferencesKey("autoconnect_boot")
 private val KEY_LAST_SERVER_ID = longPreferencesKey("last_server_id")
     private val KEY_AUTO_RECONNECT = booleanPreferencesKey("auto_reconnect")
+    private val KEY_APP_THROUGH_VPN = booleanPreferencesKey("app_through_vpn")
 
     /**
      * При обрыве/ошибке соединения держать tun-интерфейс поднятым, но без
@@ -42,6 +43,16 @@ private val KEY_LAST_SERVER_ID = longPreferencesKey("last_server_id")
     val autoReconnect: Flow<Boolean> = context.vpnSettingsStore.data.map { it[KEY_AUTO_RECONNECT] != false }
     suspend fun setAutoReconnect(enabled: Boolean) {
         context.vpnSettingsStore.edit { it[KEY_AUTO_RECONNECT] = enabled }
+    }
+
+    /**
+     * Собственный трафик Hydra (SSH «Моих серверов», загрузка подписок, обновления) идёт через туннель, пока VPN включён
+     * (0.8.0-rc3). Иначе сервер, недоступный без VPN, не открывался и при подключённом VPN. По умолчанию включено;
+     * для режимов с подпроцессами (ByeDPI, OpenFlux, olcRTC, Xray) приложение остаётся вне туннеля — см. AppTunnelPolicy.
+     */
+    val appThroughVpn: Flow<Boolean> = context.vpnSettingsStore.data.map { it[KEY_APP_THROUGH_VPN] != false }
+    suspend fun setAppThroughVpn(enabled: Boolean) {
+        context.vpnSettingsStore.edit { it[KEY_APP_THROUGH_VPN] = enabled }
     }
 
     /** Автоподключение к последнему серверу при запуске приложения (если VPN-согласие уже выдано). */
