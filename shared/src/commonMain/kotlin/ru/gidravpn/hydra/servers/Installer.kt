@@ -48,7 +48,7 @@ class Redactor(private val secrets: Collection<String>) {
     fun clean(s: String): String {
         var r = s
         for (x in secrets) if (x.length >= 6) r = r.replace(x, "•••")
-        return r.replace(Regex("(?i)(PrivateKey|PresharedKey|HeaderProtectionKey|password)(\\s*[=:]\\s*)\\S+"), "$1$2•••")
+        return r.replace(Regex("(?i)(PrivateKey|PresharedKey|HeaderProtectionKey|password|api[ _-]?token|token)(\\s*[=:]\\s*)\\S+"), "$1$2•••")
     }
 }
 

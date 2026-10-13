@@ -107,7 +107,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
         val api = XuiApi(SshXuiTransport(ssh, local, token, target.host))
         try {
             val version = res["XUI_VERSION"].orEmpty().ifBlank { tag }
-            api.settings() // токен принят
+            waitPanelReady(api, onLog) // служба запущена, но панель начинает слушать порт не сразу; заодно проверяется токен
             onLog("Токен принят, панель отвечает")
             val (priv, pub) = api.newRealityKeys()
             val inboundId = api.addInbound(XuiPanel.defaultInbound(accessPort, priv, pub, remark = "Hydra"))
@@ -126,6 +126,20 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
         }
     }
 
+
+    /** После установки панель поднимается несколько секунд: ждём ответ (до ~60 с); неверный токен и ошибки панели — сразу. */
+    private fun waitPanelReady(api: XuiApi, onLog: (String) -> Unit) {
+        var last: XuiApiException? = null
+        repeat(30) {
+            try { api.settings(); return } catch (e: XuiApiException) {
+                if (!e.message.orEmpty().startsWith("Панель не ответила")) throw e
+                last = e
+                if (it == 0) onLog("Жду, пока панель начнёт отвечать…")
+                Thread.sleep(2000)
+            }
+        }
+        throw last ?: XuiApiException("Панель не ответила")
+    }
     /** Ещё один клиент панели: возвращает ссылки. */
     fun addPanelClient(ssh: SshSession, s: MyServer, email: String): List<String>? {
         val p = s.panel ?: return null
@@ -151,7 +165,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
 
     /** Удаление панели с сервера (скрипт самой панели, без вопросов). */
     fun uninstallXui(installer: Installer): Boolean = installer.run(listOf(
-        Step("xui-remove", "Удалить 3x-ui с сервера", "printf 'y\\n' | /usr/local/x-ui/x-ui uninstall; test ! -e /usr/local/x-ui/x-ui",
+        Step("xui-remove", "Удалить 3x-ui с сервера", "printf 'y\\n' | /usr/bin/x-ui uninstall; test ! -e /usr/local/x-ui/x-ui",
             failHint = "3x-ui не удалось удалить"),
     ))
 

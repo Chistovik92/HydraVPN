@@ -126,6 +126,7 @@ class XuiApi(private val t: XuiTransport) {
 object XuiPanel {
     const val SCRIPT = "/root/.hydra-xui-install.sh"
     const val ENV_FILE = "/tmp/.hydra-xui.env"
+    const val LOG = "/tmp/.hydra-xui-install.log"
     const val RESULT = "/etc/x-ui/install-result.env"
 
     fun scriptUrl(tag: String) = "https://raw.githubusercontent.com/MHSanaei/3x-ui/$tag/install.sh"
@@ -164,8 +165,10 @@ object XuiPanel {
             upload = Step.Upload(ENV_FILE, ("XUI_NONINTERACTIVE=1\nXUI_USERNAME=${p.username}\nXUI_PASSWORD=${p.password}\nXUI_PANEL_PORT=${p.port}\n" +
                 "XUI_WEB_BASE_PATH=${p.webPath}\nXUI_SSL_MODE=none\nXUI_ENABLE_FAIL2BAN=false\n").toByteArray(), 384)))
         add(Step("xui-install", "Установить 3x-ui ${p.tag}: ядро Xray, служба x-ui, панель на порту ${p.port}",
-            "set -a; . $ENV_FILE; set +a; bash $SCRIPT ${p.tag} > /tmp/.hydra-xui-install.log 2>&1; rc=\$?; rm -f $ENV_FILE; tail -n 6 /tmp/.hydra-xui-install.log; exit \$rc",
-            rollback = "/usr/local/x-ui/x-ui uninstall -y 2>/dev/null; rm -f $ENV_FILE", failHint = "Установка 3x-ui не удалась (журнал: /tmp/.hydra-xui-install.log)"))
+            // Журнал установщика содержит логин, пароль и токен: при успехе его не читаем, при сбое показываем хвост с вырезанием; файл удаляется всегда.
+            "set -a; . $ENV_FILE; set +a; bash $SCRIPT ${p.tag} > $LOG 2>&1; rc=\$?; rm -f $ENV_FILE; " +
+                "if [ \$rc -ne 0 ]; then tail -n 6 $LOG | sed -E 's/(assword|sername|oken)[^:=]*[:=].*/\\1: ***/'; fi; rm -f $LOG; exit \$rc",
+            rollback = "printf 'y\\n' | /usr/bin/x-ui uninstall >/dev/null 2>&1; rm -f $ENV_FILE", failHint = "Установка 3x-ui не удалась"))
         if (openFirewall && firewall == "ufw") add(Step("xui-fw", "Открыть порт панели ${p.port}/tcp в ufw", "ufw allow ${p.port}/tcp", rollback = "ufw delete allow ${p.port}/tcp"))
         if (openFirewall && firewall == "firewalld") add(Step("xui-fw", "Открыть порт панели ${p.port}/tcp в firewalld",
             "firewall-cmd --permanent --add-port=${p.port}/tcp && firewall-cmd --reload", rollback = "firewall-cmd --permanent --remove-port=${p.port}/tcp && firewall-cmd --reload"))
