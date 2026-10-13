@@ -59,6 +59,9 @@ class CoreRunner(
     /** Дополнительные клиенты (0.7.13): ByeDPI и узлы маршрутизации на OpenFlux/olcRTC — каждому свой процесс и порт. */
     private val extra = mutableListOf<Handle>()
 
+    /** Каждый запущенный этим экземпляром процесс (0.8.0-rc2): даже если ссылка на него потерялась при перезапусках, [stop] его добьёт. */
+    private val spawned = java.util.concurrent.ConcurrentHashMap.newKeySet<Process>()
+
     /** Службы внутри самого Hydra (TG WS, 0.7.14): живут столько же, сколько ядра; остановка — в [stop]. */
     private val inProcess = mutableListOf<AutoCloseable>()
     @Synchronized fun attachInProcess(c: AutoCloseable) { inProcess += c }
@@ -152,7 +155,13 @@ class CoreRunner(
         synchronized(this) { inProcess.forEach { runCatching { it.close() } }; inProcess.clear() }
         sidecarSecrets.forEach { runCatching { it.delete() } }
         sidecarSecrets = emptyList()
+        // 0.8.0-rc2: в портативной Windows-сборке sing-box и Xray оставались в диспетчере задач после «Отключить» и выхода.
+        // Добиваем всё, что запускали мы (с деревом), и любые процессы с путями наших ядер.
+        spawned.toList().forEach { p -> runCatching { killTree(p) }; spawned.remove(p) }
+        runCatching { killByExecutable(ownBinaries()) }
     }
+
+    private fun ownBinaries(): List<File> = listOfNotNull(Platform.bundledCore(), Platform.bundledXray(), Platform.bundledOpenFlux(), Platform.bundledOlcRtc(), Platform.bundledByeDpi())
 
     private fun waitPort(port: Int, h: Handle, timeoutMs: Long = 8000): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs
@@ -183,6 +192,28 @@ class CoreRunner(
             (0 until 24).forEach { killStale("sidecar-$it.pid", "olcrtc", "openflux", "ciadpi") }
         }
 
+        /** Завершает процесс вместе с потомками; на Windows `destroy()` потомков не трогает. */
+        fun killTree(p: Process) {
+            val h = p.toHandle()
+            h.descendants().forEach { d -> runCatching { d.destroyForcibly() } }
+            if (h.isAlive) { h.destroy(); runCatching { h.onExit().get(2, TimeUnit.SECONDS) } }
+            if (h.isAlive) h.destroyForcibly()
+        }
+
+        /**
+         * Завершает все процессы, чей исполняемый файл — один из [files] (сравнение по полному пути без учёта регистра).
+         * Свой путь у каждой установки (portable, MSI), поэтому чужие экземпляры sing-box не задеваются.
+         */
+        fun killByExecutable(files: Collection<File>): Int {
+            val paths = files.mapNotNull { runCatching { it.canonicalPath.lowercase() }.getOrNull() }.toSet()
+            if (paths.isEmpty()) return 0
+            val self = ProcessHandle.current().pid()
+            var n = 0
+            ProcessHandle.allProcesses().filter { h -> h.pid() != self && h.info().command().map { c -> runCatching { File(c).canonicalPath.lowercase() in paths }.getOrDefault(false) }.orElse(false) }
+                .forEach { h -> n++; h.destroy(); runCatching { h.onExit().get(2, TimeUnit.SECONDS) }; if (h.isAlive) h.destroyForcibly() }
+            return n
+        }
+
         private fun killStale(pidName: String, vararg prefixes: String) {
             val pidFile = File(Platform.runDir, pidName)
             val pid = runCatching { pidFile.readText().trim().toLong() }.getOrNull()
@@ -204,12 +235,14 @@ class CoreRunner(
         // Своих geo-баз Xray не даём (маршрутизация — в sing-box), но ищет он их здесь.
         pb.environment()["XRAY_LOCATION_ASSET"] = dir.absolutePath
         val p = pb.start()
+        spawned += p
         val pidFile = File(dir, pidName)
         runCatching { pidFile.writeText(p.pid().toString()) }
         thread(isDaemon = true, name = "$name-log") {
             runCatching { p.inputStream.bufferedReader().forEachLine { onLog(tag(it)) } }
             val code = runCatching { p.waitFor() }.getOrDefault(-1)
             runCatching { if (pidFile.readText().trim() == p.pid().toString()) pidFile.delete() }
+            spawned.remove(p)
             onExit(session, code, name)
         }
         return object : Handle {
