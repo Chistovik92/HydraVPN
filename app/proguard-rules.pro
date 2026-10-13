@@ -20,3 +20,15 @@
 
 # AmneziaWG: JNI-символы libwg-go.so жёстко называют класс и методы — не трогать.
 -keep class org.amnezia.awg.GoBackend { *; }
+
+# «Мои серверы» (0.8.0): JSch подгружает алгоритмы (обмен ключами, шифры, подписи) по ИМЕНАМ классов из своей таблицы настроек.
+# Без этих правил R8 в release-сборке переименовывает или вырезает классы, и вход по SSH падает на согласовании алгоритмов
+# («не ответил по SSH») — в debug-сборке минификации нет, поэтому там всё работало.
+-keep class com.jcraft.jsch.** { *; }
+-keep class org.bouncycastle.** { *; }
+-dontwarn com.jcraft.jsch.**
+-dontwarn org.bouncycastle.**
+-dontwarn javax.naming.**
+-dontwarn org.ietf.jgss.**
+-dontwarn org.slf4j.**
+-dontwarn java.lang.management.**

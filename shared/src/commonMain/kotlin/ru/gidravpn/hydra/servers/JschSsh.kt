@@ -90,8 +90,16 @@ object SshConnector {
     fun fingerprint(t: SshTarget): String {
         val repo = Pinned(null)
         val s = newSession(SshTarget(t.host, t.port, t.user), repo)
-        try { s.connect(CONNECT_TIMEOUT_MS) } catch (_: JSchException) { /* ключ хоста виден ещё до входа */ } finally { s.disconnect() }
-        return repo.seen ?: throw JSchException("Сервер ${t.host}:${t.port} не ответил по SSH")
+        var failure: Throwable? = null
+        try { s.connect(CONNECT_TIMEOUT_MS) } catch (e: JSchException) { failure = e /* ключ хоста виден ещё до входа: ошибка входа здесь ожидаема */ } finally { s.disconnect() }
+        // Настоящая причина (согласование алгоритмов, сеть, время ожидания) — в сообщении, а не просто «не ответил»: по ней видно, чинить сервер, сеть или приложение.
+        return repo.seen ?: throw JSchException("Сервер ${t.host}:${t.port} не ответил по SSH" + (failure?.let { " (${rootMessage(it)})" } ?: ""))
+    }
+
+    private fun rootMessage(e: Throwable): String {
+        var t: Throwable = e
+        while (t.cause != null && t.cause !== t) t = t.cause!!
+        return (if (t === e) e.message else "${e.message}: ${t.javaClass.simpleName} ${t.message}").orEmpty().take(300)
     }
 
     /** Подключиться, сверив отпечаток с [pinned]. */

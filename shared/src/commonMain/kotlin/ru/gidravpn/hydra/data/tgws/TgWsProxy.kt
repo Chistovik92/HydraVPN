@@ -99,7 +99,8 @@ class TgWsProxy(
         server = null
         runCatching { mtServer?.close() }
         mtServer = null
-        active.toList().forEach { runCatching { it.close() } }
+        // ArrayList(коллекция) берёт снимок через toArray(): toList() на конкурентном множестве мог упасть, если соединение закрылось посреди обхода
+        ArrayList(active).forEach { runCatching { it.close() } }
         active.clear()
     }
 

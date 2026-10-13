@@ -25,7 +25,9 @@ data class ServerProfile(
     val extra: String = "{}",          // JSON: reality pbk/sid, hysteria obfs, tuic congestion и т.д.
     val subscriptionId: Long? = null,  // если импортирован из подписки
     val pingMs: Int = -1,              // -1 = не измерялось
-    val flag: String = "🌐"
+    val flag: String = "🌐",
+    /** Позиция в ответе подписки (0.8.0-rc2): порядок серверов в списке — как отдала панель; 0 — не из подписки. */
+    val sortIndex: Int = 0
 ) {
     val protocol: Protocol? get() = Protocol.fromId(protocolId)
     val summary: String

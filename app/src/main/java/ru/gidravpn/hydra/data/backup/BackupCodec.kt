@@ -107,7 +107,7 @@ object BackupCodec {
         put("transportPath", s.transportPath); put("security", s.security); put("alpn", s.alpn)
         put("fingerprint", s.fingerprint); put("extra", s.extra)
         put("subscriptionId", s.subscriptionId ?: JSONObject.NULL)
-        put("pingMs", s.pingMs); put("flag", s.flag)
+        put("pingMs", s.pingMs); put("flag", s.flag); put("sortIndex", s.sortIndex)
     }
 
     private fun decodeServer(o: JSONObject): ServerProfile {
@@ -130,6 +130,7 @@ object BackupCodec {
             subscriptionId = if (o.isNull("subscriptionId")) null else o.getLong("subscriptionId"),
             pingMs = o.optInt("pingMs", d.pingMs),
             flag = o.optString("flag", d.flag),
+            sortIndex = o.optInt("sortIndex", 0),
         )
     }
 
