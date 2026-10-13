@@ -46,6 +46,7 @@ import ru.gidravpn.hydra.servers.AwgGeneration
 import ru.gidravpn.hydra.servers.FriendlyText
 import ru.gidravpn.hydra.servers.MyServer
 import ru.gidravpn.hydra.servers.MyServersManager
+import ru.gidravpn.hydra.servers.XuiPanel
 import ru.gidravpn.hydra.servers.MyServersUi
 import ru.gidravpn.hydra.servers.OfxNodeSpec
 import ru.gidravpn.hydra.servers.ServerForm
@@ -82,10 +83,12 @@ internal fun MyServersScreen(c: AppController, ui: UiState, startWizard: Boolean
     var forget by remember { mutableStateOf<MyServer?>(null) }
     var addUserFor by remember { mutableStateOf<MyServer?>(null) }
     var addDeviceFor by remember { mutableStateOf<MyServer?>(null) }
+    var connectPanel by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Header("Мои серверы") {
             OutlinedButton(onClick = { help = true }) { Text("Что это такое?") }
+            OutlinedButton(onClick = { m.reset(); connectPanel = true }, enabled = !s.busy && !wizard) { Text("У меня уже есть панель") }
             Button(onClick = { m.reset(); wizard = true }, enabled = !s.busy && !wizard) { Text("Добавить сервер") }
         }
         if (ui.data.myServers.isEmpty() && !wizard) IntroCard(onStart = { m.reset(); wizard = true }, onGuide = { openUrl(GUIDE_URL) })
@@ -102,6 +105,10 @@ internal fun MyServersScreen(c: AppController, ui: UiState, startWizard: Boolean
         if (s.stage == Stage.IDLE && !wizard) {
             s.error?.let { ErrorBox(it) }
         }
+    }
+
+    if (connectPanel) ConnectPanelDialog(onClose = { connectPanel = false }) { name, address, token ->
+        connectPanel = false; m.connectPanel(name, address, token)
     }
 
     if (help) AlertDialog(
@@ -182,6 +189,33 @@ internal fun MyServersScreen(c: AppController, ui: UiState, startWizard: Boolean
     }
     login?.let { n -> LoginDialog(n, onCancel = { login = null }) { t -> login = null; n.run(t) } }
     s.shown?.let { (name, text) -> ShownDialog(c, name, text) { m.hideShown() } }
+}
+
+/** «У меня уже есть панель» (0.8.1-a): адрес и токен доступа 3x-ui — без установки и без входа на сервер. */
+@Composable
+private fun ConnectPanelDialog(onClose: () -> Unit, onOk: (name: String, address: String, token: String) -> Unit) {
+    var name by remember { mutableStateOf("Моя панель") }
+    var address by remember { mutableStateOf("") }
+    var token by remember { mutableStateOf("") }
+    val plain = address.isNotBlank() && !XuiPanel.isHttps(XuiPanel.normalizeUrl(address).orEmpty())
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("Подключить свою панель 3x-ui") },
+        text = {
+            Column(Modifier.widthIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Если панель 3x-ui уже стоит на вашем сервере, Hydra подключится к ней и сможет заводить пользователей и выдавать ссылки. Устанавливать ничего не нужно.", fontSize = 13.sp)
+                OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Название") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(address, { address = it }, singleLine = true, label = { Text("Адрес панели (как в браузере)") },
+                    placeholder = { Text("http://203.0.113.5:2053/путь") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(token, { token = it }, singleLine = true, label = { Text("Токен доступа (API)") },
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                Text("Где взять токен: на сервере команда  x-ui setting -getApiToken  (или файл /etc/x-ui/install-result.env, строка XUI_API_TOKEN).", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (plain) Text("Адрес начинается с http:// — токен пойдёт без шифрования. Подключайтесь при включённом VPN (тогда трафик Hydra идёт через туннель) или используйте https://.", fontSize = 12.sp, color = Danger)
+            }
+        },
+        confirmButton = { TextButton(enabled = address.isNotBlank() && token.isNotBlank(), onClick = { onOk(name, address, token) }) { Text("Подключить") } },
+        dismissButton = { TextButton(onClick = onClose) { Text("Отмена") } },
+    )
 }
 
 @Composable
@@ -478,8 +512,10 @@ private fun ServerCard(
                     Text("Панель — это сайт, где вы заводите пользователей. Версия ${p.version.ifBlank { "—" }}.", fontSize = 13.sp)
                     SelectionContainer { Text("Адрес: ${p.baseUrl}\nЛогин: ${p.username}", fontFamily = FontFamily.Monospace, fontSize = 12.sp) }
                     ChipRow {
-                        Button(onClick = { setClipboard(p.password); openUrl(p.baseUrl); c.toast("Пароль скопирован — вставьте его на странице входа") }) { Text("Открыть панель") }
-                        OutlinedButton(onClick = { setClipboard(p.password); c.toast("Пароль скопирован") }) { Text("Скопировать пароль") }
+                        if (p.password.isNotBlank()) {
+                            Button(onClick = { copySecret(c, p.password); openUrl(p.baseUrl); c.toast("Пароль скопирован на 30 секунд — вставьте его на странице входа") }) { Text("Открыть панель") }
+                            OutlinedButton(onClick = { copySecret(c, p.password); c.toast("Пароль скопирован на 30 секунд") }) { Text("Скопировать пароль") }
+                        } else Button(onClick = { openUrl(p.baseUrl) }) { Text("Открыть панель") }
                         OutlinedButton(onClick = { m.loadPanelClients(srv.id) }, enabled = !busy) { Text("Пользователи") }
                         OutlinedButton(onClick = onAddUser, enabled = !busy) { Text("Добавить пользователя") }
                     }
@@ -499,12 +535,14 @@ private fun ServerCard(
             if (busy) Busy("Работаю…")
             TextButton(onClick = { more = !more }) { Text(if (more) "Скрыть" else "Ещё…") }
             if (more) {
-                Text("Отпечаток сервера: ${srv.fingerprint}", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val managedOverSsh = srv.fingerprint.isNotBlank()   // подключённая вручную панель SSH не использует — удалять с сервера нечего
+                if (managedOverSsh) Text("Отпечаток сервера: ${srv.fingerprint}", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 ChipRow {
-                    OutlinedButton(onClick = onUninstall, enabled = !busy) { Text("Удалить с сервера", color = Danger) }
+                    if (managedOverSsh) OutlinedButton(onClick = onUninstall, enabled = !busy) { Text("Удалить с сервера", color = Danger) }
                     TextButton(onClick = onForget, enabled = !busy) { Text("Убрать из списка") }
                 }
-                Text("«Удалить с сервера» — Hydra зайдёт на сервер и уберёт всё, что установила. «Убрать из списка» — сервер продолжит работать, просто пропадёт из приложения.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (managedOverSsh) "«Удалить с сервера» — Hydra зайдёт на сервер и уберёт всё, что установила. «Убрать из списка» — сервер продолжит работать, просто пропадёт из приложения."
+                    else "«Убрать из списка» — панель продолжит работать, просто пропадёт из приложения. Панель ставили не мы, поэтому удалять её с сервера Hydra не будет.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -562,4 +600,13 @@ private fun ShownDialog(c: AppController, name: String, text: String, onClose: (
             }
         },
     )
+}
+
+/** Пароль панели в буфер обмена на 30 секунд (0.8.1-a): потом очищается, если там всё ещё он. */
+private fun copySecret(@Suppress("UNUSED_PARAMETER") c: AppController, text: String) {
+    setClipboard(text)
+    kotlin.concurrent.thread(isDaemon = true, name = "clipboard-clear") {
+        Thread.sleep(30_000)
+        if (runCatching { clipboard() }.getOrNull() == text) setClipboard("")
+    }
 }

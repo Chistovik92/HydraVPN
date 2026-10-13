@@ -193,6 +193,36 @@ class MyServersManager(
         }
     }
 
+    /**
+     * Подключить уже стоящую панель 3x-ui по адресу и токену — без SSH и без установки (0.8.1-a).
+     * Токен проверяется запросом настроек; запись панели попадает в «Мои серверы» и управляется так же, как поставленная мастером
+     * (пользователи, ссылки). Запрос идёт обычным путём Hydra: при включённом VPN — через туннель (0.8.0-rc3).
+     */
+    fun connectPanel(name: String, address: String, token: String) {
+        val base = XuiPanel.normalizeUrl(address) ?: return _ui.update { it.copy(error = "Не похоже на адрес панели. Пример: http://203.0.113.5:2053/путь") }
+        val tok = token.trim()
+        if (tok.isEmpty()) return _ui.update { it.copy(error = "Вставьте токен доступа к панели") }
+        _ui.update { it.copy(busy = true, error = null, progress = "Проверяю панель…") }
+        scope.launch(Dispatchers.IO) {
+            try {
+                val api = XuiApi(DirectXuiTransport(base, tok))
+                api.settings()   // неверный токен или не та панель — исключение
+                val ins = api.inbounds()
+                val inboundId = (0 until ins.length()).mapNotNull { ins.optJSONObject(it) }
+                    .let { l -> l.firstOrNull { it.optString("protocol") == "vless" } ?: l.firstOrNull() }?.optInt("id") ?: 0
+                val host = java.net.URL(base).host
+                val panel = PanelInstance(PanelKind.XUI3, base, "", "", tok, "", inboundId, "")
+                val srv = MyServer(java.util.UUID.randomUUID().toString(), name.ifBlank { "Моя панель" }, host, fingerprint = "", panel = panel)
+                save(servers() + srv)
+                _ui.update { it.copy(busy = false, progress = "Панель подключена") }
+            } catch (e: XuiApiException) {
+                _ui.update { it.copy(busy = false, progress = "", error = "Панель ответила отказом: ${e.message}. Проверьте токен.") }
+            } catch (e: Exception) {
+                _ui.update { it.copy(busy = false, progress = "", error = "Панель не открывается по адресу $base (${e.message}). Проверьте адрес, порт и что панель включена.") }
+            }
+        }
+    }
+
     /** Клиенты панели (email) — для списка в карточке. */
     fun loadPanelClients(id: String) = withPanel(id) { s, api ->
         val emails = api.clientEmails()

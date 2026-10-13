@@ -156,4 +156,14 @@
     <string name="ms_copied">Copied</string>
     <string name="ms_add_to_servers">Add to Servers</string>
     <string name="ms_added">Server “%1$s” added</string>
+    <string name="ms_connect_panel">I already have a panel</string>
+    <string name="ms_cp_title">Connect your 3x-ui panel</string>
+    <string name="ms_cp_text">If a 3x-ui panel is already installed on your server, Hydra connects to it and can create users and hand out links. Nothing is installed.</string>
+    <string name="ms_cp_name">Name</string>
+    <string name="ms_cp_address">Panel address (as in the browser)</string>
+    <string name="ms_cp_token">Access token (API)</string>
+    <string name="ms_cp_token_hint">On the server run: x-ui setting -getApiToken (or see XUI_API_TOKEN in /etc/x-ui/install-result.env)</string>
+    <string name="ms_cp_plain_warn">The address starts with http:// - the token travels unencrypted. Connect while the VPN is on (Hydra traffic goes through the tunnel) or use https://.</string>
+    <string name="ms_cp_connect">Connect</string>
+    <string name="ms_more_note_connected">"Remove from list" - the panel keeps working, it just disappears from the app. Hydra did not install this panel, so it will not delete it from the server.</string>
 </resources>

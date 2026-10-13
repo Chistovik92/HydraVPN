@@ -155,4 +155,14 @@
     <string name="ms_copied">Скопировано</string>
     <string name="ms_add_to_servers">Добавить в «Серверы»</string>
     <string name="ms_added">Сервер «%1$s» добавлен</string>
+    <string name="ms_connect_panel">У меня уже есть панель</string>
+    <string name="ms_cp_title">Подключить свою панель 3x-ui</string>
+    <string name="ms_cp_text">Если панель 3x-ui уже стоит на вашем сервере, Hydra подключится к ней и сможет заводить пользователей и выдавать ссылки. Устанавливать ничего не нужно.</string>
+    <string name="ms_cp_name">Название</string>
+    <string name="ms_cp_address">Адрес панели (как в браузере)</string>
+    <string name="ms_cp_token">Токен доступа (API)</string>
+    <string name="ms_cp_token_hint">На сервере выполните: x-ui setting -getApiToken (или строка XUI_API_TOKEN в /etc/x-ui/install-result.env)</string>
+    <string name="ms_cp_plain_warn">Адрес начинается с http:// — токен пойдёт без шифрования. Подключайтесь при включённом VPN (трафик Hydra идёт через туннель) или используйте https://.</string>
+    <string name="ms_cp_connect">Подключить</string>
+    <string name="ms_more_note_connected">«Убрать из списка» — панель продолжит работать, просто пропадёт из приложения. Панель ставили не мы, поэтому удалять её с сервера Hydra не будет.</string>
 </resources>

@@ -72,6 +72,7 @@ fun MyServersScreen(vm: MainViewModel, onBack: () -> Unit, mvm: MyServersViewMod
     var forget by remember { mutableStateOf<MyServer?>(null) }
     var addDeviceFor by remember { mutableStateOf<MyServer?>(null) }
     var addUserFor by remember { mutableStateOf<MyServer?>(null) }
+    var connectPanel by remember { mutableStateOf(false) }
 
     val addedFmt = stringResource(R.string.ms_added, "%s")
     DisposableEffect(Unit) {
@@ -95,6 +96,7 @@ fun MyServersScreen(vm: MainViewModel, onBack: () -> Unit, mvm: MyServersViewMod
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                 MsChip(stringResource(R.string.ms_help_btn), TextSecondary) { help = true }
                 if (!wizard && s.stage == Stage.IDLE) MsChip(stringResource(R.string.ms_add), AccentCyan) { if (!s.busy) { m.reset(); wizard = true } }
+                if (!wizard && s.stage == Stage.IDLE) MsChip(stringResource(R.string.ms_connect_panel), AccentViolet) { if (!s.busy) { m.reset(); connectPanel = true } }
             }
         }
         if (servers.isEmpty() && !wizard && s.stage == Stage.IDLE) item {
@@ -125,6 +127,10 @@ fun MyServersScreen(vm: MainViewModel, onBack: () -> Unit, mvm: MyServersViewMod
         }
         if (s.stage == Stage.IDLE && !wizard) s.error?.let { item { ErrorBox(it) } }
         item { Spacer(Modifier.height(16.dp)) }
+    }
+
+    if (connectPanel) ConnectPanelDialog(onClose = { connectPanel = false }) { name, address, token ->
+        connectPanel = false; m.connectPanel(name, address, token)
     }
 
     if (help) AlertDialog(
@@ -505,8 +511,11 @@ private fun ServerCard(
                 SelectionContainer { Text("${p.baseUrl}\n${p.username}", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextMuted) }
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    MsChip(stringResource(R.string.ms_open_panel), AccentCyan) { clip.setText(AnnotatedString(p.password)); Toast.makeText(ctx, pwMsg, Toast.LENGTH_LONG).show(); openUrl(p.baseUrl) }
-                    MsChip(stringResource(R.string.ms_copy_password), TextSecondary) { clip.setText(AnnotatedString(p.password)); Toast.makeText(ctx, pwMsg, Toast.LENGTH_SHORT).show() }
+                    if (p.password.isBlank()) MsChip(stringResource(R.string.ms_open_panel), AccentCyan) { openUrl(p.baseUrl) }
+                    else {
+                        MsChip(stringResource(R.string.ms_open_panel), AccentCyan) { copySecret(clip, p.password); Toast.makeText(ctx, pwMsg, Toast.LENGTH_LONG).show(); openUrl(p.baseUrl) }
+                        MsChip(stringResource(R.string.ms_copy_password), TextSecondary) { copySecret(clip, p.password); Toast.makeText(ctx, pwMsg, Toast.LENGTH_SHORT).show() }
+                    }
                 }
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
@@ -531,13 +540,14 @@ private fun ServerCard(
         MsChip(stringResource(if (more) R.string.ms_hide else R.string.ms_more), TextSecondary) { more = !more }
         if (more) {
             Spacer(Modifier.height(6.dp))
-            Text(stringResource(R.string.ms_fingerprint, srv.fingerprint), color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+            val overSsh = srv.fingerprint.isNotBlank()   // подключённая вручную панель SSH не использует — удалять с сервера нечего
+            if (overSsh) Text(stringResource(R.string.ms_fingerprint, srv.fingerprint), color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                MsChip(stringResource(R.string.ms_uninstall), Danger) { if (!busy) onUninstall() }
+                if (overSsh) MsChip(stringResource(R.string.ms_uninstall), Danger) { if (!busy) onUninstall() }
                 MsChip(stringResource(R.string.ms_forget), TextSecondary) { if (!busy) onForget() }
             }
-            Text(stringResource(R.string.ms_more_note), color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+            Text(stringResource(if (overSsh) R.string.ms_more_note else R.string.ms_more_note_connected), color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
         }
     }
 }
@@ -597,6 +607,38 @@ private fun MsChip(text: String, color: Color, selected: Boolean = false, onClic
             .defaultMinSize(minHeight = 40.dp).padding(horizontal = 12.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) { Text(text, color = c, fontSize = 12.sp, maxLines = 1) }
+}
+
+/** «У меня уже есть панель» (0.8.1-a): адрес и токен доступа 3x-ui — без установки и без входа на сервер. */
+@Composable
+private fun ConnectPanelDialog(onClose: () -> Unit, onOk: (name: String, address: String, token: String) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+    var token by remember { mutableStateOf("") }
+    val plain = address.isNotBlank() && !ru.gidravpn.hydra.servers.XuiPanel.isHttps(ru.gidravpn.hydra.servers.XuiPanel.normalizeUrl(address).orEmpty())
+    AlertDialog(
+        onDismissRequest = onClose, containerColor = Surface,
+        title = { Text(stringResource(R.string.ms_cp_title), color = TextPrimary) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.ms_cp_text), color = TextSecondary, fontSize = 13.sp)
+                MsField(stringResource(R.string.ms_cp_name), name) { name = it }
+                MsField(stringResource(R.string.ms_cp_address), address, hint = "http://203.0.113.5:2053/path") { address = it }
+                MsField(stringResource(R.string.ms_cp_token), token, secret = true, hint = stringResource(R.string.ms_cp_token_hint)) { token = it }
+                if (plain) Text(stringResource(R.string.ms_cp_plain_warn), color = Danger, fontSize = 12.sp)
+            }
+        },
+        confirmButton = { TextButton(enabled = address.isNotBlank() && token.isNotBlank(), onClick = { onOk(name, address, token) }) { Text(stringResource(R.string.ms_cp_connect), color = AccentCyan) } },
+        dismissButton = { TextButton(onClose) { Text(stringResource(R.string.ms_cancel), color = TextMuted) } },
+    )
+}
+
+/** Пароль панели в буфер на 30 секунд (0.8.1-a): потом очищается, если там всё ещё он. */
+private fun copySecret(clip: androidx.compose.ui.platform.ClipboardManager, text: String) {
+    clip.setText(AnnotatedString(text))
+    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+        if (clip.getText()?.text == text) clip.setText(AnnotatedString(""))
+    }, 30_000)
 }
 
 @Composable

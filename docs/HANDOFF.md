@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.8.0-rc3** — пре-релиз «Мои серверы» (`app/build.gradle.kts` → `versionName`); последний выпуск — 0.7.20
+- Текущая версия: **0.8.1-a** — альфа (панель 3x-ui; ветка `claude/0-8-1-alpha`, в `master` не вливается; `app/build.gradle.kts` → `versionName`); в `master` — пре-релиз 0.8.0-rc3 «Мои серверы»; последний выпуск — 0.7.20
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 

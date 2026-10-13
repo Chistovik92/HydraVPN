@@ -139,6 +139,20 @@ object XuiPanel {
         return JSONObject(text).getString("tag_name").also { require(Regex("^v\\d+\\.\\d+\\.\\d+$").matches(it)) { "Неожиданный тег $it" } }
     }
 
+    /**
+     * Адрес панели из того, что вставил пользователь: без схемы — `http://`, без завершающего слеша, без пробелов.
+     * null — это не адрес (пусто, нет хоста). Схема `http` пропускается: многие панели стоят без сертификата — экран предупреждает.
+     */
+    fun normalizeUrl(raw: String): String? {
+        val t = raw.trim().trimEnd('/')
+        if (t.isEmpty() || t.any { it.isWhitespace() }) return null
+        val withScheme = if (t.startsWith("http://", true) || t.startsWith("https://", true)) t else "http://$t"
+        val u = runCatching { URL(withScheme) }.getOrNull() ?: return null
+        return withScheme.takeIf { u.host.isNotBlank() }
+    }
+
+    fun isHttps(url: String) = url.startsWith("https://", true)
+
     fun validTag(t: String) = Regex("^v\\d+\\.\\d+\\.\\d+$").matches(t)
 
     private val alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
