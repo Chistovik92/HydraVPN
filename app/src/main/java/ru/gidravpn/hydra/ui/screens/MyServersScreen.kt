@@ -37,6 +37,8 @@ import ru.gidravpn.hydra.servers.MyServer
 import ru.gidravpn.hydra.servers.MyServersManager
 import ru.gidravpn.hydra.servers.MyServersUi
 import ru.gidravpn.hydra.servers.ServerForm
+import ru.gidravpn.hydra.servers.ServerKind
+import ru.gidravpn.hydra.servers.OfxNodeSpec
 import ru.gidravpn.hydra.servers.SshTarget
 import ru.gidravpn.hydra.servers.Stage
 import ru.gidravpn.hydra.ui.MainViewModel
@@ -125,7 +127,7 @@ fun MyServersScreen(vm: MainViewModel, onBack: () -> Unit, mvm: MyServersViewMod
             onDismissRequest = { confirm = null },
             containerColor = Surface,
             title = { Text(n.title, color = TextPrimary) },
-            text = { Text(stringResource(R.string.ms_uninstall_msg, n.server.host), color = TextSecondary) },
+            text = { Text(stringResource(if (n.server.ofx != null) R.string.ms_uninstall_msg_ofx else R.string.ms_uninstall_msg, n.server.host), color = TextSecondary) },
             confirmButton = { TextButton({ confirm = null; login = n }) { Text(stringResource(R.string.ms_next), color = Danger) } },
             dismissButton = { TextButton({ confirm = null }) { Text(stringResource(R.string.ms_cancel), color = TextMuted) } },
         )
@@ -161,7 +163,8 @@ private fun ServerCard(
     onAddClient: () -> Unit, onShow: (String) -> Unit, onRemoveClient: (String) -> Unit, onUninstall: () -> Unit, onForget: () -> Unit,
 ) = Card {
     Text(srv.name, color = TextPrimary, fontWeight = FontWeight.SemiBold)
-    Text(stringResource(R.string.ms_server_line, srv.host, srv.sshPort, srv.awg?.generation?.label ?: "—", srv.awg?.port ?: 0), color = TextMuted, fontSize = 12.sp)
+    if (srv.ofx != null) Text(stringResource(R.string.ms_ofx_line, srv.host, srv.sshPort, srv.ofx!!.channel, srv.ofx!!.port), color = TextMuted, fontSize = 12.sp)
+    else Text(stringResource(R.string.ms_server_line, srv.host, srv.sshPort, srv.awg?.generation?.label ?: "—", srv.awg?.port ?: 0), color = TextMuted, fontSize = 12.sp)
     Text(stringResource(R.string.ms_fingerprint, srv.fingerprint), color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
     Spacer(Modifier.height(8.dp))
     srv.clients.forEach { cl ->
@@ -173,7 +176,8 @@ private fun ServerCard(
     }
     Spacer(Modifier.height(8.dp))
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        MsChip(stringResource(R.string.ms_add_client), AccentCyan) { if (!busy) onAddClient() }
+        if (srv.ofx != null) MsChip(stringResource(R.string.ms_ofx_link), AccentViolet) { onShow("") }
+        else MsChip(stringResource(R.string.ms_add_client), AccentCyan) { if (!busy) onAddClient() }
         MsChip(stringResource(R.string.ms_uninstall), Danger) { if (!busy) onUninstall() }
         MsChip(stringResource(R.string.ms_forget), TextSecondary) { if (!busy) onForget() }
     }
@@ -190,13 +194,17 @@ private fun WizardCard(m: MyServersManager, s: MyServersUi, onClose: () -> Unit)
     var gen by remember { mutableStateOf(AwgGeneration.V2_0) }
     var awgPort by remember { mutableStateOf("51820") }
     var openFw by remember { mutableStateOf(false) }
+    var kind by remember { mutableStateOf(ServerKind.AMNEZIAWG) }
+    var channel by remember { mutableStateOf("hydra") }
+    var yandex by remember { mutableStateOf("") }
+    var mailru by remember { mutableStateOf("") }
     val defaultName = stringResource(R.string.ms_name_default)
     val yes = stringResource(R.string.ms_yes)
     val no = stringResource(R.string.ms_no)
     fun yn(b: Boolean) = if (b) yes else no
 
     Card {
-        Label(stringResource(R.string.ms_wizard_title))
+        Label(stringResource(if (kind == ServerKind.AMNEZIAWG) R.string.ms_wizard_title else R.string.ms_wizard_title_ofx))
         if (s.busy) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CircularProgressIndicator(Modifier.size(18.dp), color = AccentCyan, strokeWidth = 2.dp)
             Text(s.progress, color = TextSecondary, fontSize = 13.sp)
@@ -204,6 +212,11 @@ private fun WizardCard(m: MyServersManager, s: MyServersUi, onClose: () -> Unit)
         when (s.stage) {
             Stage.IDLE, Stage.FAILED -> {
                 s.error?.let { Text(it, color = Danger, fontSize = 13.sp); Spacer(Modifier.height(6.dp)) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MsChip("AmneziaWG", TextSecondary, selected = kind == ServerKind.AMNEZIAWG) { kind = ServerKind.AMNEZIAWG }
+                    MsChip(stringResource(R.string.ms_kind_ofx), TextSecondary, selected = kind == ServerKind.OPENFLUX) { kind = ServerKind.OPENFLUX }
+                }
+                Spacer(Modifier.height(8.dp))
                 MsField(stringResource(R.string.ms_name), name) { name = it.take(40) }
                 Spacer(Modifier.height(8.dp))
                 MsField(stringResource(R.string.ms_host), host) { host = it.trim() }
@@ -217,6 +230,7 @@ private fun WizardCard(m: MyServersManager, s: MyServersUi, onClose: () -> Unit)
                 Spacer(Modifier.height(8.dp))
                 MsField(stringResource(R.string.ms_key), key, singleLine = false) { key = it }
                 Spacer(Modifier.height(10.dp))
+                if (kind == ServerKind.AMNEZIAWG) {
                 Label(stringResource(R.string.ms_generation))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AwgGeneration.entries.forEach { g -> MsChip(g.label, TextSecondary, selected = gen == g) { gen = g } }
@@ -230,6 +244,14 @@ private fun WizardCard(m: MyServersManager, s: MyServersUi, onClose: () -> Unit)
                     }), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp),
                 )
                 MsField(stringResource(R.string.ms_awg_port), awgPort) { awgPort = it.filter(Char::isDigit).take(5) }
+                } else {
+                Text(stringResource(R.string.ms_ofx_hint), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
+                MsField(stringResource(R.string.ms_ofx_channel), channel) { channel = it.lowercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' }.take(31) }
+                Spacer(Modifier.height(8.dp))
+                MsField(stringResource(R.string.ms_ofx_yandex), yandex) { yandex = it.trim() }
+                Spacer(Modifier.height(8.dp))
+                MsField(stringResource(R.string.ms_ofx_mailru), mailru) { mailru = it.trim() }
+                }
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.clickableNoRipple { openFw = !openFw }, verticalAlignment = Alignment.CenterVertically) {
                     androidx.compose.material3.Checkbox(openFw, { openFw = it })
@@ -237,12 +259,13 @@ private fun WizardCard(m: MyServersManager, s: MyServersUi, onClose: () -> Unit)
                 }
                 val port = sshPort.toIntOrNull() ?: 0
                 val aport = awgPort.toIntOrNull() ?: 0
-                val ready = !s.busy && MyServersManager.validHost(host) && port in 1..65535 && aport in 1024..65535 && (password.isNotEmpty() || key.isNotBlank())
+                val ready = !s.busy && MyServersManager.validHost(host) && port in 1..65535 && (kind == ServerKind.OPENFLUX && OfxNodeSpec.validChannel(channel) || kind == ServerKind.AMNEZIAWG && aport in 1024..65535) && (password.isNotEmpty() || key.isNotBlank())
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (ready) MsChip(stringResource(R.string.ms_connect), AccentCyan) {
                         m.begin(ServerForm(name.ifBlank { defaultName }, SshTarget(host, port, user.ifBlank { "root" },
-                            password.takeIf { key.isBlank() && it.isNotEmpty() }, key.takeIf { it.isNotBlank() }), gen, aport, openFw))
+                            password.takeIf { key.isBlank() && it.isNotEmpty() }, key.takeIf { it.isNotBlank() }), gen, aport, openFw,
+                            kind, channel, yandex, mailru))
                     }
                     MsChip(stringResource(R.string.ms_close), TextSecondary) { onClose() }
                 }

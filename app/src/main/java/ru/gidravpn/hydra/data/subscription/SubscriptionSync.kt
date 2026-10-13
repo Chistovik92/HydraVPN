@@ -29,12 +29,13 @@ object SubscriptionSync {
         val pool = existing.groupBy(::key).mapValues { ArrayDeque(it.value) }
         val insert = mutableListOf<ServerProfile>()
         val update = mutableListOf<ServerProfile>()
-        for (fresh in incoming) {
+        // sortIndex = позиция в ответе подписки (с 1): список в приложении идёт в том порядке, как его отдала панель.
+        for ((i, fresh) in incoming.withIndex()) {
             val old = pool[key(fresh)]?.removeFirstOrNull()
             if (old == null) {
-                insert += fresh.copy(id = 0, subscriptionId = subId)
+                insert += fresh.copy(id = 0, subscriptionId = subId, sortIndex = i + 1)
             } else {
-                var next = fresh.copy(id = old.id, subscriptionId = subId, pingMs = old.pingMs, flag = old.flag)
+                var next = fresh.copy(id = old.id, subscriptionId = subId, pingMs = old.pingMs, flag = old.flag, sortIndex = i + 1)
                 // «Пустить через …» (0.7.13) хранится в профиле — обновление подписки его не стирает.
                 viaOf(old)?.let { next = withVia(next, it) }
                 if (next != old) update += next

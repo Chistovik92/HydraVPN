@@ -49,6 +49,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -244,9 +245,18 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
                     selected = settings.mode == m,
                     enabled = !ui.active,
                     onClick = { c.updateSettings { it.copy(mode = m) } },
+                    // В подключённом состоянии режим не меняется, но подпись должна читаться (особенно в AMOLED).
+                    colors = FilterChipDefaults.filterChipColors(disabledLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                        disabledSelectedContainerColor = MaterialTheme.colorScheme.secondaryContainer),
                     label = { Text(if (m == ConnectionMode.PROXY) "Системный прокси" else "TUN (весь трафик)") },
                 )
             }
+        }
+        // Права администратора: кнопка всегда под рукой (TUN, службы, системный прокси для всех пользователей).
+        Spacer(Modifier.height(8.dp))
+        ChipRow(center = true) {
+            Text(if (c.isElevated) "Запущена от администратора" else "Обычные права", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(onClick = onRelaunchAdmin, enabled = !c.isElevated) { Text("Запустить от имени администратора") }
         }
         if (ui.active) {
             Spacer(Modifier.height(16.dp))
@@ -255,13 +265,9 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
                 Stat("↑ ${speed(ui.upSpeed)}", "всего ${bytes(ui.upTotal)}")
             }
         }
-        // 0.7.15: подключено и в Hydra есть локальный прокси для Telegram (TG WS или ByeDPI) — кнопка «Подключить Telegram к прокси».
-        val routes = settings.routing.routes
-        if (ui.status == Status.CONNECTED && (routes.dpi.enabled || ru.gidravpn.hydra.data.tgws.TgWsPreset.isApplied(routes.rules) ||
-                ui.selected?.protocolId == ru.gidravpn.hydra.data.model.Protocol.BYEDPI.id)) {
-            Spacer(Modifier.height(16.dp))
-            Box(Modifier.widthIn(max = 520.dp)) { TelegramProxySection(c, ui, compact = true) }
-        }
+        // Telegram всегда на главном экране: переключатель TG WS и кнопка «Подключить Telegram к прокси».
+        Spacer(Modifier.height(16.dp))
+        Box(Modifier.widthIn(max = 520.dp)) { TelegramHomeCard(c, ui) }
         if (ui.needsElevation) {
             Spacer(Modifier.height(16.dp))
             Card(Modifier.widthIn(max = 520.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {

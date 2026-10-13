@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ServerDao {
-    @Query("SELECT * FROM servers ORDER BY id")
+    @Query("SELECT * FROM servers ORDER BY sortIndex, id")
     fun observeAll(): Flow<List<ServerProfile>>
 
     @Query("SELECT * FROM servers WHERE id = :id")
@@ -37,7 +37,7 @@ interface ServerDao {
         upsertAll(servers)
     }
 
-    @Query("SELECT * FROM servers WHERE subscriptionId = :subId ORDER BY id")
+    @Query("SELECT * FROM servers WHERE subscriptionId = :subId ORDER BY sortIndex, id")
     suspend fun bySubscription(subId: Long): List<ServerProfile>
 
     @Delete
@@ -59,7 +59,7 @@ interface ServerDao {
         return plan
     }
 
-    @Query("SELECT * FROM servers ORDER BY id")
+    @Query("SELECT * FROM servers ORDER BY sortIndex, id")
     suspend fun getAll(): List<ServerProfile>
 
     @Query("DELETE FROM servers")

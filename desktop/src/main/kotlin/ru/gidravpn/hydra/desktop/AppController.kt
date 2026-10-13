@@ -872,9 +872,10 @@ class AppController(
         _ui.update { it.copy(status = Status.STOPPING, statusText = "Отключение…") }
         scope.launch(Dispatchers.IO) {
             connLock.withLock {
-                SystemProxy.restore()
-                runner.stop()
-                if (WindowsPptp.active) WindowsPptp.disconnect()
+                // Сбой одного шага не должен оставить ядра работать (0.8.0-rc2): каждый — отдельно.
+                runCatching { SystemProxy.restore() }
+                runCatching { runner.stop() }
+                runCatching { if (WindowsPptp.active) WindowsPptp.disconnect() }
             }
             _ui.update { it.copy(status = Status.DISCONNECTED, statusText = "Не подключено", connectedId = null,
                 upSpeed = 0, downSpeed = 0, delayMs = null, blocked = false) }

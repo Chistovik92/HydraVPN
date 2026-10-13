@@ -48,7 +48,7 @@ class MigrationTest {
 
         val db = Room.databaseBuilder(
             ApplicationProvider.getApplicationContext(), AppDatabase::class.java, dbName
-        ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3).allowMainThreadQueries().build()
+        ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4).allowMainThreadQueries().build()
         try {
             runBlocking {
                 val server = db.serverDao().getAll().single()
@@ -79,9 +79,30 @@ class MigrationTest {
         helper.runMigrationsAndValidate(dbName, 3, true, AppDatabase.MIGRATION_2_3).close()
         val db = Room.databaseBuilder(
             ApplicationProvider.getApplicationContext(), AppDatabase::class.java, dbName
-        ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3).allowMainThreadQueries().build()
+        ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4).allowMainThreadQueries().build()
         try {
             runBlocking { assertEquals("", db.subscriptionDao().getAll().single().botPanel) }
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun v3ToV4_addsSortIndexAndKeepsServers() {
+        helper.createDatabase(dbName, 3).apply {
+            execSQL("INSERT INTO servers (id, name, protocolId, address, port, uuidOrPassword, flow, sni, transport, transportPath, security, alpn, fingerprint, extra, subscriptionId, pingMs, flag) VALUES (1, 'A', 'vless', 'a.example', 443, 'u', '', '', 'tcp', '', 'reality', '', 'chrome', '', NULL, 5, 'x')")
+            execSQL("INSERT INTO servers (id, name, protocolId, address, port, uuidOrPassword, flow, sni, transport, transportPath, security, alpn, fingerprint, extra, subscriptionId, pingMs, flag) VALUES (2, 'B', 'vless', 'b.example', 443, 'u', '', '', 'tcp', '', 'reality', '', 'chrome', '', NULL, 6, 'x')")
+            close()
+        }
+        helper.runMigrationsAndValidate(dbName, 4, true, AppDatabase.MIGRATION_3_4).close()
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java, dbName)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4).allowMainThreadQueries().build()
+        try {
+            runBlocking {
+                val all = db.serverDao().getAll()
+                assertEquals(listOf("A", "B"), all.map { it.name })
+                assertEquals(listOf(0, 0), all.map { it.sortIndex })
+            }
         } finally {
             db.close()
         }

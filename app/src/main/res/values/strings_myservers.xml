@@ -58,4 +58,13 @@
     <string name="ms_added">Server “%1$s” added</string>
     <string name="ms_act_remove_client">Remove client “%1$s”</string>
     <string name="ms_act_add_client">Add client “%1$s”</string>
+    <string name="ms_wizard_title_ofx">New OpenFlux node</string>
+    <string name="ms_kind_ofx">OpenFlux node</string>
+    <string name="ms_ofx_hint">The exit node is installed with the official “own node” wizard script (pinned commit, SHA-256 checked); the script picks the port. Yandex / Mail.ru transports are optional, direct is always on.</string>
+    <string name="ms_ofx_channel">Channel name (a-z, 0-9, dash)</string>
+    <string name="ms_ofx_yandex">Yandex document https://docs.yandex.ru/edit/d/… (optional)</string>
+    <string name="ms_ofx_mailru">Mail.ru public document (optional)</string>
+    <string name="ms_ofx_line">%1$s:%2$d · OpenFlux node “%3$s” · port %4$d/tcp</string>
+    <string name="ms_ofx_link">openflux:// link</string>
+    <string name="ms_uninstall_msg_ofx">The OpenFlux node channel, its service and config will be removed on %1$s. Profiles using this node will stop working.</string>
 </resources>

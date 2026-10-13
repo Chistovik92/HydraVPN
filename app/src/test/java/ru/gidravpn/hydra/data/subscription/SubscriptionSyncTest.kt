@@ -22,8 +22,20 @@ class SubscriptionSyncTest {
         assertEquals(listOf(2L), plan.toDelete.map { it.id })                     // b пропал из подписки
         assertEquals(listOf("d.example"), plan.toInsert.map { it.address })       // d новый
         assertEquals(0L, plan.toInsert.single().id)
-        val a = plan.toUpdate.single()                                             // c без изменений — не трогаем
-        assertEquals(1L, a.id); assertEquals(40, a.pingMs); assertEquals("🇩🇪 A renamed", a.name)
+        // a переименован, c не менялся по содержимому, но сдвинулся (позиция в подписке) — оба обновляются, id и пинг сохраняются
+        assertEquals(setOf(1L, 3L), plan.toUpdate.map { it.id }.toSet())
+        val a = plan.toUpdate.first { it.id == 1L }
+        assertEquals(40, a.pingMs); assertEquals("🇩🇪 A renamed", a.name); assertEquals(1, a.sortIndex)
+        assertEquals(2, plan.toUpdate.first { it.id == 3L }.sortIndex); assertEquals(3, plan.toInsert.single().sortIndex)
+    }
+
+    @Test fun orderFollowsSubscriptionResponse() {
+        // старые a, b, c; панель теперь отдаёт d, c, a, e — порядок (sortIndex) должен быть именно таким
+        val existing = listOf(s(1, "a.example"), s(2, "b.example"), s(3, "c.example"))
+        val incoming = listOf(s(0, "d.example"), s(0, "c.example"), s(0, "a.example"), s(0, "e.example"))
+        val plan = SubscriptionSync.plan(7, existing, incoming)
+        val byHost = (plan.toInsert + plan.toUpdate).associate { it.address to it.sortIndex }
+        assertEquals(mapOf("d.example" to 1, "c.example" to 2, "a.example" to 3, "e.example" to 4), byHost)
     }
 
     @Test fun changedCredentialsIsANewServer() {
