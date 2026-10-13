@@ -66,6 +66,7 @@ object Subscriptions {
         .callTimeout(60, TimeUnit.SECONDS)
         // https → http при редиректе раскрыл бы токен подписки в URL по открытому каналу.
         .followSslRedirects(false)
+        .proxySelector(AppNet.selector)
         .build()
 
     data class Fetched(val servers: List<ServerProfile>, val info: SubscriptionHeaders.Info)

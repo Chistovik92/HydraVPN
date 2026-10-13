@@ -310,11 +310,10 @@ private fun ServersScreen(c: AppController, ui: UiState) {
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(input, { input = it }, Modifier.weight(1f), singleLine = true,
-                // Enter добавляет — раньше приходилось тянуться к кнопке «+».
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { if (input.isNotBlank()) { c.import(input); input = "" } }),
-                placeholder = { Text("vless://…, trojan://…, ss://… или адрес подписки", maxLines = 1, overflow = TextOverflow.Ellipsis) })
+            // 0.8.0-rc3: поле многострочное — вставленный целиком .conf (WireGuard/AmneziaWG) раньше склеивался в одну строку
+            // и не разбирался. Добавляет кнопка «+» (Enter — новая строка).
+            OutlinedTextField(input, { input = it }, Modifier.weight(1f), minLines = 1, maxLines = 6,
+                placeholder = { Text("vless://…, trojan://…, ss://…, .conf WireGuard/AmneziaWG или адрес подписки", maxLines = 1, overflow = TextOverflow.Ellipsis) })
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = { c.import(input); input = "" }, enabled = input.isNotBlank()) { Icon(Icons.Default.Add, "Добавить") }
         }
