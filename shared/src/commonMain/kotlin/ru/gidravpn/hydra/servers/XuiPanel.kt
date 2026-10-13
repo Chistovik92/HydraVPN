@@ -76,7 +76,7 @@ class SshXuiTransport(private val ssh: SshSession, private val localBase: String
     }
 }
 
-/** Клиент API 3x-ui (`/panel/api/*`). Ответ панели всегда `{success, msg, obj}`. */
+/** Клиент API 3x-ui (пути `/panel/api/…`). Ответ панели всегда `{success, msg, obj}`. */
 class XuiApi(private val t: XuiTransport) {
     private fun obj(raw: String): Any? {
         val j = runCatching { JSONObject(raw.trim()) }.getOrElse { throw XuiApiException("Некорректный ответ панели: ${raw.take(120)}") }

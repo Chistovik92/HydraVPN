@@ -179,15 +179,13 @@ class MyServersManager(
     /** Панель: новый клиент (ссылка показывается в окне, можно добавить в «Серверы»). */
     fun addPanelClient(id: String, login: SshTarget, email: String) = withServer(id, login) { s, ssh, _ ->
         val links = service.addPanelClient(ssh, s, email)
-        if (links.isNullOrEmpty()) null else { _ui.update { it.copy(shown = email to links.joinToString("
-")) }; s }
+        if (links.isNullOrEmpty()) null else { _ui.update { it.copy(shown = email to links.joinToString("\n")) }; s }
     }
 
     /** Панель: ссылки уже созданного клиента. */
     fun showPanelLinks(id: String, login: SshTarget, email: String) = withServer(id, login) { s, ssh, _ ->
         val links = service.panelLinks(ssh, s, email)
-        if (links.isEmpty()) null else { _ui.update { it.copy(shown = email to links.joinToString("
-")) }; s }
+        if (links.isEmpty()) null else { _ui.update { it.copy(shown = email to links.joinToString("\n")) }; s }
     }
 
     /** Удалить сервер: со своей машины снимаем службу и файлы, из приложения — запись. */
