@@ -196,7 +196,7 @@ class XuiLiveTest {
         assertTrue(api.clientEmails().contains("hydra-1"))
         assertEquals(1, api.inbounds().length())
         // ещё один клиент и его ссылки — через мастер
-        m.addPanelClient(srv.id, login, "second")
+        m.addPanelClient(srv.id, "second")
         waitFor("клиент") { !m.ui.value.busy && m.ui.value.shown != null }
         assertTrue(m.ui.value.shown!!.second.startsWith("vless://"), m.ui.value.shown.toString())
         assertTrue(api.clientEmails().contains("second"))

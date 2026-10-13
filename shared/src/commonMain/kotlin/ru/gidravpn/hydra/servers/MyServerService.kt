@@ -140,29 +140,6 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
         }
         throw last ?: XuiApiException("Панель не ответила")
     }
-    /** Ещё один клиент панели: возвращает ссылки. */
-    fun addPanelClient(ssh: SshSession, s: MyServer, email: String): List<String>? {
-        val p = s.panel ?: return null
-        val api = apiOver(ssh, s, p)
-        val inbound = p.inboundId.takeIf { it > 0 } ?: return null
-        api.addClient(email, XuiPanel.random(14), listOf(inbound))
-        return api.links(email)
-    }
-
-    fun removePanelClient(ssh: SshSession, s: MyServer, email: String) {
-        val p = s.panel ?: return
-        apiOver(ssh, s, p).delClient(email)
-    }
-
-    fun panelLinks(ssh: SshSession, s: MyServer, email: String): List<String> = s.panel?.let { apiOver(ssh, s, it).links(email) }.orEmpty()
-
-    fun panelClients(ssh: SshSession, s: MyServer): List<String> = s.panel?.let { apiOver(ssh, s, it).clientEmails() }.orEmpty()
-
-    private fun apiOver(ssh: SshSession, s: MyServer, p: PanelInstance): XuiApi {
-        val u = java.net.URI(p.baseUrl)
-        return XuiApi(SshXuiTransport(ssh, "http://127.0.0.1:${u.port}${u.path}", p.token, s.host))
-    }
-
     /** Удаление панели с сервера (скрипт самой панели, без вопросов). */
     fun uninstallXui(installer: Installer): Boolean = installer.run(listOf(
         Step("xui-remove", "Удалить 3x-ui с сервера", "printf 'y\\n' | /usr/bin/x-ui uninstall; test ! -e /usr/local/x-ui/x-ui",

@@ -39,6 +39,8 @@ data class MyServersUi(
     val plan: List<Step> = emptyList(),
     val log: List<String> = emptyList(),
     val progress: String = "",
+    /** Панели 3x-ui: id сервера → email клиентов (после «Клиенты»). */
+    val panelClients: Map<String, List<String>> = emptyMap(),
     val error: String? = null,
     /** Клиент, чей .conf показываем (имя сервера → клиент). */
     val shown: Pair<String, String>? = null,
@@ -58,6 +60,9 @@ class MyServersManager(
     private val service = MyServersService(bundleFor)
     private val _ui = MutableStateFlow(MyServersUi())
     val ui: StateFlow<MyServersUi> = _ui
+
+    /** Подставить состояние без сети — для скриншотов и тестов отрисовки. */
+    fun previewState(state: MyServersUi) { _ui.value = state }
 
     private var form: ServerForm? = null
     private var session: SshSession? = null
@@ -172,20 +177,46 @@ class MyServersManager(
         }
     }
 
-    fun removeClient(id: String, login: SshTarget, name: String) = withServer(id, login) { s, ssh, inst ->
-        if (s.panel != null) { service.removePanelClient(ssh, s, name); s.copy(panel = s.panel) } else service.removeClient(s, name, inst)
+    fun removeClient(id: String, login: SshTarget, name: String) = withServer(id, login) { s, _, inst -> service.removeClient(s, name, inst) }
+
+    // ---------------------------------------------------------- Панель 3x-ui: клиенты по токену API (без входа по SSH)
+
+    private fun withPanel(id: String, work: (MyServer, XuiApi) -> Unit) {
+        val srv = servers().firstOrNull { it.id == id }?.takeIf { it.panel != null } ?: return
+        val panel = srv.panel!!
+        _ui.update { it.copy(busy = true, error = null) }
+        scope.launch(Dispatchers.IO) {
+            try { work(srv, XuiApi(DirectXuiTransport(panel.baseUrl, panel.token))) }
+            catch (e: XuiApiException) { _ui.update { it.copy(error = "Панель: ${e.message}") } }
+            catch (e: Exception) { _ui.update { it.copy(error = "Панель недоступна по сети (порт закрыт файрволом?): ${e.message}") } }
+            _ui.update { it.copy(busy = false) }
+        }
     }
 
-    /** Панель: новый клиент (ссылка показывается в окне, можно добавить в «Серверы»). */
-    fun addPanelClient(id: String, login: SshTarget, email: String) = withServer(id, login) { s, ssh, _ ->
-        val links = service.addPanelClient(ssh, s, email)
-        if (links.isNullOrEmpty()) null else { _ui.update { it.copy(shown = email to links.joinToString("\n")) }; s }
+    /** Клиенты панели (email) — для списка в карточке. */
+    fun loadPanelClients(id: String) = withPanel(id) { s, api ->
+        val emails = api.clientEmails()
+        _ui.update { it.copy(panelClients = it.panelClients + (s.id to emails)) }
     }
 
-    /** Панель: ссылки уже созданного клиента. */
-    fun showPanelLinks(id: String, login: SshTarget, email: String) = withServer(id, login) { s, ssh, _ ->
-        val links = service.panelLinks(ssh, s, email)
-        if (links.isEmpty()) null else { _ui.update { it.copy(shown = email to links.joinToString("\n")) }; s }
+    /** Новый клиент панели: ссылка показывается в окне, её можно добавить в «Серверы». */
+    fun addPanelClient(id: String, email: String) = withPanel(id) { s, api ->
+        val inbound = s.panel!!.inboundId.takeIf { it > 0 } ?: throw XuiApiException("У панели нет инбаунда Hydra")
+        api.addClient(email, XuiPanel.random(14), listOf(inbound))
+        val links = api.links(email)
+        _ui.update { it.copy(shown = email to links.joinToString("\n"), panelClients = it.panelClients + (s.id to api.clientEmails())) }
+    }
+
+    /** Ссылки уже созданного клиента панели. */
+    fun showPanelLinks(id: String, email: String) = withPanel(id) { _, api ->
+        val links = api.links(email)
+        if (links.isEmpty()) throw XuiApiException("Панель не выдала ссылок для $email")
+        _ui.update { it.copy(shown = email to links.joinToString("\n")) }
+    }
+
+    fun removePanelClient(id: String, email: String) = withPanel(id) { s, api ->
+        api.delClient(email)
+        _ui.update { it.copy(panelClients = it.panelClients + (s.id to api.clientEmails())) }
     }
 
     /** Удалить сервер: со своей машины снимаем службу и файлы, из приложения — запись. */
