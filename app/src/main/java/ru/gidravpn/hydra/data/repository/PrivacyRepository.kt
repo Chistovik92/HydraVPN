@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -17,6 +18,7 @@ class PrivacyRepository(private val context: Context) {
     private val KEY_HIDE_SECRETS = booleanPreferencesKey("hide_secrets")
     private val KEY_UPDATE_CHECK = booleanPreferencesKey("update_check")
     private val KEY_UPDATE_LAST = longPreferencesKey("update_last_check")
+    private val KEY_UPDATE_CHANNEL = stringPreferencesKey("update_channel")
 
     /** Отпечаток/лицо/PIN устройства при открытии приложения. По умолчанию выключено. */
     val appLock: Flow<Boolean> = context.vpnSettingsStore.data.map { it[KEY_APP_LOCK] == true }
@@ -29,6 +31,11 @@ class PrivacyRepository(private val context: Context) {
     /** Раз в сутки спрашивать GitHub о новом релизе. По умолчанию включено. */
     val updateCheck: Flow<Boolean> = context.vpnSettingsStore.data.map { it[KEY_UPDATE_CHECK] != false }
     suspend fun setUpdateCheck(enabled: Boolean) { context.vpnSettingsStore.edit { it[KEY_UPDATE_CHECK] = enabled } }
+
+    /** Канал обновлений (0.8.0): stable — только выпуски; rc — + релиз-кандидаты; dev — + альфы и беты. */
+    val updateChannel: Flow<ru.gidravpn.hydra.update.UpdateChannel> =
+        context.vpnSettingsStore.data.map { ru.gidravpn.hydra.update.UpdateChannel.fromId(it[KEY_UPDATE_CHANNEL]) }
+    suspend fun setUpdateChannel(c: ru.gidravpn.hydra.update.UpdateChannel) { context.vpnSettingsStore.edit { it[KEY_UPDATE_CHANNEL] = c.id } }
 
     val lastUpdateCheck: Flow<Long> = context.vpnSettingsStore.data.map { it[KEY_UPDATE_LAST] ?: 0L }
     suspend fun markUpdateChecked(at: Long) { context.vpnSettingsStore.edit { it[KEY_UPDATE_LAST] = at } }

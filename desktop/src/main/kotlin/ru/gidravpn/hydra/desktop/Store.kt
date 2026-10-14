@@ -81,6 +81,8 @@ data class DesktopSettings(
     // Раздача VPN в локальную сеть (хотспот-прокси Android).
     val lanShare: HotspotSettings = HotspotSettings(),
     val checkUpdates: Boolean = true,
+    /** Канал обновлений (0.8.0): stable / rc / dev — «Участвовать в бета-тестировании». */
+    val updateChannel: String = "stable",
     // Оформление (0.7.9) — как «Тема» и «Иконка приложения» на Android.
     val theme: AppTheme = AppTheme.AMBIENT,
     val appIcon: AppIcon = AppIcon.FOLLOW_THEME,
@@ -271,6 +273,7 @@ class Store(val file: File = File(Platform.dataDir, "hydra.json")) {
             .put("lanShare", JSONObject().put("enabled", s.lanShare.enabled).put("port", s.lanShare.port)
                 .put("username", s.lanShare.username).put("password", s.lanShare.password))
             .put("checkUpdates", s.checkUpdates)
+            .put("updateChannel", s.updateChannel)
             .put("theme", s.theme.name).put("appIcon", s.appIcon.name)
 
         private fun settingsFromJson(o: JSONObject): DesktopSettings {
@@ -300,6 +303,7 @@ class Store(val file: File = File(Platform.dataDir, "hydra.json")) {
                     password = lan.optString("password", "").take(128),
                 ),
                 checkUpdates = o.optBoolean("checkUpdates", true),
+                updateChannel = o.optString("updateChannel", "stable"),
                 theme = AppTheme.of(o.optString("theme")),
                 appIcon = AppIcon.of(o.optString("appIcon")),
             )

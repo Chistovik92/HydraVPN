@@ -18,8 +18,9 @@ object UpdateChecker {
         val apkUrl: String? get() = apk?.url
     }
 
-    suspend fun latest(): Release = withContext(Dispatchers.IO) {
-        parse(UpdateFeed.latest("Hydra-VPN-update-check"), stub = ru.gidravpn.hydra.BuildConfig.FLAVOR == "stub")
+    /** [channel] — канал из «Участвовать в бета-тестировании» (0.8.0). */
+    suspend fun latest(channel: ru.gidravpn.hydra.update.UpdateChannel = ru.gidravpn.hydra.update.UpdateChannel.STABLE): Release = withContext(Dispatchers.IO) {
+        parse(UpdateFeed.latest("Hydra-VPN-update-check", channel), stub = ru.gidravpn.hydra.BuildConfig.FLAVOR == "stub")
     }
 
     internal fun parse(json: String, stub: Boolean = false, abis: List<String> = emptyList()): Release = parse(UpdateFeed.parse(json), stub, abis)

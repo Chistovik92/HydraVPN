@@ -365,6 +365,13 @@
 "a11y_dismiss" = "Dismiss";
 "a11y_more_actions" = "More actions";
 "a11y_selected" = "Selected";
+"upd_beta" = "Take part in beta testing";
+"upd_beta_desc" = "Off — only final releases. On — also pre-releases of the chosen level. Pre-releases may contain bugs.";
+"upd_beta_level" = "Beta testing level";
+"upd_level_rc" = "Release candidates";
+"upd_level_rc_desc" = "Versions -rc1, -rc2…: almost final, need light checking.";
+"upd_level_dev" = "Developer";
+"upd_level_dev_desc" = "Also alphas (-a) and betas (-b): new features before anyone else, unchecked code.";
 "rh_hub_title" = "Routing";
 "rh_hub_sub" = "Apps, sites, DPI bypass and exits in one place";
 "rh_title" = "Routing";
@@ -633,7 +640,7 @@
 "xray_toggle_missing" = "Requires app/libs/libXray.aar — see docs/BUILD.md, section 2.2.";
 "sec_killswitch_desc" = "If a connection attempt fails, the tunnel does not fall back to a direct connection — traffic is blocked until you disconnect the VPN manually. It does not protect against the system revoking the VPN (another VPN app, \"Disconnect\" in system settings) — for a full guarantee at OS level enable \"Block connections without VPN\" below.";
 "sec_app_through" = "Hydra traffic through the VPN";
-"sec_app_through_desc" = "SSH to your servers, subscription downloads and updates go through the tunnel while the VPN is on — so servers that are blocked without a VPN open too. Modes with helper processes (ByeDPI, OpenFlux, olcRTC, Xray) keep Hydra outside the tunnel. Applied on the next connection.";
+"sec_app_through_desc" = "SSH to your servers, subscription downloads and updates go through the tunnel while the VPN is on — so servers that are blocked without a VPN open too. Modes with helper processes (ByeDPI, OpenFlux, olcRTC, Xray) and AmneziaWG keep Hydra outside the tunnel. Applied on the next connection.";
 "sec_auto_app" = "Auto-connect on app start";
 "sec_auto_app_desc" = "Open Hydra and it brings the tunnel up to the last server, if VPN consent was granted earlier.";
 "sec_auto_boot" = "Auto-connect on device boot";

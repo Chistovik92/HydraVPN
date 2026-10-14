@@ -234,6 +234,18 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
                 ToggleRow("Проверять обновления при запуске", s.checkUpdates, "Запрос к GitHub: есть ли релиз новее. Скачивание — только по кнопке «Обновить».") {
                     v -> c.updateSettings { it.copy(checkUpdates = v) }
                 }
+                val ch = ru.gidravpn.hydra.update.UpdateChannel.fromId(s.updateChannel)
+                ToggleRow("Участвовать в бета-тестировании", ch != ru.gidravpn.hydra.update.UpdateChannel.STABLE,
+                    "Выключено — только выпуски. Включено — ещё и пре-релизы выбранного уровня. В пре-релизах возможны ошибки.") { v ->
+                    c.updateSettings { it.copy(updateChannel = if (v) "rc" else "stable") }; c.checkForUpdates(manual = true)
+                }
+                if (ch != ru.gidravpn.hydra.update.UpdateChannel.STABLE) ChipRow {
+                    Text("Уровень:", fontSize = 13.sp)
+                    FilterChip(selected = ch == ru.gidravpn.hydra.update.UpdateChannel.RC, onClick = { c.updateSettings { it.copy(updateChannel = "rc") }; c.checkForUpdates(manual = true) },
+                        label = { Text("Релиз-кандидаты (-rc)") })
+                    FilterChip(selected = ch == ru.gidravpn.hydra.update.UpdateChannel.DEV, onClick = { c.updateSettings { it.copy(updateChannel = "dev") }; c.checkForUpdates(manual = true) },
+                        label = { Text("Разработчик (+ альфы -a и беты -b)") })
+                }
                 ChipRow {
                     OutlinedButton(onClick = { c.checkForUpdates(manual = true) }) { Text("Проверить сейчас") }
                     ui.update?.let { u -> UpdateBanner(c, ui, u) }

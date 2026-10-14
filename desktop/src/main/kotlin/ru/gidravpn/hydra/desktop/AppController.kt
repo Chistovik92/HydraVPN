@@ -658,7 +658,7 @@ class AppController(
     }
 
     fun checkForUpdates(manual: Boolean) = scope.launch(Dispatchers.IO) {
-        runCatching { Updates.latest() }
+        runCatching { Updates.latest(ru.gidravpn.hydra.update.UpdateChannel.fromId(_ui.value.data.settings.updateChannel)) }
             .onSuccess { r ->
                 if (Updates.isNewer(r.version, Platform.version)) _ui.update { it.copy(update = r) }
                 else if (manual) toast("Установлена последняя версия (${Platform.version})")
