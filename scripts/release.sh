@@ -216,6 +216,9 @@ if [[ -z "$NOTES_FILE" ]]; then
 
 Что изменилось — см. [CHANGELOG.md](https://github.com/Chistovik92/HydraVPN/blob/master/CHANGELOG.md).
 
+> **⚠️ Windows: с версии 0.7.20 антивирус (например, Kaspersky: \`PDM:Trojan.Win32.Generic\`) может блокировать установку и \`Hydra.exe\`.** Это считаем ложным срабатыванием: код открыт, SHA-256 — в файлах релиза.
+> На время установки отключите защиту или добавьте \`%LOCALAPPDATA%\\Hydra\` в исключения. Подробности и план исправления — [docs/versions/0.7.21.md](https://github.com/Chistovik92/HydraVPN/blob/master/docs/versions/0.7.21.md).
+
 ### Скачать
 | Процессор | Windows | macOS | Debian, Ubuntu, Mint | Fedora, RHEL, openSUSE | Любой Linux | Android | iPhone, iPad |
 |---|---|---|---|---|---|---|---|

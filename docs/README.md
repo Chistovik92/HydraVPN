@@ -21,7 +21,7 @@
 | iOS: тестирование | [IOS_TESTING.md](IOS_TESTING.md) |
 | Распространение (магазины) | [DISTRIBUTION.md](DISTRIBUTION.md) |
 | Как вносить изменения | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| Старое | [LEGACY.md](LEGACY.md), [archive/](archive/) — прежняя дорожная карта целиком |
+| Старое | [LEGACY.md](LEGACY.md), [archive/](archive/) — прежние дорожные карты (до rc3, ветки 0.8.1-a, ветки kaspersky) прежние тексты заметки 0.8.1 и инструкция «Свой сервер» альфы дословно |
 
 Правило: при каждом выпуске обновляются CHANGELOG, `HISTORY.md` (строка версии и решения владельца), `versions/<номер>.md`
 (для заметных версий), оглавление `versions/README.md` (`python scripts/docs-versions-index.py .`) и раздел «Сейчас» в `ROADMAP.md`.
