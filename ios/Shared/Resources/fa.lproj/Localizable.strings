@@ -411,6 +411,13 @@
 "a11y_dismiss" = "بستن";
 "a11y_more_actions" = "کارهای بیشتر";
 "a11y_selected" = "انتخاب‌شده";
+"upd_beta" = "شرکت در آزمایش بتا";
+"upd_beta_desc" = "خاموش — فقط نسخه‌های نهایی. روشن — پیش‌انتشارهای سطح انتخابی هم. پیش‌انتشارها ممکن است خطا داشته باشند.";
+"upd_beta_level" = "سطح آزمایش بتا";
+"upd_level_rc" = "نامزدهای انتشار";
+"upd_level_rc_desc" = "نسخه‌های -rc1، -rc2…: تقریباً نهایی، به بررسی سبک نیاز دارند.";
+"upd_level_dev" = "توسعه‌دهنده";
+"upd_level_dev_desc" = "آلفاها (-a) و بتاها (-b) هم: امکانات تازه زودتر از همه، کد بررسی‌نشده.";
 "rh_hub_title" = "Routing";
 "rh_hub_sub" = "Apps, sites, DPI bypass and exits in one place";
 "rh_title" = "Routing";

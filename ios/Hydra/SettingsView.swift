@@ -76,6 +76,8 @@ struct TunnelSettings: View {
 
 struct SecuritySettings: View {
     @EnvironmentObject var model: AppModel
+    /// Канал обновлений (0.8.0): stable — только выпуски; rc — + релиз-кандидаты; dev — + альфы и беты.
+    @AppStorage("update.channel") private var updateChannel = "stable"
     var body: some View {
         List {
             Section(footer: Text(L("ios_killswitch_desc"))) {
@@ -89,6 +91,15 @@ struct SecuritySettings: View {
             }
             Section(footer: Text(L("sec_hide_secrets_desc"))) {
                 Toggle(L("sec_hide_secrets"), isOn: Binding(get: { model.state.app.hideSecrets }, set: { v in model.mutate { $0.app.hideSecrets = v } }))
+            }
+            Section(footer: Text(L("upd_beta_desc"))) {
+                Toggle(L("upd_beta"), isOn: Binding(get: { updateChannel != "stable" }, set: { updateChannel = $0 ? "rc" : "stable" }))
+                if updateChannel != "stable" {
+                    Picker(L("upd_beta_level"), selection: $updateChannel) {
+                        Text(L("upd_level_rc")).tag("rc")
+                        Text(L("upd_level_dev")).tag("dev")
+                    }
+                }
             }
             Section(L("ios_widgets_title")) { Text(L("ios_widgets_desc")).font(.footnote) }
         }

@@ -201,6 +201,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
     fun setUpdateCheck(enabled: Boolean) = safeLaunch { privacyRepo.setUpdateCheck(enabled) }
 
+    val updateChannel: StateFlow<ru.gidravpn.hydra.update.UpdateChannel> = privacyRepo.updateChannel
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ru.gidravpn.hydra.update.UpdateChannel.STABLE)
+    /** Смена канала сразу проверяет обновления этого канала. */
+    fun setUpdateChannel(c: ru.gidravpn.hydra.update.UpdateChannel) = safeLaunch {
+        privacyRepo.setUpdateChannel(c)
+        checkForUpdates(manual = true)
+    }
+
     /** Состояние проверки обновлений для экрана «О приложении» и плашки на главном. */
     sealed interface UpdateUi {
         data object Idle : UpdateUi
@@ -245,7 +253,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (System.currentTimeMillis() - last < 24 * 3_600_000L) return@safeLaunch
         }
         _update.value = UpdateUi.Checking
-        _update.value = runCatching { ru.gidravpn.hydra.data.update.UpdateChecker.latest() }.fold(
+        val channel = privacyRepo.updateChannel.first()
+        _update.value = runCatching { ru.gidravpn.hydra.data.update.UpdateChecker.latest(channel) }.fold(
             onSuccess = { r ->
                 privacyRepo.markUpdateChecked(System.currentTimeMillis())
                 if (ru.gidravpn.hydra.data.update.UpdateChecker.isNewer(r.version, ru.gidravpn.hydra.BuildConfig.VERSION_NAME))

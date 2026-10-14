@@ -17,8 +17,8 @@ object Updates {
     /** [asset] — файл для этой машины; null — подходящего нет (тогда только страница релиза). */
     data class Release(val version: String, val pageUrl: String, val asset: ReleaseAsset? = null)
 
-    fun latest(): Release {
-        val info = UpdateFeed.latest("Hydra-desktop-update-check")
+    fun latest(channel: ru.gidravpn.hydra.update.UpdateChannel = ru.gidravpn.hydra.update.UpdateChannel.STABLE): Release {
+        val info = UpdateFeed.latest("Hydra-desktop-update-check", channel)
         return Release(info.version, info.pageUrl, pick(info, Platform.os, arch(), installKind(), Platform.classic))
     }
 

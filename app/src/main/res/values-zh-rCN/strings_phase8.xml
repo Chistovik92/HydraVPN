@@ -72,4 +72,11 @@
     <string name="a11y_dismiss">关闭</string>
     <string name="a11y_more_actions">更多操作</string>
     <string name="a11y_selected">已选择</string>
+    <string name="upd_beta">参与 Beta 测试</string>
+    <string name="upd_beta_desc">关闭——仅正式版。开启——还包括所选级别的预发布版本。预发布版本可能有错误。</string>
+    <string name="upd_beta_level">Beta 测试级别</string>
+    <string name="upd_level_rc">候选发布版</string>
+    <string name="upd_level_rc_desc">-rc1、-rc2… 版本：基本完成，需要简单检查。</string>
+    <string name="upd_level_dev">开发者</string>
+    <string name="upd_level_dev_desc">还包括 alpha（-a）和 beta（-b）：最先体验新功能，代码未经检查。</string>
 </resources>
