@@ -172,7 +172,7 @@
     <string name="ms_panel_connected">面板已连接——在下方列表中。</string>
     <string name="ms_install_xui_title">安装 3x-ui 面板</string>
     <string name="ms_installing_xui">正在安装 3x-ui 面板</string>
-    <string name="ms_xui_hint">Hydra 将用官方安装程序安装最新版 3x-ui，生成强登录名和密码，创建 VLESS + Reality 连接和第一个用户。</string>
+    <string name="ms_xui_hint">Hydra 将用官方安装程序安装最新版 3x-ui，生成强登录名和密码，创建 VLESS + gRPC + Reality 连接和第一个用户，并把该用户的订阅添加到“服务器”——在面板网站上的修改会自动同步。</string>
     <string name="ms_panel_title">管理面板</string>
     <string name="ms_panel_kind">%1$s 面板</string>
     <string name="ms_panel_install_other">安装 %1$s</string>
@@ -181,4 +181,11 @@
     <string name="ms_panel_other_hint">Hydra 将用官方安装程序安装最新版 %1$s，并设置强登录名、密码和随机面板地址。用户请在面板网站上创建。</string>
     <string name="ms_install_done_panel">完成！面板已安装——在服务器卡片上点「打开面板」即可打开。</string>
     <string name="ms_broken">记录已损坏：在 0.8.1-a 中连接的面板在 0.8.0-rc4 中打开后会变成这样。请移除它，并通过「我已有面板」重新连接。</string>
+    <!-- 0.8.1-rc1: маскировка Reality, HTTPS панели -->
+    <string name="ms_xui_mask">伪装（Reality 冒充的网站）</string>
+    <string name="ms_xui_mask_ru">“白名单”中的网站：即使移动运营商只放行允许的网站，连接也能通过。缺点：境外 IP 上的俄罗斯网站对 DPI 是明显特征。</string>
+    <string name="ms_xui_mask_foreign">在俄罗斯没有节点的境外网站：服务器地址与伪装不矛盾。缺点：移动运营商“白名单”下无法通过。</string>
+    <string name="ms_xui_https">面板和订阅使用 HTTPS：为服务器 IP 申请免费的 Let\'s Encrypt 证书（需要开放 80/tcp）</string>
+    <string name="ms_panel_https">启用 HTTPS</string>
+    <string name="ms_xui_transport">传输方式（推荐 gRPC）</string>
 </resources>

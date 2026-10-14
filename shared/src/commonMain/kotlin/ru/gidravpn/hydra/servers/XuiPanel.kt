@@ -65,15 +65,18 @@ class DirectXuiTransport(private val baseUrl: String, private val token: String,
     }
 }
 
-/** Вызовы идут `curl`-ом на сервере: [localBase] — `http://127.0.0.1:порт/путь`, [hostHeader] — внешний адрес для ссылок клиентов. */
+/**
+ * Вызовы идут `curl`-ом на сервере: [localBase] — `http(s)://127.0.0.1:порт/путь`, [hostHeader] — внешний адрес для ссылок клиентов.
+ * `-k`: с HTTPS (0.8.1-rc1) сертификат выписан на внешний IP, а запрос идёт на 127.0.0.1 — проверять его здесь не с чем.
+ */
 class SshXuiTransport(private val ssh: SshSession, private val localBase: String, private val token: String, private val hostHeader: String) : XuiTransport {
     override fun call(method: String, path: String, body: String?): String {
         val bodyFile = "/tmp/.hydra-xui-body.json"
         val hdr = "-H ${Installer.shq("Authorization: Bearer $token")} -H ${Installer.shq("Host: $hostHeader")}"
         val cmd = if (body != null) {
             ssh.upload(body.toByteArray(), bodyFile, 384)
-            "curl -sS -m 25 -X $method $hdr -H 'Content-Type: application/json' --data @$bodyFile ${Installer.shq(localBase.trimEnd('/') + path)}; rm -f $bodyFile"
-        } else "curl -sS -m 25 -X $method $hdr ${Installer.shq(localBase.trimEnd('/') + path)}"
+            "curl -ksS -m 25 -X $method $hdr -H 'Content-Type: application/json' --data @$bodyFile ${Installer.shq(localBase.trimEnd('/') + path)}; rm -f $bodyFile"
+        } else "curl -ksS -m 25 -X $method $hdr ${Installer.shq(localBase.trimEnd('/') + path)}"
         val r = ssh.exec(cmd)
         if (r.out.isBlank()) throw XuiApiException("Панель не ответила (curl код ${r.exit})")
         return r.out
@@ -112,6 +115,21 @@ class XuiApi(private val t: XuiTransport) {
         obj(t.call("POST", "/panel/api/clients/add", JSONObject().put("client", client).put("inboundIds", JSONArray(inboundIds)).toString()))
     }
 
+    /** Клиенты всех инбаундов (как отдаёт панель: `email`, `subId`, …). */
+    fun clients(): List<JSONObject> {
+        val a = obj(t.call("GET", "/panel/api/clients/list")) as? JSONArray ?: return emptyList()
+        return (0 until a.length()).mapNotNull { a.optJSONObject(it) }
+    }
+
+    /** `subId` клиента по `email` — для адреса подписки. */
+    fun subIdOf(email: String): String? = clients().firstOrNull { it.optString("email") == email }?.optString("subId")?.takeIf { it.isNotBlank() }
+
+    /**
+     * Адрес подписки клиента (0.8.1-rc1): подписка обновляется сама, и правки инбаунда на сайте панели доходят до приложения.
+     * null — подписка в панели выключена или у клиента нет `subId`.
+     */
+    fun subscriptionUrl(host: String, subId: String): String? = XuiPanel.subscriptionUrl(settings(), host, subId)
+
     fun delClient(email: String) { obj(t.call("POST", "/panel/api/clients/del/${java.net.URLEncoder.encode(email, "UTF-8")}")) }
 
     /** Готовые ссылки (`vless://…`) клиента по всем его инбаундам. */
@@ -121,10 +139,7 @@ class XuiApi(private val t: XuiTransport) {
     }
 
     /** Список клиентов (`email`) всех инбаундов. */
-    fun clientEmails(): List<String> {
-        val a = obj(t.call("GET", "/panel/api/clients/list")) as? JSONArray ?: return emptyList()
-        return (0 until a.length()).mapNotNull { a.optJSONObject(it)?.optString("email")?.takeIf { e -> e.isNotBlank() } }
-    }
+    fun clientEmails(): List<String> = clients().mapNotNull { it.optString("email").takeIf { e -> e.isNotBlank() } }
 }
 
 object XuiPanel {
@@ -169,6 +184,10 @@ object XuiPanel {
         val password: String = random(16),
         val port: Int = 20000 + SecureRandom().nextInt(40000),
         val webPath: String = random(14),
+        /** HTTPS панели и подписки сертификатом Let's Encrypt на IP (0.8.1-rc1): `XUI_SSL_MODE=ip`, нужен открытый 80/tcp. */
+        val sslIp: Boolean = false,
+        /** Сервер добавлен по имени: сертификат выписывается на домен (`XUI_SSL_MODE=domain`), а не на IP. */
+        val domain: String = "",
     )
 
     /** Шаги установки. Переменные окружения идут файлом 0600 (не в аргументах — не видны в `ps`). */
@@ -181,13 +200,16 @@ object XuiPanel {
             rollback = "rm -f $SCRIPT", failHint = "Не удалось скачать установщик с GitHub"))
         add(Step("xui-env", "Записать параметры установки (файл 0600; логин и пароль не показываются)",
             upload = Step.Upload(ENV_FILE, ("XUI_NONINTERACTIVE=1\nXUI_USERNAME=${p.username}\nXUI_PASSWORD=${p.password}\nXUI_PANEL_PORT=${p.port}\n" +
-                "XUI_WEB_BASE_PATH=${p.webPath}\nXUI_SSL_MODE=none\nXUI_ENABLE_FAIL2BAN=false\n").toByteArray(), 384)))
+                "XUI_WEB_BASE_PATH=${p.webPath}\nXUI_SSL_MODE=${when { !p.sslIp -> "none"; p.domain.isNotBlank() -> "domain\nXUI_DOMAIN=${p.domain}"; else -> "ip" }}\nXUI_ENABLE_FAIL2BAN=false\n").toByteArray(), 384)))
+        // сертификат на IP проверяется по 80/tcp — при выдаче и при каждом продлении (раз в ~6 дней), поэтому порт остаётся открытым
+        if (p.sslIp && openFirewall) ServerOps.openPortStep(firewall, "80/tcp")?.let { add(Step("xui-fw80", "Открыть 80/tcp для выдачи и продления сертификата", it.command, rollback = it.rollback)) }
         add(Step("xui-install", "Установить 3x-ui ${p.tag}: ядро Xray, служба x-ui, панель на порту ${p.port}",
             // Журнал установщика содержит логин, пароль и токен: при успехе его не читаем, при сбое показываем хвост с вырезанием; файл удаляется всегда.
             "set -a; . $ENV_FILE; set +a; bash $SCRIPT ${p.tag} > $LOG 2>&1; rc=\$?; rm -f $ENV_FILE; " +
                 "if [ \$rc -ne 0 ]; then tail -n 6 $LOG | sed -E 's/(assword|sername|oken)[^:=]*[:=].*/\\1: ***/'; fi; rm -f $LOG; exit \$rc",
             rollback = "printf 'y\\n' | /usr/bin/x-ui uninstall >/dev/null 2>&1; rm -f $ENV_FILE", failHint = "Установка 3x-ui не удалась"))
         if (openFirewall) ServerOps.openPortStep(firewall, "${p.port}/tcp")?.let { add(Step("xui-fw", "Открыть порт панели ${p.port}/tcp", it.command, rollback = it.rollback)) }
+        if (openFirewall) ServerOps.openPortStep(firewall, "$SUB_PORT/tcp")?.let { add(Step("xui-fw-sub", "Открыть порт подписки $SUB_PORT/tcp", it.command, rollback = it.rollback)) }
         add(Step("xui-active", "Проверить: служба x-ui запущена", "systemctl is-active x-ui",
             accept = { it.out.lineSequence().any { l -> l.trim() == "active" } }, failHint = "Служба x-ui не активна"))
         // метка «поставила Hydra»: полная очистка сервера снимает только такую панель
@@ -199,18 +221,107 @@ object XuiPanel {
         val i = l.indexOf('='); if (i <= 0) null else l.substring(0, i).trim() to l.substring(i + 1).trim().trim('\'', '"').replace("\\", "")
     }.toMap()
 
-    /** Инбаунд VLESS + Reality по умолчанию; ключи — от панели ([newRealityKeys]). */
-    fun defaultInbound(port: Int, priv: String, pub: String, target: String = "www.cloudflare.com:443", remark: String = "Hydra", rnd: SecureRandom = SecureRandom()): JSONObject {
+    /** Порт подписки 3x-ui по умолчанию (`subPort`). */
+    const val SUB_PORT = 2096
+
+    /** Каталог сертификата на IP (так его кладёт установщик 3x-ui). */
+    const val CERT_DIR = "/root/cert/ip"
+
+    /**
+     * Адрес подписки по настройкам панели (`/panel/api/setting/all`): `subURI`, если задан на сайте, иначе схема (https — когда у
+     * подписки есть сертификат), `subDomain` или адрес сервера, `subPort`, `subPath`.
+     */
+    fun subscriptionUrl(s: JSONObject, host: String, subId: String): String? {
+        if (!s.optBoolean("subEnable", true) || subId.isBlank()) return null
+        s.optString("subURI").trim().takeIf { it.isNotBlank() }?.let { return it.trimEnd('/') + "/" + subId }
+        val tls = s.optString("subCertFile").isNotBlank() && s.optString("subKeyFile").isNotBlank()
+        val port = s.optInt("subPort", SUB_PORT)
+        val h = s.optString("subDomain").trim().ifBlank { host }.let { if (':' in it && !it.startsWith("[")) "[$it]" else it }
+        val path = "/" + s.optString("subPath", "/sub/").trim('/').let { if (it.isEmpty()) "" else "$it/" }
+        val p = if ((tls && port == 443) || (!tls && port == 80)) "" else ":$port"
+        return "${if (tls) "https" else "http"}://$h$p$path$subId"
+    }
+
+    /**
+     * Маскировка Reality (0.8.1-rc1, обход блокировок в РФ). Reality выдаёт себя за [sni]: для ТСПУ соединение выглядит как HTTPS к
+     * этому сайту. С февраля 2026 ТСПУ сверяет SNI с сетью сервера, а мобильные операторы при отключениях пускают только «белый список» —
+     * поэтому выбор оставлен пользователю.
+     */
+    enum class RealityMask(val target: String, val sni: String) {
+        /** Российский сайт из белых списков: проходит при отключениях мобильного интернета (выбор владельца 15.10.2026). */
+        VK("vk.com:443", "vk.com"),
+        /** Ещё один сайт из белых списков. */
+        YANDEX("ya.ru:443", "ya.ru"),
+        /** Зарубежный сайт без своих узлов в РФ — SNI не спорит с зарубежным IP сервера. */
+        GITHUB("github.com:443", "github.com"),
+    }
+
+    /** Транспорт инбаунда Hydra (0.8.1-rc1). */
+    enum class Transport(val title: String) {
+        /** gRPC + Reality — по умолчанию (решение владельца 15.10.2026: подключение «Vless grpc» у него в РФ работает). */
+        GRPC("gRPC"),
+        /** XHTTP + Reality — запасной: поток режется на HTTP-запросы с паддингом. */
+        XHTTP("XHTTP"),
+    }
+
+    /**
+     * Инбаунд по умолчанию (0.8.1-rc1): **VLESS + gRPC + Reality** (или XHTTP). Прежний TCP + Reality с маскировкой под
+     * www.cloudflare.com на сервере владельца в РФ отдавал 1–2 КБ и замирал. `flow` (Vision) у gRPC и XHTTP не используется.
+     * Ключи — от панели ([XuiApi.newRealityKeys]).
+     */
+    fun defaultInbound(port: Int, priv: String, pub: String, mask: RealityMask = RealityMask.VK, remark: String = "Hydra",
+                       rnd: SecureRandom = SecureRandom(), transport: Transport = Transport.GRPC): JSONObject {
         val shortId = ByteArray(8).also { rnd.nextBytes(it) }.joinToString("") { "%02x".format(it) }
-        val sni = target.substringBefore(':')
-        val settings = JSONObject().put("clients", JSONArray()).put("decryption", "none").put("fallbacks", JSONArray())
-        val reality = JSONObject().put("show", false).put("xver", 0).put("target", target).put("serverNames", JSONArray(listOf(sni)))
+        val settings = JSONObject().put("clients", JSONArray()).put("decryption", "none").put("encryption", "none").put("fallbacks", JSONArray())
+        val reality = JSONObject().put("show", false).put("xver", 0).put("target", mask.target).put("serverNames", JSONArray(listOf(mask.sni)))
             .put("privateKey", priv).put("minClientVer", "").put("maxClientVer", "").put("maxTimediff", 0).put("shortIds", JSONArray(listOf(shortId)))
-            .put("settings", JSONObject().put("publicKey", pub).put("fingerprint", "chrome").put("serverName", "").put("spiderX", "/"))
-        val stream = JSONObject().put("network", "tcp").put("security", "reality").put("externalProxy", JSONArray()).put("realitySettings", reality)
-            .put("tcpSettings", JSONObject().put("acceptProxyProtocol", false).put("header", JSONObject().put("type", "none")))
+            .put("mldsa65Seed", "")
+            .put("settings", JSONObject().put("publicKey", pub).put("fingerprint", "chrome").put("serverName", "").put("spiderX", "/").put("mldsa65Verify", ""))
+        val xhttp = JSONObject().put("path", "/" + random(10, rnd).lowercase()).put("host", "").put("mode", "auto")
+            .put("xPaddingBytes", "100-1000").put("noSSEHeader", false).put("scMaxBufferedPosts", 30).put("scStreamUpServerSecs", "20-80")
+            .put("headers", JSONObject())
+        val stream = JSONObject().put("security", "reality").put("externalProxy", JSONArray()).put("realitySettings", reality)
+        when (transport) {
+            Transport.GRPC -> stream.put("network", "grpc")
+                .put("grpcSettings", JSONObject().put("serviceName", random(10, rnd).lowercase()).put("authority", "").put("multiMode", false))
+            Transport.XHTTP -> stream.put("network", "xhttp").put("xhttpSettings", xhttp)
+        }
         val sniffing = JSONObject().put("enabled", true).put("destOverride", JSONArray(listOf("http", "tls", "quic"))).put("metadataOnly", false).put("routeOnly", false)
         return JSONObject().put("enable", true).put("remark", remark).put("listen", "").put("port", port).put("protocol", "vless")
             .put("expiryTime", 0).put("total", 0).put("settings", settings).put("streamSettings", stream).put("sniffing", sniffing)
     }
+
+    /**
+     * Включить HTTPS у уже стоящей 3x-ui (0.8.1-rc1): сертификат Let's Encrypt на IP (профиль shortlived, ~6 дней, продлевается
+     * сам по cron acme.sh) или на домен, если сервер добавлен по имени. Так же делает установщик 3x-ui (`setup_ip_certificate`):
+     * acme.sh в режиме standalone на 80/tcp, файлы в [CERT_DIR], пути — командой `x-ui cert` (она ставит их и панели, и подписке).
+     */
+    fun httpsSteps(host: String, openFirewall: Boolean, firewall: String): List<Step> = buildList {
+        val ip = Regex("""^\d{1,3}(\.\d{1,3}){3}$""").matches(host)
+        require(ip || Regex("""^[A-Za-z0-9.-]+$""").matches(host)) { "Неверный адрес $host" }
+        val h = Installer.shq(host)
+        val acme = "~/.acme.sh/acme.sh"
+        if (openFirewall) ServerOps.openPortStep(firewall, "80/tcp")?.let { add(Step("cert-fw80", "Открыть 80/tcp для выдачи и продления сертификата", it.command, rollback = it.rollback)) }
+        add(Step("cert-port80", "Проверить, что порт 80 свободен (его на время проверки займёт acme.sh)",
+            "! (ss -ltnH 2>/dev/null | awk '{print \$4}' | grep -Eq '(^|:)80\$')",
+            failHint = "Порт 80 занят другой программой (веб-сервер?) — сертификат так не выдать"))
+        add(Step("cert-acme", "Поставить acme.sh и socat, если их нет",
+            "(command -v socat >/dev/null || (apt-get install -y -q socat || dnf install -y socat || yum install -y socat) >/dev/null 2>&1) && " +
+                "([ -x $acme ] || curl -fsSL https://get.acme.sh | sh >/dev/null 2>&1) && [ -x $acme ]",
+            failHint = "Не удалось поставить acme.sh"))
+        add(Step("cert-issue", "Получить сертификат Let's Encrypt для $host" + if (ip) " (на IP, 6 дней, продлевается сам)" else "",
+            "$acme --set-default-ca --server letsencrypt >/dev/null && $acme --issue -d $h --standalone --server letsencrypt --httpport 80 --force" +
+                (if (ip) " --certificate-profile shortlived --days 6" else "") + " > /tmp/.hydra-acme.log 2>&1; rc=\$?; tail -n 4 /tmp/.hydra-acme.log; rm -f /tmp/.hydra-acme.log; exit \$rc",
+            failHint = "Let's Encrypt не смог проверить сервер — порт 80 закрыт снаружи (файрвол хостинга?)"))
+        add(Step("cert-install", "Установить сертификат в $CERT_DIR и настроить его продление",
+            "mkdir -p $CERT_DIR && $acme --installcert --force -d $h --key-file $CERT_DIR/privkey.pem --fullchain-file $CERT_DIR/fullchain.pem " +
+                "--reloadcmd 'systemctl restart x-ui' >/dev/null 2>&1; chmod 600 $CERT_DIR/privkey.pem; test -s $CERT_DIR/fullchain.pem",
+            failHint = "Файлы сертификата не появились"))
+        add(Step("cert-panel", "Включить HTTPS у панели и подписки",
+            "/usr/local/x-ui/x-ui cert -webCert $CERT_DIR/fullchain.pem -webCertKey $CERT_DIR/privkey.pem >/dev/null && systemctl restart x-ui && sleep 2 && systemctl is-active x-ui",
+            accept = { it.out.lineSequence().any { l -> l.trim() == "active" } }, failHint = "Панель не запустилась с сертификатом"))
+    }
+
+    /** Адрес панели на `https://` (тот же хост, порт и путь). */
+    fun toHttps(url: String) = if (url.startsWith("http://", true)) "https://" + url.substring(7) else url
 }

@@ -476,7 +476,12 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
         Text(stringResource(R.string.ms_panel_address, p.baseUrl) + if (p.username.isNotBlank()) "\n" + stringResource(R.string.ms_panel_login, p.username) else "",
             fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextSecondary)
     }
-    if (!XuiPanel.isHttps(p.baseUrl)) Text(stringResource(R.string.ms_panel_http), color = TextMuted, fontSize = 11.sp)
+    if (!XuiPanel.isHttps(p.baseUrl)) {
+        Text(stringResource(R.string.ms_panel_http), color = TextMuted, fontSize = 11.sp)
+        // сертификат на IP ставится по SSH — только у панели на своём сервере (у подключённой по токену SSH нет)
+        if (p.kind == ru.gidravpn.hydra.servers.PanelKind.XUI3 && srv.fingerprint.isNotBlank())
+            MsRow { MsChip(stringResource(R.string.ms_panel_https), AccentCyan) { if (!busy) m.enablePanelHttps(srv.id) } }
+    }
     Spacer(Modifier.height(6.dp))
     MsRow {
         if (p.password.isNotBlank()) {
@@ -580,6 +585,9 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
     var yandex by remember { mutableStateOf("") }
     var mailru by remember { mutableStateOf("") }
     var accessPort by remember { mutableStateOf("443") }
+    var sslIp by remember { mutableStateOf(true) }
+    var mask by remember { mutableStateOf(XuiPanel.RealityMask.VK) }
+    var transport by remember { mutableStateOf(XuiPanel.Transport.GRPC) }
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, Border, RoundedCornerShape(14.dp)).padding(12.dp)) {
         Text(when (kind) {
                 ServerKind.AMNEZIAWG -> stringResource(R.string.ms_install_awg_title)
@@ -592,6 +600,18 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
         if (kind == ServerKind.PANEL_3XUI) {
             Text(stringResource(R.string.ms_xui_hint), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
             MsField(stringResource(R.string.ms_xui_port), accessPort) { accessPort = it.filter(Char::isDigit).take(5) }
+            Text(stringResource(R.string.ms_xui_transport), color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+            MsRow { XuiPanel.Transport.entries.forEach { t -> MsChip(t.title, TextSecondary, selected = transport == t) { transport = t } } }
+            Text(stringResource(R.string.ms_xui_mask), color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+            MsRow { XuiPanel.RealityMask.entries.forEach { r -> MsChip(r.sni, TextSecondary, selected = mask == r) { mask = r } } }
+            Text(stringResource(when (mask) {
+                XuiPanel.RealityMask.VK, XuiPanel.RealityMask.YANDEX -> R.string.ms_xui_mask_ru
+                XuiPanel.RealityMask.GITHUB -> R.string.ms_xui_mask_foreign
+            }), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 4.dp))
+            Row(Modifier.clickableNoRipple { sslIp = !sslIp }.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Checkbox(sslIp, { sslIp = it })
+                Text(stringResource(R.string.ms_xui_https), color = TextSecondary, fontSize = 13.sp)
+            }
         } else if (kind == ServerKind.AMNEZIAWG) {
             Text(stringResource(R.string.ms_generation), color = TextSecondary, fontSize = 13.sp)
             MsRow {
@@ -627,7 +647,7 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
         }
         Spacer(Modifier.height(8.dp))
         MsRow {
-            if (ok && !busy) MsChip(stringResource(R.string.ms_check_plan), AccentCyan) { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443)) }
+            if (ok && !busy) MsChip(stringResource(R.string.ms_check_plan), AccentCyan) { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443, sslIp = sslIp, mask = mask, transport = transport)) }
             MsChip(stringResource(R.string.ms_cancel), TextSecondary) { onCancel() }
         }
     }

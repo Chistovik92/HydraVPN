@@ -448,8 +448,14 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
     val p = srv.panel ?: return
     val busy = s.busy
     SelectionContainer { Text("Адрес: ${p.baseUrl}" + (if (p.username.isNotBlank()) "\nЛогин: ${p.username}" else ""), fontFamily = FontFamily.Monospace, fontSize = 12.sp) }
-    if (!XuiPanel.isHttps(p.baseUrl)) Text("Панель открывается по http:// — пароль на сайте идёт без шифрования. Входите при включённом VPN или настройте HTTPS в панели.",
-        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (!XuiPanel.isHttps(p.baseUrl)) {
+        Text("Панель открывается по http:// — пароль на сайте идёт без шифрования, а провайдер может обрывать такие страницы. " +
+            "Включите HTTPS (бесплатный сертификат Let's Encrypt на IP сервера) или входите при включённом VPN.",
+            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // сертификат ставится по SSH — только у панели на своём сервере (у подключённой по токену SSH нет)
+        if (p.kind == ru.gidravpn.hydra.servers.PanelKind.XUI3 && srv.fingerprint.isNotBlank())
+            OutlinedButton(onClick = { m.enablePanelHttps(srv.id) }, enabled = !busy) { Text("Включить HTTPS") }
+    }
     ChipRow {
         if (p.password.isNotBlank()) {
             Button(onClick = { copySecret(p.password); openUrl(p.baseUrl); c.toast("Пароль скопирован на 30 секунд — вставьте его на странице входа") }) { Text("Открыть панель") }
@@ -527,6 +533,10 @@ private fun ConnectPanelDialog(onClose: () -> Unit, onOk: (name: String, address
     )
 }
 
+private const val MASK_RU = "Сайт из «белых списков»: подключение пройдёт и тогда, когда мобильный оператор пускает только разрешённые сайты. " +
+    "Минус: российский сайт на зарубежном IP — заметный признак для ТСПУ."
+private const val MASK_FOREIGN = "Зарубежный сайт без своих узлов в России: адрес сервера не спорит с маскировкой. Минус: не пройдёт при «белых списках» мобильных операторов."
+
 /** Пароль панели в буфер на 30 секунд: потом очищается, если там всё ещё он. */
 private fun copySecret(text: String) {
     setClipboard(text)
@@ -545,6 +555,9 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
     var yandex by remember { mutableStateOf("") }
     var mailru by remember { mutableStateOf("") }
     var accessPort by remember { mutableStateOf("443") }
+    var sslIp by remember { mutableStateOf(true) }
+    var mask by remember { mutableStateOf(XuiPanel.RealityMask.VK) }
+    var transport by remember { mutableStateOf(XuiPanel.Transport.GRPC) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(when (kind) { ServerKind.AMNEZIAWG -> "Установка AmneziaWG"; ServerKind.OPENFLUX -> "Установка узла OpenFlux"; else -> "Установка панели ${kind.panel!!.title}" }, fontWeight = FontWeight.SemiBold)
@@ -552,9 +565,22 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
                 Text("Hydra поставит последнюю версию ${kind.panel!!.title} официальным установщиком и задаст надёжный логин, пароль и случайный адрес панели. Пользователей вы заведёте на сайте панели.",
                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (kind == ServerKind.PANEL_3XUI) {
-                Text("Hydra поставит последнюю версию 3x-ui официальным установщиком, придумает надёжный логин и пароль, создаст подключение VLESS + Reality и первого пользователя.",
+                Text("Hydra поставит последнюю версию 3x-ui официальным установщиком, придумает надёжный логин и пароль, создаст подключение " +
+                    "VLESS + gRPC + Reality и первого пользователя, а в «Серверы» добавит его подписку — правки на сайте панели будут приходить сами.",
                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(accessPort, { accessPort = it.filter(Char::isDigit).take(5) }, Modifier.width(220.dp), singleLine = true, label = { Text("Порт подключения (TCP)") })
+                ChipRow {
+                    Text("Транспорт:", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                    XuiPanel.Transport.entries.forEach { t -> FilterChip(selected = transport == t, onClick = { transport = t }, label = { Text(if (t == XuiPanel.Transport.GRPC) "${t.title} (рекомендуем)" else t.title) }) }
+                }
+                ChipRow {
+                    Text("Маскировка:", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                    XuiPanel.RealityMask.entries.forEach { r -> FilterChip(selected = mask == r, onClick = { mask = r }, label = { Text(r.sni) }) }
+                }
+                Text(if (mask == XuiPanel.RealityMask.GITHUB) MASK_FOREIGN else MASK_RU, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(sslIp, { sslIp = it }); Text("HTTPS для панели и подписки: бесплатный сертификат Let's Encrypt на IP (нужен открытый 80/tcp)", fontSize = 13.sp)
+                }
             } else if (kind == ServerKind.AMNEZIAWG) {
                 ChipRow {
                     Text("Версия:", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
@@ -580,7 +606,7 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
                 ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> true
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(enabled = ok && !busy, onClick = { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443)) }) { Text("Проверить сервер и показать план") }
+                Button(enabled = ok && !busy, onClick = { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443, sslIp = sslIp, mask = mask, transport = transport)) }) { Text("Проверить сервер и показать план") }
                 TextButton(onClick = onCancel) { Text("Отмена") }
             }
         }

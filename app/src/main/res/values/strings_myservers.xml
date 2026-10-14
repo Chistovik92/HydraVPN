@@ -173,7 +173,7 @@
     <string name="ms_panel_connected">Panel connected — it is in the list below.</string>
     <string name="ms_install_xui_title">Install 3x-ui panel</string>
     <string name="ms_installing_xui">Installing 3x-ui panel</string>
-    <string name="ms_xui_hint">Hydra installs the latest 3x-ui with the official installer, makes up a strong login and password, creates a VLESS + Reality connection and the first user.</string>
+    <string name="ms_xui_hint">Hydra installs the latest 3x-ui with the official installer, makes up a strong login and password, creates a VLESS + gRPC + Reality connection and the first user, and adds the user\'s subscription to Servers — changes made on the panel site arrive by themselves.</string>
     <string name="ms_panel_title">Control panel</string>
     <string name="ms_panel_kind">%1$s panel</string>
     <string name="ms_panel_install_other">Install %1$s</string>
@@ -182,4 +182,11 @@
     <string name="ms_panel_other_hint">Hydra installs the latest %1$s with the official installer and sets a strong login, password and a random panel address. You create users on the panel website.</string>
     <string name="ms_install_done_panel">Done! The panel is installed — open it with \"Open panel\" on the server card.</string>
     <string name="ms_broken">Damaged record: this is how a panel connected in 0.8.1-a looks after being opened in 0.8.0-rc4. Remove it and connect the panel again with \"I already have a panel\".</string>
+    <!-- 0.8.1-rc1: маскировка Reality, HTTPS панели -->
+    <string name="ms_xui_mask">Disguise (Reality pretends to be this site)</string>
+    <string name="ms_xui_mask_ru">A site from the \"white lists\": the connection still works when a mobile carrier lets only allowed sites through. Downside: a Russian site on a foreign IP is a visible sign for DPI.</string>
+    <string name="ms_xui_mask_foreign">A foreign site with no nodes in Russia: the server address does not contradict the disguise. Downside: blocked under mobile \"white lists\".</string>
+    <string name="ms_xui_https">HTTPS for the panel and subscription: a free Let\'s Encrypt certificate for the server IP (needs port 80/tcp open)</string>
+    <string name="ms_panel_https">Enable HTTPS</string>
+    <string name="ms_xui_transport">Transport (gRPC recommended)</string>
 </resources>

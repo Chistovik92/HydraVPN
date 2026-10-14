@@ -148,17 +148,23 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
     // ---------------------------------------------------------------------------------------------------- Панель 3x-ui (0.8.1)
 
     /** Что будет выполнено при установке панели — для показа до запуска. */
-    fun planPreviewXui(tag: String, openFirewall: Boolean, pre: Preflight): List<Step> =
-        XuiPanel.installSteps(XuiPanel.InstallParams(tag, "••••", "••••", 0, "••••"), openFirewall, pre.firewall) + listOf(
-            Step("xui-access", "Создать доступ: инбаунд VLESS + Reality и клиент (через API панели, по токену)", "curl … /panel/api/inbounds/add, /panel/api/clients/add"),
-            Step("xui-import", "Импортировать ссылку клиента в «Серверы»"),
+    fun planPreviewXui(tag: String, openFirewall: Boolean, pre: Preflight, sslIp: Boolean = false, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK,
+                       transport: XuiPanel.Transport = XuiPanel.Transport.GRPC): List<Step> =
+        XuiPanel.installSteps(XuiPanel.InstallParams(tag, "••••", "••••", 0, "••••", sslIp), openFirewall, pre.firewall) + listOf(
+            Step("xui-access", "Создать доступ: инбаунд VLESS + ${transport.title} + Reality (маскировка под ${mask.sni}) и клиент — через API панели, по токену",
+                "curl … /panel/api/inbounds/add, /panel/api/clients/add"),
+            Step("xui-import", "Добавить подписку клиента в «Серверы» — правки на сайте панели будут приходить сами"),
         )
 
     fun deployXui(
         ssh: SshSession, srv: MyServer, tag: String, accessPort: Int, openFirewall: Boolean, pre: Preflight,
-        installer: Installer, onLog: (String) -> Unit,
+        installer: Installer, sslIp: Boolean = false, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK,
+        transport: XuiPanel.Transport = XuiPanel.Transport.GRPC, onLog: (String) -> Unit,
     ): DeployResult {
-        val params = XuiPanel.InstallParams(tag)
+        // сертификат: на IPv4 — профиль shortlived Let's Encrypt, на имя — обычный; IPv6-адрес установщик 3x-ui не поддерживает
+        val v4 = Regex("""^\d{1,3}(\.\d{1,3}){3}$""").matches(srv.host)
+        val ssl = sslIp && (v4 || ':' !in srv.host)
+        val params = XuiPanel.InstallParams(tag, sslIp = ssl, domain = if (ssl && !v4) srv.host else "")
         installer.addSecret(params.password); installer.addSecret(params.username)
         if (!installer.run(XuiPanel.installSteps(params, openFirewall, pre.firewall))) return DeployResult.Failed("Установка остановлена")
         val res = XuiPanel.parseResult(ssh.exec("cat ${XuiPanel.RESULT}").out)
@@ -167,26 +173,47 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
         val path = (res["XUI_WEB_BASE_PATH"] ?: params.webPath).trim('/')
         if (token.isBlank()) return DeployResult.Failed("Установщик не выдал API-токен (${XuiPanel.RESULT})")
         installer.addSecret(token)
-        val api = XuiApi(SshXuiTransport(ssh, "http://127.0.0.1:$port/$path", token, srv.host))
+        // HTTPS: установщик пишет итоговый адрес в XUI_ACCESS_URL; если сертификат не выдался, панель осталась на http
+        val https = ssl && (res["XUI_ACCESS_URL"]?.startsWith("https://", true) == true ||
+            ssh.exec("test -s ${XuiPanel.CERT_DIR}/fullchain.pem && echo yes").out.trim() == "yes")
+        if (ssl) onLog(if (https) "Сертификат на IP выдан — панель и подписка по HTTPS" else "Сертификат выдать не удалось (порт 80 закрыт снаружи?) — панель пока по HTTP")
+        val scheme = if (https) "https" else "http"
+        val api = XuiApi(SshXuiTransport(ssh, "$scheme://127.0.0.1:$port/$path", token, srv.host))
         try {
             val version = res["XUI_VERSION"].orEmpty().ifBlank { tag }
             waitPanelReady(api, onLog) // служба запущена, но порт панель открывает не сразу; заодно проверяется токен
             onLog("Токен принят, панель отвечает")
             val (priv, pub) = api.newRealityKeys()
-            val inboundId = api.addInbound(XuiPanel.defaultInbound(accessPort, priv, pub, remark = "Hydra"))
+            val inboundId = api.addInbound(XuiPanel.defaultInbound(accessPort, priv, pub, mask, remark = "Hydra", transport = transport))
             if (openFirewall) ServerOps.openPortStep(pre.firewall, "$accessPort/tcp")?.let { installer.run(listOf(it)) }
             val email = "hydra-1"
-            api.addClient(email, XuiPanel.random(14), listOf(inboundId))
+            val subId = XuiPanel.random(16).lowercase()
+            api.addClient(email, subId, listOf(inboundId), flow = "")
             val links = api.links(email)
             if (links.isEmpty()) return DeployResult.Failed("Панель не выдала ссылку клиента")
-            onLog("Создан инбаунд VLESS+Reality на порту $accessPort и клиент $email")
-            val panel = PanelInstance(PanelKind.XUI3, "http://${if (srv.host.contains(':')) "[${srv.host}]" else srv.host}:$port/$path",
+            onLog("Создан инбаунд VLESS + ${transport.title} + Reality (маскировка под ${mask.sni}) на порту $accessPort и клиент $email")
+            // подписка вместо голой ссылки: правки инбаунда на сайте панели приложение заберёт само (запрос владельца 15.10.2026)
+            val sub = runCatching { api.subscriptionUrl(srv.host, subId) }.getOrNull()
+            if (sub != null) onLog("Подписка клиента: ${sub.substringBeforeLast('/')}/…")
+            val panel = PanelInstance(PanelKind.XUI3, "$scheme://${if (srv.host.contains(':')) "[${srv.host}]" else srv.host}:$port/$path",
                 params.username, params.password, token, version, inboundId, email)
             installer.run(OtherPanels.stateSteps(panel))
-            return DeployResult.Ok(srv.copy(panel = panel), links)
+            return DeployResult.Ok(srv.copy(panel = panel), sub?.let { listOf(it) } ?: links)
         } catch (e: XuiApiException) {
             return DeployResult.Failed("Панель установлена, но доступ создать не удалось: ${e.message}. Адрес: http://${srv.host}:$port/$path")
         }
+    }
+
+    /**
+     * HTTPS для уже стоящей 3x-ui (0.8.1-rc1): сертификат Let's Encrypt на IP сервера (или на домен) — [XuiPanel.httpsSteps].
+     * Адрес панели в записи переходит на `https://`; подписки 3x-ui после этого тоже отдаются по HTTPS.
+     */
+    fun enableXuiHttps(s: MyServer, pre: Preflight, openFirewall: Boolean, installer: Installer): MyServer? {
+        val panel = s.panel?.takeIf { it.kind == PanelKind.XUI3 } ?: return null
+        if (!installer.run(XuiPanel.httpsSteps(s.host.removePrefix("[").removeSuffix("]"), openFirewall, pre.firewall))) return null
+        val upd = panel.copy(baseUrl = XuiPanel.toHttps(panel.baseUrl))
+        installer.run(OtherPanels.stateSteps(upd))
+        return s.copy(panel = upd)
     }
 
     /** После установки панель поднимается несколько секунд: ждём ответ (до ~60 с); неверный токен и ошибки панели — сразу. */

@@ -245,7 +245,7 @@ class AppController(
         if (t.isEmpty()) return toast("Буфер обмена пуст")
         if (t.length > Subscriptions.MAX_BYTES) return toast("Слишком большой текст для импорта")
         if (t.startsWith("http://", true) || t.startsWith("https://", true)) {
-            return addSubscription(t.lineSequence().first().trim(), "")
+            return addSubscription(t.lineSequence().first().trim(), name.orEmpty())
         }
         // olcbox://add?url=<ссылка подписки> — «поделиться» из клиента olcBox: это обычная подписка.
         if (t.startsWith("olcbox://", true)) {

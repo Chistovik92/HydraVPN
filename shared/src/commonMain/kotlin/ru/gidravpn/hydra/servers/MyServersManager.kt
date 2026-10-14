@@ -42,6 +42,12 @@ class ServiceForm(
     val autoupdate: Boolean = true,
     /** Панель 3x-ui: порт доступа (инбаунд VLESS+Reality), по умолчанию 443. */
     val accessPort: Int = 443,
+    /** Панель 3x-ui: HTTPS сертификатом Let's Encrypt на IP (0.8.1-rc1). */
+    val sslIp: Boolean = true,
+    /** Панель 3x-ui: под какой сайт маскируется Reality (0.8.1-rc1). */
+    val mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK,
+    /** Панель 3x-ui: транспорт инбаунда (0.8.1-rc1), по умолчанию gRPC. */
+    val transport: XuiPanel.Transport = XuiPanel.Transport.GRPC,
 )
 
 /** Мастер добавления сервера. */
@@ -259,7 +265,11 @@ class MyServersManager(
         when (e) {
             is InstallEvent.StepStart -> _ui.update { it.copy(progress = "${e.index}/${e.total}: ${e.step.title}") }.also { log("▶ ${e.step.title}") }
             is InstallEvent.Output -> log("  " + e.line)
-            is InstallEvent.StepOk -> log("✔ ${e.step.title}")
+            // «▶ шаг» заменяется на «✔ шаг», а не дублируется второй строкой
+            is InstallEvent.StepOk -> _ui.update { u ->
+                val i = u.log.lastIndexOf("▶ ${e.step.title}")
+                u.copy(log = if (i >= 0) u.log.toMutableList().also { it[i] = "✔ ${e.step.title}" } else (u.log + "✔ ${e.step.title}").takeLast(400))
+            }
             is InstallEvent.StepFailed -> { log("✘ ${e.step.title}: ${e.reason}"); _ui.update { it.copy(error = "${e.step.title}: ${e.reason}") } }
             InstallEvent.Done -> Unit
         }
@@ -301,7 +311,7 @@ class MyServersManager(
                 ServerKind.PANEL_3XUI -> {
                     _ui.update { it.copy(progress = "Узнаю последнюю версию 3x-ui…") }
                     xuiTag = XuiPanel.latestTag()
-                    service.planPreviewXui(xuiTag, f.openFirewall, pre)
+                    service.planPreviewXui(xuiTag, f.openFirewall, pre, f.sslIp, f.mask, f.transport)
                 }
                 ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> {
                     val spec = OtherPanels.spec(f.kind.panel!!)!!
@@ -330,7 +340,7 @@ class MyServersManager(
             val res = when (f.kind) {
                 ServerKind.AMNEZIAWG -> service.deployAwg(srv, f.generation, f.awgPort, f.openFirewall, pre, inst, ::log)
                 ServerKind.OPENFLUX -> service.deployOfx(ssh, srv, f.channel, f.vyandex, f.mailru, f.cupsonline, f.autoupdate, inst, ::log)
-                ServerKind.PANEL_3XUI -> service.deployXui(ssh, srv, xuiTag.ifBlank { XuiPanel.latestTag() }, f.accessPort, f.openFirewall, pre, inst, ::log)
+                ServerKind.PANEL_3XUI -> service.deployXui(ssh, srv, xuiTag.ifBlank { XuiPanel.latestTag() }, f.accessPort, f.openFirewall, pre, inst, f.sslIp, f.mask, f.transport, ::log)
                 ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> service.deployPanel(srv, f.kind.panel!!,
                     panelTag.ifBlank { OtherPanels.latestTag(OtherPanels.spec(f.kind.panel!!)!!) }, f.openFirewall, pre, inst)
             }
@@ -338,7 +348,11 @@ class MyServersManager(
                 is DeployResult.Ok -> {
                     update(res.server)
                     res.links.forEach { importConf(res.server.name, it) }
-                    log(if (res.links.isEmpty()) "Готово: панель установлена — откройте её на карточке сервера" else "Готово: подключение добавлено в «Серверы»")
+                    log(when {
+                        res.links.isEmpty() -> "Готово: панель установлена — откройте её на карточке сервера"
+                        res.links.any { it.startsWith("http", true) } -> "Готово: подписка добавлена в «Серверы» — обновляется сама"
+                        else -> "Готово: подключение добавлено в «Серверы»"
+                    })
                     _ui.update { it.copy(install = i.copy(stage = InstallStage.DONE)) }
                 }
                 is DeployResult.Failed -> {
@@ -371,6 +385,14 @@ class MyServersManager(
         }
         if (!ok) throw OpFailed(_ui.value.error ?: "Служба не перезапустилась")
         log("Служба перезапущена")
+    }
+
+    /** HTTPS для панели 3x-ui на своём сервере: сертификат на IP (0.8.1-rc1). */
+    fun enablePanelHttps(id: String, openFirewall: Boolean = true) = op(id, "Получаю сертификат для панели…") { srv, ssh, inst ->
+        val pre = service.preflight(ssh, 0)
+        val upd = service.enableXuiHttps(srv, pre, openFirewall, inst) ?: throw OpFailed(_ui.value.error ?: "Сертификат получить не удалось")
+        update(upd)
+        log("Готово: панель и подписка работают по HTTPS — ${upd.panel?.baseUrl}")
     }
 
     fun uninstallService(id: String, kind: ServerKind) = op(id, "Удаляю службу с сервера…") { srv, _, inst ->
@@ -484,16 +506,26 @@ class MyServersManager(
         val inbound = s.panel!!.inboundId.takeIf { it > 0 } ?: api.inbounds().let { a ->
             (0 until a.length()).mapNotNull { a.optJSONObject(it) }.let { l -> l.firstOrNull { it.optString("protocol") == "vless" } ?: l.firstOrNull() }?.optInt("id")
         }?.takeIf { it > 0 } ?: throw XuiApiException("В панели нет ни одного инбаунда — создайте его на сайте панели")
-        api.addClient(email, XuiPanel.random(14), listOf(inbound))
-        val links = api.links(email)
-        _ui.update { it.copy(shown = email to links.joinToString("\n"), panelClients = it.panelClients + (s.id to api.clientEmails())) }
+        val subId = XuiPanel.random(16).lowercase()
+        // flow «xtls-rprx-vision» — только у TCP(RAW)-инбаундов; XHTTP-инбаунд Hydra (0.8.1-rc1) его не принимает
+        val flow = if (api.inbounds().let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it) } }
+                .firstOrNull { it.optInt("id") == inbound }?.optString("streamSettings")?.contains("\"tcp\"") == true) "xtls-rprx-vision" else ""
+        api.addClient(email, subId, listOf(inbound), flow = flow)
+        _ui.update { it.copy(shown = email to accessText(s, api, email, subId), panelClients = it.panelClients + (s.id to api.clientEmails())) }
     }
 
     /** Ссылки уже созданного пользователя панели. */
-    fun showPanelLinks(id: String, email: String) = withPanel(id) { _, api ->
+    fun showPanelLinks(id: String, email: String) = withPanel(id) { s, api ->
+        _ui.update { it.copy(shown = email to accessText(s, api, email, api.subIdOf(email))) }
+    }
+
+    /** Что выдать пользователю: адрес подписки (обновляется сам, 0.8.1-rc1), а если подписка в панели выключена — ссылки. */
+    private fun accessText(s: MyServer, api: XuiApi, email: String, subId: String?): String {
+        val host = runCatching { java.net.URL(s.panel!!.baseUrl).host }.getOrNull()?.ifBlank { null } ?: s.host
+        subId?.let { id -> runCatching { api.subscriptionUrl(host.removePrefix("[").removeSuffix("]"), id) }.getOrNull() }?.let { return it }
         val links = api.links(email)
         if (links.isEmpty()) throw XuiApiException("Панель не выдала ссылок для $email")
-        _ui.update { it.copy(shown = email to links.joinToString("\n")) }
+        return links.joinToString("\n")
     }
 
     fun removePanelClient(id: String, email: String) = withPanel(id) { s, api ->

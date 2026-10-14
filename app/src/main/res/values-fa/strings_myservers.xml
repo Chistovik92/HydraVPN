@@ -172,7 +172,7 @@
     <string name="ms_panel_connected">پنل وصل شد — در فهرست زیر است.</string>
     <string name="ms_install_xui_title">نصب پنل 3x-ui</string>
     <string name="ms_installing_xui">نصب پنل 3x-ui</string>
-    <string name="ms_xui_hint">Hydra آخرین نسخهٔ 3x-ui را با نصب‌کنندهٔ رسمی نصب می‌کند، نام کاربری و رمز قوی می‌سازد، اتصال VLESS + Reality و نخستین کاربر را ایجاد می‌کند.</string>
+    <string name="ms_xui_hint">Hydra آخرین نسخهٔ 3x-ui را با نصب‌کنندهٔ رسمی نصب می‌کند، نام کاربری و رمز قوی می‌سازد، اتصال VLESS + gRPC + Reality و نخستین کاربر را ایجاد می‌کند و اشتراک او را به «سرورها» می‌افزاید — تغییرات در سایت پنل خودکار می‌رسند.</string>
     <string name="ms_panel_title">پنل مدیریت</string>
     <string name="ms_panel_kind">پنل %1$s</string>
     <string name="ms_panel_install_other">نصب %1$s</string>
@@ -181,4 +181,11 @@
     <string name="ms_panel_other_hint">Hydra آخرین نسخهٔ %1$s را با نصب‌کنندهٔ رسمی نصب می‌کند و نام کاربری، رمز قوی و نشانی تصادفی پنل را تنظیم می‌کند. کاربران را در سایت پنل می‌سازید.</string>
     <string name="ms_install_done_panel">انجام شد! پنل نصب شد — با دکمهٔ «باز کردن پنل» روی کارت سرور آن را باز کنید.</string>
     <string name="ms_broken">رکورد خراب است: پنلی که در 0.8.1-a وصل شده پس از باز شدن در 0.8.0-rc4 این‌طور دیده می‌شود. آن را بردارید و پنل را دوباره با «پنل دارم» وصل کنید.</string>
+    <!-- 0.8.1-rc1: маскировка Reality, HTTPS панели -->
+    <string name="ms_xui_mask">استتار (Reality خود را این سایت نشان می‌دهد)</string>
+    <string name="ms_xui_mask_ru">سایتی از «فهرست سفید»: اتصال حتی وقتی اپراتور موبایل فقط سایت‌های مجاز را می‌گذارد برقرار می‌ماند. عیب: سایت روسی روی IP خارجی نشانهٔ آشکاری برای DPI است.</string>
+    <string name="ms_xui_mask_foreign">سایتی خارجی بدون گره در روسیه: نشانی سرور با استتار تناقض ندارد. عیب: در «فهرست سفید» اپراتورهای موبایل کار نمی‌کند.</string>
+    <string name="ms_xui_https">HTTPS برای پنل و اشتراک: گواهی رایگان Let\'s Encrypt برای IP سرور (پورت 80/tcp باید باز باشد)</string>
+    <string name="ms_panel_https">فعال‌سازی HTTPS</string>
+    <string name="ms_xui_transport">ترابری (gRPC توصیه می‌شود)</string>
 </resources>

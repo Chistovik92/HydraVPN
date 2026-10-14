@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
+    <!-- 0.8.1-rc1: подписки и панели 3x-ui часто отдаются по http:// (на IP без сертификата) — до этого Android отказывал
+         с «CLEARTEXT communication … not permitted». Экран панели предупреждает про http и предлагает HTTPS. -->
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

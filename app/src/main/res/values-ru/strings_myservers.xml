@@ -173,7 +173,7 @@
     <string name="ms_panel_connected">Панель подключена — она в списке ниже.</string>
     <string name="ms_install_xui_title">Установка панели 3x-ui</string>
     <string name="ms_installing_xui">Установка панели 3x-ui</string>
-    <string name="ms_xui_hint">Hydra поставит последнюю версию 3x-ui официальным установщиком, придумает надёжный логин и пароль, создаст подключение VLESS + Reality и первого пользователя.</string>
+    <string name="ms_xui_hint">Hydra поставит последнюю версию 3x-ui официальным установщиком, придумает надёжный логин и пароль, создаст подключение VLESS + gRPC + Reality и первого пользователя, а в «Серверы» добавит его подписку — правки на сайте панели будут приходить сами.</string>
     <string name="ms_panel_title">Панель управления</string>
     <string name="ms_panel_kind">Панель %1$s</string>
     <string name="ms_panel_install_other">Установить %1$s</string>
@@ -182,4 +182,11 @@
     <string name="ms_panel_other_hint">Hydra поставит последнюю версию %1$s официальным установщиком и задаст надёжный логин, пароль и случайный адрес панели. Пользователей вы заведёте на сайте панели.</string>
     <string name="ms_install_done_panel">Готово! Панель установлена — откройте её кнопкой «Открыть панель» на карточке сервера.</string>
     <string name="ms_broken">Запись повреждена: так выглядит панель, подключённая в 0.8.1-a, после открытия в 0.8.0-rc4. Уберите её и подключите панель заново кнопкой «У меня уже есть панель».</string>
+    <!-- 0.8.1-rc1: маскировка Reality, HTTPS панели -->
+    <string name="ms_xui_mask">Маскировка (под какой сайт выдаёт себя Reality)</string>
+    <string name="ms_xui_mask_ru">Сайт из «белых списков»: подключение пройдёт и тогда, когда мобильный оператор пускает только разрешённые сайты. Минус: российский сайт на зарубежном IP — заметный признак для ТСПУ.</string>
+    <string name="ms_xui_mask_foreign">Зарубежный сайт без своих узлов в России: адрес сервера не спорит с маскировкой. Минус: не пройдёт при «белых списках» мобильных операторов.</string>
+    <string name="ms_xui_https">HTTPS для панели и подписки: бесплатный сертификат Let\'s Encrypt на IP сервера (нужен открытый 80/tcp)</string>
+    <string name="ms_panel_https">Включить HTTPS</string>
+    <string name="ms_xui_transport">Транспорт (рекомендуем gRPC)</string>
 </resources>

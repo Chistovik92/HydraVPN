@@ -113,7 +113,7 @@ class XuiPanelTest {
             if (command == "systemctl is-active x-ui") return ExecResult(0, "active")
             if (command.startsWith("cat ${XuiPanel.RESULT}")) return ExecResult(0,
                 "XUI_USERNAME=u\nXUI_PASSWORD=p\nXUI_PANEL_PORT=24680\nXUI_WEB_BASE_PATH=hp\nXUI_API_TOKEN=TOKEN-from-installer-123\n")
-            if (command.startsWith("curl -sS")) {
+            if (command.startsWith("curl -ksS")) {
                 val path = Regex("'http://127.0.0.1:24680/hp([^']*)'").find(command)?.groupValues?.get(1).orEmpty()
                 if ("Bearer TOKEN-from-installer-123" !in command) return ExecResult(0, """{"success":false,"msg":"unauthorized"}""")
                 return ExecResult(0, when (path) {
@@ -121,14 +121,47 @@ class XuiPanelTest {
                     "/panel/api/server/getNewX25519Cert" -> """{"success":true,"obj":{"privateKey":"PRIV","publicKey":"PUB"}}"""
                     "/panel/api/inbounds/add" -> """{"success":true,"obj":{"id":3}}"""
                     "/panel/api/clients/add" -> """{"success":true,"obj":null}"""
+                    "/panel/api/clients/list" -> """{"success":true,"obj":[{"email":"hydra-1","subId":"abcsub"}]}"""
                     "/panel/api/clients/links/hydra-1" -> """{"success":true,"obj":["vless://uuid@203.0.113.5:443?security=reality#Hydra-hydra-1"]}"""
                     else -> """{"success":false,"msg":"?? $path"}"""
                 })
             }
             return ExecResult(0, "")
         }
-        override fun upload(data: ByteArray, remotePath: String, mode: Int) {}
+        val bodies = mutableListOf<String>()
+        override fun upload(data: ByteArray, remotePath: String, mode: Int) { bodies += String(data) }
         override fun close() {}
+    }
+
+    @Test fun subscriptionUrlFollowsPanelSettings() {
+        val o = { s: String -> org.json.JSONObject(s) }
+        assertEquals("http://1.2.3.4:2096/sub/ID", XuiPanel.subscriptionUrl(o("{}"), "1.2.3.4", "ID"))
+        assertEquals("https://1.2.3.4:2096/abc/ID", XuiPanel.subscriptionUrl(o("""{"subPath":"/abc/","subCertFile":"/c","subKeyFile":"/k"}"""), "1.2.3.4", "ID"))
+        assertEquals("https://sub.example.com/x/ID", XuiPanel.subscriptionUrl(o("""{"subURI":"https://sub.example.com/x/"}"""), "1.2.3.4", "ID"))
+        assertEquals("http://[2001:db8::1]:2096/sub/ID", XuiPanel.subscriptionUrl(o("{}"), "2001:db8::1", "ID"))
+        assertEquals(null, XuiPanel.subscriptionUrl(o("""{"subEnable":false}"""), "1.2.3.4", "ID"))
+    }
+
+    @Test fun installEnvAsksForIpCertificateAndOpensPort80() {
+        val p = XuiPanel.InstallParams("v3.10.2", "u", "p", 20000, "w", sslIp = true)
+        val steps = XuiPanel.installSteps(p, true, "ufw")
+        val env = String(steps.first { it.id == "xui-env" }.upload!!.data)
+        assertTrue("XUI_SSL_MODE=ip\n" in env, env)
+        assertTrue(steps.any { it.id == "xui-fw80" } && steps.any { it.id == "xui-fw-sub" })
+        val dom = String(XuiPanel.installSteps(XuiPanel.InstallParams("v3.10.2", "u", "p", 1, "w", sslIp = true, domain = "vpn.example.com"), false, "none")
+            .first { it.id == "xui-env" }.upload!!.data)
+        assertTrue("XUI_SSL_MODE=domain\nXUI_DOMAIN=vpn.example.com\n" in dom, dom)
+        val off = String(XuiPanel.installSteps(XuiPanel.InstallParams("v3.10.2", "u", "p", 1, "w"), false, "none").first { it.id == "xui-env" }.upload!!.data)
+        assertTrue("XUI_SSL_MODE=none\n" in off, off)
+    }
+
+    @Test fun httpsStepsForExistingPanel() {
+        val ip = XuiPanel.httpsSteps("203.0.113.5", true, "ufw")
+        assertTrue(ip.first().command!!.startsWith("ufw allow 80/tcp"))
+        assertTrue(ip.single { it.id == "cert-issue" }.command!!.contains("--certificate-profile shortlived --days 6"))
+        assertTrue(ip.single { it.id == "cert-panel" }.command!!.contains("x-ui cert -webCert ${XuiPanel.CERT_DIR}/fullchain.pem"))
+        assertFalse(XuiPanel.httpsSteps("vpn.example.com", false, "none").single { it.id == "cert-issue" }.command!!.contains("shortlived"))
+        assertEquals("https://h:1/p", XuiPanel.toHttps("http://h:1/p"))
     }
 
     @Test fun deployFlowCreatesPanelInboundClientAndLink() {
@@ -143,7 +176,12 @@ class XuiPanelTest {
         assertEquals("TOKEN-from-installer-123", panel.token)
         assertEquals("http://203.0.113.5:24680/hp", panel.baseUrl)
         assertEquals(3, panel.inboundId); assertEquals("hydra-1", panel.clientEmail)
-        assertEquals(listOf("vless://uuid@203.0.113.5:443?security=reality#Hydra-hydra-1"), ok.links)
+        // 0.8.1-rc1: в «Серверы» уходит подписка клиента (обновляется сама), а не голая ссылка
+        assertTrue(Regex("""^http://203\.0\.113\.5:2096/sub/[a-z0-9]{16}$""").matches(ok.links.single()), ok.links.toString())
+        // инбаунд — VLESS + gRPC + Reality под vk.com, клиент без flow (у XHTTP его нет)
+        val inbound = ssh.bodies.first { "\"protocol\":\"vless\"" in it }
+        assertTrue("\"network\":\"grpc\"" in inbound && "\"target\":\"vk.com:443\"" in inbound, inbound)
+        assertTrue(ssh.bodies.any { "\"flow\":\"\"" in it && "hydra-1" in it })
         // токен не попал в журнал, пароль тоже
         assertFalse(log.any { "TOKEN-from-installer-123" in it })
         // сохранение/чтение записи панели
@@ -185,7 +223,8 @@ class XuiLiveTest {
         m.confirmFingerprint()
         waitFor("добавление") { m.ui.value.stage == Stage.DONE || m.ui.value.stage == Stage.FAILED }
         val id = saved.single().id
-        m.prepareInstall(id, ServiceForm(ServerKind.PANEL_3XUI, accessPort = 24443))
+        // сертификат Let's Encrypt на стенде не выдать (нет внешнего IP) — HTTPS проверяется только на VPS
+        m.prepareInstall(id, ServiceForm(ServerKind.PANEL_3XUI, accessPort = 24443, sslIp = false))
         waitFor("план") { !m.ui.value.busy && (m.ui.value.install?.stage == InstallStage.READY || m.ui.value.error != null) }
         assertEquals(InstallStage.READY, m.ui.value.install?.stage, "${m.ui.value.error}")
         assertTrue(m.ui.value.install!!.plan.any { it.id == "xui-install" && "v" in it.title })
@@ -195,7 +234,19 @@ class XuiLiveTest {
         m.closeInstall()
         val srv = saved.single(); val panel = srv.panel!!
         println("XUI_PANEL=${panel.baseUrl} version=${panel.version}")
-        assertTrue(imported.single().startsWith("vless://") && "security=reality" in imported.single(), imported.toString())
+        // 0.8.1-rc1: в «Серверы» уходит подписка; сама подписка отдаёт ссылку VLESS + gRPC + Reality
+        val sub = imported.single()
+        assertTrue(sub.startsWith("http://${login.host}:2096/"), imported.toString())
+        // как клиент Hydra: Accept */* (с text/html 3x-ui отдаёт страницу для браузера)
+        val body = (java.net.URL(sub).openConnection().apply { setRequestProperty("Accept", "*/*") }).getInputStream().use { it.readBytes().toString(Charsets.UTF_8) }.trim()
+        val links = runCatching { String(java.util.Base64.getDecoder().decode(body)) }.getOrDefault(body)
+        println("SUB_LINKS=" + links.replace(Regex("pbk=[^&]+"), "pbk=…"))
+        assertTrue(links.lines().any { it.startsWith("vless://") && "type=grpc" in it && "security=reality" in it && "sni=vk.com" in it }, links)
+        // клиент Hydra разбирает ссылку из подписки
+        val prof = ru.gidravpn.hydra.data.subscription.LinkParser.parseSubscription(body)
+        assertTrue(prof.any { it.port == 24443 && it.address.isNotBlank() }, "ссылка подписки не разобралась: $prof")
+        // ядро Xray панели действительно слушает порт инбаунда
+        SshConnector.connect(login, saved.single().fingerprint).use { ssh -> assertTrue(ssh.exec("ss -ltn | grep -q ':24443 '").exit == 0, "Xray не слушает 24443") }
         // токен реально работает снаружи, по сети
         val api = XuiApi(DirectXuiTransport(panel.baseUrl, panel.token))
         assertTrue(api.clientEmails().contains("hydra-1"))
@@ -203,7 +254,7 @@ class XuiLiveTest {
         // ещё один клиент и его ссылки — через мастер
         m.addPanelClient(srv.id, "second")
         waitFor("клиент") { !m.ui.value.busy && m.ui.value.shown != null }
-        assertTrue(m.ui.value.shown!!.second.startsWith("vless://"), m.ui.value.shown.toString())
+        assertTrue(m.ui.value.shown!!.second.startsWith("http://"), m.ui.value.shown.toString())
         assertTrue(api.clientEmails().contains("second"))
         // токен и пароль не в журнале
         assertFalse(m.ui.value.log.any { panel.token in it || panel.password in it }, "секрет в журнале")
