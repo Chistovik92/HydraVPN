@@ -142,6 +142,13 @@ for i in "${!ABIS[@]}"; do
   [[ "$(apk_list "$src" | grep -cE '^assets/libxray\.dex$' || true)" -ge 1 ]] || err \
 "внутри $src нет assets/libxray.dex — ядро Xray не встроено (нужен app/libs/libXray.aar).
        Это неполная сборка — публикация отменена."
+  # 0.8.0-rc4: ядра-подпроцессы и AmneziaWG. ByeDPI (libciadpi.so) молча выпадал из APK с 0.7.17 по 0.8.0-rc3:
+  # каталог app/libs/byedpi в git не хранится, а проверки не было — «Обход DPI» в выпущенных сборках не запускался.
+  for lib in libciadpi.so libopenflux.so libolcrtc.so libwg-go.so; do
+    [[ "$(apk_list "$src" | grep -cE "^lib/$abi/${lib//./\\.}$" || true)" -ge 1 ]] || err \
+"внутри $src нет lib/$abi/$lib (нужен app/libs/<движок>/$abi/$lib, см. app/libs/README.md).
+       Без него часть протоколов не работает — публикация отменена."
+  done
   if apk_list "$src" | grep -E '^lib/[^/]+/' | grep -vqE "^lib/$abi/"; then
     err "в $src есть библиотеки чужой архитектуры — разделение по ABI не сработало"
   fi

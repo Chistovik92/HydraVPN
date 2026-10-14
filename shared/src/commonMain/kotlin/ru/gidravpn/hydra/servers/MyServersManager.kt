@@ -6,16 +6,25 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.net.InetAddress
+import java.util.UUID
 
-/** Анкета нового сервера. Пароль и ключ живут только в памяти, пока идёт мастер. */
+/** Анкета нового сервера: только доступ. Что ставить, выбирается уже после входа ([ServiceForm]). */
 class ServerForm(
     val name: String,
     val target: SshTarget,
+    /** Запомнить пароль/ключ (зашифрованно) — тогда управление сервером не спрашивает его каждый раз. */
+    val remember: Boolean = true,
+)
+
+/** Служба, которую можно поставить на свой сервер. */
+enum class ServerKind { AMNEZIAWG, OPENFLUX }
+
+/** Параметры установки службы. */
+class ServiceForm(
+    val kind: ServerKind = ServerKind.AMNEZIAWG,
     val generation: AwgGeneration = AwgGeneration.V2_0,
     val awgPort: Int = 51820,
     val openFirewall: Boolean = false,
-    val kind: ServerKind = ServerKind.AMNEZIAWG,
     /** Узел OpenFlux: имя канала и необязательные транспорты (direct есть всегда). */
     val channel: String = "hydra",
     val vyandex: String = "",
@@ -24,104 +33,211 @@ class ServerForm(
     val autoupdate: Boolean = true,
 )
 
-enum class ServerKind { AMNEZIAWG, OPENFLUX }
+/** Мастер добавления сервера. */
+enum class Stage { IDLE, CONFIRM_FINGERPRINT, DONE, FAILED }
 
-enum class Stage { IDLE, CONFIRM_FINGERPRINT, READY, RUNNING, DONE, FAILED }
+/** Установка службы на уже добавленный сервер. */
+enum class InstallStage { CHECKING, READY, RUNNING, DONE, FAILED }
+
+data class InstallUi(
+    val serverId: String,
+    val form: ServiceForm,
+    val stage: InstallStage = InstallStage.CHECKING,
+    val preflight: Preflight? = null,
+    /** Что будет выполнено — показывается до запуска. */
+    val plan: List<Step> = emptyList(),
+)
+
+/** Нужен пароль/ключ: сохранённого нет или он не подошёл. Экран показывает окно входа, ответ — [MyServersManager.provideLogin]. */
+data class LoginRequest(val serverId: String, val title: String, val error: String? = null)
 
 data class MyServersUi(
     val stage: Stage = Stage.IDLE,
     val busy: Boolean = false,
     val fingerprint: String = "",
     val preflight: Preflight? = null,
-    /** Что будет выполнено — показывается до запуска. */
-    val plan: List<Step> = emptyList(),
     val log: List<String> = emptyList(),
     val progress: String = "",
     val error: String? = null,
-    /** Клиент, чей .conf показываем (имя сервера → клиент). */
+    /** Сервер, к которому относятся текущая операция, журнал и ошибка (null — мастер добавления). */
+    val opServer: String? = null,
+    /** id сервера, только что добавленного мастером. */
+    val addedId: String? = null,
+    val install: InstallUi? = null,
+    val login: LoginRequest? = null,
+    /** Последняя проверка каждого сервера. */
+    val status: Map<String, ServerStatus> = emptyMap(),
+    /** Серверы с запомненными данными входа. */
+    val saved: Set<String> = emptySet(),
+    /** Что показываем в окне: имя → конфиг клиента или ссылка. */
     val shown: Pair<String, String>? = null,
 )
 
 /**
- * Мастер и управление своими серверами (Android и ПК используют один и тот же код).
- * [bundleFor] — получить серверный пакет по архитектуре; [importConf] — добавить клиентский .conf в список серверов Hydra.
+ * «Мои серверы» (Android и ПК используют один и тот же код). С 0.8.0-rc4 — сначала доступ к серверу, потом службы:
+ *  1. «Добавить сервер»: адрес и пароль/ключ → отпечаток → вход и проверка → сервер в списке (данные входа можно запомнить;
+ *     найденные на сервере службы Hydra берутся под управление);
+ *  2. на карточке сервера — установка AmneziaWG / узла OpenFlux, клиенты, перезапуск, удаление службы, перезагрузка,
+ *     полная очистка сервера от всего, что ставила Hydra, смена/забывание данных входа.
+ * Любая операция берёт данные входа из [vault] (или из памяти на время работы приложения); если их нет или они не подошли —
+ * ставит [LoginRequest] и повторяет операцию после [provideLogin].
+ *
+ * [bundleFor] — серверный пакет AmneziaWG по архитектуре; [importConf] — добавить конфиг/ссылку в список серверов Hydra.
  */
 class MyServersManager(
     private val scope: CoroutineScope,
     private val servers: () -> List<MyServer>,
     private val save: (List<MyServer>) -> Unit,
     bundleFor: (String) -> AwgBundle,
+    vault: CredentialVault = MemoryVault(),
     private val importConf: (name: String, conf: String) -> Unit,
 ) {
-    private val service = MyServersService(bundleFor)
-    private val _ui = MutableStateFlow(MyServersUi())
+    private val service = MyServerService(bundleFor)
+    /** Сбой хранилища (Keystore недоступен, нет места) не роняет операцию: вход тогда помнится до закрытия приложения. */
+    private val store: CredentialVault = SafeVault(vault)
+    private val _ui = MutableStateFlow(MyServersUi(saved = runCatching { store.ids() }.getOrDefault(emptySet())))
     val ui: StateFlow<MyServersUi> = _ui
 
+    /** Подставить состояние без сети — для скриншотов и тестов отрисовки. */
+    fun previewState(state: MyServersUi) { _ui.value = state }
+
     private var form: ServerForm? = null
-    private var session: SshSession? = null
-    private var installer: Installer? = null
+    @Volatile private var installer: Installer? = null
+    /** Данные входа на время работы приложения (не запомненные пользователем): не спрашивать их на каждую кнопку. */
+    private val memLogins = java.util.concurrent.ConcurrentHashMap<String, SshTarget>()
+    /** Операция, ждущая ввода пароля. */
+    private var pending: ((SshTarget) -> Unit)? = null
+
+    private fun find(id: String) = servers().firstOrNull { it.id == id }
+    private fun update(s: MyServer) = save(servers().map { if (it.id == s.id) s else it })
+    private fun refreshSaved() = _ui.update { it.copy(saved = runCatching { store.ids() }.getOrDefault(emptySet())) }
 
     private fun log(l: String) = _ui.update { it.copy(log = (it.log + l).takeLast(400)) }
-    private fun fail(msg: String) {
-        closeSession()
-        _ui.update { it.copy(stage = Stage.FAILED, busy = false, error = msg) }
-    }
-    private fun closeSession() { runCatching { session?.close() }; session = null }
 
-    fun reset() { closeSession(); form = null; _ui.value = MyServersUi() }
+    fun hasSavedLogin(id: String) = id in _ui.value.saved
+
+    // ================================================================================================ Добавление сервера
+
+    fun reset() {
+        form = null
+        _ui.update { MyServersUi(saved = it.saved, status = it.status) }
+    }
 
     /** Шаг 1: узнать отпечаток хоста и показать его пользователю. */
     fun begin(f: ServerForm) {
         form = f
-        _ui.value = MyServersUi(busy = true, progress = "Подключаюсь к ${f.target.host}…")
+        _ui.update { it.copy(stage = Stage.IDLE, busy = true, progress = "Подключаюсь к ${f.target.host}…", error = null, opServer = null, log = emptyList(), addedId = null) }
         scope.launch(Dispatchers.IO) {
             runCatching { SshConnector.fingerprint(f.target) }
                 .onSuccess { fp -> _ui.update { it.copy(stage = Stage.CONFIRM_FINGERPRINT, busy = false, fingerprint = fp, progress = "") } }
-                .onFailure { fail("Не удалось подключиться по SSH: ${it.message}") }
+                .onFailure { e -> _ui.update { it.copy(stage = Stage.FAILED, busy = false, progress = "", error = "Не удалось подключиться по SSH: ${e.message}") } }
         }
     }
 
-    /** Шаг 2: пользователь подтвердил отпечаток — входим, проверяем сервер и показываем план. */
+    /**
+     * Шаг 2: пользователь подтвердил отпечаток — входим, проверяем сервер, ищем уже стоящие службы Hydra и сохраняем сервер.
+     * Тот же адрес и порт уже есть в списке — запись обновляется (новый отпечаток, данные входа), службы сохраняются.
+     */
     fun confirmFingerprint() {
         val f = form ?: return
         val fp = _ui.value.fingerprint
         _ui.update { it.copy(busy = true, progress = "Вхожу и проверяю сервер…") }
         scope.launch(Dispatchers.IO) {
             try {
-                val s = SshConnector.connect(f.target, fp); session = s
-                val pre = service.preflight(s, if (f.kind == ServerKind.AMNEZIAWG) f.awgPort else 0)
-                val preview = if (f.kind == ServerKind.AMNEZIAWG)
-                    service.planPreview(AwgServerSpec.create(f.target.host, f.awgPort, f.generation), pre, f.openFirewall)
-                else service.planPreviewOfx(OfxNodeSpec(f.target.host, f.channel, 0, "•".repeat(64), f.vyandex, f.mailru, f.cupsonline, f.autoupdate))
-                _ui.update { it.copy(stage = Stage.READY, busy = false, preflight = pre, plan = preview, progress = "") }
-            } catch (e: Exception) { fail("Вход не удался: ${e.message}") }
-        }
-    }
-
-    /** Шаг 3: выполнить план. */
-    fun install() {
-        val f = form ?: return
-        val s = session ?: return
-        val pre = _ui.value.preflight ?: return
-        val fp = _ui.value.fingerprint
-        _ui.update { it.copy(stage = Stage.RUNNING, busy = true, log = emptyList(), error = null) }
-        scope.launch(Dispatchers.IO) {
-            val mk: (SshSession, Collection<String>) -> Installer = { ssh, secrets -> Installer(ssh, secrets, ::onEvent).also { installer = it } }
-            val res = if (f.kind == ServerKind.AMNEZIAWG)
-                service.deployAwg(s, f.target, fp, f.name, f.generation, f.awgPort, f.openFirewall, pre, mk)
-            else service.deployOfx(s, f.target, fp, f.name, f.channel, f.vyandex, f.mailru, f.cupsonline, f.autoupdate, mk, ::log)
-            when (res) {
-                is DeployResult.Ok -> {
-                    save(servers() + res.server)
-                    res.server.awg?.let { spec -> importConf(res.server.name, spec.clientConf(res.server.clients.first())) }
-                    res.server.ofx?.let { importConf(res.server.name, it.shareLink(res.server.name)) }
-                    closeSession(); form = null
-                    _ui.update { it.copy(stage = Stage.DONE, busy = false, progress = "Готово: сервер добавлен в «Серверы»") }
+                SshConnector.connect(f.target, fp).use { ssh ->
+                    val pre = service.preflight(ssh, 0)
+                    val st = service.status(ssh)
+                    val existing = servers().firstOrNull { it.host.equals(f.target.host, true) && it.sshPort == f.target.port }
+                    val base = (existing ?: MyServer(UUID.randomUUID().toString(), f.name, f.target.host, f.target.port, f.target.user, fp))
+                        .copy(name = f.name.ifBlank { existing?.name ?: f.target.host }, sshUser = f.target.user, fingerprint = fp)
+                    val (srv, writeState) = service.reconcile(base, st)
+                    if (writeState) srv.awg?.let { spec -> Installer(ssh, listOf(spec.privateKey)) {}.run(ServerOps.awgStateSteps(spec, srv.clients)) }
+                    if (existing == null) save(servers() + srv) else update(srv)
+                    if (f.remember) store.save(srv.id, SavedLogin.of(f.target)) else { store.remove(srv.id); memLogins[srv.id] = f.target }
+                    refreshSaved()
+                    val found = listOfNotNull(srv.awg?.let { "AmneziaWG ${it.generation.label}" }, srv.ofx?.let { "узел OpenFlux «${it.channel}»" })
+                    form = null
+                    _ui.update {
+                        it.copy(stage = Stage.DONE, busy = false, preflight = pre, addedId = srv.id, status = it.status + (srv.id to st),
+                            progress = if (found.isEmpty()) "Сервер добавлен" else "Сервер добавлен; уже установлено: ${found.joinToString()}")
+                    }
                 }
-                is DeployResult.Failed -> if (_ui.value.stage != Stage.FAILED) fail(_ui.value.error ?: res.reason)
+            } catch (e: Exception) {
+                _ui.update { it.copy(stage = Stage.FAILED, busy = false, progress = "", error = "Вход не удался: ${e.message}") }
             }
         }
     }
+
+    // ================================================================================================ Вход для операций
+
+    private fun isAuthError(e: Throwable): Boolean {
+        val m = (e.message ?: "").lowercase()
+        return "auth fail" in m || "auth cancel" in m || "userauth" in m || "too many authentication" in m
+    }
+
+    /**
+     * Выполнить [work] на сервере [id]: данные входа — сохранённые, из памяти или спросить ([LoginRequest]).
+     * [quiet] — без журнала и индикатора «занят» на всём экране (проверка состояния).
+     */
+    private fun op(id: String, title: String, quiet: Boolean = false, work: (srv: MyServer, ssh: SshSession, inst: Installer) -> Unit) {
+        val srv = find(id) ?: return
+        if (_ui.value.busy) return
+        val t = store.load(id)?.target(srv) ?: memLogins[id]
+        if (t == null) { askLogin(id, title, null) { login -> run(id, title, login, quiet, work) }; return }
+        run(id, title, t, quiet, work)
+    }
+
+    private fun askLogin(id: String, title: String, error: String?, retry: (SshTarget) -> Unit) {
+        pending = retry
+        _ui.update { it.copy(login = LoginRequest(id, title, error), busy = false) }
+    }
+
+    /** Ответ на [LoginRequest]: [remember] — сохранить зашифрованно. */
+    fun provideLogin(target: SshTarget, remember: Boolean) {
+        val req = _ui.value.login ?: return
+        val retry = pending ?: return
+        pending = null
+        _ui.update { it.copy(login = null) }
+        if (remember) { store.save(req.serverId, SavedLogin.of(target)); memLogins.remove(req.serverId) } else memLogins[req.serverId] = target
+        refreshSaved()
+        retry(target)
+    }
+
+    fun cancelLogin() { pending = null; _ui.update { it.copy(login = null, install = it.install?.takeIf { i -> i.stage != InstallStage.CHECKING }) } }
+
+    private fun run(id: String, title: String, t: SshTarget, quiet: Boolean, work: (MyServer, SshSession, Installer) -> Unit) {
+        val srv = find(id) ?: return
+        _ui.update { it.copy(busy = true, opServer = id, error = null, progress = title, log = if (quiet) it.log else emptyList()) }
+        scope.launch(Dispatchers.IO) {
+            try {
+                SshConnector.connect(t, srv.fingerprint).use { ssh ->
+                    val inst = Installer(ssh, listOfNotNull(t.password, t.privateKey, t.keyPassphrase), if (quiet) { _ -> } else ::onEvent).also { installer = it }
+                    try { work(srv, ssh, inst) } finally {
+                        // после любого действия карточка показывает свежее состояние, а не то, что было до него
+                        if (!quiet) runCatching { service.status(ssh, find(id)?.awg?.iface ?: "awg0") }.getOrNull()
+                            ?.let { st -> _ui.update { it.copy(status = it.status + (id to st)) } }
+                    }
+                }
+            } catch (e: HostKeyMismatch) {
+                _ui.update { it.copy(error = e.message) }
+            } catch (e: Exception) {
+                if (isAuthError(e)) {
+                    // сохранённый пароль поменяли на сервере — забываем его и спрашиваем заново
+                    store.remove(id); memLogins.remove(id); refreshSaved()
+                    _ui.update { it.copy(busy = false, progress = "") }
+                    askLogin(id, title, "Сервер не принял сохранённые данные входа — введите новые") { login -> run(id, title, login, quiet, work) }
+                    return@launch
+                }
+                val msg = if (e is OpFailed) e.message else "Ошибка SSH: ${e.message}"
+                _ui.update { it.copy(error = msg, status = if (quiet) it.status + (id to ServerStatus(error = msg)) else it.status) }
+            } finally {
+                installer = null
+            }
+            _ui.update { it.copy(busy = false, progress = "") }
+        }
+    }
+
+    private class OpFailed(msg: String) : Exception(msg)
 
     private fun onEvent(e: InstallEvent) {
         when (e) {
@@ -129,73 +245,169 @@ class MyServersManager(
             is InstallEvent.Output -> log("  " + e.line)
             is InstallEvent.StepOk -> log("✔ ${e.step.title}")
             is InstallEvent.StepFailed -> { log("✘ ${e.step.title}: ${e.reason}"); _ui.update { it.copy(error = "${e.step.title}: ${e.reason}") } }
-            InstallEvent.Done -> log("Готово")
+            InstallEvent.Done -> Unit
         }
     }
 
+    /** Остановить выполняющийся план (после текущего шага). */
     fun stop() { installer?.cancelled = true }
 
-    // ------------------------------------------------------------- Управление развёрнутым сервером
-    private fun withServer(id: String, pwd: SshTarget, work: (MyServer, SshSession, Installer) -> MyServer?) {
-        val srv = servers().firstOrNull { it.id == id } ?: return
-        _ui.update { it.copy(busy = true, error = null, log = emptyList()) }
+    // ================================================================================================ Состояние
+
+    /** Проверить сервер: доступность, система, службы, клиенты; заодно сверить запись с сервером. */
+    fun refresh(id: String) = op(id, "Проверяю сервер…", quiet = true) { srv, ssh, inst ->
+        val st = service.status(ssh, srv.awg?.iface ?: "awg0")
+        val (upd, writeState) = service.reconcile(srv, st)
+        if (writeState) upd.awg?.let { spec -> inst.addSecret(spec.privateKey); inst.run(ServerOps.awgStateSteps(spec, upd.clients)) }
+        if (upd != srv) update(upd)
+        _ui.update { it.copy(status = it.status + (srv.id to st)) }
+    }
+
+    // ================================================================================================ Установка служб
+
+    /** Подготовить установку: войти, проверить сервер под эту службу, показать план. */
+    fun prepareInstall(id: String, f: ServiceForm) {
+        if (_ui.value.busy) return
+        _ui.update { it.copy(install = InstallUi(id, f), error = null, opServer = id) }
+        op(id, "Проверяю сервер перед установкой…") { srv, ssh, _ ->
+            val pre = service.preflight(ssh, if (f.kind == ServerKind.AMNEZIAWG) f.awgPort else 0)
+            val plan = when (f.kind) {
+                ServerKind.AMNEZIAWG -> service.planPreview(AwgServerSpec.create(srv.host, f.awgPort, f.generation), pre, f.openFirewall)
+                ServerKind.OPENFLUX -> service.planPreviewOfx(OfxNodeSpec(srv.host, f.channel, 0, "•".repeat(64), f.vyandex, f.mailru, f.cupsonline, f.autoupdate))
+            }
+            update(srv.copy(osName = pre.osName.ifBlank { srv.osName }, arch = pre.arch))
+            _ui.update { it.copy(install = InstallUi(id, f, InstallStage.READY, pre, plan)) }
+        }
+    }
+
+    /** Выполнить подготовленную установку. */
+    fun runInstall() {
+        val i = _ui.value.install?.takeIf { it.stage == InstallStage.READY } ?: return
+        val pre = i.preflight ?: return
+        op(i.serverId, if (i.form.kind == ServerKind.AMNEZIAWG) "Устанавливаю AmneziaWG…" else "Устанавливаю узел OpenFlux…") { srv, ssh, inst ->
+            _ui.update { it.copy(install = i.copy(stage = InstallStage.RUNNING)) }
+            val f = i.form
+            val res = when (f.kind) {
+                ServerKind.AMNEZIAWG -> service.deployAwg(srv, f.generation, f.awgPort, f.openFirewall, pre, inst, ::log)
+                ServerKind.OPENFLUX -> service.deployOfx(ssh, srv, f.channel, f.vyandex, f.mailru, f.cupsonline, f.autoupdate, inst, ::log)
+            }
+            when (res) {
+                is DeployResult.Ok -> {
+                    update(res.server)
+                    res.links.forEach { importConf(res.server.name, it) }
+                    log("Готово: подключение добавлено в «Серверы»")
+                    _ui.update { it.copy(install = i.copy(stage = InstallStage.DONE)) }
+                }
+                is DeployResult.Failed -> {
+                    _ui.update { it.copy(install = i.copy(stage = InstallStage.FAILED), error = it.error ?: res.reason) }
+                }
+            }
+        }
+    }
+
+    fun closeInstall() { if (_ui.value.install?.stage != InstallStage.RUNNING) _ui.update { it.copy(install = null) } }
+
+    // ================================================================================================ Управление
+
+    fun addClient(id: String, name: String) = op(id, "Добавляю устройство «$name»…") { srv, _, inst ->
+        val (upd, c) = service.addClient(srv, name, inst) ?: throw OpFailed(_ui.value.error ?: "Не удалось добавить устройство")
+        update(upd)
+        _ui.update { it.copy(shown = name to upd.awg!!.clientConf(c)) }
+    }
+
+    fun removeClient(id: String, name: String) = op(id, "Удаляю устройство «$name»…") { srv, _, inst ->
+        update(service.removeClient(srv, name, inst) ?: throw OpFailed(_ui.value.error ?: "Не удалось удалить устройство"))
+    }
+
+    fun restartService(id: String, kind: ServerKind) = op(id, "Перезапускаю службу…") { srv, _, inst ->
+        val ok = if (kind == ServerKind.AMNEZIAWG) service.restartAwg(inst) else service.restartOfx(srv, inst)
+        if (!ok) throw OpFailed(_ui.value.error ?: "Служба не перезапустилась")
+        log("Служба перезапущена")
+    }
+
+    fun uninstallService(id: String, kind: ServerKind) = op(id, "Удаляю службу с сервера…") { srv, _, inst ->
+        val upd = if (kind == ServerKind.AMNEZIAWG) service.uninstallAwg(srv, inst) else service.uninstallOfx(srv, inst)
+        update(upd ?: throw OpFailed(_ui.value.error ?: "Не удалось удалить службу"))
+        log("Служба удалена с сервера. Подключения к ней в «Серверах» больше не работают — их можно удалить.")
+    }
+
+    /** Убрать с сервера всё, что ставила Hydra. Запись и данные входа остаются. */
+    fun wipe(id: String) = op(id, "Очищаю сервер…") { srv, _, inst ->
+        update(service.wipe(srv, inst) ?: throw OpFailed(_ui.value.error ?: "Очистка не завершилась"))
+        log("Сервер очищен: службы, файлы, правила файрвола и копии настроек Hydra удалены.")
+        _ui.update { it.copy(status = it.status - srv.id) }
+    }
+
+    fun reboot(id: String) = op(id, "Перезагружаю сервер…") { _, ssh, _ ->
+        service.reboot(ssh)
+        log("Команда перезагрузки отправлена. Сервер будет недоступен 1–2 минуты.")
+        _ui.update { it.copy(status = it.status - id) }
+    }
+
+    /** Убрать сервер из приложения (на самом сервере ничего не меняется) и забыть данные входа. */
+    fun forget(id: String) {
+        save(servers().filterNot { it.id == id })
+        store.remove(id); memLogins.remove(id); refreshSaved()
+        _ui.update { it.copy(status = it.status - id, opServer = if (it.opServer == id) null else it.opServer) }
+    }
+
+    /** Сменить данные входа: проверяются входом на сервер, потом сохраняются (или держатся в памяти). */
+    fun changeLogin(id: String, target: SshTarget, remember: Boolean) {
+        val srv = find(id) ?: return
+        _ui.update { it.copy(busy = true, opServer = id, error = null, progress = "Проверяю данные входа…", log = emptyList()) }
         scope.launch(Dispatchers.IO) {
             try {
-                SshConnector.connect(pwd, srv.fingerprint).use { ssh ->
-                    val inst = Installer(ssh, listOf(pwd.password.orEmpty(), pwd.privateKey.orEmpty()), ::onEvent)
-                    val upd = work(srv, ssh, inst)
-                    if (upd != null) save(servers().map { if (it.id == id) upd else it })
-                    else _ui.update { it.copy(error = it.error ?: "Операция не выполнена") }
-                }
-            } catch (e: HostKeyMismatch) { _ui.update { it.copy(error = e.message) } }
-            catch (e: Exception) { _ui.update { it.copy(error = "Ошибка SSH: ${e.message}") } }
-            _ui.update { it.copy(busy = false) }
+                SshConnector.connect(target, srv.fingerprint).use { }
+                if (remember) { store.save(id, SavedLogin.of(target)); memLogins.remove(id) } else { store.remove(id); memLogins[id] = target }
+                if (target.user != srv.sshUser) update(srv.copy(sshUser = target.user))
+                refreshSaved()
+                log("Данные входа ${if (remember) "сохранены" else "приняты (до закрытия приложения)"}")
+            } catch (e: Exception) {
+                _ui.update { it.copy(error = "Вход не удался: ${e.message}") }
+            }
+            _ui.update { it.copy(busy = false, progress = "") }
         }
     }
 
-    fun addClient(id: String, login: SshTarget, name: String) = withServer(id, login) { s, ssh, inst ->
-        service.addClient(ssh, s, name, inst)?.let { (upd, c) ->
-            _ui.update { it.copy(shown = name to upd.awg!!.clientConf(c)) }
-            upd
-        }
-    }
+    fun forgetLogin(id: String) { store.remove(id); memLogins.remove(id); refreshSaved() }
 
-    fun removeClient(id: String, login: SshTarget, name: String) = withServer(id, login) { s, _, inst -> service.removeClient(s, name, inst) }
-
-    /** Удалить сервер: со своей машины снимаем службу и файлы, из приложения — запись. */
-    fun uninstall(id: String, login: SshTarget) {
-        val srv = servers().firstOrNull { it.id == id } ?: return
-        _ui.update { it.copy(busy = true, error = null, log = emptyList()) }
-        scope.launch(Dispatchers.IO) {
-            try {
-                SshConnector.connect(login, srv.fingerprint).use { ssh ->
-                    val inst = Installer(ssh, listOf(login.password.orEmpty(), srv.ofx?.key.orEmpty()), ::onEvent)
-                    if (if (srv.ofx != null) service.uninstallOfx(srv, inst) else service.uninstall(srv, inst)) save(servers().filterNot { it.id == id })
-                    else _ui.update { it.copy(error = it.error ?: "Не удалось удалить") }
-                }
-            } catch (e: Exception) { _ui.update { it.copy(error = "Ошибка SSH: ${e.message}") } }
-            _ui.update { it.copy(busy = false) }
-        }
-    }
-
-    /** Убрать только запись (сервер недоступен или уже удалён вручную). */
-    fun forget(id: String) = save(servers().filterNot { it.id == id })
+    fun rename(id: String, name: String) { find(id)?.let { if (name.isNotBlank()) update(it.copy(name = name.trim().take(40))) } }
 
     fun clientConf(id: String, clientName: String): String? {
-        val s = servers().firstOrNull { it.id == id } ?: return null
-        s.ofx?.let { return it.shareLink(s.name) }
-        val c = s.clients.firstOrNull { it.name == clientName } ?: return null
+        val s = find(id) ?: return null
+        val c = s.clients.firstOrNull { it.name == clientName }?.takeIf { it.privateKey.isNotEmpty() } ?: return null
         return s.awg?.clientConf(c)
     }
 
+    fun ofxLink(id: String): String? = find(id)?.let { s -> s.ofx?.shareLink(s.name) }
+
     fun showConf(name: String, conf: String) = _ui.update { it.copy(shown = name to conf) }
     fun hideShown() = _ui.update { it.copy(shown = null) }
+    fun clearError() = _ui.update { it.copy(error = null) }
 
     companion object {
-        /** Грубая проверка адреса до сети: IP или имя хоста. */
-        fun validHost(h: String) = h.isNotBlank() && h.length < 254 && !h.any { it.isWhitespace() || it == '/' } &&
-            (runCatching { InetAddress.getByName(h); true }.getOrDefault(false))
+        /**
+         * Проверка адреса без сети: IPv4, IPv6 или имя хоста. Раньше здесь был `InetAddress.getByName` — на Android из потока
+         * интерфейса он падал (NetworkOnMainThreadException), и имя хоста вместо IP считалось ошибкой.
+         */
+        fun validHost(h: String): Boolean {
+            if (h.isBlank() || h.length > 253 || h.any { it.isWhitespace() || it == '/' }) return false
+            if (IPV4.matches(h)) return h.split('.').all { (it.toIntOrNull() ?: 256) <= 255 }
+            if (':' in h) return h.removePrefix("[").removeSuffix("]").all { it.isDigit() || it.lowercaseChar() in 'a'..'f' || it == ':' || it == '.' } && h.count { it == ':' } >= 2
+            return HOST.matches(h) && !h.all { it.isDigit() || it == '.' }
+        }
+        private val IPV4 = Regex("""^\d{1,3}(\.\d{1,3}){3}$""")
+        private val HOST = Regex("""^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.?$""")
     }
 }
 
-private typealias MyServersService = MyServerService
+/** Обёртка хранилища входа: исключения не выходят наружу, при сбое записи вход держится в памяти. */
+private class SafeVault(private val inner: CredentialVault) : CredentialVault {
+    private val fallback = MemoryVault()
+    override fun load(id: String) = fallback.load(id) ?: runCatching { inner.load(id) }.getOrNull()
+    override fun save(id: String, login: SavedLogin) {
+        if (runCatching { inner.save(id, login) }.isSuccess) fallback.remove(id) else fallback.save(id, login)
+    }
+    override fun remove(id: String) { fallback.remove(id); runCatching { inner.remove(id) } }
+    override fun ids(): Set<String> = fallback.ids() + runCatching { inner.ids() }.getOrDefault(emptySet())
+}

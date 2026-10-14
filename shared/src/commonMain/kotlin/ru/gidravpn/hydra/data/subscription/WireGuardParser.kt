@@ -112,7 +112,9 @@ object WireGuardParser {
     /** Сборка ServerProfile из разобранного конфига. */
     fun toProfile(text: String, fallbackName: String, isAmnezia: Boolean): ru.gidravpn.hydra.data.model.ServerProfile? {
         val (meta, extra) = parse(text, isAmnezia) ?: return null
-        val proto = if (isAmnezia) Protocol.AMNEZIAWG else Protocol.WIREGUARD
+        // 0.8.0-rc4: параметры обфускации в конфиге — это AmneziaWG, как бы его ни назвали. Иначе профиль уходил в sing-box как
+        // обычный WireGuard, рукопожатие с сервером AmneziaWG не проходило («подключено», но трафик не идёт).
+        val proto = if (isAmnezia || hasAwgParams(extra)) Protocol.AMNEZIAWG else Protocol.WIREGUARD
         return ru.gidravpn.hydra.data.model.ServerProfile(
             name = fallbackName,
             protocolId = proto.id,
@@ -122,4 +124,7 @@ object WireGuardParser {
             extra = extra.toString(),
         )
     }
+
+    /** В extra профиля есть параметры AmneziaWG (Jc, Jmin, Jmax, S1–S4, H1–H4, I1–I5, 3.x). */
+    fun hasAwgParams(extra: JSONObject): Boolean = AwgParams.ALL.any { extra.has(it.conf) }
 }

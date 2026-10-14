@@ -17,6 +17,16 @@ class WireGuardConfigBuilderTest {
         extra = extra.put("public_key", key).put("local_address", "10.8.0.2/32, fd00::2/128").toString(),
     )
 
+    /** 0.8.0-rc4: replace_allowed_ips после allowed_ip стирал маршруты пира — «подключено», но трафик не шёл. */
+    @Test fun replaceAllowedIpsComesBeforeAllowedIps() {
+        val lines = WireGuardConfigBuilder.buildUapi(awg()).lines()
+        val replace = lines.indexOf("replace_allowed_ips=true")
+        val allowed = lines.indexOfFirst { it.startsWith("allowed_ip=") }
+        assertTrue(lines.toString(), replace in 0 until allowed)
+        assertEquals(1, lines.count { it == "replace_allowed_ips=true" })
+        assertTrue(lines.count { it.startsWith("allowed_ip=") } >= 2)
+    }
+
     @Test fun awgParamsAreInterfaceLevelBeforeFirstPeer() {
         val u = WireGuardConfigBuilder.buildUapi(awg(JSONObject().put("jc", "5").put("s1", "20").put("h1", "111").put("i1", "<r 16>")))
         val lines = u.lines()

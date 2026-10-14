@@ -16,8 +16,13 @@ import ru.gidravpn.hydra.data.routing.viaOf
  */
 object AppTunnelPolicy {
 
-    /** Движки, чьи сокеты Hydra защищает сама через `VpnService.protect()`: sing-box (libbox), AmneziaWG, SSTP/L2TP/PPTP. */
-    private val PROTECTED_ENGINES = setOf(Engine.SINGBOX, Engine.AWG, Engine.USERSPACE)
+    /**
+     * Движки, чьи сокеты защищаются через `VpnService.protect()` ДО первого пакета и при каждой смене сети: sing-box (libbox)
+     * и SSTP/L2TP/PPTP. AmneziaWG сюда не входит (0.8.0-rc4): его сокет защищается только после старта ядра — первая попытка
+     * рукопожатия уходила в собственный tun (5 с задержки), а после смены сети amneziawg-go создаёт сокеты заново без защиты,
+     * и туннель замыкался сам на себя. С AmneziaWG приложение остаётся вне туннеля, как до rc3.
+     */
+    private val PROTECTED_ENGINES = setOf(Engine.SINGBOX, Engine.USERSPACE)
 
     /**
      * @param lookup профиль по id — чтобы проверить узлы, на которые ссылаются правила маршрутизации.

@@ -298,6 +298,8 @@ private fun ServersScreen(c: AppController, ui: UiState) {
     var query by remember { mutableStateOf("") }
     var sortByPing by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf<ServerProfile?>(null) }
+    var manual by remember { mutableStateOf(false) }
+    if (manual) ManualAddDialog(c) { manual = false }
     confirmDelete?.let { s ->
         ConfirmDelete("Удалить сервер?", "«${s.name}» будет удалён из списка.", { c.deleteServer(s.id) }) { confirmDelete = null }
     }
@@ -305,6 +307,7 @@ private fun ServersScreen(c: AppController, ui: UiState) {
         Header("Серверы") {
             FilterChip(selected = sortByPing, onClick = { sortByPing = !sortByPing }, label = { Text("По пингу") })
             OutlinedButton(onClick = { c.import(clipboard()) }) { Text("Вставить из буфера") }
+            OutlinedButton(onClick = { manual = true }) { Text("Добавить вручную") }
             OutlinedButton(onClick = { c.pingAll() }, enabled = !ui.pinging && ui.data.servers.isNotEmpty()) {
                 Text(if (ui.pinging) "Пинг…" else "Пинг всех")
             }

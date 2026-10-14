@@ -98,6 +98,11 @@ object OpenFluxNode {
     )
 
     fun removeSteps(channel: String): List<Step> = listOf(
-        Step("ofx-remove", "Удалить канал «$channel»", "sh /opt/openflux-node/node-install.sh remove ${Installer.shq(channel)}", accept = okJson),
+        Step("ofx-remove", "Удалить канал «$channel» (последний канал убирает и ядро узла)",
+            "sh /opt/openflux-node/node-install.sh remove ${Installer.shq(channel)}; rm -f ${Installer.shq(ServerOps.ofxState(channel))}",
+            accept = okJson, failHint = "Канал удалить не удалось"),
     )
+
+    /** Перезапустить канал узла. */
+    fun restartCommand(channel: String) = "systemctl restart ${Installer.shq("openflux-node@$channel")} && systemctl is-active ${Installer.shq("openflux-node@$channel")}"
 }

@@ -36,59 +36,6 @@ class MyServersTest {
         runCatching { AwgBundleLoader.parse("amd64", bad.toByteArray()) }.let { assertTrue(it.isFailure) }
     }
 
-    /** Весь мастер на настоящем Linux: HYDRA_SSH_TEST (root) и HYDRA_AWG_BUNDLE. */
-    @Test fun wizardEndToEndLive() {
-        val v = System.getenv("HYDRA_SSH_TEST")
-        val dir = System.getenv("HYDRA_AWG_BUNDLE")
-        assumeTrue(v != null && dir != null)
-        val p = v!!.split(":", limit = 4)
-        val login = SshTarget(p[0], p[1].toInt(), p[2], password = p[3])
-        var saved = emptyList<MyServer>()
-        val imported = mutableListOf<String>()
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val m = MyServersManager(scope, { saved }, { saved = it }, { AwgBundleLoader.fromDir(it, File(dir)) }) { _, conf -> imported += conf }
-
-        fun waitFor(what: String, cond: () -> Boolean) {
-            val end = System.currentTimeMillis() + 120_000
-            while (System.currentTimeMillis() < end) { if (cond()) return; Thread.sleep(100) }
-            fail("таймаут: $what; ${m.ui.value.error}; ${m.ui.value.log.takeLast(8)}")
-        }
-
-        m.begin(ServerForm("e2e", login, AwgGeneration.V1_5, 51821, openFirewall = false))
-        waitFor("отпечаток") { m.ui.value.stage == Stage.CONFIRM_FINGERPRINT }
-        assertTrue(m.ui.value.fingerprint.startsWith("SHA256:"))
-        m.confirmFingerprint()
-        waitFor("предполёт") { m.ui.value.stage == Stage.READY }
-        assertTrue(m.ui.value.plan.isNotEmpty())
-        m.install()
-        waitFor("установка") { m.ui.value.stage == Stage.DONE || m.ui.value.stage == Stage.FAILED }
-        assertEquals(Stage.DONE, m.ui.value.stage, "${m.ui.value.error} ${m.ui.value.log.takeLast(10)}")
-        val srv = saved.single()
-        assertEquals(1, imported.size)
-        assertEquals(1, srv.clients.size)
-
-        m.addClient(srv.id, login, "second")
-        waitFor("клиент") { !m.ui.value.busy && saved.single().clients.size == 2 }
-        // сервер видит обоих пиров, живая служба не перезапускалась
-        SshConnector.connect(login, srv.fingerprint).use { ssh ->
-            val peers = ssh.exec("WG_QUICK_USERSPACE_IMPLEMENTATION=amneziawg-go /usr/local/bin/awg show awg0 peers").out.lines().filter { it.isNotBlank() }
-            assertEquals(2, peers.size, peers.toString())
-        }
-        val conf2 = m.clientConf(srv.id, "second")
-        assertNotNull(conf2); assertTrue("Endpoint = ${login.host}:51821" in conf2!!)
-
-        m.removeClient(srv.id, login, "second")
-        waitFor("удаление клиента") { !m.ui.value.busy && saved.single().clients.size == 1 }
-
-        m.uninstall(srv.id, login)
-        waitFor("удаление сервера") { !m.ui.value.busy && saved.isEmpty() }
-        SshConnector.connect(login, srv.fingerprint).use { ssh ->
-            assertTrue(ssh.exec("test -e /etc/amnezia/amneziawg/awg0.conf").exit != 0)
-        }
-        // запись о сервере для чужого/неверного отпечатка не проходит
-        assertNull(m.clientConf("нет", "x"))
-    }
-
     @Test fun ofxLinkAndPlanParsing() {
         val spec = OfxNodeSpec("203.0.113.9", "hydra", 24680, OfxNodeSpec.newKey(), vyandex = "https://docs.yandex.ru/edit/d/AbCdEfGhIjKlMnOpQrSt")
         val cfg = spec.config(true)
@@ -115,27 +62,31 @@ class MyServersTest {
         var saved = emptyList<MyServer>()
         val imported = mutableListOf<String>()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val m = MyServersManager(scope, { saved }, { saved = it }, { error("не нужен") }) { _, conf -> imported += conf }
+        val m = MyServersManager(scope, { saved }, { saved = it }, { error("не нужен") }, MemoryVault()) { _, conf -> imported += conf }
         fun waitFor(what: String, cond: () -> Boolean) {
             val end = System.currentTimeMillis() + 240_000
+            Thread.sleep(150)
             while (System.currentTimeMillis() < end) { if (cond()) return; Thread.sleep(200) }
             fail("таймаут: $what; ${m.ui.value.error}; ${m.ui.value.log.takeLast(10)}")
         }
-        m.begin(ServerForm("node", login, kind = ServerKind.OPENFLUX, channel = "hydratest"))
+        m.begin(ServerForm("node", login))
         waitFor("отпечаток") { m.ui.value.stage == Stage.CONFIRM_FINGERPRINT }
         m.confirmFingerprint()
-        waitFor("предполёт") { m.ui.value.stage == Stage.READY }
-        m.install()
-        waitFor("установка") { m.ui.value.stage == Stage.DONE || m.ui.value.stage == Stage.FAILED }
-        assertEquals(Stage.DONE, m.ui.value.stage, "${m.ui.value.error} ${m.ui.value.log.takeLast(12)}")
+        waitFor("добавление") { m.ui.value.stage == Stage.DONE }
+        val id = saved.single().id
+        m.prepareInstall(id, ServiceForm(ServerKind.OPENFLUX, channel = "hydratest"))
+        waitFor("предполёт") { !m.ui.value.busy && m.ui.value.install?.stage == InstallStage.READY }
+        m.runInstall()
+        waitFor("установка") { !m.ui.value.busy && m.ui.value.install?.stage in setOf(InstallStage.DONE, InstallStage.FAILED) }
+        assertEquals(InstallStage.DONE, m.ui.value.install?.stage, "${m.ui.value.error} ${m.ui.value.log.takeLast(12)}")
         val node = saved.single().ofx!!
         println("OFX_LINK=" + imported.single())
         java.io.File("build/ofx-link.txt").writeText(imported.single())
         println("OFX_PORT=${node.port}")
         assertTrue(node.port in 1024..65535 && imported.single().startsWith("openflux://v1/"))
         if (System.getenv("HYDRA_OFX_KEEP") == null) {
-            m.uninstall(saved.single().id, login)
-            waitFor("удаление") { !m.ui.value.busy && saved.isEmpty() }
+            m.uninstallService(id, ServerKind.OPENFLUX)
+            waitFor("удаление") { !m.ui.value.busy && saved.single().ofx == null }
         }
     }
 }

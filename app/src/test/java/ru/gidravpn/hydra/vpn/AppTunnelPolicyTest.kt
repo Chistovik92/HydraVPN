@@ -21,8 +21,12 @@ class AppTunnelPolicyTest {
 
     @Test fun singBoxServerGoesThroughTunnel() {
         assertFalse(AppTunnelPolicy.needsAppBypass(p(Protocol.VLESS), RouteConfig(), none))
-        assertFalse(AppTunnelPolicy.needsAppBypass(p(Protocol.AMNEZIAWG), RouteConfig(), none))
         assertFalse(AppTunnelPolicy.needsAppBypass(p(Protocol.SSTP), RouteConfig(), none))
+    }
+
+    /** 0.8.0-rc4: сокет amneziawg-go защищается только после старта и не защищается после смены сети — приложение вне туннеля. */
+    @Test fun amneziaKeepsAppOutside() {
+        assertTrue(AppTunnelPolicy.needsAppBypass(p(Protocol.AMNEZIAWG), RouteConfig(), none))
     }
 
     @Test fun subprocessEnginesKeepAppOutside() {
