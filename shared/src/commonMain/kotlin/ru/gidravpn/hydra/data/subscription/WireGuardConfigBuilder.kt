@@ -69,6 +69,10 @@ object WireGuardConfigBuilder {
             extra.optString("preshared_key").takeIf { it.isNotBlank() }?.let {
                 appendLine("preshared_key=${b64ToHex(it)}")
             }
+            // 0.8.0-rc4: replace_allowed_ips — ДО allowed_ip. В UAPI строки применяются по порядку, и стоявшая после списка
+            // replace_allowed_ips=true стирала все только что заданные адреса: рукопожатие проходило, а пакетам не было маршрута
+            // («подключено», но трафик не идёт). Ошибка жила с 0.2.0.
+            appendLine("replace_allowed_ips=true")
             extra.optString("allowed_ips").ifBlank { "0.0.0.0/0, ::/0" }.split(",").map { it.trim() }
                 .filter { it.isNotBlank() }.forEach { cidr ->
                     val (ip, mask) = parseCidr(cidr)
@@ -76,9 +80,6 @@ object WireGuardConfigBuilder {
                 }
             appendLine("endpoint=${p.address}:${p.port}")
             extra.optString("keepalive").takeIf { it.isNotBlank() }?.let { appendLine("persistent_keepalive_interval=$it") }
-            appendLine("replace_allowed_ips=true")
-
-
         }
     }
 

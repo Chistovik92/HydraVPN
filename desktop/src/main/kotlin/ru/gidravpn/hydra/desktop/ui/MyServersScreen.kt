@@ -1,16 +1,15 @@
 package ru.gidravpn.hydra.desktop.ui
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -21,13 +20,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -44,110 +45,96 @@ import ru.gidravpn.hydra.desktop.AppController
 import ru.gidravpn.hydra.desktop.UiState
 import ru.gidravpn.hydra.servers.AwgGeneration
 import ru.gidravpn.hydra.servers.FriendlyText
+import ru.gidravpn.hydra.servers.InstallStage
 import ru.gidravpn.hydra.servers.MyServer
 import ru.gidravpn.hydra.servers.MyServersManager
-import ru.gidravpn.hydra.servers.XuiPanel
 import ru.gidravpn.hydra.servers.MyServersUi
 import ru.gidravpn.hydra.servers.OfxNodeSpec
 import ru.gidravpn.hydra.servers.ServerForm
 import ru.gidravpn.hydra.servers.ServerKind
+import ru.gidravpn.hydra.servers.ServerStatus
+import ru.gidravpn.hydra.servers.ServiceForm
 import ru.gidravpn.hydra.servers.SshTarget
 import ru.gidravpn.hydra.servers.Stage
+import ru.gidravpn.hydra.servers.XuiPanel
 
-private const val GUIDE_URL = "https://github.com/Chistovik92/HydraVPN/blob/master/docs/SERVERS.md"
+private val Ok = Color(0xFF22C55E)
 
-/** Действие над уже развёрнутым сервером, которому нужен пароль (он запрашивается и нигде не сохраняется). */
-private class NeedLogin(val title: String, val why: String, val server: MyServer, val run: (SshTarget) -> Unit)
+/** Действие, которое надо подтвердить (удаление, очистка, перезагрузка). */
+private class Confirm(val title: String, val text: String, val button: String, val run: () -> Unit)
 
-private fun kindTitle(k: ServerKind) = when (k) {
-    ServerKind.AMNEZIAWG -> "Личный VPN-сервер"
-    ServerKind.OPENFLUX -> "Узел OpenFlux"
-    ServerKind.PANEL_3XUI -> "Панель управления 3x-ui"
-}
-
-private fun kindText(k: ServerKind) = when (k) {
-    ServerKind.AMNEZIAWG -> "Ваш собственный VPN: весь трафик устройств идёт через ваш сервер в другой стране, а защита AmneziaWG не даёт провайдеру распознать VPN."
-    ServerKind.OPENFLUX -> "Обходной путь для сложных блокировок: связь идёт через сервисы вроде Яндекс Документов, поэтому её трудно заблокировать. Для опытных пользователей."
-    ServerKind.PANEL_3XUI -> "Готовый сайт-панель, где вы сами заводите пользователей и выдаёте им ссылки. Удобно, если VPN нужен нескольким людям."
-}
-
-// ============================================================== Мои серверы
+// ============================================================== Мои серверы (0.8.0; сервер-сначала с 0.8.0-rc4)
 @Composable
-internal fun MyServersScreen(c: AppController, ui: UiState, startWizard: Boolean = false, startStep: Int = 1) {
+internal fun MyServersScreen(c: AppController, ui: UiState) {
     val m = c.myServers
     val s by m.ui.collectAsState()
-    var wizard by remember { mutableStateOf(startWizard) }
-    var help by remember { mutableStateOf(false) }
-    var login by remember { mutableStateOf<NeedLogin?>(null) }
-    var confirm by remember { mutableStateOf<NeedLogin?>(null) }
-    var forget by remember { mutableStateOf<MyServer?>(null) }
-    var addUserFor by remember { mutableStateOf<MyServer?>(null) }
-    var addDeviceFor by remember { mutableStateOf<MyServer?>(null) }
+    var wizard by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf<Confirm?>(null) }
+    var addClientFor by remember { mutableStateOf<MyServer?>(null) }
+    var loginFor by remember { mutableStateOf<MyServer?>(null) }
     var connectPanel by remember { mutableStateOf(false) }
+    var addUserFor by remember { mutableStateOf<MyServer?>(null) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    // при первом показе — проверить серверы с сохранённым входом (без журнала, по одному: операции идут по очереди)
+    LaunchedEffect(Unit) {
+        ui.data.myServers.filter { m.hasSavedLogin(it.id) && it.id !in s.status }.forEach { srv ->
+            while (m.ui.value.busy) kotlinx.coroutines.delay(300)
+            m.refresh(srv.id)
+            kotlinx.coroutines.delay(300)
+        }
+    }
+
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Header("Мои серверы") {
-            OutlinedButton(onClick = { help = true }) { Text("Что это такое?") }
-            OutlinedButton(onClick = { m.reset(); connectPanel = true }, enabled = !s.busy && !wizard) { Text("У меня уже есть панель") }
-            Button(onClick = { m.reset(); wizard = true }, enabled = !s.busy && !wizard) { Text("Добавить сервер") }
+            Button(onClick = { m.reset(); wizard = true }, enabled = !s.busy) { Text("Добавить сервер") }
+            OutlinedButton(onClick = { m.reset(); connectPanel = true }, enabled = !s.busy) { Text("У меня уже есть панель") }
         }
-        if (ui.data.myServers.isEmpty() && !wizard) IntroCard(onStart = { m.reset(); wizard = true }, onGuide = { openUrl(GUIDE_URL) })
-        if (wizard || (s.stage != Stage.IDLE)) WizardCard(c, m, s, startStep) { wizard = false; m.reset() }
-
-        ui.data.myServers.forEach { srv ->
-            ServerCard(c, srv, m, s,
-                onAddDevice = { addDeviceFor = srv },
-                onAddUser = { addUserFor = srv },
-                onRemoveDevice = { name -> login = NeedLogin("Удалить устройство «$name»", "Устройство «$name» перестанет подключаться к этому серверу.", srv) { t -> m.removeClient(srv.id, t, name) } },
-                onUninstall = { confirm = NeedLogin("Удалить сервер «${srv.name}» с компьютера в интернете", "", srv) { t -> m.uninstall(srv.id, t) } },
-                onForget = { forget = srv })
-        }
-        if (s.stage == Stage.IDLE && !wizard) {
-            s.error?.let { ErrorBox(it) }
-        }
-    }
-
-    if (connectPanel) ConnectPanelDialog(onClose = { connectPanel = false }) { name, address, token ->
-        connectPanel = false; m.connectPanel(name, address, token)
-    }
-
-    if (help) AlertDialog(
-        onDismissRequest = { help = false },
-        title = { Text("Свой сервер — что это и зачем") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()).widthIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Обычный VPN — это чужой сервер, которым пользуются тысячи людей. Свой сервер — только ваш: он быстрее, реже блокируется, и никто, кроме вас, к нему не подключён.")
-                Text("Как это устроено:", fontWeight = FontWeight.SemiBold)
-                Text("1. Вы арендуете у хостинга маленький компьютер в интернете (VPS) — от нескольких долларов в месяц. Выбирайте страну без ограничений и систему Debian или Ubuntu.")
-                Text("2. Хостинг присылает письмо с адресом сервера (IP) и паролем.")
-                Text("3. Вы вводите их здесь. Hydra сама подключится к серверу, всё установит и настроит.")
-                Text("4. В разделе «Серверы» появится готовое подключение — останется нажать «Подключить».")
-                Text("Ничего вводить в чёрных окнах не нужно. Пароль от сервера Hydra нигде не сохраняет.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "Ваш собственный сервер (VPS). Hydra входит на него по SSH, ставит VPN и обслуживает его: устройства, перезапуск, удаление, " +
+                "полная очистка. Данные входа можно запомнить — они хранятся зашифрованными только на этом компьютере. " +
+                "Отпечаток SSH-ключа сервера закрепляется: подменённый сервер Hydra не примет.",
+            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (wizard || s.stage != Stage.IDLE) AddServerCard(m, s) { wizard = false; m.reset() }
+            // ошибка/ход подключения готовой панели (без сервера в списке)
+            if (!wizard && s.stage == Stage.IDLE && s.opServer == null) {
+                if (s.busy) Busy(s.progress)
+                s.error?.let { ErrorBox(it) }
+                if (!s.busy && s.progress == "Панель подключена") Text("Панель подключена — она в списке ниже.", color = Ok, fontSize = 13.sp)
             }
-        },
-        confirmButton = { TextButton(onClick = { help = false }) { Text("Понятно") } },
-        dismissButton = { TextButton(onClick = { openUrl(GUIDE_URL) }) { Text("Подробная инструкция") } },
-    )
+            if (ui.data.myServers.isEmpty() && !wizard && s.stage == Stage.IDLE)
+                Empty("Серверов пока нет. Нужен VPS с Debian или Ubuntu, вход root по паролю или ключу.")
+            ui.data.myServers.forEach { srv ->
+                if (srv.panelOnly) PanelOnlyCard(c, srv, m, s, onAddUser = { addUserFor = srv }, onConfirm = { confirm = it })
+                else ServerCard(c, srv, m, s,
+                    onAddClient = { addClientFor = srv },
+                    onAddUser = { addUserFor = srv },
+                    onLogin = { loginFor = srv },
+                    onConfirm = { confirm = it })
+            }
+        }
+    }
 
-    addDeviceFor?.let { srv ->
+    addClientFor?.let { srv ->
         var name by remember { mutableStateOf("") }
         AlertDialog(
-            onDismissRequest = { addDeviceFor = null },
+            onDismissRequest = { addClientFor = null },
             title = { Text("Новое устройство") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Каждому телефону или компьютеру нужен свой доступ. Назовите устройство, например: телефон-мамы.", fontSize = 13.sp)
-                    OutlinedTextField(name, { name = it.filter { ch -> ch.isLetterOrDigit() || ch in "-_" }.take(24) }, singleLine = true, label = { Text("Название латиницей, без пробелов") })
+                    Text("Для каждого телефона или компьютера — своё устройство: его можно отключить, не трогая остальные.", fontSize = 13.sp)
+                    OutlinedTextField(name, { name = it.filter { ch -> ch.isLetterOrDigit() || ch in "-_" }.take(24) }, singleLine = true, label = { Text("Имя латиницей, например phone") })
                 }
             },
             confirmButton = {
-                TextButton(enabled = name.isNotBlank() && srv.clients.none { it.name == name }, onClick = {
-                    addDeviceFor = null
-                    login = NeedLogin("Добавить устройство «$name»", "Чтобы добавить устройство, Hydra подключится к серверу.", srv) { t -> m.addClient(srv.id, t, name) }
-                }) { Text("Далее") }
+                TextButton(enabled = name.isNotBlank() && srv.clients.none { it.name == name }, onClick = { addClientFor = null; m.addClient(srv.id, name) }) { Text("Добавить") }
             },
-            dismissButton = { TextButton(onClick = { addDeviceFor = null }) { Text("Отмена") } },
+            dismissButton = { TextButton(onClick = { addClientFor = null }) { Text("Отмена") } },
         )
+    }
+    if (connectPanel) ConnectPanelDialog(onClose = { connectPanel = false }) { name, address, token ->
+        connectPanel = false; m.connectPanel(name, address, token)
     }
     addUserFor?.let { srv ->
         var name by remember { mutableStateOf("") }
@@ -156,39 +143,340 @@ internal fun MyServersScreen(c: AppController, ui: UiState, startWizard: Boolean
             title = { Text("Новый пользователь панели") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Пользователь — это один человек или одно устройство. Вы получите ссылку для подключения.", fontSize = 13.sp)
-                    OutlinedTextField(name, { name = it.filter { ch -> ch.isLetterOrDigit() || ch in "-_" }.take(24) }, singleLine = true, label = { Text("Имя латиницей, без пробелов") })
+                    Text("Панель создаст пользователя и выдаст ссылку для подключения.", fontSize = 13.sp)
+                    OutlinedTextField(name, { name = it.filter { ch -> ch.isLetterOrDigit() || ch in "-_" }.take(24) }, singleLine = true, label = { Text("Имя латиницей, например anna") })
                 }
             },
-            confirmButton = {
-                TextButton(enabled = name.isNotBlank(), onClick = { addUserFor = null; m.addPanelClient(srv.id, name) }) { Text("Создать") }
-            },
+            confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { addUserFor = null; m.addPanelClient(srv.id, name) }) { Text("Создать") } },
             dismissButton = { TextButton(onClick = { addUserFor = null }) { Text("Отмена") } },
         )
     }
-    forget?.let { srv ->
-        AlertDialog(
-            onDismissRequest = { forget = null },
-            title = { Text("Убрать «${srv.name}» из списка?") },
-            text = { Text("Сам сервер продолжит работать, он просто исчезнет из приложения. Вы больше не сможете управлять им отсюда (добавлять устройства, удалять его). Подключения, уже добавленные в «Серверы», останутся.") },
-            confirmButton = { TextButton(onClick = { forget = null; m.forget(srv.id) }) { Text("Убрать", color = Danger) } },
-            dismissButton = { TextButton(onClick = { forget = null }) { Text("Отмена") } },
-        )
-    }
-    confirm?.let { n ->
+    confirm?.let { k ->
         AlertDialog(
             onDismissRequest = { confirm = null },
-            title = { Text(n.title + "?") },
-            text = {
-                Text("Hydra подключится к серверу ${n.server.host} и удалит с него всё, что установила: службу, настройки и программы. " +
-                    "Сам сервер у хостинга останется арендованным — отказаться от аренды можно в панели хостинга. Подключения, выданные этим сервером, перестанут работать.")
-            },
-            confirmButton = { TextButton(onClick = { confirm = null; login = n }) { Text("Продолжить", color = Danger) } },
+            title = { Text(k.title) },
+            text = { Text(k.text, fontSize = 13.sp) },
+            confirmButton = { TextButton(onClick = { confirm = null; k.run() }) { Text(k.button, color = Danger) } },
             dismissButton = { TextButton(onClick = { confirm = null }) { Text("Отмена") } },
         )
     }
-    login?.let { n -> LoginDialog(n, onCancel = { login = null }) { t -> login = null; n.run(t) } }
-    s.shown?.let { (name, text) -> ShownDialog(c, name, text) { m.hideShown() } }
+    loginFor?.let { srv ->
+        LoginDialog("Данные входа на «${srv.name}»", srv.sshUser, srv.host, srv.sshPort, null, rememberDefault = m.hasSavedLogin(srv.id), editUser = true,
+            onCancel = { loginFor = null }) { t, remember -> loginFor = null; m.changeLogin(srv.id, t, remember) }
+    }
+    s.login?.let { req ->
+        ui.data.myServers.firstOrNull { it.id == req.serverId }?.let { srv ->
+            LoginDialog(req.title.removeSuffix("…"), srv.sshUser, srv.host, srv.sshPort, req.error, rememberDefault = true, editUser = false,
+                onCancel = { m.cancelLogin() }) { t, remember -> m.provideLogin(t, remember) }
+        }
+    }
+    s.shown?.let { (name, conf) ->
+        val isConf = "[Interface]" in conf
+        AlertDialog(
+            onDismissRequest = { m.hideShown() },
+            title = { Text("Подключение «$name»") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()).heightIn(max = 360.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(if (isConf) "Файл настроек AmneziaWG. Hydra добавит его сама; в официальное приложение AmneziaWG — скопируйте текст или сохраните как .conf."
+                        else "Ссылка для подключения. Hydra добавит её сама; в другое приложение — скопируйте.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Это ключ доступа: не публикуйте его.", fontSize = 12.sp, color = Danger)
+                    SelectionContainer { Text(conf, fontFamily = FontFamily.Monospace, fontSize = 11.sp) }
+                }
+            },
+            confirmButton = { TextButton(onClick = { setClipboard(conf); c.toast("Скопировано") }) { Text("Копировать") } },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { c.import(conf); m.hideShown() }) { Text("Добавить в «Серверы»") }
+                    TextButton(onClick = { m.hideShown() }) { Text("Закрыть") }
+                }
+            },
+        )
+    }
+}
+
+// ------------------------------------------------------------------------------------------------ Добавление сервера
+
+@Composable
+private fun AddServerCard(m: MyServersManager, s: MyServersUi, onClose: () -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var host by remember { mutableStateOf("") }
+    var sshPort by remember { mutableStateOf("22") }
+    var user by remember { mutableStateOf("root") }
+    var password by remember { mutableStateOf("") }
+    var key by remember { mutableStateOf("") }
+    var passphrase by remember { mutableStateOf("") }
+    var remember by remember { mutableStateOf(true) }
+
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Новый сервер", style = MaterialTheme.typography.titleMedium)
+            if (s.busy && s.opServer == null) Busy(s.progress)
+            when (s.stage) {
+                Stage.IDLE, Stage.FAILED -> {
+                    s.error?.takeIf { s.opServer == null }?.let { ErrorBox(it) }
+                    Text("Шаг 1 из 2. Данные из письма хостинга: адрес сервера и пароль root (или SSH-ключ). Что поставить на сервер, выберете после входа.",
+                        fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(host, { host = it.trim() }, Modifier.weight(1f), singleLine = true, label = { Text("Адрес сервера (IP или имя)") },
+                            isError = host.isNotBlank() && !MyServersManager.validHost(host))
+                        OutlinedTextField(name, { name = it.take(40) }, Modifier.weight(1f), singleLine = true, label = { Text("Название (необязательно)") })
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(sshPort, { sshPort = it.filter(Char::isDigit).take(5) }, Modifier.width(110.dp), singleLine = true, label = { Text("Порт SSH") })
+                        OutlinedTextField(user, { user = it.trim() }, Modifier.width(140.dp), singleLine = true, label = { Text("Пользователь") })
+                        OutlinedTextField(password, { password = it }, Modifier.weight(1f), singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(), label = { Text("Пароль") })
+                    }
+                    OutlinedTextField(key, { key = it }, Modifier.fillMaxWidth().height(90.dp), label = { Text("Или закрытый SSH-ключ (текст файла id_ed25519 / id_rsa) — вместо пароля") })
+                    if (key.isNotBlank()) OutlinedTextField(passphrase, { passphrase = it }, Modifier.fillMaxWidth(), singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(), label = { Text("Пароль к ключу (если есть)") })
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(remember, { remember = it })
+                        Text("Запомнить данные входа (зашифрованно, только на этом компьютере)", fontSize = 13.sp)
+                    }
+                    val port = sshPort.toIntOrNull() ?: 0
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            enabled = !s.busy && MyServersManager.validHost(host) && port in 1..65535 && (password.isNotEmpty() || key.isNotBlank()),
+                            onClick = {
+                                m.begin(ServerForm(name.ifBlank { host }, SshTarget(host, port, user.ifBlank { "root" },
+                                    password.takeIf { key.isBlank() && it.isNotEmpty() }, key.takeIf { it.isNotBlank() }, passphrase.takeIf { key.isNotBlank() && it.isNotEmpty() }), remember))
+                            },
+                        ) { Text("Подключиться") }
+                        TextButton(onClick = onClose) { Text("Закрыть") }
+                    }
+                }
+                Stage.CONFIRM_FINGERPRINT -> {
+                    Text("Шаг 2 из 2. Это «отпечаток» сервера — его уникальный признак. Если хостинг показывает отпечаток в панели, сверьте; " +
+                        "дальше Hydra будет входить только на сервер с этим отпечатком.", fontSize = 13.sp)
+                    SelectionContainer { Text(s.fingerprint, fontFamily = FontFamily.Monospace, fontSize = 13.sp) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { m.confirmFingerprint() }, enabled = !s.busy) { Text("Доверять и войти") }
+                        TextButton(onClick = onClose) { Text("Отмена") }
+                    }
+                }
+                Stage.DONE -> {
+                    Text(s.progress, color = Ok, fontWeight = FontWeight.SemiBold)
+                    Text("Сервер появился в списке ниже. Выберите на его карточке, что установить: AmneziaWG (рекомендуем) или узел OpenFlux.", fontSize = 13.sp)
+                    Button(onClick = onClose) { Text("Готово") }
+                }
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------------------------------------------ Карточка сервера
+
+@Composable
+private fun ServerCard(c: AppController, srv: MyServer, m: MyServersManager, s: MyServersUi, onAddClient: () -> Unit, onAddUser: () -> Unit, onLogin: () -> Unit, onConfirm: (Confirm) -> Unit) {
+    val st = s.status[srv.id]
+    val mine = s.opServer == srv.id
+    val busy = s.busy
+    var installKind by remember { mutableStateOf<ServerKind?>(null) }
+    var rename by remember { mutableStateOf(false) }
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(srv.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                StatusChip(st)
+            }
+            Text("${srv.sshUser}@${srv.host}:${srv.sshPort}" + listOf(st?.osName ?: srv.osName, st?.arch ?: srv.arch).filter { it.isNotBlank() }.joinToString(" · ", " · "),
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            st?.takeIf { it.error == null && it.uptimeSec > 0 }?.let {
+                Text("Работает ${uptime(it.uptimeSec)} · нагрузка ${it.load} · память ${it.mem} · диск ${it.disk}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(if (srv.id in s.saved) "Данные входа сохранены (зашифрованно)" else "Данные входа не сохранены — Hydra спросит пароль при действии",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ChipRow {
+                OutlinedButton(onClick = { m.refresh(srv.id) }, enabled = !busy) { Text("Проверить") }
+                OutlinedButton(onClick = onLogin, enabled = !busy) { Text("Данные входа") }
+                OutlinedButton(onClick = { rename = true }, enabled = !busy) { Text("Переименовать") }
+                OutlinedButton(onClick = {
+                    onConfirm(Confirm("Перезагрузить «${srv.name}»?", "Сервер будет недоступен 1–2 минуты; VPN на нём поднимется сам.", "Перезагрузить") { m.reboot(srv.id) })
+                }, enabled = !busy) { Text("Перезагрузить") }
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            AwgSection(srv, st, m, busy, onAddClient, onConfirm) { installKind = ServerKind.AMNEZIAWG }
+            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            OfxSection(srv, st, m, busy, onConfirm) { installKind = ServerKind.OPENFLUX }
+            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            PanelSection(c, srv, st, m, s, onAddUser, onConfirm) { installKind = ServerKind.PANEL_3XUI }
+
+            val inst = s.install?.takeIf { it.serverId == srv.id }
+            if (installKind != null && inst == null) InstallForm(installKind!!, busy, onCancel = { installKind = null }) { f -> m.prepareInstall(srv.id, f) }
+            if (inst != null) InstallPanel(inst, s, m) { installKind = null; m.closeInstall() }
+
+            if (mine && busy && inst == null) Busy(s.progress)
+            if (mine && s.log.isNotEmpty() && inst == null) LogBox(s.log)
+            if (mine && s.error != null && inst == null) ErrorBox(s.error!!)
+
+            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            ChipRow {
+                TextButton(onClick = {
+                    onConfirm(Confirm("Очистить сервер «${srv.name}»?",
+                        "С сервера ${srv.host} будет удалено всё, что ставила Hydra: AmneziaWG, узел OpenFlux, панель 3x-ui, их настройки, правила файрвола и копии ключей. " +
+                            "Подключения к этому серверу в «Серверах» перестанут работать. Чужие программы не трогаются. Сервер останется в списке — на него можно поставить всё заново.",
+                        "Очистить") { m.wipe(srv.id) })
+                }, enabled = !busy) { Text("Очистить сервер полностью", color = Danger) }
+                TextButton(onClick = {
+                    onConfirm(Confirm("Убрать «${srv.name}» из списка?",
+                        "Запись и сохранённые данные входа будут удалены из приложения. На самом сервере ничего не изменится — чтобы удалить VPN с сервера, сначала нажмите «Очистить сервер полностью».",
+                        "Убрать") { m.forget(srv.id) })
+                }, enabled = !busy) { Text("Убрать из списка") }
+            }
+        }
+    }
+    if (rename) {
+        var n by remember { mutableStateOf(srv.name) }
+        AlertDialog(
+            onDismissRequest = { rename = false },
+            title = { Text("Название сервера") },
+            text = { OutlinedTextField(n, { n = it.take(40) }, singleLine = true) },
+            confirmButton = { TextButton(enabled = n.isNotBlank(), onClick = { rename = false; m.rename(srv.id, n) }) { Text("Сохранить") } },
+            dismissButton = { TextButton(onClick = { rename = false }) { Text("Отмена") } },
+        )
+    }
+}
+
+@Composable
+private fun AwgSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, busy: Boolean, onAddClient: () -> Unit, onConfirm: (Confirm) -> Unit, onInstall: () -> Unit) {
+    val awg = srv.awg
+    Text("AmneziaWG", fontWeight = FontWeight.SemiBold)
+    if (awg == null) {
+        Text("Не установлен. Самый простой путь к своему VPN — подойдёт большинству.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedButton(onClick = onInstall, enabled = !busy) { Text("Установить AmneziaWG") }
+        return
+    }
+    val state = st?.takeIf { it.error == null }?.let { if (it.awgActive) "работает" else "служба: ${it.awgState.ifBlank { "не запущена" }}" } ?: "состояние не проверено"
+    Text("Версия ${awg.generation.label} · UDP ${awg.port} · $state", fontSize = 12.sp,
+        color = if (st?.awgActive == true) Ok else MaterialTheme.colorScheme.onSurfaceVariant)
+    Text("Устройства:", fontSize = 13.sp)
+    srv.clients.forEach { cl ->
+        val peer = st?.awgPeers?.firstOrNull { it.publicKey == cl.publicKey }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.width(320.dp)) {
+                Text("${cl.name} · ${cl.address.substringBefore('/')}", fontSize = 13.sp)
+                peer?.let { Text(peerLine(it.latestHandshake, it.rx, it.tx), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                if (cl.privateKey.isEmpty()) Text("создано на другом устройстве — конфиг там же", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (cl.privateKey.isNotEmpty()) OutlinedButton(onClick = { m.clientConf(srv.id, cl.name)?.let { conf -> m.showConf(cl.name, conf) } }) { Text("Конфиг") }
+            TextButton(onClick = {
+                onConfirm(Confirm("Удалить устройство «${cl.name}»?", "Это устройство больше не сможет подключиться к серверу. Остальные продолжат работать.", "Удалить") { m.removeClient(srv.id, cl.name) })
+            }, enabled = !busy && srv.clients.size > 1) { Text("Удалить", color = Danger) }
+        }
+    }
+    ChipRow {
+        OutlinedButton(onClick = onAddClient, enabled = !busy) { Text("Добавить устройство") }
+        OutlinedButton(onClick = { m.restartService(srv.id, ServerKind.AMNEZIAWG) }, enabled = !busy) { Text("Перезапустить") }
+        TextButton(onClick = {
+            onConfirm(Confirm("Удалить AmneziaWG с «${srv.name}»?",
+                "Служба, её настройки и программы будут удалены с сервера ${srv.host}; порт ${awg.port}/udp закроется, если его открывала Hydra. Все устройства этого VPN перестанут подключаться.",
+                "Удалить") { m.uninstallService(srv.id, ServerKind.AMNEZIAWG) })
+        }, enabled = !busy) { Text("Удалить AmneziaWG", color = Danger) }
+    }
+}
+
+@Composable
+private fun OfxSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, busy: Boolean, onConfirm: (Confirm) -> Unit, onInstall: () -> Unit) {
+    val ofx = srv.ofx
+    Text("Узел OpenFlux", fontWeight = FontWeight.SemiBold)
+    if (ofx == null) {
+        Text("Не установлен. Для опытных: обход блокировок через сервисы вроде Яндекс Документов.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedButton(onClick = onInstall, enabled = !busy) { Text("Установить узел OpenFlux") }
+        return
+    }
+    val state = st?.takeIf { it.error == null }?.ofxChannels?.get(ofx.channel)
+    Text("Канал «${ofx.channel}» · TCP ${ofx.port}" + (state?.let { " · служба: $it" } ?: ""), fontSize = 12.sp,
+        color = if (state == "active") Ok else MaterialTheme.colorScheme.onSurfaceVariant)
+    ChipRow {
+        OutlinedButton(onClick = { m.ofxLink(srv.id)?.let { m.showConf(srv.name, it) } }) { Text("Ссылка openflux://") }
+        OutlinedButton(onClick = { m.restartService(srv.id, ServerKind.OPENFLUX) }, enabled = !busy) { Text("Перезапустить") }
+        TextButton(onClick = {
+            onConfirm(Confirm("Удалить узел OpenFlux с «${srv.name}»?", "Канал «${ofx.channel}», его служба и (если других каналов нет) ядро узла будут удалены. Ссылки на этот узел перестанут работать.",
+                "Удалить") { m.uninstallService(srv.id, ServerKind.OPENFLUX) })
+        }, enabled = !busy) { Text("Удалить узел", color = Danger) }
+    }
+}
+
+/** Панель 3x-ui на сервере, управляемом по SSH (0.8.1): сайт панели, пользователи, перезапуск, удаление. */
+@Composable
+private fun PanelSection(c: AppController, srv: MyServer, st: ServerStatus?, m: MyServersManager, s: MyServersUi, onAddUser: () -> Unit, onConfirm: (Confirm) -> Unit, onInstall: () -> Unit) {
+    val p = srv.panel
+    val busy = s.busy
+    Text("Панель 3x-ui", fontWeight = FontWeight.SemiBold)
+    if (p == null) {
+        Text("Не установлена. Сайт-панель, где вы сами заводите пользователей и выдаёте им ссылки — удобно, если VPN нужен нескольким людям.",
+            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (st?.xuiInstalled == true && !st.xuiByHydra) Text("На сервере уже стоит 3x-ui, поставленная не Hydra: подключите её кнопкой «У меня уже есть панель» (адрес и токен).",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else OutlinedButton(onClick = onInstall, enabled = !busy) { Text("Установить панель 3x-ui") }
+        return
+    }
+    val state = st?.takeIf { it.error == null }?.xuiState?.takeIf { it.isNotBlank() }
+    Text("Версия ${p.version.ifBlank { "—" }}" + (state?.let { " · служба: $it" } ?: ""), fontSize = 12.sp,
+        color = if (state == "active") Ok else MaterialTheme.colorScheme.onSurfaceVariant)
+    PanelBody(c, srv, m, s, onAddUser)
+    ChipRow {
+        OutlinedButton(onClick = { m.restartService(srv.id, ServerKind.PANEL_3XUI) }, enabled = !busy) { Text("Перезапустить") }
+        TextButton(onClick = {
+            onConfirm(Confirm("Удалить панель 3x-ui с «${srv.name}»?", "Панель, её ядро Xray и все пользователи панели будут удалены с сервера. Ссылки, выданные панелью, перестанут работать.",
+                "Удалить") { m.uninstallService(srv.id, ServerKind.PANEL_3XUI) })
+        }, enabled = !busy) { Text("Удалить панель", color = Danger) }
+    }
+}
+
+/** Общее для панели на своём сервере и подключённой готовой: адрес, вход на сайт, пользователи. */
+@Composable
+private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: MyServersUi, onAddUser: () -> Unit) {
+    val p = srv.panel ?: return
+    val busy = s.busy
+    SelectionContainer { Text("Адрес: ${p.baseUrl}" + (if (p.username.isNotBlank()) "\nЛогин: ${p.username}" else ""), fontFamily = FontFamily.Monospace, fontSize = 12.sp) }
+    if (!XuiPanel.isHttps(p.baseUrl)) Text("Панель открывается по http:// — пароль на сайте идёт без шифрования. Входите при включённом VPN или настройте HTTPS в панели.",
+        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    ChipRow {
+        if (p.password.isNotBlank()) {
+            Button(onClick = { copySecret(p.password); openUrl(p.baseUrl); c.toast("Пароль скопирован на 30 секунд — вставьте его на странице входа") }) { Text("Открыть панель") }
+            OutlinedButton(onClick = { copySecret(p.password); c.toast("Пароль скопирован на 30 секунд") }) { Text("Скопировать пароль") }
+        } else Button(onClick = { openUrl(p.baseUrl) }) { Text("Открыть панель") }
+        OutlinedButton(onClick = { m.loadPanelClients(srv.id) }, enabled = !busy) { Text("Пользователи") }
+        OutlinedButton(onClick = onAddUser, enabled = !busy) { Text("Добавить пользователя") }
+    }
+    s.panelClients[srv.id]?.let { emails ->
+        if (emails.isEmpty()) Text("Пользователей пока нет.", fontSize = 12.sp)
+        emails.forEach { email ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("• $email", Modifier.width(200.dp), fontSize = 13.sp)
+                OutlinedButton(onClick = { m.showPanelLinks(srv.id, email) }, enabled = !busy) { Text("Ссылка") }
+                TextButton(onClick = { m.removePanelClient(srv.id, email) }, enabled = !busy) { Text("Удалить", color = Danger) }
+            }
+        }
+    }
+}
+
+/** Готовая панель, подключённая по адресу и токену (без SSH): только API панели. */
+@Composable
+private fun PanelOnlyCard(c: AppController, srv: MyServer, m: MyServersManager, s: MyServersUi, onAddUser: () -> Unit, onConfirm: (Confirm) -> Unit) {
+    val st = s.status[srv.id]
+    val mine = s.opServer == srv.id
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(srv.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                StatusChip(st)
+            }
+            Text("Панель 3x-ui, подключена по токену (без входа на сервер)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            PanelBody(c, srv, m, s, onAddUser)
+            if (mine && s.busy) Busy(s.progress.ifBlank { "Работаю…" })
+            if (mine && s.error != null) ErrorBox(s.error!!)
+            ChipRow {
+                OutlinedButton(onClick = { m.refresh(srv.id) }, enabled = !s.busy) { Text("Проверить") }
+                TextButton(onClick = {
+                    onConfirm(Confirm("Убрать «${srv.name}» из списка?", "Hydra забудет адрес и токен панели. Сама панель и её пользователи не изменятся.", "Убрать") { m.forget(srv.id) })
+                }, enabled = !s.busy) { Text("Убрать из списка") }
+            }
+        }
+    }
 }
 
 /** «У меня уже есть панель» (0.8.1-a): адрес и токен доступа 3x-ui — без установки и без входа на сервер. */
@@ -202,15 +490,15 @@ private fun ConnectPanelDialog(onClose: () -> Unit, onOk: (name: String, address
         onDismissRequest = onClose,
         title = { Text("Подключить свою панель 3x-ui") },
         text = {
-            Column(Modifier.widthIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.width(520.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Если панель 3x-ui уже стоит на вашем сервере, Hydra подключится к ней и сможет заводить пользователей и выдавать ссылки. Устанавливать ничего не нужно.", fontSize = 13.sp)
                 OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Название") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(address, { address = it }, singleLine = true, label = { Text("Адрес панели (как в браузере)") },
                     placeholder = { Text("http://203.0.113.5:2053/путь") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(token, { token = it }, singleLine = true, label = { Text("Токен доступа (API)") },
-                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
                 Text("Где взять токен: на сервере команда  x-ui setting -getApiToken  (или файл /etc/x-ui/install-result.env, строка XUI_API_TOKEN).", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (plain) Text("Адрес начинается с http:// — токен пойдёт без шифрования. Подключайтесь при включённом VPN (тогда трафик Hydra идёт через туннель) или используйте https://.", fontSize = 12.sp, color = Danger)
+                if (plain) Text("Адрес начинается с http:// — токен пойдёт без шифрования. Подключайтесь при включённом VPN или используйте https://.", fontSize = 12.sp, color = Danger)
             }
         },
         confirmButton = { TextButton(enabled = address.isNotBlank() && token.isNotBlank(), onClick = { onOk(name, address, token) }) { Text("Подключить") } },
@@ -218,395 +506,209 @@ private fun ConnectPanelDialog(onClose: () -> Unit, onOk: (name: String, address
     )
 }
 
-@Composable
-private fun IntroCard(onStart: () -> Unit, onGuide: () -> Unit) {
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Свой VPN за несколько минут", style = MaterialTheme.typography.titleMedium)
-            Text("Вы арендуете маленький сервер в интернете — Hydra сама установит на него VPN и подключит к вашему приложению. " +
-                "Знать ничего про серверы не нужно.", fontSize = 13.sp)
-            Text("Что понадобится:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-            Text("• арендованный сервер (VPS) с Debian или Ubuntu — от нескольких долларов в месяц;\n• из письма хостинга: адрес сервера (набор чисел вроде 203.0.113.5) и пароль.", fontSize = 13.sp)
-            ChipRow {
-                Button(onClick = onStart) { Text("Начать") }
-                OutlinedButton(onClick = onGuide) { Text("Как арендовать сервер") }
-            }
-        }
+/** Пароль панели в буфер на 30 секунд: потом очищается, если там всё ещё он. */
+private fun copySecret(text: String) {
+    setClipboard(text)
+    kotlin.concurrent.thread(isDaemon = true, name = "clipboard-clear") {
+        Thread.sleep(30_000)
+        if (runCatching { clipboard() }.getOrNull() == text) setClipboard("")
     }
 }
 
 @Composable
-private fun ErrorBox(raw: String) {
-    val f = FriendlyText.explain(raw)
-    var details by remember { mutableStateOf(false) }
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), border = BorderStroke(1.dp, Danger)) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(f.title, color = Danger, fontWeight = FontWeight.SemiBold)
-            Text(f.advice, fontSize = 13.sp)
-            ChipRow {
-                TextButton(onClick = { details = !details }) { Text(if (details) "Скрыть подробности" else "Подробности") }
-                TextButton(onClick = { setClipboard(f.raw) }) { Text("Скопировать подробности") }
-            }
-            if (details) SelectionContainer { Text(f.raw, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        }
-    }
-}
-
-// ------------------------------------------------------------------------------------------------ Мастер
-
-private val STEP_TITLES = listOf("Что установить", "Данные сервера", "Это ваш сервер?", "Проверка", "Установка", "Готово")
-
-@Composable
-private fun WizardCard(c: AppController, m: MyServersManager, s: MyServersUi, startStep: Int, onClose: () -> Unit) {
-    var local by remember { mutableStateOf(startStep.coerceIn(1, 2)) }
-    var kind by remember { mutableStateOf(ServerKind.AMNEZIAWG) }
-    var name by remember { mutableStateOf("") }
-    var host by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var advanced by remember { mutableStateOf(false) }
-    var sshPort by remember { mutableStateOf("22") }
-    var user by remember { mutableStateOf("root") }
-    var key by remember { mutableStateOf("") }
+private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, onNext: (ServiceForm) -> Unit) {
     var gen by remember { mutableStateOf(AwgGeneration.V2_0) }
     var awgPort by remember { mutableStateOf("51820") }
     var openFw by remember { mutableStateOf(false) }
     var channel by remember { mutableStateOf("hydra") }
     var yandex by remember { mutableStateOf("") }
     var mailru by remember { mutableStateOf("") }
-    var panelPort by remember { mutableStateOf("443") }
-    var showCommands by remember { mutableStateOf(false) }
-    var showLog by remember { mutableStateOf(false) }
-
-    val step = when (s.stage) {
-        Stage.IDLE, Stage.FAILED -> local
-        Stage.CONFIRM_FINGERPRINT -> 3
-        Stage.READY -> 4
-        Stage.RUNNING -> 5
-        Stage.DONE -> 6
-    }
-    val defaultName = when (kind) { ServerKind.AMNEZIAWG -> "Мой VPN"; ServerKind.OPENFLUX -> "Мой узел"; ServerKind.PANEL_3XUI -> "Моя панель" }
-
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Шаг $step из 6 · ${STEP_TITLES[step - 1]}", style = MaterialTheme.typography.titleMedium)
-            LinearProgressIndicator(progress = { step / 6f }, Modifier.fillMaxWidth())
-
-            if (s.stage == Stage.FAILED) {
-                s.error?.let { ErrorBox(it) }
-                if (s.log.isNotEmpty()) TextButton(onClick = { showLog = !showLog }) { Text(if (showLog) "Скрыть журнал" else "Показать журнал установки") }
-                if (showLog) LogBox(s.log)
+    var accessPort by remember { mutableStateOf("443") }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(when (kind) { ServerKind.AMNEZIAWG -> "Установка AmneziaWG"; ServerKind.OPENFLUX -> "Установка узла OpenFlux"; ServerKind.PANEL_3XUI -> "Установка панели 3x-ui" }, fontWeight = FontWeight.SemiBold)
+            if (kind == ServerKind.PANEL_3XUI) {
+                Text("Hydra поставит последнюю версию 3x-ui официальным установщиком, придумает надёжный логин и пароль, создаст подключение VLESS + Reality и первого пользователя.",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(accessPort, { accessPort = it.filter(Char::isDigit).take(5) }, Modifier.width(220.dp), singleLine = true, label = { Text("Порт подключения (TCP)") })
+            } else if (kind == ServerKind.AMNEZIAWG) {
+                ChipRow {
+                    Text("Версия:", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                    AwgGeneration.entries.forEach { g -> FilterChip(selected = gen == g, onClick = { gen = g }, label = { Text(if (g == AwgGeneration.V2_0) "${g.label} (рекомендуем)" else g.label) }) }
+                }
+                Text(genHint(gen), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(awgPort, { awgPort = it.filter(Char::isDigit).take(5) }, Modifier.width(160.dp), singleLine = true, label = { Text("UDP-порт") })
+            } else {
+                Text("Узел ставится официальным скриптом OpenFlux закреплённой версии (с проверкой SHA-256); порт выберет скрипт. Транспорты Яндекс / Mail.ru — по желанию.",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(channel, { channel = it.lowercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' }.take(31) }, Modifier.width(260.dp), singleLine = true, label = { Text("Имя канала (a-z, 0-9, дефис)") })
+                OutlinedTextField(yandex, { yandex = it.trim() }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Документ Яндекса https://docs.yandex.ru/edit/d/… (необязательно)") })
+                OutlinedTextField(mailru, { mailru = it.trim() }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Публичный документ Mail.ru https://cloud.mail.ru/public/… (необязательно)") })
             }
-
-            when (step) {
-                1 -> {
-                    Text("Выберите, что поставить на ваш сервер. Если не уверены — оставьте первый вариант.", fontSize = 13.sp)
-                    ServerKind.entries.forEach { k ->
-                        Card(
-                            Modifier.fillMaxWidth().clickable { kind = k },
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            border = BorderStroke(if (kind == k) 2.dp else 1.dp, if (kind == k) Accent else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
-                        ) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text((if (kind == k) "● " else "○ ") + kindTitle(k), fontWeight = FontWeight.SemiBold)
-                                Text(kindText(k), fontSize = 13.sp)
-                                Text(FriendlyText.recommendation(k), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                    ChipRow {
-                        Button(onClick = { local = 2 }) { Text("Далее") }
-                        TextButton(onClick = onClose) { Text("Закрыть") }
-                    }
-                }
-                2 -> {
-                    Text("Эти данные пришли в письме от хостинга после аренды сервера. Пароль нигде не сохраняется — он нужен только на время установки.", fontSize = 13.sp)
-                    OutlinedTextField(host, { host = it.trim() }, Modifier.fillMaxWidth(), singleLine = true,
-                        label = { Text("Адрес сервера") }, supportingText = { Text("Четыре числа через точки, например 203.0.113.5") })
-                    OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation(),
-                        label = { Text("Пароль") }, supportingText = { Text("Пароль пользователя root из письма. Лучше вставить, чем набирать.") })
-                    OutlinedTextField(name, { name = it.take(40) }, Modifier.fillMaxWidth(), singleLine = true,
-                        label = { Text("Как назвать (для вас)") }, placeholder = { Text(defaultName) })
-                    TextButton(onClick = { advanced = !advanced }) { Text(if (advanced) "Скрыть «Дополнительно»" else "Дополнительно (обычно ничего менять не нужно)") }
-                    if (advanced) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(sshPort, { sshPort = it.filter(Char::isDigit).take(5) }, Modifier.weight(1f), singleLine = true,
-                                    label = { Text("Порт для входа") }, supportingText = { Text("Обычно 22") })
-                                OutlinedTextField(user, { user = it.trim() }, Modifier.weight(1f), singleLine = true,
-                                    label = { Text("Пользователь") }, supportingText = { Text("Обычно root") })
-                            }
-                            OutlinedTextField(key, { key = it }, Modifier.fillMaxWidth().height(90.dp),
-                                label = { Text("Ключ входа (вместо пароля, для опытных)") })
-                            when (kind) {
-                                ServerKind.AMNEZIAWG -> {
-                                    Text("Версия защиты (рекомендуем 2.0):", fontSize = 13.sp)
-                                    ChipRow { AwgGeneration.entries.forEach { g -> FilterChip(selected = gen == g, onClick = { gen = g }, label = { Text(if (g == AwgGeneration.V2_0) "${g.label} · рекомендуем" else g.label) }) } }
-                                    Text(genHint(gen), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    OutlinedTextField(awgPort, { awgPort = it.filter(Char::isDigit).take(5) }, Modifier.widthIn(max = 260.dp), singleLine = true,
-                                        label = { Text("Порт VPN") }, supportingText = { Text("Любой от 1024 до 65535") })
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Checkbox(openFw, { openFw = it })
-                                        Column {
-                                            Text("Открыть порт в защите сервера", fontSize = 13.sp)
-                                            Text("Нужно, только если на сервере включён файрвол (проверка покажет). По умолчанию мы ничего не открываем без вашего согласия.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                    }
-                                }
-                                ServerKind.OPENFLUX -> {
-                                    OutlinedTextField(channel, { channel = it.lowercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' }.take(31) }, Modifier.widthIn(max = 300.dp), singleLine = true,
-                                        label = { Text("Имя канала") }, supportingText = { Text("Латиница, цифры и дефис") })
-                                    OutlinedTextField(yandex, { yandex = it.trim() }, Modifier.fillMaxWidth(), singleLine = true,
-                                        label = { Text("Документ Яндекса (по желанию)") }, supportingText = { Text("Ссылка вида https://docs.yandex.ru/edit/d/…") })
-                                    OutlinedTextField(mailru, { mailru = it.trim() }, Modifier.fillMaxWidth(), singleLine = true,
-                                        label = { Text("Публичный документ Mail.ru (по желанию)") })
-                                }
-                                ServerKind.PANEL_3XUI -> OutlinedTextField(panelPort, { panelPort = it.filter(Char::isDigit).take(5) }, Modifier.widthIn(max = 260.dp), singleLine = true,
-                                    label = { Text("Порт подключения") }, supportingText = { Text("Через него будут подключаться пользователи. Обычно 443") })
-                            }
-                        }
-                    }
-                    val port = sshPort.toIntOrNull() ?: 0
-                    val extraOk = when (kind) {
-                        ServerKind.AMNEZIAWG -> (awgPort.toIntOrNull() ?: 0) in 1024..65535
-                        ServerKind.OPENFLUX -> OfxNodeSpec.validChannel(channel)
-                        ServerKind.PANEL_3XUI -> (panelPort.toIntOrNull() ?: 0) in 1..65535
-                    }
-                    val hostOk = MyServersManager.validHost(host)
-                    if (host.isNotBlank() && !hostOk) Text("Адрес не похож на настоящий — проверьте, нет ли лишних символов.", color = Danger, fontSize = 12.sp)
-                    ChipRow {
-                        TextButton(onClick = { local = 1 }) { Text("← Назад") }
-                        Button(enabled = !s.busy && hostOk && port in 1..65535 && extraOk && (password.isNotEmpty() || key.isNotBlank()), onClick = {
-                            m.begin(ServerForm(name.ifBlank { defaultName }, SshTarget(host, port, user.ifBlank { "root" },
-                                password.takeIf { key.isBlank() && it.isNotEmpty() }, key.takeIf { it.isNotBlank() }), gen, awgPort.toIntOrNull() ?: 51820, openFw,
-                                kind, channel, yandex, mailru, accessPort = panelPort.toIntOrNull() ?: 443))
-                        }) { Text("Проверить сервер") }
-                        TextButton(onClick = onClose) { Text("Закрыть") }
-                    }
-                    if (s.busy) Busy(s.progress.ifBlank { "Подключаюсь к серверу…" })
-                }
-                3 -> {
-                    Text("Мы подключились к серверу. У каждого сервера есть «отпечаток» — как номер паспорта. Hydra запомнит его и в будущем будет подключаться только к серверу с таким же номером: так никто не сможет подменить ваш сервер.", fontSize = 13.sp)
-                    Text("Если вы только что арендовали этот сервер — просто нажмите «Да, это мой сервер». Сверить отпечаток можно в панели хостинга (это по желанию).", fontSize = 13.sp)
-                    SelectionContainer { Text(s.fingerprint, fontFamily = FontFamily.Monospace, fontSize = 13.sp) }
-                    ChipRow {
-                        Button(onClick = { m.confirmFingerprint() }, enabled = !s.busy) { Text("Да, это мой сервер") }
-                        TextButton(onClick = onClose) { Text("Нет, отмена") }
-                    }
-                    if (s.busy) Busy(s.progress.ifBlank { "Вхожу на сервер…" })
-                }
-                4 -> {
-                    s.preflight?.let { pre ->
-                        Text("Проверили ваш сервер:", fontWeight = FontWeight.SemiBold)
-                        FriendlyText.checklist(pre).forEach { item ->
-                            Column {
-                                Text((if (item.ok) "✓ " else "✗ ") + item.title, color = if (item.ok) Accent else Danger, fontSize = 13.sp)
-                                if (!item.ok) Text(item.help, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 18.dp))
-                            }
-                        }
-                    }
-                    Text("Что мы сейчас сделаем:", fontWeight = FontWeight.SemiBold)
-                    FriendlyText.planSentences(kind, openFw).forEachIndexed { i, t -> Text("${i + 1}. $t", fontSize = 13.sp) }
-                    Text("Это займёт 1–3 минуты. Всё установленное можно будет удалить одной кнопкой.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    TextButton(onClick = { showCommands = !showCommands }) { Text(if (showCommands) "Скрыть технические подробности" else "Показать технические подробности (для опытных)") }
-                    if (showCommands) SelectionContainer {
-                        Column {
-                            s.plan.forEachIndexed { i, st ->
-                                Text("${i + 1}. ${st.title}", fontSize = 12.sp)
-                                (st.command ?: st.upload?.let { "загрузка файла → ${it.path}" })?.let { Text("   $it", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                            }
-                        }
-                    }
-                    ChipRow {
-                        Button(onClick = { m.install() }, enabled = s.preflight?.ok == true) { Text("Установить") }
-                        TextButton(onClick = onClose) { Text("Отмена") }
-                    }
-                    if (s.preflight?.ok == false) Text("Пока есть красные пункты, установить нельзя. Исправьте их и начните заново.", color = Danger, fontSize = 12.sp)
-                }
-                5 -> {
-                    Busy(s.progress.ifBlank { "Устанавливаю…" })
-                    Text("Идёт установка. Не закрывайте приложение — обычно это занимает 1–3 минуты.", fontSize = 13.sp)
-                    TextButton(onClick = { showLog = !showLog }) { Text(if (showLog) "Скрыть журнал" else "Показать журнал (для опытных)") }
-                    if (showLog) LogBox(s.log)
-                    OutlinedButton(onClick = { m.stop() }) { Text("Остановить") }
-                }
-                else -> {
-                    Text("Готово! ✓", style = MaterialTheme.typography.titleLarge, color = Accent)
-                    val done = c.ui.value.data.myServers.lastOrNull()
-                    when (kind) {
-                        ServerKind.AMNEZIAWG -> Text("Подключение уже добавлено в раздел «Серверы». Откройте его, выберите «${done?.name ?: "ваш сервер"}» и нажмите «Подключить».\n\nЧтобы подключить ещё один телефон или компьютер — в карточке сервера ниже нажмите «Добавить устройство».", fontSize = 13.sp)
-                        ServerKind.OPENFLUX -> Text("Узел запущен, ссылка для подключения добавлена в раздел «Серверы». Выберите её и нажмите «Подключить». Ссылку можно отправить и другим устройствам — кнопка «Ссылка openflux://» в карточке сервера.", fontSize = 13.sp)
-                        ServerKind.PANEL_3XUI -> {
-                            Text("Панель установлена, первый пользователь создан и добавлен в раздел «Серверы» — осталось нажать «Подключить».", fontSize = 13.sp)
-                            done?.panel?.let { p ->
-                                Text("Запишите вход в панель (он нужен, если захотите управлять пользователями на сайте):", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                SelectionContainer { Text("Адрес: ${p.baseUrl}\nЛогин: ${p.username}\nПароль: ${p.password}", fontFamily = FontFamily.Monospace, fontSize = 12.sp) }
-                                ChipRow {
-                                    OutlinedButton(onClick = { setClipboard("Адрес: ${p.baseUrl}\nЛогин: ${p.username}\nПароль: ${p.password}"); c.toast("Данные для входа скопированы") }) { Text("Скопировать данные") }
-                                    OutlinedButton(onClick = { setClipboard(p.password); openUrl(p.baseUrl); c.toast("Пароль скопирован — вставьте его на странице входа") }) { Text("Открыть панель") }
-                                }
-                            }
-                        }
-                    }
-                    Button(onClick = onClose) { Text("Закрыть") }
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(openFw, { openFw = it }); Text("Открыть порт в файрволе сервера (ufw/firewalld), если он включён", fontSize = 13.sp)
+            }
+            val aport = awgPort.toIntOrNull() ?: 0
+            val ok = when (kind) { ServerKind.AMNEZIAWG -> aport in 1024..65535; ServerKind.OPENFLUX -> OfxNodeSpec.validChannel(channel); ServerKind.PANEL_3XUI -> (accessPort.toIntOrNull() ?: 0) in 1..65535 }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(enabled = ok && !busy, onClick = { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443)) }) { Text("Проверить сервер и показать план") }
+                TextButton(onClick = onCancel) { Text("Отмена") }
             }
         }
     }
 }
 
-private fun genHint(g: AwgGeneration) = when (g) {
-    AwgGeneration.V1_0 -> "Самая старая версия. Работает с любыми программами AmneziaWG."
-    AwgGeneration.V1_5 -> "Промежуточная версия; совместима со старыми и новыми программами."
-    AwgGeneration.V2_0 -> "Современная защита от распознавания VPN. Подходит Hydra и новым версиям AmneziaWG."
-    AwgGeneration.V3 -> "Самая новая версия защиты. Нужна свежая программа AmneziaWG (Hydra подходит)."
+@Composable
+private fun InstallPanel(i: ru.gidravpn.hydra.servers.InstallUi, s: MyServersUi, m: MyServersManager, onClose: () -> Unit) {
+    var details by remember { mutableStateOf(false) }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(when (i.form.kind) {
+                ServerKind.AMNEZIAWG -> "Установка AmneziaWG ${i.form.generation.label}"
+                ServerKind.OPENFLUX -> "Установка узла OpenFlux «${i.form.channel}»"
+                ServerKind.PANEL_3XUI -> "Установка панели 3x-ui"
+            }, fontWeight = FontWeight.SemiBold)
+            when (i.stage) {
+                InstallStage.CHECKING -> Busy(s.progress.ifBlank { "Проверяю сервер…" })
+                InstallStage.READY -> {
+                    i.preflight?.let { pre ->
+                        FriendlyText.checklist(pre).forEach { item ->
+                            Text((if (item.ok) "✓ " else "✗ ") + item.title, color = if (item.ok) Ok else Danger, fontSize = 13.sp)
+                            if (!item.ok) Text(item.help, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp))
+                        }
+                    }
+                    Text("Что будет сделано:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    FriendlyText.planSentences(i.form.kind, i.form.openFirewall).forEachIndexed { n, t -> Text("${n + 1}. $t", fontSize = 13.sp) }
+                    TextButton(onClick = { details = !details }) { Text(if (details) "Скрыть команды" else "Показать команды") }
+                    if (details) SelectionContainer {
+                        Column {
+                            i.plan.forEachIndexed { n, st ->
+                                Text("${n + 1}. ${st.title}", fontSize = 12.sp)
+                                (st.command ?: st.upload?.let { "загрузка → ${it.path}" })?.let { Text("   $it", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { m.runInstall() }, enabled = i.preflight?.ok == true && !s.busy) { Text("Установить") }
+                        TextButton(onClick = onClose) { Text("Отмена") }
+                    }
+                }
+                InstallStage.RUNNING -> {
+                    Busy(s.progress)
+                    LogBox(s.log)
+                    OutlinedButton(onClick = { m.stop() }) { Text("Остановить") }
+                }
+                InstallStage.DONE -> {
+                    Text("Готово! Подключение добавлено в «Серверы» — осталось выбрать его и нажать «Подключить».", color = Ok, fontSize = 13.sp)
+                    LogBox(s.log)
+                    Button(onClick = onClose) { Text("Закрыть") }
+                }
+                InstallStage.FAILED -> {
+                    s.error?.let { ErrorBox(it) }
+                    LogBox(s.log)
+                    Button(onClick = onClose) { Text("Закрыть") }
+                }
+            }
+            if (i.stage == InstallStage.CHECKING || i.stage == InstallStage.READY) s.error?.let { ErrorBox(it) }
+        }
+    }
+}
+
+@Composable
+private fun StatusChip(st: ServerStatus?) {
+    val (text, color) = when {
+        st == null -> "не проверялся" to MaterialTheme.colorScheme.onSurfaceVariant
+        st.error != null -> "недоступен" to Danger
+        else -> "на связи" to Ok
+    }
+    Text(text, fontSize = 12.sp, color = color)
 }
 
 @Composable
 private fun Busy(text: String) = Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-    CircularProgressIndicator(Modifier.height(18.dp).widthIn(max = 18.dp), strokeWidth = 2.dp); Text(text, fontSize = 13.sp)
+    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Text(text, fontSize = 13.sp)
+}
+
+@Composable
+private fun ErrorBox(raw: String) {
+    val f = FriendlyText.explain(raw)
+    var details by remember { mutableStateOf(false) }
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Danger.copy(alpha = 0.08f))) {
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(f.title, color = Danger, fontWeight = FontWeight.SemiBold)
+            Text(f.advice, fontSize = 13.sp)
+            Row {
+                TextButton(onClick = { details = !details }) { Text(if (details) "Скрыть подробности" else "Подробности") }
+                TextButton(onClick = { setClipboard(f.raw) }) { Text("Скопировать подробности") }
+            }
+            if (details) SelectionContainer { Text(f.raw, fontFamily = FontFamily.Monospace, fontSize = 11.sp) }
+        }
+    }
+}
+
+private fun genHint(g: AwgGeneration) = when (g) {
+    AwgGeneration.V1_0 -> "1.0: Jc, Jmin, Jmax, S1, S2, H1–H4. Работает с любыми клиентами AmneziaWG."
+    AwgGeneration.V1_5 -> "1.5: параметры как в 1.0 (сигнатурные пакеты I1–I5 не заданы); совместим с клиентами 1.0 и 1.5."
+    AwgGeneration.V2_0 -> "2.0: + S3, S4 и диапазоны H1–H4. Нужен клиент 2.0 и новее (Hydra подходит)."
+    AwgGeneration.V3 -> "3.x: + HeaderProtectionKey, дополнение содержимого, случайные хвосты. Нужен клиент 3.x (Hydra подходит)."
+}
+
+internal fun uptime(sec: Long): String = when {
+    sec >= 86_400 -> "${sec / 86_400} дн ${sec % 86_400 / 3600} ч"
+    sec >= 3600 -> "${sec / 3600} ч ${sec % 3600 / 60} мин"
+    else -> "${sec / 60} мин"
+}
+
+internal fun peerLine(handshake: Long, rx: Long, tx: Long): String {
+    if (handshake <= 0) return "ещё не подключалось"
+    val ago = (System.currentTimeMillis() / 1000 - handshake).coerceAtLeast(0)
+    val t = when { ago < 180 -> "на связи"; ago < 3600 -> "${ago / 60} мин назад"; ago < 86_400 -> "${ago / 3600} ч назад"; else -> "${ago / 86_400} дн назад" }
+    return "$t · принято ${bytes(rx)} · отправлено ${bytes(tx)}"
 }
 
 @Composable
 private fun LogBox(lines: List<String>) {
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         SelectionContainer {
-            Column(Modifier.padding(8.dp).height(180.dp).verticalScroll(rememberScrollState(Int.MAX_VALUE))) {
+            Column(Modifier.padding(8.dp).heightIn(max = 180.dp).verticalScroll(rememberScrollState(Int.MAX_VALUE))) {
                 lines.takeLast(200).forEach { Text(it, fontFamily = FontFamily.Monospace, fontSize = 11.sp) }
             }
         }
     }
 }
 
-// ------------------------------------------------------------------------------------------------ Карточка сервера
-
 @Composable
-private fun ServerCard(
-    c: AppController, srv: MyServer, m: MyServersManager, st: MyServersUi,
-    onAddDevice: () -> Unit, onAddUser: () -> Unit, onRemoveDevice: (String) -> Unit, onUninstall: () -> Unit, onForget: () -> Unit,
+private fun LoginDialog(
+    title: String, user: String, host: String, port: Int, error: String?, rememberDefault: Boolean, editUser: Boolean,
+    onCancel: () -> Unit, onOk: (SshTarget, Boolean) -> Unit,
 ) {
-    val busy = st.busy
-    var more by remember { mutableStateOf(false) }
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            val kind = when { srv.panel != null -> ServerKind.PANEL_3XUI; srv.ofx != null -> ServerKind.OPENFLUX; else -> ServerKind.AMNEZIAWG }
-            Text(srv.name, style = MaterialTheme.typography.titleMedium)
-            Text(kindTitle(kind) + " · сервер ${srv.host}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            when (kind) {
-                ServerKind.AMNEZIAWG -> {
-                    Text("Устройства, которым разрешено подключаться:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    srv.clients.forEach { cl ->
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("• ${cl.name}", Modifier.widthIn(min = 160.dp), fontSize = 13.sp)
-                            OutlinedButton(onClick = { m.clientConf(srv.id, cl.name)?.let { conf -> m.showConf(cl.name, conf) } }) { Text("Показать доступ") }
-                            TextButton(onClick = { onRemoveDevice(cl.name) }, enabled = !busy && srv.clients.size > 1) { Text("Удалить", color = Danger) }
-                        }
-                    }
-                    OutlinedButton(onClick = onAddDevice, enabled = !busy) { Text("Добавить устройство") }
-                }
-                ServerKind.OPENFLUX -> {
-                    Text("Узел работает. Ссылка для подключения уже добавлена в «Серверы»; её же можно отправить на другое устройство.", fontSize = 13.sp)
-                    OutlinedButton(onClick = { m.clientConf(srv.id, "")?.let { link -> m.showConf("Ссылка openflux://", link) } }) { Text("Показать ссылку openflux://") }
-                }
-                ServerKind.PANEL_3XUI -> {
-                    val p = srv.panel!!
-                    Text("Панель — это сайт, где вы заводите пользователей. Версия ${p.version.ifBlank { "—" }}.", fontSize = 13.sp)
-                    SelectionContainer { Text("Адрес: ${p.baseUrl}\nЛогин: ${p.username}", fontFamily = FontFamily.Monospace, fontSize = 12.sp) }
-                    ChipRow {
-                        if (p.password.isNotBlank()) {
-                            Button(onClick = { copySecret(c, p.password); openUrl(p.baseUrl); c.toast("Пароль скопирован на 30 секунд — вставьте его на странице входа") }) { Text("Открыть панель") }
-                            OutlinedButton(onClick = { copySecret(c, p.password); c.toast("Пароль скопирован на 30 секунд") }) { Text("Скопировать пароль") }
-                        } else Button(onClick = { openUrl(p.baseUrl) }) { Text("Открыть панель") }
-                        OutlinedButton(onClick = { m.loadPanelClients(srv.id) }, enabled = !busy) { Text("Пользователи") }
-                        OutlinedButton(onClick = onAddUser, enabled = !busy) { Text("Добавить пользователя") }
-                    }
-                    st.panelClients[srv.id]?.let { emails ->
-                        if (emails.isEmpty()) Text("Пользователей пока нет.", fontSize = 12.sp)
-                        emails.forEach { email ->
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("• $email", Modifier.widthIn(min = 160.dp), fontSize = 13.sp)
-                                OutlinedButton(onClick = { m.showPanelLinks(srv.id, email) }, enabled = !busy) { Text("Ссылка") }
-                                TextButton(onClick = { m.removePanelClient(srv.id, email) }, enabled = !busy) { Text("Удалить", color = Danger) }
-                            }
-                        }
-                    }
-                    if (st.error != null && st.stage == Stage.IDLE) ErrorBox(st.error!!)
-                }
-            }
-            if (busy) Busy("Работаю…")
-            TextButton(onClick = { more = !more }) { Text(if (more) "Скрыть" else "Ещё…") }
-            if (more) {
-                val managedOverSsh = srv.fingerprint.isNotBlank()   // подключённая вручную панель SSH не использует — удалять с сервера нечего
-                if (managedOverSsh) Text("Отпечаток сервера: ${srv.fingerprint}", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                ChipRow {
-                    if (managedOverSsh) OutlinedButton(onClick = onUninstall, enabled = !busy) { Text("Удалить с сервера", color = Danger) }
-                    TextButton(onClick = onForget, enabled = !busy) { Text("Убрать из списка") }
-                }
-                Text(if (managedOverSsh) "«Удалить с сервера» — Hydra зайдёт на сервер и уберёт всё, что установила. «Убрать из списка» — сервер продолжит работать, просто пропадёт из приложения."
-                    else "«Убрать из списка» — панель продолжит работать, просто пропадёт из приложения. Панель ставили не мы, поэтому удалять её с сервера Hydra не будет.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-private fun LoginDialog(n: NeedLogin, onCancel: () -> Unit, onOk: (SshTarget) -> Unit) {
+    var u by remember { mutableStateOf(user) }
     var password by remember { mutableStateOf("") }
     var key by remember { mutableStateOf("") }
-    val srv = n.server
+    var passphrase by remember { mutableStateOf("") }
+    var remember by remember { mutableStateOf(rememberDefault) }
     AlertDialog(
         onDismissRequest = onCancel,
-        title = { Text(n.title) },
+        title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (n.why.isNotBlank()) Text(n.why, fontSize = 13.sp)
-                Text("Введите пароль от сервера ${srv.host} (пользователь ${srv.sshUser}). Hydra его не запоминает.", fontSize = 12.sp)
+                error?.let { Text(it, color = Danger, fontSize = 13.sp) }
+                Text("Вход на $host:$port", fontSize = 12.sp)
+                if (editUser) OutlinedTextField(u, { u = it.trim() }, singleLine = true, label = { Text("Пользователь") })
                 OutlinedTextField(password, { password = it }, singleLine = true, visualTransformation = PasswordVisualTransformation(), label = { Text("Пароль") })
-                OutlinedTextField(key, { key = it }, Modifier.height(80.dp), label = { Text("или ключ входа (для опытных)") })
+                OutlinedTextField(key, { key = it }, Modifier.height(80.dp), label = { Text("или закрытый SSH-ключ") })
+                if (key.isNotBlank()) OutlinedTextField(passphrase, { passphrase = it }, singleLine = true, visualTransformation = PasswordVisualTransformation(), label = { Text("Пароль к ключу (если есть)") })
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(remember, { remember = it }); Text("Запомнить (зашифрованно, только на этом компьютере)", fontSize = 13.sp)
+                }
             }
         },
         confirmButton = {
             TextButton(enabled = password.isNotEmpty() || key.isNotBlank(), onClick = {
-                onOk(SshTarget(srv.host, srv.sshPort, srv.sshUser, password.takeIf { key.isBlank() && it.isNotEmpty() }, key.takeIf { it.isNotBlank() }))
-            }) { Text("Выполнить") }
+                onOk(SshTarget(host, port, u.ifBlank { user }, password.takeIf { key.isBlank() && it.isNotEmpty() }, key.takeIf { it.isNotBlank() },
+                    passphrase.takeIf { key.isNotBlank() && it.isNotEmpty() }), remember)
+            }) { Text("Войти") }
         },
         dismissButton = { TextButton(onClick = onCancel) { Text("Отмена") } },
     )
-}
-
-/** Окно с доступом: файл настроек WireGuard/AmneziaWG, ссылка openflux:// или ссылка vless:// — с пояснением, что с ней делать. */
-@Composable
-private fun ShownDialog(c: AppController, name: String, text: String, onClose: () -> Unit) {
-    val isConf = "[Interface]" in text
-    val hint = when {
-        isConf -> "Это файл настроек для устройства «$name». На этом компьютере нажмите «Добавить в «Серверы»». На телефоне или другом компьютере установите приложение Hydra или AmneziaWG и вставьте эти настройки (или откройте их как файл)."
-        text.startsWith("openflux://") -> "Это ссылка для подключения. На этом компьютере нажмите «Добавить в «Серверы»». На другом устройстве вставьте её в Hydra: «Серверы» → «Вставить из буфера»."
-        else -> "Это ссылка для подключения пользователя «$name». На этом компьютере нажмите «Добавить в «Серверы»». На другом устройстве вставьте её в Hydra: «Серверы» → «Вставить из буфера»."
-    }
-    AlertDialog(
-        onDismissRequest = onClose,
-        title = { Text("Доступ: $name") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()).height(320.dp).widthIn(max = 600.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(hint, fontSize = 13.sp)
-                Text("Не показывайте это посторонним: по ссылке или файлу можно пользоваться вашим сервером.", fontSize = 12.sp, color = Danger)
-                SelectionContainer { Text(text, fontFamily = FontFamily.Monospace, fontSize = 11.sp) }
-            }
-        },
-        confirmButton = { TextButton(onClick = { setClipboard(text); c.toast("Скопировано") }) { Text("Скопировать") } },
-        dismissButton = {
-            Row {
-                TextButton(onClick = { c.import(text); onClose() }) { Text("Добавить в «Серверы»") }
-                TextButton(onClick = onClose) { Text("Закрыть") }
-            }
-        },
-    )
-}
-
-/** Пароль панели в буфер обмена на 30 секунд (0.8.1-a): потом очищается, если там всё ещё он. */
-private fun copySecret(@Suppress("UNUSED_PARAMETER") c: AppController, text: String) {
-    setClipboard(text)
-    kotlin.concurrent.thread(isDaemon = true, name = "clipboard-clear") {
-        Thread.sleep(30_000)
-        if (runCatching { clipboard() }.getOrNull() == text) setClipboard("")
-    }
 }

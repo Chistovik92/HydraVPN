@@ -40,7 +40,7 @@ class MyServersShotsTest {
             Store(file).save(HydraState(myServers = servers))
             return AppController(CoroutineScope(SupervisorJob() + Dispatchers.Unconfined), Store(file), background = false)
         }
-        fun render(name: String, c: AppController, startWizard: Boolean = false, step: Int = 1, h: Int = 900) {
+        fun render(name: String, c: AppController, @Suppress("UNUSED_PARAMETER") startWizard: Boolean = false, @Suppress("UNUSED_PARAMETER") step: Int = 1, h: Int = 900) {
             val scheme = AppTheme.AMBIENT.colors().let { k ->
                 darkColorScheme(primary = Color(k.accent), onPrimary = Color(k.onAccent), background = Color(k.bg), surface = Color(k.surface),
                     surfaceVariant = Color(k.surfaceVariant), onSurface = Color(k.text), onSurfaceVariant = Color(k.textSecondary))
@@ -49,7 +49,7 @@ class MyServersShotsTest {
                 val ui by c.ui.collectAsState()
                 MaterialTheme(colorScheme = scheme) {
                     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
-                        androidx.compose.foundation.layout.Box(Modifier.padding(24.dp)) { MyServersScreen(c, ui, startWizard, step) }
+                        androidx.compose.foundation.layout.Box(Modifier.padding(24.dp)) { MyServersScreen(c, ui) }
                     }
                 }
             }
@@ -68,15 +68,15 @@ class MyServersShotsTest {
             render("3-fingerprint", c, true, 1, 600)
         }
         controller(emptyList()).let { c ->
-            c.myServers.previewState(MyServersUi(stage = Stage.READY, preflight = pre, plan = plan))
+            c.myServers.previewState(MyServersUi(install = InstallUi("1", ServiceForm(), InstallStage.READY, pre, plan)))
             render("4-check-ok", c, true, 1, 800)
         }
         controller(emptyList()).let { c ->
-            c.myServers.previewState(MyServersUi(stage = Stage.READY, preflight = pre.copy(root = false, portFree = false, issues = listOf("x")), plan = plan))
+            c.myServers.previewState(MyServersUi(install = InstallUi("1", ServiceForm(), InstallStage.READY, pre.copy(root = false, portFree = false, issues = listOf("x")), plan)))
             render("4-check-bad", c, true, 1, 900)
         }
         controller(emptyList()).let { c ->
-            c.myServers.previewState(MyServersUi(stage = Stage.RUNNING, busy = true, progress = "4/9: Включить пересылку пакетов", log = listOf("▶ Создать каталоги", "✔ Создать каталоги", "▶ Загрузить amneziawg-go")))
+            c.myServers.previewState(MyServersUi(install = InstallUi("1", ServiceForm(), InstallStage.RUNNING), busy = true, opServer = "1", progress = "4/9: Включить пересылку пакетов", log = listOf("▶ Создать каталоги", "✔ Создать каталоги", "▶ Загрузить amneziawg-go")))
             render("5-running", c, true, 1, 520)
         }
         controller(emptyList()).let { c ->

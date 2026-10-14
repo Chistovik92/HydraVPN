@@ -44,7 +44,9 @@ object LinkParser {
             "byedpi"    -> ByeDpiLink.parse(link)
             // вставленный целиком .conf (без схемы): AWG-параметры → AmneziaWG, иначе WireGuard
             else -> if ("[Interface]" in link) {
-                val awg = Regex("^(Jc|Jmin|Jmax|S1|S2|H[1-4]|I[1-5])\\s*=", RegexOption.IGNORE_CASE)
+                // MULTILINE (0.8.0-rc4): без него «^» видел только первую строку, и AmneziaWG-.conf становился обычным WireGuard
+                val awg = Regex("^\\s*(Jc|Jmin|Jmax|S[1-4]|H[1-4]|I[1-5]|HeaderProtectionKey|ContentPaddingAddition|RandomTrailers)\\s*=",
+                    setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
                     .containsMatchIn(link)
                 WireGuardParser.toProfile(link, if (awg) "AmneziaWG" else "WireGuard", isAmnezia = awg)
             } else null

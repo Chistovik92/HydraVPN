@@ -256,32 +256,68 @@ struct LinkImportSheet: View {
     }
 }
 
+/// Ручное добавление (0.8.0-rc4): поля каждого протокола — из общей с Android/ПК схемы `ManualLink`; собранная ссылка/.conf
+/// проверяется тем же `LinkParser`, что и импорт. До rc4 форма знала только имя, адрес и порт — профиль без ключа не подключался.
 struct ManualServerSheet: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) var dismiss
     @State private var name = ""
-    @State private var address = ""
-    @State private var port = "443"
-    @State private var proto: ServerProtocol = .vless
+    @State private var proto = "vless"
+    @State private var values: [String: String] = ManualLink.defaults("vless")
+    @State private var error: String?
+    private var en: Bool { !(Locale.current.language.languageCode?.identifier ?? "ru").hasPrefix("ru") }
+
+    private func binding(_ key: String) -> Binding<String> {
+        Binding(get: { values[key] ?? "" }, set: { values[key] = $0 })
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                TextField(L("field_name"), text: $name)
-                TextField(L("field_address"), text: $address).textInputAutocapitalization(.never).autocorrectionDisabled()
-                TextField(L("field_port"), text: $port).keyboardType(.numberPad)
                 Picker(L("main_protocol"), selection: $proto) {
-                    ForEach(ServerProtocol.allCases.filter { $0.engine == .singBox }, id: \.self) { Text($0.displayName).tag($0) }
+                    ForEach(ServerProtocol.allCases.filter { ManualLink.supported.contains($0.rawValue) }, id: \.self) { Text($0.displayName).tag($0.rawValue) }
                 }
+                .onChange(of: proto) { _, p in values = ManualLink.defaults(p); error = nil }
+                TextField(L("field_name"), text: $name)
+                ForEach(ManualLink.fields(proto).filter { $0.visible(values) }) { f in
+                    let label = f.label(en: en) + (f.required ? " *" : "")
+                    Section {
+                        switch f.kind {
+                        case .choice:
+                            Picker(label, selection: binding(f.key)) {
+                                ForEach(f.choices, id: \.self) { c in Text(f.choiceLabel(c, en: en)).tag(c) }
+                            }
+                        case .multiline:
+                            VStack(alignment: .leading) {
+                                Text(label).font(.caption).foregroundStyle(.secondary)
+                                TextEditor(text: binding(f.key)).font(.system(.footnote, design: .monospaced)).frame(minHeight: 90)
+                                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                            }
+                        case .secret:
+                            SecureField(label, text: binding(f.key))
+                        case .number:
+                            TextField(label, text: binding(f.key)).keyboardType(.numberPad)
+                        case .text:
+                            TextField(label, text: binding(f.key)).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        }
+                    } footer: {
+                        if !f.hint(en: en).isEmpty { Text(f.hint(en: en)) }
+                    }
+                }
+                if let error { Text(error).foregroundStyle(.red).font(.footnote) }
             }
             .navigationTitle(L("servers_new_title"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(L("action_cancel")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L("action_save")) {
-                        model.addServer(ServerProfile(name: name.isEmpty ? L("default_server_name") : name, protocolId: proto.rawValue,
-                                                      address: address, port: Int(port) ?? 443))
+                        guard let link = ManualLink.build(proto, name: name, values: values), var p = LinkParser.parseLine(link) else {
+                            error = L("manual_bad"); return
+                        }
+                        if !name.trimmingCharacters(in: .whitespaces).isEmpty { p.name = name }
+                        model.addServer(p)
                         dismiss()
-                    }.disabled(address.isEmpty || Int(port) == nil)
+                    }.disabled(!ManualLink.missing(proto, values).isEmpty)
                 }
             }
         }

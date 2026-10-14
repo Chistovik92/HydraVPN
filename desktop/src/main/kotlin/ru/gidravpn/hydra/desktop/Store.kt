@@ -110,7 +110,7 @@ data class HydraState(
  * поэтому файл доступен только владельцу. Запись атомарная (tmp + move) и
  * последовательная: сохраняют и UI-поток, и фоновые обновления подписок.
  */
-class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
+class Store(val file: File = File(Platform.dataDir, "hydra.json")) {
 
     private val lock = Any()
 
@@ -160,7 +160,12 @@ class Store(private val file: File = File(Platform.dataDir, "hydra.json")) {
             .put("bot", s.bot?.let { JSONObject().put("server", it.server).put("token", it.token).put("username", it.username).put("panels", it.panels ?: JSONObject.NULL) } ?: JSONObject.NULL)
 
         fun fromJson(o: JSONObject): HydraState = HydraState(
-            servers = o.optJSONArray("servers").objects().map(::serverFromJson)
+            // 0.8.0-rc4: AmneziaWG, сохранённый раньше как «WireGuard» (параметры обфускации есть), — исправляем тип при чтении
+            servers = o.optJSONArray("servers").objects().map(::serverFromJson).map { p ->
+                if (p.protocolId == ru.gidravpn.hydra.data.model.Protocol.WIREGUARD.id &&
+                    runCatching { ru.gidravpn.hydra.data.subscription.WireGuardParser.hasAwgParams(JSONObject(p.extra)) }.getOrDefault(false))
+                    p.copy(protocolId = ru.gidravpn.hydra.data.model.Protocol.AMNEZIAWG.id) else p
+            }
                 .filter { it.hasValidEndpoint }
                 .distinctBy { it.id },
             subscriptions = o.optJSONArray("subscriptions").objects().map(::subFromJson).distinctBy { it.id },

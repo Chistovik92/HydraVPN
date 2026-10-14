@@ -266,8 +266,7 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit, onMyServers: () -> 
     }
     if (showManual) AddServerDialog(
         onDismiss = { showManual = false },
-        onSaveProfile = { vm.addServer(it); showManual = false },
-        onSaveConf = { conf, name -> vm.importAuto(listOf(conf), name); showManual = false },
+        onSave = { link, name -> vm.importAuto(listOf(link), name); showManual = false },
         onOpenImport = { showManual = false; showImport = true }
     )
     if (showImport) ImportDialog(

@@ -136,8 +136,8 @@ class XuiPanelTest {
         val log = mutableListOf<String>()
         val pre = Preflight("amd64", "Ubuntu", true, true, true, true, "none", emptyList())
         val svc = MyServerService { error("пакет AmneziaWG для панели не нужен") }
-        val res = svc.deployXui(ssh, SshTarget("203.0.113.5", 22, "root", password = "pw"), "SHA256:fp", "Панель", "v3.9.0", 443, false, pre,
-            { s, secrets -> Installer(s, secrets) { e -> if (e is InstallEvent.Output) log += e.line } }) { log += it }
+        val res = svc.deployXui(ssh, MyServer("i", "Панель", "203.0.113.5", fingerprint = "SHA256:fp"), "v3.9.0", 443, false, pre,
+            Installer(ssh, listOf("pw")) { e -> if (e is InstallEvent.Output) log += e.line }) { log += it }
         val ok = res as? DeployResult.Ok ?: fail("не удалось: $res")
         val panel = ok.server.panel!!
         assertEquals("TOKEN-from-installer-123", panel.token)
@@ -157,8 +157,8 @@ class XuiPanelTest {
                 if (command.startsWith("cat ${XuiPanel.RESULT}")) ExecResult(0, "XUI_USERNAME=u\n") else FakeSsh().exec(command, onLine)
         }
         val pre = Preflight("amd64", "Ubuntu", true, true, true, true, "none", emptyList())
-        val res = MyServerService { error("не нужен") }.deployXui(ssh, SshTarget("h", 22, "root", password = "pw"), "fp", "n", "v3.9.0", 443, false, pre,
-            { s, secrets -> Installer(s, secrets) { } }) { }
+        val res = MyServerService { error("не нужен") }.deployXui(ssh, MyServer("i", "n", "h", fingerprint = "fp"), "v3.9.0", 443, false, pre,
+            Installer(ssh, listOf("pw")) { }) { }
         assertTrue(res is DeployResult.Failed && "токен" in res.reason, res.toString())
     }
 }
@@ -173,21 +173,26 @@ class XuiLiveTest {
         var saved = emptyList<MyServer>()
         val imported = mutableListOf<String>()
         val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
-        val m = MyServersManager(scope, { saved }, { saved = it }, { error("не нужен") }) { _, conf -> imported += conf }
-        fun waitFor(what: String, cond: () -> Boolean) {
+        val m = MyServersManager(scope, { saved }, { saved = it }, { error("не нужен") }, MemoryVault()) { _, conf -> imported += conf }
+        fun waitFor(what: String, mgr: MyServersManager = m, cond: () -> Boolean) {
             val end = System.currentTimeMillis() + 420_000
+            Thread.sleep(150)
             while (System.currentTimeMillis() < end) { if (cond()) return; Thread.sleep(300) }
-            fail("таймаут: $what; ${m.ui.value.error}; ${m.ui.value.log.takeLast(12)}")
+            fail("таймаут: $what; ${mgr.ui.value.error}; ${mgr.ui.value.log.takeLast(12)}")
         }
-        m.begin(ServerForm("panel", login, kind = ServerKind.PANEL_3XUI, accessPort = 24443))
+        m.begin(ServerForm("panel", login))
         waitFor("отпечаток") { m.ui.value.stage == Stage.CONFIRM_FINGERPRINT }
         m.confirmFingerprint()
-        waitFor("план") { m.ui.value.stage == Stage.READY || m.ui.value.stage == Stage.FAILED }
-        assertEquals(Stage.READY, m.ui.value.stage, "${m.ui.value.error}")
-        assertTrue(m.ui.value.plan.any { it.id == "xui-install" && "v" in it.title })
-        m.install()
-        waitFor("установка") { m.ui.value.stage == Stage.DONE || m.ui.value.stage == Stage.FAILED }
-        assertEquals(Stage.DONE, m.ui.value.stage, "${m.ui.value.error} ${m.ui.value.log.takeLast(14)}")
+        waitFor("добавление") { m.ui.value.stage == Stage.DONE || m.ui.value.stage == Stage.FAILED }
+        val id = saved.single().id
+        m.prepareInstall(id, ServiceForm(ServerKind.PANEL_3XUI, accessPort = 24443))
+        waitFor("план") { !m.ui.value.busy && (m.ui.value.install?.stage == InstallStage.READY || m.ui.value.error != null) }
+        assertEquals(InstallStage.READY, m.ui.value.install?.stage, "${m.ui.value.error}")
+        assertTrue(m.ui.value.install!!.plan.any { it.id == "xui-install" && "v" in it.title })
+        m.runInstall()
+        waitFor("установка") { !m.ui.value.busy && m.ui.value.install?.stage in setOf(InstallStage.DONE, InstallStage.FAILED) }
+        assertEquals(InstallStage.DONE, m.ui.value.install?.stage, "${m.ui.value.error} ${m.ui.value.log.takeLast(14)}")
+        m.closeInstall()
         val srv = saved.single(); val panel = srv.panel!!
         println("XUI_PANEL=${panel.baseUrl} version=${panel.version}")
         assertTrue(imported.single().startsWith("vless://") && "security=reality" in imported.single(), imported.toString())
@@ -202,9 +207,18 @@ class XuiLiveTest {
         assertTrue(api.clientEmails().contains("second"))
         // токен и пароль не в журнале
         assertFalse(m.ui.value.log.any { panel.token in it || panel.password in it }, "секрет в журнале")
-        // удаление
-        m.uninstall(srv.id, login)
-        waitFor("удаление") { !m.ui.value.busy && saved.isEmpty() }
+        // второе устройство подхватывает панель, поставленную Hydra
+        var saved2 = emptyList<MyServer>()
+        val m2 = MyServersManager(scope, { saved2 }, { saved2 = it }, { error("не нужен") }, MemoryVault()) { _, _ -> }
+        m2.begin(ServerForm("second device", login, remember = false))
+        waitFor("отпечаток 2", m2) { m2.ui.value.stage == Stage.CONFIRM_FINGERPRINT }
+        m2.confirmFingerprint()
+        waitFor("добавление 2", m2) { m2.ui.value.stage == Stage.DONE || m2.ui.value.stage == Stage.FAILED }
+        assertEquals(panel.token, saved2.single().panel?.token)
+        // полная очистка снимает и панель
+        m.wipe(id)
+        waitFor("очистка") { !m.ui.value.busy && saved.single().panel == null }
+        assertEquals(null, m.ui.value.error, m.ui.value.log.takeLast(10).toString())
         SshConnector.connect(login, srv.fingerprint).use { ssh -> assertTrue(ssh.exec("test -e /usr/local/x-ui/x-ui").exit != 0) }
     }
 }

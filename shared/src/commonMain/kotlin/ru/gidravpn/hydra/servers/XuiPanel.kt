@@ -183,11 +183,11 @@ object XuiPanel {
             "set -a; . $ENV_FILE; set +a; bash $SCRIPT ${p.tag} > $LOG 2>&1; rc=\$?; rm -f $ENV_FILE; " +
                 "if [ \$rc -ne 0 ]; then tail -n 6 $LOG | sed -E 's/(assword|sername|oken)[^:=]*[:=].*/\\1: ***/'; fi; rm -f $LOG; exit \$rc",
             rollback = "printf 'y\\n' | /usr/bin/x-ui uninstall >/dev/null 2>&1; rm -f $ENV_FILE", failHint = "Установка 3x-ui не удалась"))
-        if (openFirewall && firewall == "ufw") add(Step("xui-fw", "Открыть порт панели ${p.port}/tcp в ufw", "ufw allow ${p.port}/tcp", rollback = "ufw delete allow ${p.port}/tcp"))
-        if (openFirewall && firewall == "firewalld") add(Step("xui-fw", "Открыть порт панели ${p.port}/tcp в firewalld",
-            "firewall-cmd --permanent --add-port=${p.port}/tcp && firewall-cmd --reload", rollback = "firewall-cmd --permanent --remove-port=${p.port}/tcp && firewall-cmd --reload"))
+        if (openFirewall) ServerOps.openPortStep(firewall, "${p.port}/tcp")?.let { add(Step("xui-fw", "Открыть порт панели ${p.port}/tcp", it.command, rollback = it.rollback)) }
         add(Step("xui-active", "Проверить: служба x-ui запущена", "systemctl is-active x-ui",
             accept = { it.out.lineSequence().any { l -> l.trim() == "active" } }, failHint = "Служба x-ui не активна"))
+        // метка «поставила Hydra»: полная очистка сервера снимает только такую панель
+        add(Step("xui-mark", "Отметить, что панель поставила Hydra", "mkdir -p ${ServerOps.STATE_DIR} && chmod 700 ${ServerOps.STATE_DIR} && touch ${ServerOps.XUI_MARK}"))
     }
 
     /** Читает `/etc/x-ui/install-result.env` (`KEY=value`, значения в `printf %q` — без пробелов у наших случайных значений). */

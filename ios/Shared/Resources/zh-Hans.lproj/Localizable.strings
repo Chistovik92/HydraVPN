@@ -495,6 +495,8 @@
 "xray_toggle_desc" = "代替 sing-box — 为了使用其 XTLS Vision 实现（独立进程，sing-box 仍作为 TUN 桥接）。VLESS 已在真机验证；VMess/Trojan/SS 及长期稳定性尚未验证。";
 "xray_toggle_missing" = "需要 app/libs/libXray.aar — 见 docs/BUILD.md 第 2.2 节。";
 "sec_killswitch_desc" = "连接尝试失败时，隧道不会退回直连 — 流量会被阻断，直到你手动断开 VPN。它无法防止系统撤销 VPN（其他 VPN 应用、系统设置中的“断开”）— 如需系统级完全保障，请在下方开启“阻止未使用 VPN 的连接”。";
+"sec_app_through" = "Hydra 自身流量走 VPN";
+"sec_app_through_desc" = "VPN 开启时，连接您服务器的 SSH、订阅下载和更新都会经过隧道，因此没有 VPN 就打不开的服务器也能访问。使用辅助进程的模式（ByeDPI、OpenFlux、olcRTC、Xray）下 Hydra 仍留在隧道之外。下次连接时生效。";
 "sec_auto_app" = "启动应用时自动连接";
 "sec_auto_app_desc" = "打开 Hydra 即连接到上次使用的服务器（前提是之前已授予 VPN 权限）。";
 "sec_auto_boot" = "开机时自动连接";

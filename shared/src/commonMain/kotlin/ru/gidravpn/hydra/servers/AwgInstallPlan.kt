@@ -72,15 +72,14 @@ object AwgInstallPlan {
             add(Step("unit", "Создать службу systemd $SERVICE",
                 upload = Step.Upload("/etc/systemd/system/$SERVICE.service", unit(spec).toByteArray(), 420),
                 rollback = "systemctl disable --now $SERVICE; rm -f /etc/systemd/system/$SERVICE.service; systemctl daemon-reload"))
-            if (openFirewall && firewall == "ufw") add(Step("fw", "Открыть UDP ${spec.port} в ufw", "ufw allow ${spec.port}/udp", rollback = "ufw delete allow ${spec.port}/udp"))
-            if (openFirewall && firewall == "firewalld") add(Step("fw", "Открыть UDP ${spec.port} в firewalld",
-                "firewall-cmd --permanent --add-port=${spec.port}/udp && firewall-cmd --reload", rollback = "firewall-cmd --permanent --remove-port=${spec.port}/udp && firewall-cmd --reload"))
+            if (openFirewall) ServerOps.openPortStep(firewall, "${spec.port}/udp")?.let(::add)
             add(Step("start", "Запустить службу", "systemctl daemon-reload && systemctl enable $SERVICE && systemctl restart $SERVICE",
                 rollback = "systemctl disable --now $SERVICE", failHint = "Служба не запустилась (journalctl -u $SERVICE)"))
             add(Step("verify", "Проверить: интерфейс $iface поднят",
                 "WG_QUICK_USERSPACE_IMPLEMENTATION=amneziawg-go $BIN_DIR/awg show $iface",
                 accept = { it.ok && it.out.contains("listening port: ${spec.port}") },
                 failHint = "Интерфейс не слушает порт ${spec.port}"))
+            addAll(ServerOps.awgStateSteps(spec, clients))
         }
     }
 
@@ -89,7 +88,9 @@ object AwgInstallPlan {
         Step("stop", "Остановить службу", "systemctl disable --now $SERVICE 2>/dev/null; true"),
         Step("rm", "Удалить файлы",
             "rm -f /etc/systemd/system/$SERVICE.service $CONF_DIR/${spec.iface}.conf /etc/sysctl.d/99-hydra-awg.conf " +
-                "$BIN_DIR/amneziawg-go $BIN_DIR/awg $BIN_DIR/awg-quick && systemctl daemon-reload"),
+                "$BIN_DIR/amneziawg-go $BIN_DIR/awg $BIN_DIR/awg-quick ${ServerOps.AWG_STATE} && systemctl daemon-reload; " +
+                "rmdir $CONF_DIR /etc/amnezia 2>/dev/null; true"),
+        Step("fw-close", "Закрыть порт ${spec.port}/udp, если его открывала Hydra", ServerOps.closePortCommand("${spec.port}/udp")),
     )
 
     /** Добавление/удаление клиента на живом сервере: переписать конфиг и применить без разрыва других клиентов. */
@@ -98,5 +99,5 @@ object AwgInstallPlan {
             upload = Step.Upload("$CONF_DIR/${spec.iface}.conf", conf(spec, clients).toByteArray(), 384)),
         Step("sync", "Применить без перезапуска",
             "WG_QUICK_USERSPACE_IMPLEMENTATION=amneziawg-go bash -c '$BIN_DIR/awg syncconf ${spec.iface} <($BIN_DIR/awg-quick strip $CONF_DIR/${spec.iface}.conf)'"),
-    )
+    ) + ServerOps.awgStateSteps(spec, clients)
 }

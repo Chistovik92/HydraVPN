@@ -64,7 +64,7 @@ class Installer(
     private val secretList = java.util.concurrent.CopyOnWriteArrayList(secrets)
     private val redactor = Redactor(secretList)
 
-    /** Секрет, появившийся по ходу работы (токен, выданный установщиком): с этого момента вырезается из журнала. */
+    /** Секрет, появившийся по ходу работы (ключи нового клиента, токен): с этого момента вырезается из журнала. */
     fun addSecret(s: String) { if (s.isNotBlank()) secretList.add(s) }
     @Volatile var cancelled = false
 

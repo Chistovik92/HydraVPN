@@ -106,7 +106,7 @@ object FriendlyText {
     fun planSentences(kind: ServerKind, openFirewall: Boolean, en: Boolean = false): List<String> = when (kind) {
         ServerKind.AMNEZIAWG -> buildList {
             add(t(en, "Загрузим на сервер программу VPN (проверим, что файлы не повреждены)", "Download the VPN program to the server (we verify the files are intact)"))
-            add(t(en, "Создадим для вас ключи и настройки — они хранятся только у вас на устройстве", "Create keys and settings for you — they are stored only on your device"))
+            add(t(en, "Создадим ключи и настройки — они хранятся у вас на устройстве и копией на самом сервере (только для администратора)", "Create keys and settings — they are kept on your device and as a copy on the server itself (admin only)"))
             add(t(en, "Включим пересылку трафика, чтобы сервер мог выпускать устройства в интернет", "Turn on traffic forwarding so the server can let devices out to the internet"))
             add(t(en, "Настроим автозапуск: VPN будет работать после перезагрузки сервера", "Set up autostart: the VPN keeps working after a server reboot"))
             if (openFirewall) add(t(en, "Откроем нужный порт в защите сервера", "Open the needed port in the server firewall"))

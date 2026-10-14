@@ -48,7 +48,7 @@ private val KEY_LAST_SERVER_ID = longPreferencesKey("last_server_id")
     /**
      * Собственный трафик Hydra (SSH «Моих серверов», загрузка подписок, обновления) идёт через туннель, пока VPN включён
      * (0.8.0-rc3). Иначе сервер, недоступный без VPN, не открывался и при подключённом VPN. По умолчанию включено;
-     * для режимов с подпроцессами (ByeDPI, OpenFlux, olcRTC, Xray) приложение остаётся вне туннеля — см. AppTunnelPolicy.
+     * для режимов с подпроцессами (ByeDPI, OpenFlux, olcRTC, Xray, AmneziaWG) приложение остаётся вне туннеля — см. AppTunnelPolicy.
      */
     val appThroughVpn: Flow<Boolean> = context.vpnSettingsStore.data.map { it[KEY_APP_THROUGH_VPN] != false }
     suspend fun setAppThroughVpn(enabled: Boolean) {

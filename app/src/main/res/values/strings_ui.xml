@@ -86,6 +86,7 @@
     <string name="field_sni">SNI (server name, optional)</string>
     <string name="manual_conf_field">.conf contents</string>
     <string name="manual_conf_hint">Paste the whole WireGuard / AmneziaWG config: from [Interface] to the end of [Peer].</string>
+    <string name="manual_bad">These fields do not make a working server - check the address, keys and port.</string>
     <string name="manual_link_only">This protocol is added only from a link or subscription - use Import.</string>
     <string name="servers_protocol">Protocol: %1$s</string>
     <string name="default_subscription_name">Subscription</string>
@@ -174,7 +175,7 @@
     <!-- Security -->
     <string name="sec_killswitch_desc">If a connection attempt fails, the tunnel does not fall back to a direct connection — traffic is blocked until you disconnect the VPN manually. It does not protect against the system revoking the VPN (another VPN app, \"Disconnect\" in system settings) — for a full guarantee at OS level enable \"Block connections without VPN\" below.</string>
     <string name="sec_app_through">Hydra traffic through the VPN</string>
-    <string name="sec_app_through_desc">SSH to your servers, subscription downloads and updates go through the tunnel while the VPN is on — so servers that are blocked without a VPN open too. Modes with helper processes (ByeDPI, OpenFlux, olcRTC, Xray) keep Hydra outside the tunnel. Applied on the next connection.</string>
+    <string name="sec_app_through_desc">SSH to your servers, subscription downloads and updates go through the tunnel while the VPN is on — so servers that are blocked without a VPN open too. Modes with helper processes (ByeDPI, OpenFlux, olcRTC, Xray) and AmneziaWG keep Hydra outside the tunnel. Applied on the next connection.</string>
     <string name="sec_auto_app">Auto-connect on app start</string>
     <string name="sec_auto_app_desc">Open Hydra and it brings the tunnel up to the last server, if VPN consent was granted earlier.</string>
     <string name="sec_auto_boot">Auto-connect on device boot</string>

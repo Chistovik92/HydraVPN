@@ -90,7 +90,7 @@ object Subscriptions {
 }
 
 object Ping {
-    /** Время TCP-рукопожатия с сервером, мс; -2 — недоступен. Для UDP-протоколов — ориентир. */
+    /** Время TCP-рукопожатия с сервером, мс; -2 — недоступен. */
     fun tcp(host: String, port: Int, timeoutMs: Int = 3000): Int = runCatching {
         Socket(Proxy.NO_PROXY).use { s ->
             val t0 = System.nanoTime()
@@ -98,6 +98,35 @@ object Ping {
             ((System.nanoTime() - t0) / 1_000_000).toInt().coerceAtLeast(1)
         }
     }.getOrDefault(-2)
+
+    private val UDP = setOf(
+        ru.gidravpn.hydra.data.model.Protocol.AMNEZIAWG, ru.gidravpn.hydra.data.model.Protocol.WIREGUARD,
+        ru.gidravpn.hydra.data.model.Protocol.HYSTERIA2, ru.gidravpn.hydra.data.model.Protocol.TUIC,
+        ru.gidravpn.hydra.data.model.Protocol.L2TP, ru.gidravpn.hydra.data.model.Protocol.WDTT,
+    )
+
+    /**
+     * Задержка до сервера профиля (0.8.0-rc4). UDP-протоколы (AmneziaWG, WireGuard, Hysteria2, TUIC) на TCP не отвечают и раньше
+     * всегда были «недоступно»: для них отказ TCP (RST) тоже значит «хост жив», а при молчании — ICMP echo.
+     * -1 — мерить нечего (ByeDPI, olcRTC/OpenFlux без адреса).
+     */
+    fun profile(p: ru.gidravpn.hydra.data.model.ServerProfile): Int {
+        if (p.protocol?.engine == ru.gidravpn.hydra.data.model.Engine.BYEDPI || p.address.isBlank() || p.port !in 1..65535) return -1
+        if (p.protocol !in UDP) return tcp(p.address, p.port)
+        val ip = runCatching { java.net.InetAddress.getByName(p.address) }.getOrNull() ?: return -2
+        runCatching {
+            Socket(Proxy.NO_PROXY).use { s ->
+                val t0 = System.nanoTime()
+                try { s.connect(InetSocketAddress(ip, p.port), 1500) } catch (e: java.net.ConnectException) {
+                    if (!e.message.orEmpty().contains("refused", true)) throw e
+                }
+                return ((System.nanoTime() - t0) / 1_000_000).toInt().coerceAtLeast(1)
+            }
+        }
+        // ICMP: на Windows isReachable шлёт echo-запрос сам; где он недоступен, Java пробует TCP-порт 7 (отказ — тоже «жив»)
+        val t0 = System.nanoTime()
+        return if (runCatching { ip.isReachable(2000) }.getOrDefault(false)) ((System.nanoTime() - t0) / 1_000_000).toInt().coerceAtLeast(1) else -2
+    }
 }
 
 /** Запущенные программы — для выбора в «Раздельном туннелировании по приложениям». */
