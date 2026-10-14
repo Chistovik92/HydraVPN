@@ -218,8 +218,8 @@ API подписки). Установка — **закреплёнными ре�
 | Панель | Установка | Учётные данные | Вход |
 |---|---|---|---|
 | 3x-ui (v3.9.0) | `bash <(curl -Ls …/install.sh) vX.Y.Z`; без вопросов — `XUI_NONINTERACTIVE=1` + `XUI_USERNAME`, `XUI_PASSWORD`, `XUI_PANEL_PORT`, `XUI_WEB_BASE_PATH`, `XUI_SSL_MODE` | сами задаём; итог — `/etc/x-ui/install-result.env` | `POST <base>/login`, cookie сессии |
-| s-ui (v1.6.3) | `bash <(curl -Ls …/install.sh)`; порт 2095 (`/app/`), подписка 2096, `admin/admin` → **сразу меняем** | по умолчанию, меняем через API | `POST /api/login`; токен `/apiv2` |
-| x-ui alireza0 (v1.12.0) | `bash <(curl -Ls …/install.sh)`; Docker-вариант | по умолчанию, меняем | `POST /login` |
+| s-ui (v1.6.4, сверено 10.10.2026) | `bash <(curl -Ls …/install.sh)`; порт 2095 (`/app/`), подписка 2096, `admin/admin` → **сразу меняем** | по умолчанию, меняем через API | `POST /api/login`; токен `/apiv2` |
+| x-ui alireza0 (v1.13.0, вышла 10.10.2026 - прочитать примечания) | `bash <(curl -Ls …/install.sh)`; Docker-вариант | по умолчанию, меняем | `POST /login` |
 
 **Прямой вход:** Android — встроенный WebView с уже выставленной cookie сессии (вход выполнен через API, пароль в страницу
 не вводится); при `http` — предупреждение «пароль идёт открытым текстом» и предложение выпустить сертификат
@@ -230,9 +230,9 @@ API подписки). Установка — **закреплёнными ре�
 
 - **PasarGuard (v5.4.1):** `pasarguard.sh @ install [--database …]`; дашборд требует TLS; владелец создаётся одноразовым ключом
   `pasarguard cli generate-temp-key` (читаем по SSH и создаём учётную запись через API); вход — `/api/admin/token`.
-- **Remnawave (3.4.4):** Docker Compose (панель + БД + Redis/Valkey) за обратным прокси, нужен домен; ставим только при домене и
+- **Remnawave (3.4.5):** Docker Compose (панель + БД + Redis/Valkey) за обратным прокси, нужен домен; ставим только при домене и
   открытых 80/443; вход по Bearer-токену API; страницы подписки — отдельный `subscription-page`.
-- **Nexora (v0.0.2):** `bash <(curl -fsSL …/install.sh)`; без вопросов, порт и пути выбирает установщик (случайно), мастер
+- **Nexora (v0.0.3):** `bash <(curl -fsSL …/install.sh)`; без вопросов, порт и пути выбирает установщик (случайно), мастер
   настройки по одноразовой ссылке; исходники закрыты, API неизвестен — вход только через браузер, пока не появится документация.
 - Marzban (последний релиз 01.2025, развитие продолжает PasarGuard) — только импорт подписки, установку не предлагаем.
 - **Подписка в один клик:** после установки приложение через API панели создаёт клиента/инбаунд (для 3x-ui —
@@ -275,9 +275,9 @@ SSTP crypto-binding против реального SoftEther/MikroTik. Нуже
 [meridian-desktop-releases](https://github.com/JinComputers/meridian-desktop-releases) и взять полезное;
 (2) повысить устойчивость всех версий и сверить ядра — sing-box, Xray и остальное; (3) AmneziaWG — все версии от 1.0
 до 3.1 и выше, **и создание собственного сервера из приложения**; (4) установка **любых панелей** и **прямой вход** в них:
-[Nexora](https://github.com/Nexora-VPN/panel) v0.0.2, [3x-ui](https://github.com/MHSanaei/3x-ui) v3.9.0,
-[s-ui](https://github.com/alireza0/s-ui) v1.6.3, [x-ui](https://github.com/alireza0/x-ui) v1.12.0,
-[PasarGuard](https://github.com/PasarGuard/panel) v5.4.1, [Remnawave](https://github.com/remnawave) 3.4.4.
+[Nexora](https://github.com/Nexora-VPN/panel) v0.0.2 (10.10.2026 - v0.0.3), [3x-ui](https://github.com/MHSanaei/3x-ui) v3.9.0,
+[s-ui](https://github.com/alireza0/s-ui) v1.6.3 (v1.6.4), [x-ui](https://github.com/alireza0/x-ui) v1.12.0 (v1.13.0),
+[PasarGuard](https://github.com/PasarGuard/panel) v5.4.1, [Remnawave](https://github.com/remnawave) 3.4.4 (3.4.5).
 За один проход это не делается, поэтому выше — этапы 0.7.11–0.8.4 (0.7.8 — в архиве ниже); каждый — отдельный релиз по `scripts/release.sh`.
 
 #### Разбор Meridian (05.10.2026)
