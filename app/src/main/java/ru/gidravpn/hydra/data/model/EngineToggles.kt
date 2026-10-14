@@ -41,6 +41,19 @@ data class EngineToggles(
         }
     }
 
+    /**
+     * Кто обслужит этот профиль (0.8.1-rc2). Как [engineFor] по протоколу, плюс: **REALITY — через Xray**, если он включён и
+     * есть в сборке. Сервер Xray-core ≥ 26.9.8 (его ставит 3x-ui v3.10, проверено на стенде: Xray 26.10.10) требует в ClientHello
+     * гибридный ключ X25519MLKEM768, а sing-box (все версии, в т. ч. 1.12.25 приложения) его не шлёт — сервер молча отдаёт сайт
+     * маскировки, и подключение «подключено, 12 КБ и тишина» (sing-box: «reality verification failed»; SagerNet/sing-box#4520).
+     * Xray-core Hydra (26.9.30) этот ключ шлёт — на стенде через тот же инбаунд 1,9 МБ за 1,3 с.
+     */
+    fun engineFor(profile: ServerProfile, xrayAvailable: Boolean): Kind? {
+        val k = engineFor(profile.protocol, xrayAvailable)
+        val reality = profile.security.equals("reality", true) && profile.protocol in XRAY_CAPABLE
+        return if (k == Kind.SINGBOX && reality && xray && xrayAvailable) Kind.XRAY else k
+    }
+
     /** Протокол заблокирован именно выключенным тумблером (а не тем, что он в принципе недоступен). */
     fun isDisabled(protocol: Protocol?, xrayAvailable: Boolean): Boolean {
         val e = protocol?.engine ?: return false

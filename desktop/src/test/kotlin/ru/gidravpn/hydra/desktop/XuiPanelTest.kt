@@ -266,6 +266,34 @@ class XuiLiveTest {
         m2.confirmFingerprint()
         waitFor("добавление 2", m2) { m2.ui.value.stage == Stage.DONE || m2.ui.value.stage == Stage.FAILED }
         assertEquals(panel.token, saved2.single().panel?.token)
+        // 0.8.1-rc2: настоящий трафик через инбаунд (в rc1 проверялось только, что панель его приняла) — HYDRA_SINGBOX=путь к sing-box
+        System.getenv("HYDRA_SINGBOX")?.let { sb ->
+            val cases = mutableListOf("подписка (gRPC, vk.com)" to prof.first { it.port == 24443 })
+            SshConnector.connect(login, srv.fingerprint).use { ssh ->
+                val u = java.net.URL(panel.baseUrl)
+                val sapi = XuiApi(SshXuiTransport(ssh, "http://127.0.0.1:${u.port}${u.path}", panel.token, login.host))
+                var port = 24444
+                for ((tr, mask) in listOf(XuiPanel.Transport.GRPC to XuiPanel.RealityMask.GITHUB, XuiPanel.Transport.XHTTP to XuiPanel.RealityMask.VK,
+                        XuiPanel.Transport.GRPC to XuiPanel.RealityMask.YANDEX)) {
+                    val (priv, pub) = sapi.newRealityKeys()
+                    val inb = sapi.addInbound(XuiPanel.defaultInbound(port, priv, pub, mask, remark = "t$port", transport = tr))
+                    val email = "t$port"; sapi.addClient(email, XuiPanel.random(16).lowercase(), listOf(inb), flow = "")
+                    val link = sapi.links(email).single()
+                    println("LINK $tr ${mask.sni}: " + link.replace(Regex("pbk=[^&]+"), "pbk=…").replace(Regex("vless://[^@]+@"), "vless://…@"))
+                    cases += "${tr.title}, ${mask.sni}" to ru.gidravpn.hydra.data.subscription.LinkParser.parseLine(link)!!
+                    port++
+                }
+            }
+            // Xray-core ≥ 26.9.8 (в 3x-ui v3.10) не пускает sing-box в REALITY — поэтому Hydra отдаёт REALITY ядру Xray
+            // (EngineToggles.engineFor(profile)); трафик обязан идти через Xray, sing-box — только для сведения
+            System.getenv("HYDRA_XRAY")?.let { xr ->
+                val results = cases.map { (name, pr) -> name to XuiTraffic.throughXray(xr, pr) }
+                results.forEach { (n, r) -> println("TRAFFIC xray $n: $r") }
+                assertTrue(results.all { it.second.startsWith("ok") }, results.toString())
+                assertTrue(cases.all { ru.gidravpn.hydra.data.model.EngineToggles().engineFor(it.second, true) == ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY })
+            }
+            cases.forEach { (n, pr) -> println("TRAFFIC sing-box $n: ${XuiTraffic.through(sb, pr).take(160)}") }
+        }
         // полная очистка снимает и панель
         m.wipe(id)
         waitFor("очистка") { !m.ui.value.busy && saved.single().panel == null }
