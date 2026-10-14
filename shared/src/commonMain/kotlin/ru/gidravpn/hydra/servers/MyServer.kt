@@ -33,12 +33,19 @@ data class MyServer(
     /** Что показала последняя проверка: система и архитектура (для карточки; пусто — ещё не проверяли). */
     val osName: String = "",
     val arch: String = "",
+    /**
+     * Поля записи, которых эта версия не знает (0.8.0-rc4 / 0.8.1-b): сохраняются как есть, чтобы переход между версиями
+     * (например, 0.8.1 → 0.8.0) не стирал данные более новой — так в rc4 потерялось поле `panel` записей из 0.8.1-a.
+     */
+    val unknown: String = "{}",
 ) {
     val hasServices get() = awg != null || ofx != null || panel != null
     /** Панель, подключённая без SSH: ни проверки, ни установки служб, ни очистки — только API панели. */
     val panelOnly get() = fingerprint.isBlank() && panel != null
+    /** Запись без отпечатка и без панели — её не к чему подключать (так выглядит панель 0.8.1-a, пересохранённая 0.8.0-rc4). */
+    val broken get() = fingerprint.isBlank() && panel == null
 
-    fun toJson(): JSONObject = JSONObject()
+    fun toJson(): JSONObject = (runCatching { JSONObject(unknown) }.getOrNull() ?: JSONObject())
         .put("id", id).put("name", name).put("host", host).put("sshPort", sshPort).put("sshUser", sshUser)
         .put("fingerprint", fingerprint).put("createdAt", createdAt).put("osName", osName).put("arch", arch)
         .also { o ->
@@ -56,7 +63,10 @@ data class MyServer(
             o.optJSONObject("panel")?.let(PanelInstance::fromJson),
             clientsFromJson(o.optJSONArray("clients")),
             o.optLong("createdAt"), o.optString("osName"), o.optString("arch"),
+            JSONObject().also { u -> o.keys().forEach { k -> if (k !in KNOWN) u.put(k, o.get(k)) } }.toString(),
         )
+
+        private val KNOWN = setOf("id", "name", "host", "sshPort", "sshUser", "fingerprint", "awg", "ofx", "panel", "clients", "createdAt", "osName", "arch")
 
         fun clientsToJson(l: List<AwgClient>) = JSONArray(l.map {
             JSONObject().put("name", it.name).put("priv", it.privateKey).put("pub", it.publicKey)

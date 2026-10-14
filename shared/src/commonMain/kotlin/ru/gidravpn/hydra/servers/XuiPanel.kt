@@ -11,6 +11,10 @@ import java.security.SecureRandom
  */
 enum class PanelKind(val title: String, val repo: String) {
     XUI3("3x-ui", "MHSanaei/3x-ui"),
+    /** s-ui (alireza0, на sing-box) — 0.8.1: установка и вход на сайт; пользователей заводят на сайте. */
+    SUI("s-ui", "alireza0/s-ui"),
+    /** x-ui (alireza0) — 0.8.1: так же, как s-ui. */
+    XUI("x-ui", "alireza0/x-ui"),
 }
 
 /**

@@ -17,7 +17,16 @@ class ServerForm(
 )
 
 /** Служба, которую можно поставить на свой сервер. */
-enum class ServerKind { AMNEZIAWG, OPENFLUX, PANEL_3XUI }
+enum class ServerKind {
+    AMNEZIAWG, OPENFLUX, PANEL_3XUI, PANEL_SUI, PANEL_XUI;
+
+    /** Вид панели для служб-панелей; null — не панель. */
+    val panel: PanelKind? get() = when (this) { PANEL_3XUI -> PanelKind.XUI3; PANEL_SUI -> PanelKind.SUI; PANEL_XUI -> PanelKind.XUI; else -> null }
+
+    companion object {
+        fun ofPanel(k: PanelKind) = when (k) { PanelKind.XUI3 -> PANEL_3XUI; PanelKind.SUI -> PANEL_SUI; PanelKind.XUI -> PANEL_XUI }
+    }
+}
 
 /** Параметры установки службы. */
 class ServiceForm(
@@ -106,8 +115,9 @@ class MyServersManager(
     fun previewState(state: MyServersUi) { _ui.value = state }
 
     private var form: ServerForm? = null
-    /** Последняя версия 3x-ui, узнанная при подготовке установки (показывается в плане и ставится она же). */
+    /** Последняя версия панели, узнанная при подготовке установки (показывается в плане и ставится она же). */
     @Volatile private var xuiTag = ""
+    @Volatile private var panelTag = ""
     @Volatile private var installer: Installer? = null
     /** Данные входа на время работы приложения (не запомненные пользователем): не спрашивать их на каждую кнопку. */
     private val memLogins = java.util.concurrent.ConcurrentHashMap<String, SshTarget>()
@@ -187,7 +197,7 @@ class MyServersManager(
      */
     private fun op(id: String, title: String, quiet: Boolean = false, work: (srv: MyServer, ssh: SshSession, inst: Installer) -> Unit) {
         val srv = find(id) ?: return
-        if (_ui.value.busy || srv.panelOnly) return   // у подключённой панели нет SSH
+        if (_ui.value.busy || srv.fingerprint.isBlank()) return   // у подключённой панели (и испорченной записи) нет SSH
         val t = store.load(id)?.target(srv) ?: memLogins[id]
         if (t == null) { askLogin(id, title, null) { login -> run(id, title, login, quiet, work) }; return }
         run(id, title, t, quiet, work)
@@ -293,6 +303,12 @@ class MyServersManager(
                     xuiTag = XuiPanel.latestTag()
                     service.planPreviewXui(xuiTag, f.openFirewall, pre)
                 }
+                ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> {
+                    val spec = OtherPanels.spec(f.kind.panel!!)!!
+                    _ui.update { it.copy(progress = "Узнаю последнюю версию ${spec.kind.title}…") }
+                    panelTag = OtherPanels.latestTag(spec)
+                    service.planPreviewPanel(spec.kind, panelTag, f.openFirewall, pre)
+                }
             }
             update(srv.copy(osName = pre.osName.ifBlank { srv.osName }, arch = pre.arch))
             _ui.update { it.copy(install = InstallUi(id, f, InstallStage.READY, pre, plan)) }
@@ -303,7 +319,11 @@ class MyServersManager(
     fun runInstall() {
         val i = _ui.value.install?.takeIf { it.stage == InstallStage.READY } ?: return
         val pre = i.preflight ?: return
-        val title = when (i.form.kind) { ServerKind.AMNEZIAWG -> "Устанавливаю AmneziaWG…"; ServerKind.OPENFLUX -> "Устанавливаю узел OpenFlux…"; ServerKind.PANEL_3XUI -> "Устанавливаю панель 3x-ui…" }
+        val title = when (i.form.kind) {
+            ServerKind.AMNEZIAWG -> "Устанавливаю AmneziaWG…"
+            ServerKind.OPENFLUX -> "Устанавливаю узел OpenFlux…"
+            else -> "Устанавливаю панель ${i.form.kind.panel!!.title}…"
+        }
         op(i.serverId, title) { srv, ssh, inst ->
             _ui.update { it.copy(install = i.copy(stage = InstallStage.RUNNING)) }
             val f = i.form
@@ -311,12 +331,14 @@ class MyServersManager(
                 ServerKind.AMNEZIAWG -> service.deployAwg(srv, f.generation, f.awgPort, f.openFirewall, pre, inst, ::log)
                 ServerKind.OPENFLUX -> service.deployOfx(ssh, srv, f.channel, f.vyandex, f.mailru, f.cupsonline, f.autoupdate, inst, ::log)
                 ServerKind.PANEL_3XUI -> service.deployXui(ssh, srv, xuiTag.ifBlank { XuiPanel.latestTag() }, f.accessPort, f.openFirewall, pre, inst, ::log)
+                ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> service.deployPanel(srv, f.kind.panel!!,
+                    panelTag.ifBlank { OtherPanels.latestTag(OtherPanels.spec(f.kind.panel!!)!!) }, f.openFirewall, pre, inst)
             }
             when (res) {
                 is DeployResult.Ok -> {
                     update(res.server)
                     res.links.forEach { importConf(res.server.name, it) }
-                    log("Готово: подключение добавлено в «Серверы»")
+                    log(if (res.links.isEmpty()) "Готово: панель установлена — откройте её на карточке сервера" else "Готово: подключение добавлено в «Серверы»")
                     _ui.update { it.copy(install = i.copy(stage = InstallStage.DONE)) }
                 }
                 is DeployResult.Failed -> {
@@ -341,13 +363,22 @@ class MyServersManager(
     }
 
     fun restartService(id: String, kind: ServerKind) = op(id, "Перезапускаю службу…") { srv, _, inst ->
-        val ok = when (kind) { ServerKind.AMNEZIAWG -> service.restartAwg(inst); ServerKind.OPENFLUX -> service.restartOfx(srv, inst); ServerKind.PANEL_3XUI -> service.restartXui(inst) }
+        val ok = when (kind) {
+            ServerKind.AMNEZIAWG -> service.restartAwg(inst)
+            ServerKind.OPENFLUX -> service.restartOfx(srv, inst)
+            ServerKind.PANEL_3XUI -> service.restartXui(inst)
+            ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> service.restartPanel(kind.panel!!, inst)
+        }
         if (!ok) throw OpFailed(_ui.value.error ?: "Служба не перезапустилась")
         log("Служба перезапущена")
     }
 
     fun uninstallService(id: String, kind: ServerKind) = op(id, "Удаляю службу с сервера…") { srv, _, inst ->
-        val upd = when (kind) { ServerKind.AMNEZIAWG -> service.uninstallAwg(srv, inst); ServerKind.OPENFLUX -> service.uninstallOfx(srv, inst); ServerKind.PANEL_3XUI -> service.uninstallXui(srv, inst) }
+        val upd = when (kind) {
+            ServerKind.AMNEZIAWG -> service.uninstallAwg(srv, inst)
+            ServerKind.OPENFLUX -> service.uninstallOfx(srv, inst)
+            else -> service.uninstallPanel(srv, inst)
+        }
         update(upd ?: throw OpFailed(_ui.value.error ?: "Не удалось удалить службу"))
         log("Служба удалена с сервера. Подключения к ней в «Серверах» больше не работают — их можно удалить.")
     }

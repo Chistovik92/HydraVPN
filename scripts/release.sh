@@ -108,11 +108,11 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 git fetch -q origin
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-if [[ "$VERSION" == *-a && "$BRANCH" != "master" ]]; then
-  # Схема версий владельца (12.10.2026): альфа (X.Y.Z-a) выходит из своей ветки и в master не вливается до проверки.
+if [[ "$VERSION" =~ -(a|b)[0-9]*$ && "$BRANCH" != "master" ]]; then
+  # Схема версий владельца (12.10.2026): альфа и бета (X.Y.Z-a, X.Y.Z-b…) выходят из своей ветки и в master не вливаются до проверки.
   [[ "$(git rev-parse HEAD)" == "$(git rev-parse "origin/$BRANCH" 2>/dev/null)" ]] || err \
-"HEAD не совпадает с origin/$BRANCH — сначала запушьте ветку альфы (CI соберёт тег именно отсюда)."
-  echo "    дерево чистое, HEAD = origin/$BRANCH (альфа $VERSION из ветки)"
+"HEAD не совпадает с origin/$BRANCH — сначала запушьте ветку (CI соберёт тег именно отсюда)."
+  echo "    дерево чистое, HEAD = origin/$BRANCH (пре-релиз $VERSION из ветки)"
 else
   [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/master)" ]] || err \
 "HEAD не совпадает с origin/master — сначала запушьте master (CI соберёт тег именно отсюда)."

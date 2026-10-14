@@ -32,7 +32,7 @@
     <string name="ms_connect">Подключиться</string>
     <string name="ms_fp_text">Это «отпечаток» сервера — его уникальный признак. Если хостинг показывает его в панели, сверьте. Дальше Hydra будет входить только на сервер с этим отпечатком.</string>
     <string name="ms_trust">Доверять и войти</string>
-    <string name="ms_added_next">Сервер появился в списке ниже. На его карточке выберите, что установить: AmneziaWG (рекомендуем) или узел OpenFlux.</string>
+    <string name="ms_added_next">Сервер появился в списке ниже. На его карточке выберите, что установить: AmneziaWG (рекомендуем), узел OpenFlux или панель.</string>
     <string name="ms_added">Подключение «%1$s» добавлено в «Серверы»</string>
 
     <string name="ms_st_unknown">не проверялся</string>
@@ -60,7 +60,7 @@
     <string name="ms_wipe">Очистить сервер полностью</string>
     <string name="ms_wipe_btn">Очистить</string>
     <string name="ms_wipe_q">Очистить «%1$s»?</string>
-    <string name="ms_wipe_msg">С сервера %1$s будет удалено всё, что ставила Hydra: AmneziaWG, узел OpenFlux, панель 3x-ui, их настройки, правила файрвола и копии ключей. Подключения к этому серверу в «Серверах» перестанут работать. Чужие программы не трогаются. Сервер останется в списке — на него можно поставить всё заново.</string>
+    <string name="ms_wipe_msg">С сервера %1$s будет удалено всё, что ставила Hydra: AmneziaWG, узел OpenFlux, панели, их настройки, правила файрвола и копии ключей. Подключения к этому серверу в «Серверах» перестанут работать. Чужие программы не трогаются. Сервер останется в списке — на него можно поставить всё заново.</string>
     <string name="ms_forget">Убрать из списка</string>
     <string name="ms_forget_q">Убрать «%1$s» из списка?</string>
     <string name="ms_forget_msg">Запись и сохранённые данные входа будут удалены из приложения. На самом сервере ничего не изменится — чтобы удалить VPN с сервера, сначала нажмите «Очистить сервер полностью».</string>
@@ -159,12 +159,12 @@
     <string name="ms_new_user_hint">Пользователь — это один человек или одно устройство. Вы получите ссылку для подключения.</string>
     <string name="ms_create">Создать</string>
     <string name="ms_panel_none">Не установлена. Сайт-панель, где вы сами заводите пользователей и выдаёте им ссылки — удобно, если VPN нужен нескольким людям.</string>
-    <string name="ms_panel_foreign">На сервере уже стоит 3x-ui, поставленная не Hydra: подключите её кнопкой «У меня уже есть панель» (адрес и токен).</string>
-    <string name="ms_panel_install">Установить панель 3x-ui</string>
+    <string name="ms_panel_foreign">На сервере уже стоит панель, поставленная не Hydra: 3x-ui подключите кнопкой «У меня уже есть панель» (адрес и токен).</string>
+    <string name="ms_panel_install">Установить 3x-ui (рекомендуем)</string>
     <string name="ms_panel_line">Версия %1$s · служба: %2$s</string>
     <string name="ms_panel_remove">Удалить панель</string>
-    <string name="ms_panel_remove_q">Удалить панель 3x-ui с «%1$s»?</string>
-    <string name="ms_panel_remove_msg">Панель, её ядро Xray и все пользователи панели будут удалены с сервера. Ссылки, выданные панелью, перестанут работать.</string>
+    <string name="ms_panel_remove_q">Удалить панель с «%1$s»?</string>
+    <string name="ms_panel_remove_msg">Панель, её ядро и все пользователи панели будут удалены с сервера. Ссылки, выданные панелью, перестанут работать. Копия базы панели (пользователи, настройки) останется на сервере в /root/hydra-backups.</string>
     <string name="ms_panel_only">Панель 3x-ui, подключена по токену (без входа на сервер)</string>
     <string name="ms_panel_http">Панель открывается по http:// — пароль на сайте идёт без шифрования. Входите при включённом VPN или настройте HTTPS в панели.</string>
     <string name="ms_panel_address">Адрес: %1$s</string>
@@ -174,4 +174,12 @@
     <string name="ms_install_xui_title">Установка панели 3x-ui</string>
     <string name="ms_installing_xui">Установка панели 3x-ui</string>
     <string name="ms_xui_hint">Hydra поставит последнюю версию 3x-ui официальным установщиком, придумает надёжный логин и пароль, создаст подключение VLESS + Reality и первого пользователя.</string>
+    <string name="ms_panel_title">Панель управления</string>
+    <string name="ms_panel_kind">Панель %1$s</string>
+    <string name="ms_panel_install_other">Установить %1$s</string>
+    <string name="ms_panel_site_only">Пользователей и подключения заводите на сайте панели; ссылку подключения из панели можно вставить в «Серверы».</string>
+    <string name="ms_install_panel_title">Установка панели %1$s</string>
+    <string name="ms_panel_other_hint">Hydra поставит последнюю версию %1$s официальным установщиком и задаст надёжный логин, пароль и случайный адрес панели. Пользователей вы заведёте на сайте панели.</string>
+    <string name="ms_install_done_panel">Готово! Панель установлена — откройте её кнопкой «Открыть панель» на карточке сервера.</string>
+    <string name="ms_broken">Запись повреждена: так выглядит панель, подключённая в 0.8.1-a, после открытия в 0.8.0-rc4. Уберите её и подключите панель заново кнопкой «У меня уже есть панель».</string>
 </resources>

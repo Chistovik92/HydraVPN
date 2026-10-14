@@ -32,7 +32,7 @@
     <string name="ms_connect">Connect</string>
     <string name="ms_fp_text">This is the server \"fingerprint\" — its unique mark. If your hosting shows it in the panel, compare. From now on Hydra will sign in only to a server with this fingerprint.</string>
     <string name="ms_trust">Trust and sign in</string>
-    <string name="ms_added_next">The server is in the list below. On its card choose what to install: AmneziaWG (recommended) or an OpenFlux node.</string>
+    <string name="ms_added_next">The server is in the list below. On its card choose what to install: AmneziaWG (recommended), an OpenFlux node or a panel.</string>
     <string name="ms_added">Connection \"%1$s\" added to Servers</string>
 
     <string name="ms_st_unknown">not checked</string>
@@ -60,7 +60,7 @@
     <string name="ms_wipe">Wipe server completely</string>
     <string name="ms_wipe_btn">Wipe</string>
     <string name="ms_wipe_q">Wipe \"%1$s\"?</string>
-    <string name="ms_wipe_msg">Everything Hydra installed will be removed from %1$s: AmneziaWG, the OpenFlux node, the 3x-ui panel, their settings, firewall rules and key copies. Connections to this server in Servers will stop working. Other programs are not touched. The server stays in the list so you can install again.</string>
+    <string name="ms_wipe_msg">Everything Hydra installed will be removed from %1$s: AmneziaWG, the OpenFlux node, panels, their settings, firewall rules and key copies. Connections to this server in Servers will stop working. Other programs are not touched. The server stays in the list so you can install again.</string>
     <string name="ms_forget">Remove from list</string>
     <string name="ms_forget_q">Remove \"%1$s\" from the list?</string>
     <string name="ms_forget_msg">The record and saved sign-in are removed from the app. Nothing changes on the server itself — to remove the VPN from the server, use \"Wipe server completely\" first.</string>
@@ -159,12 +159,12 @@
     <string name="ms_new_user_hint">A user is one person or one device. You will get a connection link.</string>
     <string name="ms_create">Create</string>
     <string name="ms_panel_none">Not installed. A panel website where you add users and hand out links — handy if several people need the VPN.</string>
-    <string name="ms_panel_foreign">3x-ui is already on this server but was not installed by Hydra: connect it with \"I already have a panel\" (address and token).</string>
-    <string name="ms_panel_install">Install 3x-ui panel</string>
+    <string name="ms_panel_foreign">A panel not installed by Hydra is already on this server: connect 3x-ui with \"I already have a panel\" (address and token).</string>
+    <string name="ms_panel_install">Install 3x-ui (recommended)</string>
     <string name="ms_panel_line">Version %1$s · service: %2$s</string>
     <string name="ms_panel_remove">Remove panel</string>
-    <string name="ms_panel_remove_q">Remove the 3x-ui panel from \"%1$s\"?</string>
-    <string name="ms_panel_remove_msg">The panel, its Xray core and all panel users will be removed from the server. Links issued by the panel stop working.</string>
+    <string name="ms_panel_remove_q">Remove the panel from \"%1$s\"?</string>
+    <string name="ms_panel_remove_msg">The panel, its core and all panel users will be removed from the server. Links issued by the panel stop working. A copy of the panel database (users, settings) stays on the server in /root/hydra-backups.</string>
     <string name="ms_panel_only">3x-ui panel connected by token (no server sign-in)</string>
     <string name="ms_panel_http">The panel opens over http:// — the site password travels unencrypted. Sign in with the VPN on or set up HTTPS in the panel.</string>
     <string name="ms_panel_address">Address: %1$s</string>
@@ -174,4 +174,12 @@
     <string name="ms_install_xui_title">Install 3x-ui panel</string>
     <string name="ms_installing_xui">Installing 3x-ui panel</string>
     <string name="ms_xui_hint">Hydra installs the latest 3x-ui with the official installer, makes up a strong login and password, creates a VLESS + Reality connection and the first user.</string>
+    <string name="ms_panel_title">Control panel</string>
+    <string name="ms_panel_kind">%1$s panel</string>
+    <string name="ms_panel_install_other">Install %1$s</string>
+    <string name="ms_panel_site_only">Create users and connections on the panel website; a connection link from the panel can be pasted into Servers.</string>
+    <string name="ms_install_panel_title">Install %1$s panel</string>
+    <string name="ms_panel_other_hint">Hydra installs the latest %1$s with the official installer and sets a strong login, password and a random panel address. You create users on the panel website.</string>
+    <string name="ms_install_done_panel">Done! The panel is installed — open it with \"Open panel\" on the server card.</string>
+    <string name="ms_broken">Damaged record: this is how a panel connected in 0.8.1-a looks after being opened in 0.8.0-rc4. Remove it and connect the panel again with \"I already have a panel\".</string>
 </resources>

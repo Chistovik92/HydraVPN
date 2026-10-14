@@ -349,4 +349,5 @@
     <string name="split_preset_ru">Російські застосунки напряму</string>
     <string name="split_preset_done">Додано до винятків: %1$d. Режим: усе, крім вибраних.</string>
     <string name="split_preset_none">Відповідних російських застосунків не знайдено</string>
+    <string name="manual_bad">Із цих полів не виходить робочий сервер — перевірте адресу, ключі й порт.</string>
 </resources>

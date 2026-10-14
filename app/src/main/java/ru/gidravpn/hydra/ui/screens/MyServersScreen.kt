@@ -121,7 +121,8 @@ fun MyServersScreen(vm: MainViewModel, onBack: () -> Unit, mvm: MyServersViewMod
         if (servers.isEmpty() && !wizard && s.stage == Stage.IDLE) item { Text(stringResource(R.string.ms_empty), color = TextMuted, fontSize = 13.sp) }
         servers.forEach { srv ->
             item(key = srv.id) {
-                if (srv.panelOnly) PanelOnlyCard(srv, m, s, onAddUser = { addUserFor = srv }, onConfirm = { confirm = it })
+                if (srv.broken) BrokenCard(srv) { m.forget(srv.id) }
+                else if (srv.panelOnly) PanelOnlyCard(srv, m, s, onAddUser = { addUserFor = srv }, onConfirm = { confirm = it })
                 else ServerCard(srv, m, s, onAddClient = { addClientFor = srv }, onAddUser = { addUserFor = srv }, onLogin = { loginFor = srv }, onConfirm = { confirm = it })
             }
         }
@@ -323,7 +324,7 @@ private fun ServerCard(srv: MyServer, m: MyServersManager, s: MyServersUi, onAdd
         Divider()
         OfxSection(srv, st, m, busy, onConfirm) { installKind = ServerKind.OPENFLUX }
         Divider()
-        PanelSection(srv, st, m, s, onAddUser, onConfirm) { installKind = ServerKind.PANEL_3XUI }
+        PanelSection(srv, st, m, s, onAddUser, onConfirm) { k -> installKind = k }
 
         val inst = s.install?.takeIf { it.serverId == srv.id }
         if (installKind != null && inst == null) { Spacer(Modifier.height(8.dp)); InstallForm(installKind!!, busy, onCancel = { installKind = null }) { f -> m.prepareInstall(srv.id, f) } }
@@ -430,27 +431,33 @@ private fun OfxSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, bu
 
 /** Панель 3x-ui на своём сервере (0.8.1): сайт, пользователи, перезапуск, удаление. */
 @Composable
-private fun PanelSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, s: MyServersUi, onAddUser: () -> Unit, onConfirm: (Confirm) -> Unit, onInstall: () -> Unit) {
+private fun PanelSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, s: MyServersUi, onAddUser: () -> Unit, onConfirm: (Confirm) -> Unit, onInstall: (ServerKind) -> Unit) {
     val ctx = LocalContext.current
     val p = srv.panel
     val busy = s.busy
-    Text(stringResource(R.string.ms_kind_xui), color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+    Text(p?.let { stringResource(R.string.ms_panel_kind, it.kind.title) } ?: stringResource(R.string.ms_panel_title), color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
     if (p == null) {
         Text(stringResource(R.string.ms_panel_none), color = TextMuted, fontSize = 12.sp)
         Spacer(Modifier.height(6.dp))
-        if (st?.xuiInstalled == true && !st.xuiByHydra) Text(stringResource(R.string.ms_panel_foreign), color = TextMuted, fontSize = 12.sp)
-        else MsChip(stringResource(R.string.ms_panel_install), AccentViolet) { if (!busy) onInstall() }
+        val foreign = (st?.xuiInstalled == true && !st.xuiByHydra && !st.xuiAlirezaByHydra) || (st?.suiInstalled == true && !st.suiByHydra)
+        if (foreign) Text(stringResource(R.string.ms_panel_foreign), color = TextMuted, fontSize = 12.sp)
+        MsRow {
+            if (st?.xuiInstalled != true) MsChip(stringResource(R.string.ms_panel_install), AccentViolet) { if (!busy) onInstall(ServerKind.PANEL_3XUI) }
+            if (st?.suiInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "s-ui"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_SUI) }
+            if (st?.xuiInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "x-ui"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_XUI) }
+        }
         return
     }
+    val kind = ServerKind.ofPanel(p.kind)
     val state = st?.takeIf { it.error == null }?.xuiState?.takeIf { it.isNotBlank() }
     Text(stringResource(R.string.ms_panel_line, p.version.ifBlank { "—" }, state ?: "—"), color = if (state == "active") Success else TextMuted, fontSize = 12.sp)
     PanelBody(srv, m, s, onAddUser)
     Spacer(Modifier.height(6.dp))
     MsRow {
-        MsChip(stringResource(R.string.ms_restart), TextSecondary) { if (!busy) m.restartService(srv.id, ServerKind.PANEL_3XUI) }
+        MsChip(stringResource(R.string.ms_restart), TextSecondary) { if (!busy) m.restartService(srv.id, kind) }
         MsChip(stringResource(R.string.ms_panel_remove), Danger) {
             if (!busy) onConfirm(Confirm(ctx.getString(R.string.ms_panel_remove_q, srv.name), ctx.getString(R.string.ms_panel_remove_msg), ctx.getString(R.string.ms_delete)) {
-                m.uninstallService(srv.id, ServerKind.PANEL_3XUI)
+                m.uninstallService(srv.id, kind)
             })
         }
     }
@@ -476,9 +483,13 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
             MsChip(stringResource(R.string.ms_open_panel), AccentCyan) { copySecret(clip, p.password); Toast.makeText(ctx, pwMsg, Toast.LENGTH_LONG).show(); open() }
             MsChip(stringResource(R.string.ms_copy_password), TextSecondary) { copySecret(clip, p.password); Toast.makeText(ctx, pwMsg, Toast.LENGTH_SHORT).show() }
         } else MsChip(stringResource(R.string.ms_open_panel), AccentCyan) { open() }
-        MsChip(stringResource(R.string.ms_panel_users), AccentViolet) { if (!busy) m.loadPanelClients(srv.id) }
-        MsChip(stringResource(R.string.ms_panel_add_user), AccentCyan) { if (!busy) onAddUser() }
+        // пользователи через API — только у 3x-ui (токен); у s-ui и x-ui — на сайте панели
+        if (p.token.isNotBlank()) {
+            MsChip(stringResource(R.string.ms_panel_users), AccentViolet) { if (!busy) m.loadPanelClients(srv.id) }
+            MsChip(stringResource(R.string.ms_panel_add_user), AccentCyan) { if (!busy) onAddUser() }
+        }
     }
+    if (p.token.isBlank()) Text(stringResource(R.string.ms_panel_site_only), color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
     s.panelClients[srv.id]?.let { emails ->
         if (emails.isEmpty()) Text(stringResource(R.string.ms_panel_no_users), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         emails.forEach { email ->
@@ -491,6 +502,15 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
             }
         }
     }
+}
+
+/** Запись без отпечатка и без панели (панель 0.8.1-a, пересохранённая 0.8.0-rc4): подключить нечего — только убрать. */
+@Composable
+private fun BrokenCard(srv: MyServer, onForget: () -> Unit) = Card {
+    Text(srv.name, color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+    Text(stringResource(R.string.ms_broken), color = TextMuted, fontSize = 12.sp)
+    Spacer(Modifier.height(8.dp))
+    MsChip(stringResource(R.string.ms_forget), TextSecondary) { onForget() }
 }
 
 /** Готовая панель, подключённая по адресу и токену (без SSH): только API панели. */
@@ -561,8 +581,13 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
     var mailru by remember { mutableStateOf("") }
     var accessPort by remember { mutableStateOf("443") }
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, Border, RoundedCornerShape(14.dp)).padding(12.dp)) {
-        Text(stringResource(when (kind) { ServerKind.AMNEZIAWG -> R.string.ms_install_awg_title; ServerKind.OPENFLUX -> R.string.ms_install_ofx_title; ServerKind.PANEL_3XUI -> R.string.ms_install_xui_title }),
-            color = TextPrimary, fontWeight = FontWeight.SemiBold)
+        Text(when (kind) {
+                ServerKind.AMNEZIAWG -> stringResource(R.string.ms_install_awg_title)
+                ServerKind.OPENFLUX -> stringResource(R.string.ms_install_ofx_title)
+                else -> stringResource(R.string.ms_install_panel_title, kind.panel!!.title)
+            }, color = TextPrimary, fontWeight = FontWeight.SemiBold)
+        if (kind == ServerKind.PANEL_SUI || kind == ServerKind.PANEL_XUI)
+            Text(stringResource(R.string.ms_panel_other_hint, kind.panel!!.title), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
         Spacer(Modifier.height(6.dp))
         if (kind == ServerKind.PANEL_3XUI) {
             Text(stringResource(R.string.ms_xui_hint), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
@@ -581,7 +606,7 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
                 AwgGeneration.V3 -> R.string.ms_gen_3
             }), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
             MsField(stringResource(R.string.ms_awg_port), awgPort) { awgPort = it.filter(Char::isDigit).take(5) }
-        } else {
+        } else if (kind == ServerKind.OPENFLUX) {
             Text(stringResource(R.string.ms_ofx_hint), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
             MsField(stringResource(R.string.ms_ofx_channel), channel) { channel = it.lowercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' }.take(31) }
             Spacer(Modifier.height(8.dp))
@@ -594,7 +619,12 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
             Text(stringResource(R.string.ms_open_fw), color = TextSecondary, fontSize = 13.sp)
         }
         val aport = awgPort.toIntOrNull() ?: 0
-        val ok = when (kind) { ServerKind.AMNEZIAWG -> aport in 1024..65535; ServerKind.OPENFLUX -> OfxNodeSpec.validChannel(channel); ServerKind.PANEL_3XUI -> (accessPort.toIntOrNull() ?: 0) in 1..65535 }
+        val ok = when (kind) {
+            ServerKind.AMNEZIAWG -> aport in 1024..65535
+            ServerKind.OPENFLUX -> OfxNodeSpec.validChannel(channel)
+            ServerKind.PANEL_3XUI -> (accessPort.toIntOrNull() ?: 0) in 1..65535
+            ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> true
+        }
         Spacer(Modifier.height(8.dp))
         MsRow {
             if (ok && !busy) MsChip(stringResource(R.string.ms_check_plan), AccentCyan) { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443)) }
@@ -611,7 +641,7 @@ private fun InstallPanel(i: InstallUi, s: MyServersUi, m: MyServersManager, onCl
         Text(when (i.form.kind) {
                 ServerKind.AMNEZIAWG -> stringResource(R.string.ms_installing_awg, i.form.generation.label)
                 ServerKind.OPENFLUX -> stringResource(R.string.ms_installing_ofx, i.form.channel)
-                ServerKind.PANEL_3XUI -> stringResource(R.string.ms_installing_xui)
+                else -> stringResource(R.string.ms_install_panel_title, i.form.kind.panel!!.title)
             },
             color = TextPrimary, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(6.dp))
@@ -651,7 +681,7 @@ private fun InstallPanel(i: InstallUi, s: MyServersUi, m: MyServersManager, onCl
                 MsChip(stringResource(R.string.ms_stop), Danger) { m.stop() }
             }
             InstallStage.DONE -> {
-                Text(stringResource(R.string.ms_install_done), color = Success, fontSize = 13.sp)
+                Text(stringResource(if (i.form.kind == ServerKind.PANEL_SUI || i.form.kind == ServerKind.PANEL_XUI) R.string.ms_install_done_panel else R.string.ms_install_done), color = Success, fontSize = 13.sp)
                 Spacer(Modifier.height(6.dp)); LogBox(s.log); Spacer(Modifier.height(6.dp))
                 MsChip(stringResource(R.string.ms_close), AccentCyan) { onClose() }
             }

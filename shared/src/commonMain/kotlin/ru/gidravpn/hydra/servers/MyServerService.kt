@@ -40,9 +40,18 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
         } else if (s.awg != null) r = r.copy(awg = null, clients = emptyList())
 
         // панель, поставленная по SSH, исчезла с сервера — убираем; подключённую без SSH (panelOnly) не трогаем
-        if (s.panel != null && !s.panelOnly && !st.xuiInstalled) r = r.copy(panel = null)
+        if (s.panel != null && !s.panelOnly) {
+            val present = when (s.panel.kind) { PanelKind.SUI -> st.suiInstalled; else -> st.xuiInstalled }
+            if (!present) r = r.copy(panel = null)
+        }
+        // копия записи панели на сервере (любой вид) — второе устройство берёт панель под управление
+        if (r.panel == null && st.panelStateJson.trim().startsWith("{")) {
+            runCatching { PanelInstance.fromJson(org.json.JSONObject(st.panelStateJson)) }.getOrNull()
+                ?.takeIf { (it.kind == PanelKind.SUI && st.suiInstalled) || (it.kind != PanelKind.SUI && st.xuiInstalled) }
+                ?.let { r = r.copy(panel = it) }
+        }
         // панель поставлена Hydra с другого устройства — берём под управление по её install-result.env
-        if (s.panel == null && st.xuiInstalled && st.xuiByHydra && st.xuiResult.isNotBlank()) {
+        if (r.panel == null && st.xuiInstalled && st.xuiByHydra && st.xuiResult.isNotBlank()) {
             val res = XuiPanel.parseResult(st.xuiResult)
             val token = res["XUI_API_TOKEN"].orEmpty()
             val port = res["XUI_PANEL_PORT"]?.toIntOrNull()
@@ -173,6 +182,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
             onLog("Создан инбаунд VLESS+Reality на порту $accessPort и клиент $email")
             val panel = PanelInstance(PanelKind.XUI3, "http://${if (srv.host.contains(':')) "[${srv.host}]" else srv.host}:$port/$path",
                 params.username, params.password, token, version, inboundId, email)
+            installer.run(OtherPanels.stateSteps(panel))
             return DeployResult.Ok(srv.copy(panel = panel), links)
         } catch (e: XuiApiException) {
             return DeployResult.Failed("Панель установлена, но доступ создать не удалось: ${e.message}. Адрес: http://${srv.host}:$port/$path")
@@ -197,11 +207,50 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
     fun uninstallXui(s: MyServer, installer: Installer): MyServer? {
         val port = runCatching { java.net.URL(s.panel?.baseUrl ?: "").port }.getOrDefault(-1)
         val ok = installer.run(listOfNotNull(
+            ServerOps.backupPanelsStep(),
             Step("xui-remove", "Удалить 3x-ui с сервера", "printf 'y\\n' | /usr/bin/x-ui uninstall; test ! -e /usr/local/x-ui/x-ui && rm -f ${ServerOps.XUI_MARK}",
                 failHint = "3x-ui не удалось удалить"),
             port.takeIf { it > 0 }?.let { Step("xui-fw-close", "Закрыть порт панели $it/tcp, если его открывала Hydra", ServerOps.closePortCommand("$it/tcp")) },
         ))
         return if (ok) s.copy(panel = null) else null
+    }
+
+    // ---------------------------------------------------------------------------------------------------- s-ui, x-ui (0.8.1)
+
+    fun planPreviewPanel(kind: PanelKind, tag: String, openFirewall: Boolean, pre: Preflight): List<Step> {
+        val s = OtherPanels.spec(kind) ?: return emptyList()
+        return OtherPanels.installSteps(s, OtherPanels.Params(tag, "••••", "••••", 0, "••••"), openFirewall, pre.firewall) +
+            Step("panel-state", "Сохранить копию данных панели на сервере (только для root)")
+    }
+
+    fun deployPanel(srv: MyServer, kind: PanelKind, tag: String, openFirewall: Boolean, pre: Preflight, installer: Installer): DeployResult {
+        val s = OtherPanels.spec(kind) ?: return DeployResult.Failed("Неизвестная панель")
+        val p = OtherPanels.Params(tag)
+        installer.addSecret(p.password); installer.addSecret(p.username)
+        if (!installer.run(OtherPanels.installSteps(s, p, openFirewall, pre.firewall))) return DeployResult.Failed("Установка остановлена")
+        val host = if (srv.host.contains(':')) "[${srv.host}]" else srv.host
+        val panel = PanelInstance(kind, "http://$host:${p.port}/${p.path}/", p.username, p.password, "", tag)
+        installer.run(OtherPanels.stateSteps(panel))
+        return DeployResult.Ok(srv.copy(panel = panel))
+    }
+
+    /** Удалить панель любого вида с сервера; порт панели закрывается, если его открывала Hydra. */
+    fun uninstallPanel(s: MyServer, installer: Installer): MyServer? {
+        val panel = s.panel ?: return null
+        if (panel.kind == PanelKind.XUI3) return uninstallXui(s, installer)?.also { installer.run(listOf(Step("panel-state-rm", "Удалить копию данных панели", "rm -f ${OtherPanels.PANEL_STATE}"))) }
+        val spec = OtherPanels.spec(panel.kind) ?: return null
+        val port = runCatching { java.net.URL(panel.baseUrl).port }.getOrDefault(-1)
+        val ok = installer.run(listOfNotNull(
+            ServerOps.backupPanelsStep(),
+            Step("panel-remove", "Удалить ${panel.kind.title} с сервера", OtherPanels.uninstallCommand(spec) + "; test ! -e ${spec.home}", failHint = "Панель удалить не удалось"),
+            port.takeIf { it > 0 }?.let { Step("panel-fw-close", "Закрыть порт панели $it/tcp, если его открывала Hydra", ServerOps.closePortCommand("$it/tcp")) },
+        ))
+        return if (ok) s.copy(panel = null) else null
+    }
+
+    fun restartPanel(kind: PanelKind, installer: Installer): Boolean {
+        val svc = OtherPanels.spec(kind)?.service ?: "x-ui"
+        return installer.run(listOf(Step("restart", "Перезапустить панель", "systemctl restart $svc && systemctl is-active $svc", failHint = "Панель не запустилась (journalctl -u $svc)")))
     }
 
     fun restartXui(installer: Installer): Boolean = installer.run(listOf(

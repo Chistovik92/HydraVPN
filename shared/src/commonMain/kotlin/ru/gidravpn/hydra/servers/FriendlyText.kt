@@ -124,6 +124,12 @@ object FriendlyText {
             t(en, "Создадим первого пользователя и готовое подключение (VLESS + Reality)", "Create the first user and a ready connection (VLESS + Reality)"),
             t(en, "Добавим это подключение в «Серверы» — останется нажать «Подключить»", "Add this connection to “Servers” — you only need to tap “Connect”"),
         )
+        ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> listOf(
+            t(en, "Скачаем официальную панель ${kind.panel!!.title} указанной версии", "Download the official ${kind.panel!!.title} panel of the stated version"),
+            t(en, "Установим её и зададим надёжный логин, пароль и случайный адрес панели", "Install it and set a strong login, password and a random panel address"),
+            t(en, "Проверим, что панель открывается", "Check that the panel opens"),
+            t(en, "Пользователей и подключения вы заведёте на сайте панели — кнопка «Открыть панель»", "You create users and connections on the panel website — the “Open panel” button"),
+        )
     }
 
     /** Рекомендация по умолчанию: что поставить, если человек не знает. */
@@ -131,5 +137,6 @@ object FriendlyText {
         ServerKind.AMNEZIAWG -> t(en, "Рекомендуем: самый простой путь к своему VPN. Подойдёт большинству.", "Recommended: the simplest way to your own VPN. Fits most people.")
         ServerKind.OPENFLUX -> t(en, "Для опытных: обходит блокировки через сервисы вроде Яндекс Документов.", "For experienced users: bypasses blocking through services like Yandex Docs.")
         ServerKind.PANEL_3XUI -> t(en, "Для тех, кто хочет сам управлять пользователями на сайте-панели.", "For those who want to manage users on a panel website.")
+        ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> t(en, "Если вы привыкли к этой панели: всё управление — на её сайте.", "If you are used to this panel: everything is managed on its website.")
     }
 }
