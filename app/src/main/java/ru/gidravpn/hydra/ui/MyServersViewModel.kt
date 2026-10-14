@@ -18,7 +18,8 @@ import java.io.File
 /**
  * «Мои серверы» (0.8.0): мастер развёртывания и управление по SSH. Вся логика — в общем [MyServersManager] (:shared),
  * тот же, что на ПК; здесь только файл со списком (приватный каталог приложения) и добавление клиентского .conf в «Серверы».
- * Пароль/ключ SSH на диск не попадают; в файле — отпечаток хоста и ключи AmneziaWG (без них нельзя добавить клиента).
+ * В файле — отпечаток хоста и ключи AmneziaWG (без них нельзя добавить клиента). Пароль/ключ SSH — только если пользователь
+ * попросил запомнить, и только зашифрованными ключом Android Keystore (`my_servers_login.dat`, 0.8.0-rc4).
  */
 class MyServersViewModel(app: Application) : AndroidViewModel(app) {
     private val file = File(app.filesDir, "my_servers.json")
@@ -50,6 +51,8 @@ class MyServersViewModel(app: Application) : AndroidViewModel(app) {
             if (BuildConfig.DEBUG && dev.isDirectory) AwgBundleLoader.fromDir(arch, dev)
             else AwgBundleLoader.download(BuildConfig.VERSION_NAME.removeSuffix("-stub"), arch)
         },
+        vault = runCatching { ru.gidravpn.hydra.servers.FileVault(File(app.filesDir, "my_servers_login.dat"), ru.gidravpn.hydra.data.servers.KeystoreCipher()) }
+            .getOrElse { ru.gidravpn.hydra.servers.MemoryVault() },
         importConf = { name, conf -> importConf(name, conf) },
     )
 }

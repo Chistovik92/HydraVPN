@@ -48,7 +48,7 @@ class Redactor(private val secrets: Collection<String>) {
     fun clean(s: String): String {
         var r = s
         for (x in secrets) if (x.length >= 6) r = r.replace(x, "•••")
-        return r.replace(Regex("(?i)(PrivateKey|PresharedKey|HeaderProtectionKey|password)(\\s*[=:]\\s*)\\S+"), "$1$2•••")
+        return r.replace(Regex("(?i)(PrivateKey|PresharedKey|HeaderProtectionKey|password|api[ _-]?token|token)(\\s*[=:]\\s*)\\S+"), "$1$2•••")
     }
 }
 
@@ -61,7 +61,11 @@ class Installer(
     secrets: Collection<String> = emptyList(),
     private val onEvent: (InstallEvent) -> Unit,
 ) {
-    private val redactor = Redactor(secrets)
+    private val secretList = java.util.concurrent.CopyOnWriteArrayList(secrets)
+    private val redactor = Redactor(secretList)
+
+    /** Секрет, появившийся по ходу работы (ключи нового клиента, токен): с этого момента вырезается из журнала. */
+    fun addSecret(s: String) { if (s.isNotBlank()) secretList.add(s) }
     @Volatile var cancelled = false
 
     /** @return true, если все шаги выполнены. */

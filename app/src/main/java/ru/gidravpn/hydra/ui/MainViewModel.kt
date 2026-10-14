@@ -494,6 +494,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             // Не перетираем выбор, если пользователь успел ткнуть сервер раньше.
             vpnSettingsRepo.lastServerId.firstOrNull()?.let { _selectedId.compareAndSet(null, it) }
         }
+        safeLaunch {
+            val n = repo.fixMislabeledAmnezia()
+            if (n > 0) VpnState.log("Исправлен тип $n профилей: это AmneziaWG, а не WireGuard (параметры обфускации были в конфиге)")
+        }
     }
 
     val selectedServer: StateFlow<ServerProfile?> =
@@ -587,7 +591,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Ручное добавление (0.8.0-rc3): профиль собирает [ru.gidravpn.hydra.data.subscription.ManualServer], тут только сохранение. */
+    /** Сохранить готовый профиль (ручная форма с 0.8.0-rc4 идёт через ссылку и importAuto, см. AddServerDialog). */
     fun addServer(profile: ServerProfile) =
         safeLaunch {
             repo.save(profile)
@@ -631,7 +635,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     val named = if (r.profiles.size == 1 && !subName.isNullOrBlank()) r.profiles.map { it.copy(name = subName) } else r.profiles
                     val n = runCatching { repo.importProfiles(named) }.getOrDefault(0)
                     VpnState.log("Импортировано серверов: $n")
-                    lines += if (n == 1) s(ru.gidravpn.hydra.R.string.import_done_one, r.profiles.first().name)
+                    lines += if (n == 1) s(ru.gidravpn.hydra.R.string.import_done_one, named.first().name)
                     else s(ru.gidravpn.hydra.R.string.import_done_servers, n)
                 }
                 is ru.gidravpn.hydra.data.subscription.ImportDetector.Result.Unsupported ->
@@ -903,7 +907,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun measurePing(server: ServerProfile) = safeLaunch {
         _measuringIds.update { it + server.id }
         try {
-            val ms = pingLimit.withPermit { PingMeasurer.measure(server.address, server.port) }
+            val ms = pingLimit.withPermit { PingMeasurer.measure(server) }
             repo.save(server.copy(pingMs = ms))
         } finally {
             _measuringIds.update { it - server.id }

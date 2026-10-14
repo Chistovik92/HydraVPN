@@ -52,7 +52,8 @@ class InstallerTest {
         assertTrue(events.last() is InstallEvent.Done)
         val conf = String(ssh.files["/etc/amnezia/amneziawg/awg0.conf"]!!)
         assertTrue("PostUp = iptables" in conf && "PublicKey = ${client.publicKey}" in conf)
-        assertTrue(ssh.cmds.any { it == "ufw allow 51820/udp" })
+        assertTrue(ssh.cmds.any { it.startsWith("ufw allow 51820/udp && ") && ServerOps.FW_LIST in it })
+        assertTrue(ssh.files.containsKey(ServerOps.AWG_STATE))
         assertTrue(ssh.files.containsKey("/etc/systemd/system/hydra-awg.service"))
     }
 

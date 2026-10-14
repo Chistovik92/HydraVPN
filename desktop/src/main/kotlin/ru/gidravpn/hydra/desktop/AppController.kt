@@ -142,7 +142,10 @@ class AppController(
         toast = ::toast,
     )
 
-    /** Свои серверы (0.8.0): мастер развёртывания и управление по SSH. Пакет с бинарями берётся из релиза Hydra той же версии. */
+    /**
+     * Свои серверы (0.8.0, сервер-сначала с 0.8.0-rc4): доступ к серверу, установка служб и управление по SSH.
+     * Пакет с бинарями берётся из релиза Hydra той же версии; данные входа — в зашифрованном хранилище рядом с hydra.json.
+     */
     val myServers = ru.gidravpn.hydra.servers.MyServersManager(
         scope,
         servers = { _ui.value.data.myServers },
@@ -151,7 +154,9 @@ class AppController(
             System.getenv("HYDRA_AWG_BUNDLE")?.let { ru.gidravpn.hydra.servers.AwgBundleLoader.fromDir(arch, File(it)) }
                 ?: ru.gidravpn.hydra.servers.AwgBundleLoader.download(Platform.version, arch)
         },
-        importConf = { name, conf -> import(conf); toast("Сервер «$name» добавлен") },
+        vault = runCatching { ru.gidravpn.hydra.desktop.core.DesktopVault.create(store.file.absoluteFile.parentFile) }
+            .getOrElse { ru.gidravpn.hydra.servers.MemoryVault() },
+        importConf = { name, conf -> import(conf, name) },
     )
 
     /** Номер сеанса ядра: колбэки и корутины старого сеанса ничего не меняют. */
@@ -234,7 +239,8 @@ class AppController(
      * Импорт текста из буфера/поля: ссылка(и) на серверы, base64-список, .conf
      * WireGuard целиком, или http(s)-адрес подписки.
      */
-    fun import(text: String) {
+    /** [name] — имя, заданное пользователем (ручной ввод, «Мои серверы»): для одного сервера главнее имени из ссылки/.conf. */
+    fun import(text: String, name: String? = null) {
         val t = text.trim()
         if (t.isEmpty()) return toast("Буфер обмена пуст")
         if (t.length > Subscriptions.MAX_BYTES) return toast("Слишком большой текст для импорта")
@@ -258,7 +264,8 @@ class AppController(
         mutate { s ->
             var id = nextId(s.servers.map { it.id })
             val first = id
-            val added = valid.map { it.copy(id = id++, subscriptionId = null) }
+            val named = if (valid.size == 1 && !name.isNullOrBlank()) valid.map { it.copy(name = name) } else valid
+            val added = named.map { it.copy(id = id++, subscriptionId = null) }
             s.copy(servers = s.servers + added,
                 settings = if (s.settings.selectedServerId == null) s.settings.copy(selectedServerId = first) else s.settings)
         }
@@ -512,7 +519,7 @@ class AppController(
                 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
                 val pool = Dispatchers.IO.limitedParallelism(16)
                 val results: Map<Long, Int> = coroutineScope {
-                    servers.map { p -> async(pool) { p.id to Ping.tcp(p.address, p.port) } }.awaitAll().toMap()
+                    servers.map { p -> async(pool) { p.id to Ping.profile(p) } }.awaitAll().toMap()
                 }
                 mutate { s -> s.copy(servers = s.servers.map { p -> results[p.id]?.let { p.copy(pingMs = it) } ?: p }) }
             } finally {

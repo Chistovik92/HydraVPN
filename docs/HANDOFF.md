@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.8.0-rc3** — пре-релиз «Мои серверы» (`app/build.gradle.kts` → `versionName`); последний выпуск — 0.7.20
+- Текущая версия: **0.8.0-rc4** — пре-релиз «Мои серверы» сервер-сначала (`app/build.gradle.kts` → `versionName`, versionCode 67); последний выпуск — 0.7.20; ветка панелей — 0.8.1-b. Причины и проверка rc4 — `docs/versions/0.8.0-rc4.md`
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -68,7 +68,7 @@
 
 ## Дорожная карта
 
-Вынесена в [`docs/ROADMAP.md`](ROADMAP.md) (19.09.2026, упорядочена 08.10.2026): план 0.7.11 (OpenFlux как в официальных клиентах, TestFlight, скорость, идеи Meridian — `docs/plans/0.7.11.md`), 0.7.13 (обход DPI, полная маршрутизация как на роутерах и geo-базы динамическим слоем — `docs/plans/0.7.13.md`; номер 0.7.12 пропущен по решению владельца), 0.8.0 → 0.8.4, выпущенные этапы по порядку, фазы 8–13 и дословная история фаз 0–7. Хронология всех версий с коммитами и журнал идей — [`docs/HISTORY.md`](HISTORY.md). Открытые технические задачи — ниже, в «Открытых задачах (TODO)».
+Вынесена в [`docs/ROADMAP.md`](ROADMAP.md) (19.09.2026, упорядочена 08.10.2026): план 0.7.11 (OpenFlux как в официальных клиентах, TestFlight, скорость, идеи Meridian — `docs/versions/0.7.11.md`), 0.7.13 (обход DPI, полная маршрутизация как на роутерах и geo-базы динамическим слоем — `docs/versions/0.7.13.md`; номер 0.7.12 пропущен по решению владельца), 0.8.0 → 0.8.4, выпущенные этапы по порядку, фазы 8–13 и дословная история фаз 0–7. Хронология всех версий с коммитами и журнал идей — [`docs/HISTORY.md`](HISTORY.md). Открытые технические задачи — ниже, в «Открытых задачах (TODO)».
 
 ## Открытые задачи (TODO)
 
@@ -178,11 +178,16 @@ desktop/src/lite/…           Hydra Classic (Swing, Windows 7/32-бит, Linux 
 ios/                         SwiftUI + Network Extension: Hydra/ (экраны), HydraTunnel/, HydraAWG/, Packages/HydraKit (общая логика), Packages/CiaDPI, Bridge/ (gomobile)
 scripts/                     release.sh, build-{awg,olcrtc,openflux,byedpi}.sh, check-updates.sh, package-*.sh, desktop-e2e.sh
 docs/   ROUTING · PROTOCOLS · SECURITY · BUILD · ARCHITECTURE · SERVICES · PANELS · ECOSYSTEM · MULTIPLATFORM · ROADMAP · HISTORY · HANDOFF_ROUTERS …
-CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.7.20 (главный источник контекста)
+CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.8.0-rc4 (главный источник контекста); docs/README.md — карта документации
 ```
 
 ## Честные оговорки
 
+- **0.8.0-rc4 — «Мои серверы» сервер-сначала; AmneziaWG и ByeDPI снова работают (пре-релиз).** Проверено: юнит-тесты Android (195), ПК (111),
+  HydraKit (`ManualLinkTests`, Swift в WSL); живой Linux (WSL): весь путь сервер-сначала до полной очистки и рукопожатие всех поколений AWG; эмулятор
+  Android 15 (полный APK): ByeDPI и AWG передают трафик, «Мои серверы» — добавление с сохранённым входом, установка, пинг, очистка. **Не проверено:**
+  настоящий VPS, телефон владельца, ПК вживую с VPS, экран ручного ввода iOS (только сборка в CI). На ПК подключение к AmneziaWG по-прежнему не
+  поддерживается. Причины всех исправлений — `docs/versions/0.8.0-rc4.md`.
 - **0.8.0-rc1 — «Мои серверы» (пре-релиз).** Проверено: юнит-тесты; живая установка AmneziaWG всех четырёх поколений по SSH на Linux (WSL Ubuntu, amd64) с рукопожатием и пингом; мастер целиком (`MyServersTest`); Android на эмуляторе (вход по SSH с JSch + BouncyCastle, установка, список). **Не проверено:** настоящий VPS (x64 и arm64), серверные бинари arm64 / armv7 (их собирает только CI), узел OpenFlux с живыми транспортами, iOS (его в 0.8.0 нет). 0.8.1 (панели) — только план, не начато.
 - **0.7.20 — TG WS и iOS-паритет.** Проверено: юнит-тесты ПК и HydraKit (83), живые тесты против серверов Telegram (`HYDRA_LIVE_TGWS=1`): ответ DC в режимах obfuscated,
   открытый abridged и MTProto-прокси; iOS CI собрал приложение и расширение. **Не проверено:** сессия Telegram на телефоне Android (причина «Недоступен» установлена по поведению

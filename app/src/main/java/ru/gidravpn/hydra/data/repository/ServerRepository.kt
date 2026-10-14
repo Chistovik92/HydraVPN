@@ -24,6 +24,16 @@ class ServerRepository(context: Context) {
     suspend fun delete(server: ServerProfile) = servers.delete(server)
     suspend fun byId(id: Long) = servers.byId(id)
 
+    /**
+     * 0.8.0-rc4: профили AmneziaWG, сохранённые до исправления как «WireGuard» (вставленный .conf, сервер из «Моих серверов»):
+     * параметры обфускации в них есть, но тип был неверный, и sing-box не мог сделать рукопожатие. Тип исправляется на месте.
+     * @return сколько профилей исправлено.
+     */
+    suspend fun fixMislabeledAmnezia(): Int = servers.getAll()
+        .filter { it.protocolId == ru.gidravpn.hydra.data.model.Protocol.WIREGUARD.id &&
+            runCatching { ru.gidravpn.hydra.data.subscription.WireGuardParser.hasAwgParams(org.json.JSONObject(it.extra)) }.getOrDefault(false) }
+        .count { runCatching { servers.upsert(it.copy(protocolId = ru.gidravpn.hydra.data.model.Protocol.AMNEZIAWG.id)) }.isSuccess }
+
     /** Импорт одиночной ссылки (vless:// … ) из буфера обмена или deep-link. */
     suspend fun importLink(link: String): ServerProfile? =
         LinkParser.parseLine(link.trim())?.also { servers.upsert(it) }
