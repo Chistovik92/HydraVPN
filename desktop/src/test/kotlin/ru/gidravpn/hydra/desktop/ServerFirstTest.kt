@@ -55,6 +55,15 @@ class ServerFirstTest {
         assertNull(r3.awg); assertTrue(r3.clients.isEmpty())
     }
 
+    /** Запись не теряет поля более новой версии (например, `panel` из 0.8.1) при пересохранении. */
+    @Test fun unknownFieldsSurviveRoundTrip() {
+        val json = org.json.JSONObject().put("id", "1").put("name", "n").put("host", "h").put("fingerprint", "SHA256:x")
+            .put("panel", org.json.JSONObject().put("kind", "XUI3")).put("clients", org.json.JSONArray())
+        val back = MyServer.fromJson(json).copy(name = "renamed").toJson()
+        assertEquals("XUI3", back.getJSONObject("panel").getString("kind"))
+        assertEquals("renamed", back.getString("name"))
+    }
+
     @Test fun vaultEncryptsAndSurvivesReload() {
         val dir = kotlin.io.path.createTempDirectory("vault").toFile()
         val v = FileVault(File(dir, "v.dat"), KeyFileCipher(File(dir, "v.key")))
