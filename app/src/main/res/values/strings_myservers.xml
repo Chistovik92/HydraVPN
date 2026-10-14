@@ -189,4 +189,21 @@
     <string name="ms_xui_https">HTTPS for the panel and subscription: a free Let\'s Encrypt certificate for the server IP (needs port 80/tcp open)</string>
     <string name="ms_panel_https">Enable HTTPS</string>
     <string name="ms_xui_transport">Transport (gRPC recommended)</string>
+    <!-- 0.8.1-rc2: встроенный сайт панели, закрытие порта, HTTPS у s-ui/x-ui -->
+    <string name="ms_open_browser">In browser</string>
+    <string name="ms_web_close">Close</string>
+    <string name="ms_web_logging_in">Signing in to the panel…</string>
+    <string name="ms_web_login_failed">Could not sign in automatically — the password is copied for 30 seconds, paste it into the field</string>
+    <string name="ms_panel_local">The panel is closed from outside: its website opens only through Hydra, over a secure tunnel to the server.</string>
+    <string name="ms_tunnel_open">Tunnel open: %1$s</string>
+    <string name="ms_tunnel_close">Close tunnel</string>
+    <string name="ms_panel_close_ext">Close panel from outside</string>
+    <string name="ms_panel_close_q">Close the panel from outside?</string>
+    <string name="ms_panel_close_msg">The panel website will stop opening from the internet: Hydra will open it through a secure connection to the server. Users\' VPN connections keep working as before.</string>
+    <string name="ms_panel_close_btn">Close</string>
+    <string name="ms_panel_open_ext">Open panel to the outside</string>
+    <string name="ms_panel_open_q">Open the panel to the outside?</string>
+    <string name="ms_panel_open_msg">The panel website will open from the internet at its address again. It is better to enable HTTPS.</string>
+    <string name="ms_panel_open_btn">Open</string>
+    <string name="ms_panel_https_install">HTTPS for the panel: a free Let\'s Encrypt certificate for the server IP (needs port 80/tcp open; if it fails, the panel stays on HTTP)</string>
 </resources>

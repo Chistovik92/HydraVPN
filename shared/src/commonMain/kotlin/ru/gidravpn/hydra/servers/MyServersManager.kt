@@ -42,7 +42,7 @@ class ServiceForm(
     val autoupdate: Boolean = true,
     /** Панель 3x-ui: порт доступа (инбаунд VLESS+Reality), по умолчанию 443. */
     val accessPort: Int = 443,
-    /** Панель 3x-ui: HTTPS сертификатом Let's Encrypt на IP (0.8.1-rc1). */
+    /** HTTPS панели сертификатом Let's Encrypt на IP (3x-ui — 0.8.1-rc1, s-ui и x-ui — 0.8.1-rc2). */
     val sslIp: Boolean = true,
     /** Панель 3x-ui: под какой сайт маскируется Reality (0.8.1-rc1). */
     val mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK,
@@ -90,6 +90,8 @@ data class MyServersUi(
     val panelClients: Map<String, List<String>> = emptyMap(),
     /** Что показываем в окне: имя → конфиг клиента или ссылка. */
     val shown: Pair<String, String>? = null,
+    /** Открытые туннели к закрытым извне панелям (0.8.1-rc2): id сервера → адрес панели на этом устройстве. */
+    val tunnels: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -317,7 +319,7 @@ class MyServersManager(
                     val spec = OtherPanels.spec(f.kind.panel!!)!!
                     _ui.update { it.copy(progress = "Узнаю последнюю версию ${spec.kind.title}…") }
                     panelTag = OtherPanels.latestTag(spec)
-                    service.planPreviewPanel(spec.kind, panelTag, f.openFirewall, pre)
+                    service.planPreviewPanel(spec.kind, panelTag, f.openFirewall, pre, f.sslIp, srv.host)
                 }
             }
             update(srv.copy(osName = pre.osName.ifBlank { srv.osName }, arch = pre.arch))
@@ -342,7 +344,7 @@ class MyServersManager(
                 ServerKind.OPENFLUX -> service.deployOfx(ssh, srv, f.channel, f.vyandex, f.mailru, f.cupsonline, f.autoupdate, inst, ::log)
                 ServerKind.PANEL_3XUI -> service.deployXui(ssh, srv, xuiTag.ifBlank { XuiPanel.latestTag() }, f.accessPort, f.openFirewall, pre, inst, f.sslIp, f.mask, f.transport, ::log)
                 ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> service.deployPanel(srv, f.kind.panel!!,
-                    panelTag.ifBlank { OtherPanels.latestTag(OtherPanels.spec(f.kind.panel!!)!!) }, f.openFirewall, pre, inst)
+                    panelTag.ifBlank { OtherPanels.latestTag(OtherPanels.spec(f.kind.panel!!)!!) }, f.openFirewall, pre, inst, f.sslIp, ::log)
             }
             when (res) {
                 is DeployResult.Ok -> {
@@ -387,13 +389,73 @@ class MyServersManager(
         log("Служба перезапущена")
     }
 
-    /** HTTPS для панели 3x-ui на своём сервере: сертификат на IP (0.8.1-rc1). */
+    /** HTTPS для панели на своём сервере: сертификат на IP (3x-ui — 0.8.1-rc1, s-ui и x-ui — 0.8.1-rc2). */
     fun enablePanelHttps(id: String, openFirewall: Boolean = true) = op(id, "Получаю сертификат для панели…") { srv, ssh, inst ->
         val pre = service.preflight(ssh, 0)
-        val upd = service.enableXuiHttps(srv, pre, openFirewall, inst) ?: throw OpFailed(_ui.value.error ?: "Сертификат получить не удалось")
+        val upd = service.enablePanelHttps(srv, pre, openFirewall, inst) ?: throw OpFailed(_ui.value.error ?: "Сертификат получить не удалось")
         update(upd)
         log("Готово: панель и подписка работают по HTTPS — ${upd.panel?.baseUrl}")
     }
+
+    /**
+     * Закрыть порт панели извне ([local] = true) или открыть снова (0.8.1-rc2). Закрытая панель открывается через SSH-туннель
+     * ([openPanelTunnel]); пользователи 3x-ui — по SSH.
+     */
+    fun setPanelLocal(id: String, local: Boolean) = op(id, if (local) "Закрываю панель извне…" else "Открываю панель для входа извне…") { srv, ssh, inst ->
+        closePanelTunnel(id)
+        val pre = service.preflight(ssh, 0)
+        val upd = service.setPanelLocal(srv, local, pre, inst) ?: throw OpFailed(_ui.value.error ?: "Не получилось изменить доступ к панели")
+        update(upd)
+        log(if (local) "Готово: панель доступна только с самого сервера. Сайт панели Hydra откроет через защищённый туннель."
+            else "Готово: панель снова открывается по адресу ${upd.panel?.baseUrl}")
+    }
+
+    // ================================================================================================ Туннель к закрытой панели
+
+    private val tunnels = java.util.concurrent.ConcurrentHashMap<String, SshSession>()
+
+    /**
+     * Открыть туннель к панели, закрытой извне (0.8.1-rc2): порт 127.0.0.1 на устройстве ведёт на 127.0.0.1:порт панели на
+     * сервере по SSH. Адрес для браузера или WebView — в [MyServersUi.tunnels]. Туннель живёт до [closePanelTunnel].
+     */
+    fun openPanelTunnel(id: String) {
+        val srv = find(id)?.takeIf { it.panel != null && it.fingerprint.isNotBlank() } ?: return
+        if (tunnels.containsKey(id) || _ui.value.busy) return
+        val t = store.load(id)?.target(srv) ?: memLogins[id]
+        if (t == null) { askLogin(id, "Открываю туннель к панели…", null) { openTunnelWith(id, it) }; return }
+        openTunnelWith(id, t)
+    }
+
+    private fun openTunnelWith(id: String, t: SshTarget) {
+        val srv = find(id) ?: return
+        val panel = srv.panel ?: return
+        _ui.update { it.copy(busy = true, opServer = id, error = null, progress = "Открываю защищённый туннель к панели…") }
+        scope.launch(Dispatchers.IO) {
+            try {
+                val ssh = SshConnector.connect(t, srv.fingerprint)
+                val port = try { ssh.forwardLocal(PanelWeb.remotePort(panel.baseUrl)) } catch (e: Exception) { ssh.close(); throw e }
+                tunnels.put(id, ssh)?.close()
+                _ui.update { it.copy(busy = false, progress = "", tunnels = it.tunnels + (id to PanelWeb.tunnelUrl(panel.baseUrl, port))) }
+            } catch (e: Exception) {
+                if (isAuthError(e)) {
+                    store.remove(id); memLogins.remove(id); refreshSaved()
+                    _ui.update { it.copy(busy = false, progress = "") }
+                    askLogin(id, "Открываю туннель к панели…", "Сервер не принял сохранённые данные входа — введите новые") { openTunnelWith(id, it) }
+                    return@launch
+                }
+                _ui.update { it.copy(busy = false, progress = "", error = "Туннель к панели не открылся: ${e.message}") }
+            }
+        }
+    }
+
+    /** Закрыть туннель к панели (экран панели закрыт, панель снова открыта извне, сервер забыт). */
+    fun closePanelTunnel(id: String) {
+        tunnels.remove(id)?.let { runCatching { it.close() } }
+        if (id in _ui.value.tunnels) _ui.update { it.copy(tunnels = it.tunnels - id) }
+    }
+
+    /** Закрыть все туннели (выход из приложения). */
+    fun closeAllTunnels() = tunnels.keys.toList().forEach(::closePanelTunnel)
 
     fun uninstallService(id: String, kind: ServerKind) = op(id, "Удаляю службу с сервера…") { srv, _, inst ->
         val upd = when (kind) {
@@ -420,6 +482,7 @@ class MyServersManager(
 
     /** Убрать сервер из приложения (на самом сервере ничего не меняется) и забыть данные входа. */
     fun forget(id: String) {
+        closePanelTunnel(id)
         save(servers().filterNot { it.id == id })
         store.remove(id); memLogins.remove(id); refreshSaved()
         _ui.update { it.copy(status = it.status - id, opServer = if (it.opServer == id) null else it.opServer) }
@@ -453,6 +516,14 @@ class MyServersManager(
         val srv = find(id)?.takeIf { it.panel != null } ?: return
         if (_ui.value.busy) return
         val panel = srv.panel!!
+        // порт панели закрыт извне (0.8.1-rc2): API — curl на самом сервере по SSH
+        if (panel.local && srv.fingerprint.isNotBlank()) return op(id, "Обращаюсь к панели через сервер…") { s, ssh, inst ->
+            val p = s.panel ?: return@op
+            inst.addSecret(p.token)
+            val u = java.net.URL(p.baseUrl)
+            try { work(s, XuiApi(SshXuiTransport(ssh, "${u.protocol}://127.0.0.1:${u.port}${u.path}", p.token, u.host.removePrefix("[").removeSuffix("]")))) }
+            catch (e: XuiApiException) { throw OpFailed("Панель: ${e.message}") }
+        }
         _ui.update { it.copy(busy = true, opServer = id, error = null, log = emptyList()) }
         scope.launch(Dispatchers.IO) {
             try { work(srv, XuiApi(DirectXuiTransport(panel.baseUrl, panel.token))) }

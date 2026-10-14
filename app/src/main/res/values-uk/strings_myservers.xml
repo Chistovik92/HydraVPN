@@ -188,4 +188,21 @@
     <string name="ms_xui_https">HTTPS для панелі й підписки: безкоштовний сертифікат Let\'s Encrypt на IP сервера (потрібен відкритий 80/tcp)</string>
     <string name="ms_panel_https">Увімкнути HTTPS</string>
     <string name="ms_xui_transport">Транспорт (радимо gRPC)</string>
+    <!-- 0.8.1-rc2: встроенный сайт панели, закрытие порта, HTTPS у s-ui/x-ui -->
+    <string name="ms_open_browser">У браузері</string>
+    <string name="ms_web_close">Закрити</string>
+    <string name="ms_web_logging_in">Входжу в панель…</string>
+    <string name="ms_web_login_failed">Увійти автоматично не вдалося — пароль скопійовано на 30 секунд, вставте його в поле</string>
+    <string name="ms_panel_local">Панель закрита ззовні: її сайт відкривається лише через Hydra — захищеним тунелем до сервера.</string>
+    <string name="ms_tunnel_open">Тунель відкрито: %1$s</string>
+    <string name="ms_tunnel_close">Закрити тунель</string>
+    <string name="ms_panel_close_ext">Закрити панель ззовні</string>
+    <string name="ms_panel_close_q">Закрити панель ззовні?</string>
+    <string name="ms_panel_close_msg">Сайт панелі перестане відкриватися з інтернету: Hydra відкриватиме його через захищене підключення до сервера. VPN-підключення користувачів працюють як раніше.</string>
+    <string name="ms_panel_close_btn">Закрити</string>
+    <string name="ms_panel_open_ext">Відкрити панель ззовні</string>
+    <string name="ms_panel_open_q">Відкрити панель ззовні?</string>
+    <string name="ms_panel_open_msg">Сайт панелі знову відкриватиметься за своєю адресою з інтернету. Краще ввімкнути HTTPS.</string>
+    <string name="ms_panel_open_btn">Відкрити</string>
+    <string name="ms_panel_https_install">HTTPS для панелі: безкоштовний сертифікат Let\'s Encrypt на IP сервера (потрібен відкритий 80/tcp; не вийде — панель лишиться на HTTP)</string>
 </resources>

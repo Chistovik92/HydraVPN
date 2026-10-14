@@ -447,20 +447,40 @@ private fun PanelSection(c: AppController, srv: MyServer, st: ServerStatus?, m: 
 private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: MyServersUi, onAddUser: () -> Unit) {
     val p = srv.panel ?: return
     val busy = s.busy
+    val ssh = srv.fingerprint.isNotBlank()
+    val local = p.local && ssh
+    val tunnel = s.tunnels[srv.id]
+    var openWhenReady by remember { mutableStateOf(false) }
+    var askLocal by remember { mutableStateOf<Boolean?>(null) }
+    val open = { url: String ->
+        if (p.password.isNotBlank()) { copySecret(p.password); c.toast("Пароль скопирован на 30 секунд — вставьте его на странице входа") }
+        openUrl(url)
+    }
+    // закрытая извне панель (0.8.1-rc2): сайт — через SSH-туннель; адрес туннеля приходит после подключения к серверу
+    LaunchedEffect(tunnel, openWhenReady) { if (openWhenReady && tunnel != null) { openWhenReady = false; open(tunnel) } }
     SelectionContainer { Text("Адрес: ${p.baseUrl}" + (if (p.username.isNotBlank()) "\nЛогин: ${p.username}" else ""), fontFamily = FontFamily.Monospace, fontSize = 12.sp) }
+    if (local) Text("Панель закрыта извне: её сайт открывается только через Hydra — по защищённому туннелю к серверу." +
+        if (XuiPanel.isHttps(p.baseUrl)) " Браузер предупредит о сертификате: он выписан на IP сервера, а туннель открыт на 127.0.0.1 — это ожидаемо, соединение защищено SSH." else "",
+        fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+    if (tunnel != null) Text("Туннель открыт: $tunnel", fontFamily = FontFamily.Monospace, fontSize = 11.sp)
     if (!XuiPanel.isHttps(p.baseUrl)) {
         Text("Панель открывается по http:// — пароль на сайте идёт без шифрования, а провайдер может обрывать такие страницы. " +
             "Включите HTTPS (бесплатный сертификат Let's Encrypt на IP сервера) или входите при включённом VPN.",
             fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        // сертификат ставится по SSH — только у панели на своём сервере (у подключённой по токену SSH нет)
-        if (p.kind == ru.gidravpn.hydra.servers.PanelKind.XUI3 && srv.fingerprint.isNotBlank())
-            OutlinedButton(onClick = { m.enablePanelHttps(srv.id) }, enabled = !busy) { Text("Включить HTTPS") }
+        // сертификат ставится по SSH — только у панели на своём сервере (у подключённой по токену SSH нет); с rc2 — у всех трёх
+        if (ssh) OutlinedButton(onClick = { m.enablePanelHttps(srv.id) }, enabled = !busy) { Text("Включить HTTPS") }
     }
     ChipRow {
-        if (p.password.isNotBlank()) {
-            Button(onClick = { copySecret(p.password); openUrl(p.baseUrl); c.toast("Пароль скопирован на 30 секунд — вставьте его на странице входа") }) { Text("Открыть панель") }
-            OutlinedButton(onClick = { copySecret(p.password); c.toast("Пароль скопирован на 30 секунд") }) { Text("Скопировать пароль") }
-        } else Button(onClick = { openUrl(p.baseUrl) }) { Text("Открыть панель") }
+        Button(onClick = {
+            when {
+                !local -> open(p.baseUrl)
+                tunnel != null -> open(tunnel)
+                else -> { openWhenReady = true; m.openPanelTunnel(srv.id) }
+            }
+        }, enabled = !(local && tunnel == null && busy)) { Text("Открыть панель") }
+        if (p.password.isNotBlank()) OutlinedButton(onClick = { copySecret(p.password); c.toast("Пароль скопирован на 30 секунд") }) { Text("Скопировать пароль") }
+        if (tunnel != null) OutlinedButton(onClick = { m.closePanelTunnel(srv.id) }) { Text("Закрыть туннель") }
+        if (ssh) OutlinedButton(onClick = { askLocal = !p.local }, enabled = !busy) { Text(if (p.local) "Открыть панель извне" else "Закрыть панель извне") }
         // пользователи через API — только у 3x-ui (токен); у s-ui и x-ui — на сайте панели
         if (p.token.isNotBlank()) {
             OutlinedButton(onClick = { m.loadPanelClients(srv.id) }, enabled = !busy) { Text("Пользователи") }
@@ -469,6 +489,14 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
     }
     if (p.token.isBlank()) Text("Пользователей и подключения заводите на сайте панели; ссылку подключения из панели можно вставить в «Серверы».",
         fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    askLocal?.let { close ->
+        AlertDialog(onDismissRequest = { askLocal = null },
+            title = { Text(if (close) "Закрыть панель извне?" else "Открыть панель извне?") },
+            text = { Text(if (close) "Сайт панели перестанет открываться из интернета: Hydra будет открывать его через защищённое подключение к серверу. VPN-подключения пользователей работают как прежде."
+                else "Сайт панели снова будет открываться по своему адресу из интернета. Лучше включить HTTPS.") },
+            confirmButton = { TextButton(onClick = { askLocal = null; m.setPanelLocal(srv.id, close) }) { Text(if (close) "Закрыть" else "Открыть") } },
+            dismissButton = { TextButton(onClick = { askLocal = null }) { Text("Отмена") } })
+    }
     s.panelClients[srv.id]?.let { emails ->
         if (emails.isEmpty()) Text("Пользователей пока нет.", fontSize = 12.sp)
         emails.forEach { email ->
@@ -561,9 +589,13 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(when (kind) { ServerKind.AMNEZIAWG -> "Установка AmneziaWG"; ServerKind.OPENFLUX -> "Установка узла OpenFlux"; else -> "Установка панели ${kind.panel!!.title}" }, fontWeight = FontWeight.SemiBold)
-            if (kind == ServerKind.PANEL_SUI || kind == ServerKind.PANEL_XUI)
+            if (kind == ServerKind.PANEL_SUI || kind == ServerKind.PANEL_XUI) {
                 Text("Hydra поставит последнюю версию ${kind.panel!!.title} официальным установщиком и задаст надёжный логин, пароль и случайный адрес панели. Пользователей вы заведёте на сайте панели.",
                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(sslIp, { sslIp = it }); Text("HTTPS для панели: бесплатный сертификат Let's Encrypt на IP (нужен открытый 80/tcp; не выйдет — панель останется на HTTP)", fontSize = 13.sp)
+                }
+            }
             if (kind == ServerKind.PANEL_3XUI) {
                 Text("Hydra поставит последнюю версию 3x-ui официальным установщиком, придумает надёжный логин и пароль, создаст подключение " +
                     "VLESS + gRPC + Reality и первого пользователя, а в «Серверы» добавит его подписку — правки на сайте панели будут приходить сами.",
@@ -633,7 +665,7 @@ private fun InstallPanel(i: ru.gidravpn.hydra.servers.InstallUi, s: MyServersUi,
                         }
                     }
                     Text("Что будет сделано:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    FriendlyText.planSentences(i.form.kind, i.form.openFirewall).forEachIndexed { n, t -> Text("${n + 1}. $t", fontSize = 13.sp) }
+                    FriendlyText.planSentences(i.form.kind, i.form.openFirewall, ru.gidravpn.hydra.servers.UiLang.RU, https = i.form.sslIp).forEachIndexed { n, t -> Text("${n + 1}. $t", fontSize = 13.sp) }
                     TextButton(onClick = { details = !details }) { Text(if (details) "Скрыть команды" else "Показать команды") }
                     if (details) SelectionContainer {
                         Column {

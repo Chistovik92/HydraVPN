@@ -188,4 +188,21 @@
     <string name="ms_xui_https">HTTPS برای پنل و اشتراک: گواهی رایگان Let\'s Encrypt برای IP سرور (پورت 80/tcp باید باز باشد)</string>
     <string name="ms_panel_https">فعال‌سازی HTTPS</string>
     <string name="ms_xui_transport">ترابری (gRPC توصیه می‌شود)</string>
+    <!-- 0.8.1-rc2: встроенный сайт панели, закрытие порта, HTTPS у s-ui/x-ui -->
+    <string name="ms_open_browser">در مرورگر</string>
+    <string name="ms_web_close">بستن</string>
+    <string name="ms_web_logging_in">در حال ورود به پنل…</string>
+    <string name="ms_web_login_failed">ورود خودکار ممکن نشد — رمز عبور برای ۳۰ ثانیه کپی شد، آن را در کادر وارد کنید</string>
+    <string name="ms_panel_local">پنل از بیرون بسته است: وب‌سایت آن فقط از طریق Hydra و با تونل امن به سرور باز می‌شود.</string>
+    <string name="ms_tunnel_open">تونل باز است: %1$s</string>
+    <string name="ms_tunnel_close">بستن تونل</string>
+    <string name="ms_panel_close_ext">بستن پنل از بیرون</string>
+    <string name="ms_panel_close_q">پنل از بیرون بسته شود؟</string>
+    <string name="ms_panel_close_msg">وب‌سایت پنل دیگر از اینترنت باز نمی‌شود: Hydra آن را از طریق اتصال امن به سرور باز می‌کند. اتصال‌های VPN کاربران مثل قبل کار می‌کنند.</string>
+    <string name="ms_panel_close_btn">بستن</string>
+    <string name="ms_panel_open_ext">باز کردن پنل به بیرون</string>
+    <string name="ms_panel_open_q">پنل به بیرون باز شود؟</string>
+    <string name="ms_panel_open_msg">وب‌سایت پنل دوباره با نشانی خودش از اینترنت باز می‌شود. بهتر است HTTPS را فعال کنید.</string>
+    <string name="ms_panel_open_btn">باز کردن</string>
+    <string name="ms_panel_https_install">HTTPS برای پنل: گواهی رایگان Let\'s Encrypt برای IP سرور (پورت 80/tcp باید باز باشد؛ اگر نشد، پنل روی HTTP می‌ماند)</string>
 </resources>

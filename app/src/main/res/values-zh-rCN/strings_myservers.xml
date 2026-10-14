@@ -188,4 +188,21 @@
     <string name="ms_xui_https">面板和订阅使用 HTTPS：为服务器 IP 申请免费的 Let\'s Encrypt 证书（需要开放 80/tcp）</string>
     <string name="ms_panel_https">启用 HTTPS</string>
     <string name="ms_xui_transport">传输方式（推荐 gRPC）</string>
+    <!-- 0.8.1-rc2: встроенный сайт панели, закрытие порта, HTTPS у s-ui/x-ui -->
+    <string name="ms_open_browser">在浏览器中</string>
+    <string name="ms_web_close">关闭</string>
+    <string name="ms_web_logging_in">正在登录面板…</string>
+    <string name="ms_web_login_failed">无法自动登录——密码已复制 30 秒，请粘贴到输入框</string>
+    <string name="ms_panel_local">面板已对外关闭：其网站只能通过 Hydra 经由到服务器的安全隧道打开。</string>
+    <string name="ms_tunnel_open">隧道已打开：%1$s</string>
+    <string name="ms_tunnel_close">关闭隧道</string>
+    <string name="ms_panel_close_ext">对外关闭面板</string>
+    <string name="ms_panel_close_q">要对外关闭面板吗？</string>
+    <string name="ms_panel_close_msg">面板网站将无法再从互联网打开：Hydra 会通过到服务器的安全连接打开它。用户的 VPN 连接照常工作。</string>
+    <string name="ms_panel_close_btn">关闭</string>
+    <string name="ms_panel_open_ext">对外开放面板</string>
+    <string name="ms_panel_open_q">要对外开放面板吗？</string>
+    <string name="ms_panel_open_msg">面板网站将再次可以通过其地址从互联网打开。建议启用 HTTPS。</string>
+    <string name="ms_panel_open_btn">开放</string>
+    <string name="ms_panel_https_install">面板 HTTPS：为服务器 IP 申请免费的 Let\'s Encrypt 证书（需开放 80/tcp；失败时面板保持 HTTP）</string>
 </resources>

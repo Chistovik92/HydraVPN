@@ -32,15 +32,20 @@ data class PanelInstance(
     /** Созданный мастером инбаунд и клиент (для списка и удаления). */
     val inboundId: Int = 0,
     val clientEmail: String = "",
+    /**
+     * Порт панели закрыт извне (0.8.1-rc2): панель слушает только 127.0.0.1 сервера; сайт открывается через SSH-туннель
+     * приложения, API 3x-ui — `curl` на сервере по SSH. [baseUrl] остаётся внешним адресом (на него выписан сертификат).
+     */
+    val local: Boolean = false,
 ) {
     fun toJson(): JSONObject = JSONObject().put("kind", kind.name).put("baseUrl", baseUrl).put("user", username).put("password", password)
-        .put("token", token).put("version", version).put("inboundId", inboundId).put("client", clientEmail)
+        .put("token", token).put("version", version).put("inboundId", inboundId).put("client", clientEmail).put("local", local)
 
     companion object {
         fun fromJson(o: JSONObject) = PanelInstance(
             runCatching { PanelKind.valueOf(o.optString("kind", "XUI3")) }.getOrDefault(PanelKind.XUI3),
             o.getString("baseUrl"), o.optString("user"), o.optString("password"), o.getString("token"),
-            o.optString("version"), o.optInt("inboundId"), o.optString("client"),
+            o.optString("version"), o.optInt("inboundId"), o.optString("client"), o.optBoolean("local"),
         )
     }
 }
@@ -296,9 +301,21 @@ object XuiPanel {
      * сам по cron acme.sh) или на домен, если сервер добавлен по имени. Так же делает установщик 3x-ui (`setup_ip_certificate`):
      * acme.sh в режиме standalone на 80/tcp, файлы в [CERT_DIR], пути — командой `x-ui cert` (она ставит их и панели, и подписке).
      */
-    fun httpsSteps(host: String, openFirewall: Boolean, firewall: String): List<Step> = buildList {
+    fun httpsSteps(host: String, openFirewall: Boolean, firewall: String): List<Step> =
+        certIssueSteps(host, openFirewall, firewall, "x-ui") + certApplySteps(PanelKind.XUI3)
+
+    /**
+     * HTTPS для панели любого вида (0.8.1-rc2): общий выпуск сертификата ([certIssueSteps]) и установка его панели
+     * ([certApplySteps]). [port]/[path] — адрес панели на сервере: после перезапуска проверяется, что она отвечает по HTTPS.
+     */
+    fun httpsSteps(kind: PanelKind, host: String, openFirewall: Boolean, firewall: String, port: Int = 0, path: String = ""): List<Step> =
+        certIssueSteps(host, openFirewall, firewall, OtherPanels.serviceOf(kind)) + certApplySteps(kind, port, path)
+
+    /** Выпуск сертификата acme.sh в [CERT_DIR]; продление перезапускает службу [service]. */
+    fun certIssueSteps(host: String, openFirewall: Boolean, firewall: String, service: String): List<Step> = buildList {
         val ip = Regex("""^\d{1,3}(\.\d{1,3}){3}$""").matches(host)
         require(ip || Regex("""^[A-Za-z0-9.-]+$""").matches(host)) { "Неверный адрес $host" }
+        require(Regex("^[a-z-]+$").matches(service)) { "Неверная служба $service" }
         val h = Installer.shq(host)
         val acme = "~/.acme.sh/acme.sh"
         if (openFirewall) ServerOps.openPortStep(firewall, "80/tcp")?.let { add(Step("cert-fw80", "Открыть 80/tcp для выдачи и продления сертификата", it.command, rollback = it.rollback)) }
@@ -315,11 +332,27 @@ object XuiPanel {
             failHint = "Let's Encrypt не смог проверить сервер — порт 80 закрыт снаружи (файрвол хостинга?)"))
         add(Step("cert-install", "Установить сертификат в $CERT_DIR и настроить его продление",
             "mkdir -p $CERT_DIR && $acme --installcert --force -d $h --key-file $CERT_DIR/privkey.pem --fullchain-file $CERT_DIR/fullchain.pem " +
-                "--reloadcmd 'systemctl restart x-ui' >/dev/null 2>&1; chmod 600 $CERT_DIR/privkey.pem; test -s $CERT_DIR/fullchain.pem",
+                "--reloadcmd 'systemctl restart $service' >/dev/null 2>&1; chmod 600 $CERT_DIR/privkey.pem; test -s $CERT_DIR/fullchain.pem",
             failHint = "Файлы сертификата не появились"))
+    }
+
+    /**
+     * Отдать панели сертификат из [CERT_DIR]: 3x-ui и x-ui — своей командой `x-ui cert` (у 3x-ui она ставит его и подписке),
+     * у x-ui подписке и у s-ui (своей команды нет) — записью путей в таблицу настроек панели ([OtherPanels.settingsCommand]).
+     */
+    fun certApplySteps(kind: PanelKind, port: Int = 0, path: String = ""): List<Step> = buildList {
+        val crt = "$CERT_DIR/fullchain.pem"; val key = "$CERT_DIR/privkey.pem"
+        val svc = OtherPanels.serviceOf(kind)
+        val cmd = when (kind) {
+            PanelKind.XUI3 -> "/usr/local/x-ui/x-ui cert -webCert $crt -webCertKey $key >/dev/null"
+            PanelKind.XUI -> "/usr/local/x-ui/x-ui cert -webCert $crt -webCertKey $key >/dev/null && " +
+                OtherPanels.settingsCommand(kind, mapOf("subCertFile" to crt, "subKeyFile" to key))
+            PanelKind.SUI -> OtherPanels.settingsCommand(kind, mapOf("webCertFile" to crt, "webKeyFile" to key, "subCertFile" to crt, "subKeyFile" to key))
+        }
         add(Step("cert-panel", "Включить HTTPS у панели и подписки",
-            "/usr/local/x-ui/x-ui cert -webCert $CERT_DIR/fullchain.pem -webCertKey $CERT_DIR/privkey.pem >/dev/null && systemctl restart x-ui && sleep 2 && systemctl is-active x-ui",
+            "$cmd && systemctl restart $svc && sleep 2 && systemctl is-active $svc",
             accept = { it.out.lineSequence().any { l -> l.trim() == "active" } }, failHint = "Панель не запустилась с сертификатом"))
+        if (port > 0) add(OtherPanels.answersStep("cert-check", "Проверить: панель отвечает по HTTPS", "https", port, path))
     }
 
     /** Адрес панели на `https://` (тот же хост, порт и путь). */

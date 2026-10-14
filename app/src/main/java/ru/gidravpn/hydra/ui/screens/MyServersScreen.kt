@@ -58,6 +58,14 @@ import ru.gidravpn.hydra.ui.theme.*
 /** Действие, которое надо подтвердить (удаление, очистка, перезагрузка). */
 private class Confirm(val title: String, val text: String, val button: String, val run: () -> Unit)
 
+/** Открыть сайт панели внутри приложения (0.8.1-rc2): сервер, адрес (свой или туннеля), через туннель ли. */
+private val LocalConfirm = androidx.compose.runtime.staticCompositionLocalOf<(Confirm) -> Unit> { { } }
+
+private val LocalOpenWeb = androidx.compose.runtime.staticCompositionLocalOf<(MyServer, String, Boolean) -> Unit> { { _, _, _ -> } }
+
+/** Что открыто во встроенном окне панели. */
+private class WebOpen(val srv: MyServer, val url: String, val tunnel: Boolean)
+
 /**
  * «Мои серверы» (0.8.0; сервер-сначала с 0.8.0-rc4): добавить сервер (вход можно запомнить, зашифрованно) → на карточке
  * поставить AmneziaWG или узел OpenFlux → устройства, проверка, перезапуск, перезагрузка, удаление службы, полная очистка.
@@ -76,6 +84,7 @@ fun MyServersScreen(vm: MainViewModel, onBack: () -> Unit, mvm: MyServersViewMod
     var loginFor by remember { mutableStateOf<MyServer?>(null) }
     var connectPanel by remember { mutableStateOf(false) }
     var addUserFor by remember { mutableStateOf<MyServer?>(null) }
+    var web by remember { mutableStateOf<WebOpen?>(null) }
 
     val addedFmt = stringResource(R.string.ms_added, "%s")
     DisposableEffect(Unit) {
@@ -96,6 +105,7 @@ fun MyServersScreen(vm: MainViewModel, onBack: () -> Unit, mvm: MyServersViewMod
         }
     }
 
+    androidx.compose.runtime.CompositionLocalProvider(LocalOpenWeb provides { srv, url, tun -> web = WebOpen(srv, url, tun) }, LocalConfirm provides { confirm = it }) {
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Spacer(Modifier.height(8.dp))
@@ -127,6 +137,13 @@ fun MyServersScreen(vm: MainViewModel, onBack: () -> Unit, mvm: MyServersViewMod
             }
         }
         item { Spacer(Modifier.height(16.dp)) }
+    }
+    }
+
+    web?.let { w ->
+        w.srv.panel?.let { p ->
+            PanelWebDialog(p, w.url, w.tunnel) { web = null; if (w.tunnel) m.closePanelTunnel(w.srv.id) }
+        }
     }
 
     addClientFor?.let { srv ->
@@ -471,23 +488,39 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
     val clip = LocalClipboardManager.current
     val busy = s.busy
     val pwMsg = stringResource(R.string.ms_password_copied)
-    val open = { runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(p.baseUrl)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }; Unit }
+    val openWeb = LocalOpenWeb.current
+    val ssh = srv.fingerprint.isNotBlank()
+    val local = p.local && ssh
+    val tunnel = s.tunnels[srv.id]
+    // что сделать, когда туннель к закрытой панели откроется: открыть сайт внутри приложения или в браузере
+    var afterTunnel by remember { mutableStateOf<String?>(null) }
+    val browser = { url: String -> runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }; Unit }
+    val inBrowser = { url: String -> if (p.password.isNotBlank()) { copySecret(clip, p.password); Toast.makeText(ctx, pwMsg, Toast.LENGTH_LONG).show() }; browser(url) }
+    LaunchedEffect(tunnel, afterTunnel) {
+        val t = tunnel ?: return@LaunchedEffect
+        when (afterTunnel) { "web" -> openWeb(srv, t, true); "browser" -> inBrowser(t) }
+        afterTunnel = null
+    }
+    val via = { how: String -> if (!local) { if (how == "web") openWeb(srv, p.baseUrl, false) else inBrowser(p.baseUrl) }
+        else if (tunnel != null) { if (how == "web") openWeb(srv, tunnel, true) else inBrowser(tunnel) }
+        else if (!busy) { afterTunnel = how; m.openPanelTunnel(srv.id) } }
     SelectionContainer {
         Text(stringResource(R.string.ms_panel_address, p.baseUrl) + if (p.username.isNotBlank()) "\n" + stringResource(R.string.ms_panel_login, p.username) else "",
             fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = TextSecondary)
     }
+    if (local) Text(stringResource(R.string.ms_panel_local), color = Success, fontSize = 11.sp)
+    if (tunnel != null) Text(stringResource(R.string.ms_tunnel_open, tunnel), color = TextMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
     if (!XuiPanel.isHttps(p.baseUrl)) {
         Text(stringResource(R.string.ms_panel_http), color = TextMuted, fontSize = 11.sp)
-        // сертификат на IP ставится по SSH — только у панели на своём сервере (у подключённой по токену SSH нет)
-        if (p.kind == ru.gidravpn.hydra.servers.PanelKind.XUI3 && srv.fingerprint.isNotBlank())
-            MsRow { MsChip(stringResource(R.string.ms_panel_https), AccentCyan) { if (!busy) m.enablePanelHttps(srv.id) } }
+        // сертификат на IP ставится по SSH — только у панели на своём сервере (у подключённой по токену SSH нет); с rc2 — у всех трёх
+        if (ssh) MsRow { MsChip(stringResource(R.string.ms_panel_https), AccentCyan) { if (!busy) m.enablePanelHttps(srv.id) } }
     }
     Spacer(Modifier.height(6.dp))
     MsRow {
-        if (p.password.isNotBlank()) {
-            MsChip(stringResource(R.string.ms_open_panel), AccentCyan) { copySecret(clip, p.password); Toast.makeText(ctx, pwMsg, Toast.LENGTH_LONG).show(); open() }
-            MsChip(stringResource(R.string.ms_copy_password), TextSecondary) { copySecret(clip, p.password); Toast.makeText(ctx, pwMsg, Toast.LENGTH_SHORT).show() }
-        } else MsChip(stringResource(R.string.ms_open_panel), AccentCyan) { open() }
+        MsChip(stringResource(R.string.ms_open_panel), AccentCyan) { via("web") }
+        MsChip(stringResource(R.string.ms_open_browser), TextSecondary) { via("browser") }
+        if (p.password.isNotBlank()) MsChip(stringResource(R.string.ms_copy_password), TextSecondary) { copySecret(clip, p.password); Toast.makeText(ctx, pwMsg, Toast.LENGTH_SHORT).show() }
+        if (tunnel != null) MsChip(stringResource(R.string.ms_tunnel_close), TextSecondary) { m.closePanelTunnel(srv.id) }
         // пользователи через API — только у 3x-ui (токен); у s-ui и x-ui — на сайте панели
         if (p.token.isNotBlank()) {
             MsChip(stringResource(R.string.ms_panel_users), AccentViolet) { if (!busy) m.loadPanelClients(srv.id) }
@@ -495,6 +528,17 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
         }
     }
     if (p.token.isBlank()) Text(stringResource(R.string.ms_panel_site_only), color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+    // «ничего наружу без согласия» (0.8.1-rc2): панель слушает только сам сервер, сайт — через защищённый туннель
+    if (ssh) {
+        val onConfirm = LocalConfirm.current
+        MsRow {
+            if (!p.local) MsChip(stringResource(R.string.ms_panel_close_ext), TextSecondary) {
+                if (!busy) onConfirm(Confirm(ctx.getString(R.string.ms_panel_close_q), ctx.getString(R.string.ms_panel_close_msg), ctx.getString(R.string.ms_panel_close_btn)) { m.setPanelLocal(srv.id, true) })
+            } else MsChip(stringResource(R.string.ms_panel_open_ext), TextSecondary) {
+                if (!busy) onConfirm(Confirm(ctx.getString(R.string.ms_panel_open_q), ctx.getString(R.string.ms_panel_open_msg), ctx.getString(R.string.ms_panel_open_btn)) { m.setPanelLocal(srv.id, false) })
+            }
+        }
+    }
     s.panelClients[srv.id]?.let { emails ->
         if (emails.isEmpty()) Text(stringResource(R.string.ms_panel_no_users), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         emails.forEach { email ->
@@ -594,8 +638,13 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
                 ServerKind.OPENFLUX -> stringResource(R.string.ms_install_ofx_title)
                 else -> stringResource(R.string.ms_install_panel_title, kind.panel!!.title)
             }, color = TextPrimary, fontWeight = FontWeight.SemiBold)
-        if (kind == ServerKind.PANEL_SUI || kind == ServerKind.PANEL_XUI)
+        if (kind == ServerKind.PANEL_SUI || kind == ServerKind.PANEL_XUI) {
             Text(stringResource(R.string.ms_panel_other_hint, kind.panel!!.title), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
+            Row(Modifier.clickableNoRipple { sslIp = !sslIp }.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Checkbox(sslIp, { sslIp = it })
+                Text(stringResource(R.string.ms_panel_https_install), color = TextSecondary, fontSize = 13.sp)
+            }
+        }
         Spacer(Modifier.height(6.dp))
         if (kind == ServerKind.PANEL_3XUI) {
             Text(stringResource(R.string.ms_xui_hint), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
@@ -656,7 +705,7 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
 @Composable
 private fun InstallPanel(i: InstallUi, s: MyServersUi, m: MyServersManager, onClose: () -> Unit) {
     var details by remember { mutableStateOf(false) }
-    val en = !ruLocale()
+    val en = uiLang()
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, Border, RoundedCornerShape(14.dp)).padding(12.dp)) {
         Text(when (i.form.kind) {
                 ServerKind.AMNEZIAWG -> stringResource(R.string.ms_installing_awg, i.form.generation.label)
@@ -676,7 +725,7 @@ private fun InstallPanel(i: InstallUi, s: MyServersUi, m: MyServersManager, onCl
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(stringResource(R.string.ms_plan_title), color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                FriendlyText.planSentences(i.form.kind, i.form.openFirewall, en).forEachIndexed { n, t -> Text("${n + 1}. $t", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 3.dp)) }
+                FriendlyText.planSentences(i.form.kind, i.form.openFirewall, en, https = i.form.sslIp).forEachIndexed { n, t -> Text("${n + 1}. $t", color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 3.dp)) }
                 Spacer(Modifier.height(6.dp))
                 MsChip(stringResource(if (details) R.string.ms_details_hide else R.string.ms_details_show), TextSecondary) { details = !details }
                 if (details) SelectionContainer {
@@ -743,7 +792,7 @@ private fun Busy(text: String) = Row(verticalAlignment = Alignment.CenterVertica
 
 @Composable
 private fun ErrorBox(raw: String) {
-    val f = FriendlyText.explain(raw, !ruLocale())
+    val f = FriendlyText.explain(raw, uiLang())
     val clip = LocalClipboardManager.current
     var details by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Danger.copy(alpha = 0.08f)).border(1.dp, Danger.copy(alpha = 0.5f), RoundedCornerShape(12.dp)).padding(10.dp)) {
@@ -828,8 +877,9 @@ private fun MsField(label: String, value: String, secret: Boolean = false, singl
     )
 }
 
+/** Язык простых текстов и ошибок (0.8.1-rc2: и украинский, персидский, китайский). */
 @Composable
-private fun ruLocale(): Boolean = androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language == "ru"
+private fun uiLang(): ru.gidravpn.hydra.servers.UiLang = ru.gidravpn.hydra.servers.UiLang.of(androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language)
 
 @Composable
 private fun uptime(sec: Long): String = when {

@@ -173,9 +173,11 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
         val path = (res["XUI_WEB_BASE_PATH"] ?: params.webPath).trim('/')
         if (token.isBlank()) return DeployResult.Failed("Установщик не выдал API-токен (${XuiPanel.RESULT})")
         installer.addSecret(token)
-        // HTTPS: установщик пишет итоговый адрес в XUI_ACCESS_URL; если сертификат не выдался, панель осталась на http
-        val https = ssl && (res["XUI_ACCESS_URL"]?.startsWith("https://", true) == true ||
-            ssh.exec("test -s ${XuiPanel.CERT_DIR}/fullchain.pem && echo yes").out.trim() == "yes")
+        // HTTPS: XUI_ACCESS_URL установщик пишет с https:// даже тогда, когда сертификат не выдался (проверено в rc2 на стенде) —
+        // поэтому спрашиваем саму панель: отвечает ли она по https на сервере
+        // (панель поднимается несколько секунд; http-запрос к https-панели Go отвечает 400 — его успехом не считаем)
+        val https = ssl && ssh.exec("for i in \$(seq 1 20); do for s in https http; do c=\$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 \$s://127.0.0.1:$port/$path/); " +
+            "case \$c in 2*|3*) echo \$s; exit 0;; esac; done; sleep 2; done; echo none").out.trim().lines().lastOrNull() == "https"
         if (ssl) onLog(if (https) "Сертификат на IP выдан — панель и подписка по HTTPS" else "Сертификат выдать не удалось (порт 80 закрыт снаружи?) — панель пока по HTTP")
         val scheme = if (https) "https" else "http"
         val api = XuiApi(SshXuiTransport(ssh, "$scheme://127.0.0.1:$port/$path", token, srv.host))
@@ -205,13 +207,46 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
     }
 
     /**
-     * HTTPS для уже стоящей 3x-ui (0.8.1-rc1): сертификат Let's Encrypt на IP сервера (или на домен) — [XuiPanel.httpsSteps].
-     * Адрес панели в записи переходит на `https://`; подписки 3x-ui после этого тоже отдаются по HTTPS.
+     * HTTPS для уже стоящей панели (3x-ui — 0.8.1-rc1, s-ui и x-ui — 0.8.1-rc2): сертификат Let's Encrypt на IP сервера (или на
+     * домен) — [XuiPanel.httpsSteps]. Адрес панели в записи переходит на `https://`; подписки после этого тоже отдаются по HTTPS.
+     * Панель не поднялась с сертификатом — пути к нему стираются, панель возвращается на HTTP.
      */
-    fun enableXuiHttps(s: MyServer, pre: Preflight, openFirewall: Boolean, installer: Installer): MyServer? {
-        val panel = s.panel?.takeIf { it.kind == PanelKind.XUI3 } ?: return null
-        if (!installer.run(XuiPanel.httpsSteps(s.host.removePrefix("[").removeSuffix("]"), openFirewall, pre.firewall))) return null
+    fun enablePanelHttps(s: MyServer, pre: Preflight, openFirewall: Boolean, installer: Installer): MyServer? {
+        val panel = s.panel ?: return null
+        if (!issueAndApplyCert(s.host, panel, pre, openFirewall, installer)) return null
         val upd = panel.copy(baseUrl = XuiPanel.toHttps(panel.baseUrl))
+        installer.run(OtherPanels.stateSteps(upd))
+        return s.copy(panel = upd)
+    }
+
+    @Deprecated("0.8.1-rc2: для всех панелей", ReplaceWith("enablePanelHttps(s, pre, openFirewall, installer)"))
+    fun enableXuiHttps(s: MyServer, pre: Preflight, openFirewall: Boolean, installer: Installer): MyServer? =
+        s.panel?.takeIf { it.kind == PanelKind.XUI3 }?.let { enablePanelHttps(s, pre, openFirewall, installer) }
+
+    private fun issueAndApplyCert(host: String, panel: PanelInstance, pre: Preflight, openFirewall: Boolean, installer: Installer): Boolean {
+        val url = java.net.URL(panel.baseUrl)
+        val h = host.removePrefix("[").removeSuffix("]")
+        if (!installer.run(XuiPanel.certIssueSteps(h, openFirewall, pre.firewall, OtherPanels.serviceOf(panel.kind)))) return false
+        if (installer.run(XuiPanel.certApplySteps(panel.kind, url.port, url.path))) return true
+        installer.run(listOf(certRevertStep(panel.kind)))
+        return false
+    }
+
+    /** Вернуть панель на HTTP: пути к сертификату в её настройках стираются. */
+    fun certRevertStep(kind: PanelKind): Step {
+        val svc = OtherPanels.serviceOf(kind)
+        return Step("cert-revert", "Вернуть панель на HTTP (с сертификатом она не запустилась)",
+            OtherPanels.settingsCommand(kind, listOf("webCertFile", "webKeyFile", "subCertFile", "subKeyFile").associateWith { "" }) + "; systemctl restart $svc")
+    }
+
+    /**
+     * Закрыть порт панели извне или открыть снова (0.8.1-rc2) — [OtherPanels.listenSteps]. Закрытую панель приложение открывает
+     * через SSH-туннель, а API 3x-ui вызывает `curl`-ом на сервере.
+     */
+    fun setPanelLocal(s: MyServer, local: Boolean, pre: Preflight, installer: Installer): MyServer? {
+        val panel = s.panel ?: return null
+        if (!installer.run(OtherPanels.listenSteps(panel, local, pre.firewall))) return null
+        val upd = panel.copy(local = local)
         installer.run(OtherPanels.stateSteps(upd))
         return s.copy(panel = upd)
     }
@@ -244,19 +279,34 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
 
     // ---------------------------------------------------------------------------------------------------- s-ui, x-ui (0.8.1)
 
-    fun planPreviewPanel(kind: PanelKind, tag: String, openFirewall: Boolean, pre: Preflight): List<Step> {
+    fun planPreviewPanel(kind: PanelKind, tag: String, openFirewall: Boolean, pre: Preflight, sslIp: Boolean = false, host: String = ""): List<Step> {
         val s = OtherPanels.spec(kind) ?: return emptyList()
-        return OtherPanels.installSteps(s, OtherPanels.Params(tag, "••••", "••••", 0, "••••"), openFirewall, pre.firewall) +
+        val h = host.removePrefix("[").removeSuffix("]")
+        val cert = if (sslIp && ':' !in h && h.isNotBlank())
+            runCatching { XuiPanel.certIssueSteps(h, openFirewall, pre.firewall, s.service) + XuiPanel.certApplySteps(kind) }.getOrDefault(emptyList()) else emptyList()
+        return OtherPanels.installSteps(s, OtherPanels.Params(tag, "••••", "••••", 0, "••••"), openFirewall, pre.firewall) + cert +
             Step("panel-state", "Сохранить копию данных панели на сервере (только для root)")
     }
 
-    fun deployPanel(srv: MyServer, kind: PanelKind, tag: String, openFirewall: Boolean, pre: Preflight, installer: Installer): DeployResult {
+    /**
+     * Установка s-ui / x-ui. [sslIp] (0.8.1-rc2) — сразу HTTPS сертификатом Let's Encrypt на IP или имя сервера; не вышло
+     * (порт 80 закрыт снаружи) — панель остаётся на HTTP, сертификат можно получить позже кнопкой «Включить HTTPS».
+     */
+    fun deployPanel(srv: MyServer, kind: PanelKind, tag: String, openFirewall: Boolean, pre: Preflight, installer: Installer,
+                    sslIp: Boolean = false, onLog: (String) -> Unit = {}): DeployResult {
         val s = OtherPanels.spec(kind) ?: return DeployResult.Failed("Неизвестная панель")
         val p = OtherPanels.Params(tag)
         installer.addSecret(p.password); installer.addSecret(p.username)
         if (!installer.run(OtherPanels.installSteps(s, p, openFirewall, pre.firewall))) return DeployResult.Failed("Установка остановлена")
         val host = if (srv.host.contains(':')) "[${srv.host}]" else srv.host
-        val panel = PanelInstance(kind, "http://$host:${p.port}/${p.path}/", p.username, p.password, "", tag)
+        var panel = PanelInstance(kind, "http://$host:${p.port}/${p.path}/", p.username, p.password, "", tag)
+        // IPv6-адрес acme.sh standalone не проверит так же надёжно — сертификат только на IPv4 или имя
+        if (sslIp && ':' !in srv.host) {
+            if (issueAndApplyCert(srv.host, panel, pre, openFirewall, installer)) {
+                panel = panel.copy(baseUrl = XuiPanel.toHttps(panel.baseUrl))
+                onLog("Сертификат выдан — панель работает по HTTPS")
+            } else onLog("Сертификат выдать не удалось (порт 80 закрыт снаружи?) — панель пока по HTTP, HTTPS можно включить позже")
+        }
         installer.run(OtherPanels.stateSteps(panel))
         return DeployResult.Ok(srv.copy(panel = panel))
     }

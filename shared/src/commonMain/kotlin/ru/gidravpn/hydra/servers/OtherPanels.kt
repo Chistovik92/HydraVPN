@@ -94,6 +94,56 @@ object OtherPanels {
         "systemctl disable --now ${s.service} >/dev/null 2>&1; rm -f /etc/systemd/system/${s.service}.service; systemctl daemon-reload; " +
             "rm -rf /etc/${s.service} ${s.home} /usr/bin/${s.service}; rm -f ${s.mark} $PANEL_STATE"
 
+    /** Служба панели: 3x-ui и x-ui называются одинаково. */
+    fun serviceOf(kind: PanelKind) = if (kind == PanelKind.SUI) "s-ui" else "x-ui"
+
+    /** База настроек панели (SQLite; у всех трёх — таблица `settings(key, value)`). */
+    fun dbPath(kind: PanelKind) = ServerOps.PANEL_DBS.getValue(serviceOf(kind))
+
+    private val SAFE_VALUE = Regex("^[A-Za-z0-9./:_-]*$")
+
+    /**
+     * Записать настройки панели прямо в её базу (0.8.1-rc2): у s-ui нет команды для сертификата и адреса прослушивания,
+     * у x-ui и 3x-ui — для адреса и сертификата подписки. Строки, которых ещё нет (панель держит значение по умолчанию), добавляются.
+     * Нет `sqlite3` — ставится пакетом. Значения — только пути и адреса (проверяется), поэтому подставляются в SQL как есть.
+     */
+    fun settingsCommand(kind: PanelKind, values: Map<String, String>): String {
+        require(values.all { (k, v) -> Regex("^[A-Za-z]+$").matches(k) && SAFE_VALUE.matches(v) }) { "Недопустимое значение настройки" }
+        val sql = values.entries.joinToString(" ") { (k, v) ->
+            "UPDATE settings SET value='$v' WHERE key='$k'; INSERT INTO settings(key, value) SELECT '$k', '$v' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key='$k');"
+        }
+        return "(command -v sqlite3 >/dev/null || (apt-get install -y -q sqlite3 || (apt-get update -q && apt-get install -y -q sqlite3) || dnf install -y sqlite || yum install -y sqlite) >/dev/null 2>&1) && " +
+            "sqlite3 ${dbPath(kind)} ${Installer.shq(sql)}"
+    }
+
+    /** Шаг «панель отвечает на сервере» по `http`/`https` (сертификат на внешний адрес — `-k`). */
+    fun answersStep(id: String, title: String, scheme: String, port: Int, path: String) = Step(id, title,
+        "sleep 1; curl -sk -o /dev/null -w '%{http_code}\\n' --max-time 10 ${Installer.shq("$scheme://127.0.0.1:$port/${path.trim('/').let { if (it.isEmpty()) "" else "$it/" }}")}",
+        accept = { r -> r.out.lineSequence().any { it.trim().matches(Regex("[23]\\d\\d")) } }, failHint = "Панель не отвечает на порту $port")
+
+    /**
+     * Закрыть порт панели извне или открыть снова (0.8.1-rc2, «ничего наружу без согласия»): панель слушает только 127.0.0.1
+     * (`webListen`), правило файрвола, открытое Hydra, снимается. Подписка 3x-ui остаётся на своём порту — клиентам она нужна.
+     * Открыть снова — пустой `webListen` (все адреса) и порт в файрволе, если он включён.
+     */
+    fun listenSteps(p: PanelInstance, local: Boolean, firewall: String): List<Step> {
+        val url = java.net.URL(p.baseUrl)
+        val port = url.port.takeIf { it > 0 } ?: error("В адресе панели нет порта")
+        val svc = serviceOf(p.kind)
+        return listOfNotNull(
+            Step("panel-listen", if (local) "Панель слушает только сам сервер (127.0.0.1)" else "Панель снова слушает все адреса",
+                settingsCommand(p.kind, mapOf("webListen" to if (local) "127.0.0.1" else "")) + " && systemctl restart $svc && sleep 2 && systemctl is-active $svc",
+                accept = { it.out.lineSequence().any { l -> l.trim() == "active" } }, failHint = "Панель не запустилась"),
+            Step("panel-listen-check", "Проверить, на каком адресе слушает панель", "ss -ltnH 'sport = :$port' | awk '{print \$4}'",
+                accept = { r -> val a = r.out.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                    a.isNotEmpty() && (if (local) a.all { it.startsWith("127.0.0.1:") } else a.any { !it.startsWith("127.") && !it.startsWith("[::1]") }) },
+                failHint = if (local) "Панель всё ещё слушает внешний адрес" else "Панель не слушает внешний адрес"),
+            answersStep("panel-local-ok", "Проверить: панель отвечает на сервере", url.protocol, port, url.path),
+            if (local) Step("panel-fw-close", "Закрыть порт панели $port/tcp, если его открывала Hydra", ServerOps.closePortCommand("$port/tcp"))
+            else ServerOps.openPortStep(firewall, "$port/tcp")?.let { Step("panel-fw", "Открыть порт панели $port/tcp", it.command, rollback = it.rollback) },
+        )
+    }
+
     /** Шаг сохранения копии записи панели на сервере (`/etc/hydra/panel.json`, 0600). */
     fun stateSteps(panel: PanelInstance) = listOf(
         Step("panel-state-dir", "Каталог настроек Hydra на сервере", "mkdir -p ${ServerOps.STATE_DIR} && chmod 700 ${ServerOps.STATE_DIR}"),
