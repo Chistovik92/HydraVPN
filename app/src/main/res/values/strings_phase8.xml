@@ -82,4 +82,11 @@
     <string name="a11y_dismiss">Dismiss</string>
     <string name="a11y_more_actions">More actions</string>
     <string name="a11y_selected">Selected</string>
+    <string name="upd_beta">Take part in beta testing</string>
+    <string name="upd_beta_desc">Off — only final releases. On — also pre-releases of the chosen level. Pre-releases may contain bugs.</string>
+    <string name="upd_beta_level">Beta testing level</string>
+    <string name="upd_level_rc">Release candidates</string>
+    <string name="upd_level_rc_desc">Versions -rc1, -rc2…: almost final, need light checking.</string>
+    <string name="upd_level_dev">Developer</string>
+    <string name="upd_level_dev_desc">Also alphas (-a) and betas (-b): new features before anyone else, unchecked code.</string>
 </resources>

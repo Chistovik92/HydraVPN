@@ -17,9 +17,65 @@ data class ReleaseAsset(val name: String, val url: String, val size: Long, val s
 
 data class ReleaseInfo(val version: String, val pageUrl: String, val assets: List<ReleaseAsset>)
 
+/**
+ * Канал обновлений (0.8.0, решение владельца 15.10.2026): «Участвовать в бета-тестировании» в настройках.
+ *  - [STABLE] — только выпуски `X.Y.Z` (переключатель выключен, по умолчанию);
+ *  - [RC] — уровень «релиз-кандидаты»: выпуски и `X.Y.Z-rcN`;
+ *  - [DEV] — уровень «разработчик»: всё, включая альфы `-a` и беты `-b`.
+ */
+enum class UpdateChannel(val id: String) {
+    STABLE("stable"), RC("rc"), DEV("dev");
+
+    fun accepts(version: String): Boolean {
+        val k = UpdateFeed.preKey(version) ?: return true
+        return when (this) { STABLE -> false; RC -> k >= 2000; DEV -> true }
+    }
+
+    companion object {
+        fun fromId(id: String?): UpdateChannel = entries.firstOrNull { it.id == id } ?: STABLE
+    }
+}
+
 object UpdateFeed {
     const val REPO = "Chistovik92/HydraVPN"
     private const val API = "https://api.github.com/repos/$REPO/releases/latest"
+
+    private const val API_LIST = "https://api.github.com/repos/$REPO/releases?per_page=40"
+
+    /**
+     * Самый новый релиз канала [channel]. Обычный канал — «последний» релиз GitHub (пре-релизы им не бывают); каналы
+     * бета-тестирования смотрят список релизов (черновики пропускаются) и берут самый новый подходящий по номеру.
+     */
+    fun latest(userAgent: String, channel: UpdateChannel, timeoutMs: Int = 10_000): ReleaseInfo =
+        if (channel == UpdateChannel.STABLE) latest(userAgent, timeoutMs)
+        else pickNewest(parseList(get(API_LIST, userAgent, timeoutMs)), channel) ?: latest(userAgent, timeoutMs)
+
+    /** Разбор списка релизов: черновики пропускаются. */
+    fun parseList(json: String): List<ReleaseInfo> {
+        val a = org.json.JSONArray(json)
+        return (0 until a.length()).mapNotNull { i ->
+            val o = a.optJSONObject(i) ?: return@mapNotNull null
+            if (o.optBoolean("draft")) null else runCatching { parse(o.toString()) }.getOrNull()
+        }
+    }
+
+    /** Самый новый релиз, который принимает канал; null — подходящих нет. */
+    fun pickNewest(list: List<ReleaseInfo>, channel: UpdateChannel): ReleaseInfo? =
+        list.filter { channel.accepts(it.version) }.fold(null as ReleaseInfo?) { best, r -> if (best == null || isNewer(r.version, best.version)) r else best }
+
+    private fun get(url: String, userAgent: String, timeoutMs: Int): String {
+        val conn = URL(url).openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection
+        try {
+            conn.connectTimeout = timeoutMs
+            conn.readTimeout = timeoutMs
+            conn.setRequestProperty("Accept", "application/vnd.github+json")
+            conn.setRequestProperty("User-Agent", userAgent)
+            check(conn.responseCode in 200..299) { "HTTP ${conn.responseCode}" }
+            return conn.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+        } finally {
+            conn.disconnect()
+        }
+    }
 
     fun latest(userAgent: String, timeoutMs: Int = 10_000): ReleaseInfo {
         val conn = URL(API).openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection
@@ -79,7 +135,7 @@ object UpdateFeed {
     }
 
     /** Вес пре-релиза: стадия (a=0, b=1, rc=2) * 1000 + номер; null — обычный выпуск. */
-    internal fun preKey(v: String): Int? {
+    fun preKey(v: String): Int? {
         val m = Regex("-(alpha|beta|rc|a|b)(\\d*)(?=$|-)", RegexOption.IGNORE_CASE).find(v) ?: return null
         val stage = when (m.groupValues[1].lowercase()) { "a", "alpha" -> 0; "b", "beta" -> 1; else -> 2 }
         return stage * 1000 + (m.groupValues[2].toIntOrNull() ?: 0)

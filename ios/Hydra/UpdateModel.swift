@@ -15,6 +15,8 @@ final class UpdateModel: NSObject, ObservableObject {
     @Published var error: String?
 
     private static let lastCheckKey = "update.lastCheck"
+    nonisolated static let channelKey = "update.channel"
+    var channel: UpdateChannel { UpdateChannel(rawValue: UserDefaults.standard.string(forKey: Self.channelKey) ?? "") ?? .stable }
     private(set) var asset: ReleaseAsset?
     private lazy var session = URLSession(configuration: .default, delegate: Redirects(model: self), delegateQueue: nil)
 
@@ -23,12 +25,13 @@ final class UpdateModel: NSObject, ObservableObject {
     func checkIfDue(manual: Bool = false) async {
         let last = UserDefaults.standard.double(forKey: Self.lastCheckKey)
         if !manual && Date().timeIntervalSince1970 - last < 24 * 3600 { return }
-        var req = URLRequest(url: UpdateFeed.apiURL, timeoutInterval: 10)
+        let ch = channel
+        var req = URLRequest(url: ch == .stable ? UpdateFeed.apiURL : UpdateFeed.listURL, timeoutInterval: 10)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         req.setValue("Hydra-iOS-update-check", forHTTPHeaderField: "User-Agent")
         guard let (data, resp) = try? await URLSession.shared.data(for: req),
               (resp as? HTTPURLResponse)?.statusCode == 200,
-              let info = try? UpdateFeed.parse(data) else { return }
+              let info = (ch == .stable ? try? UpdateFeed.parse(data) : UpdateFeed.pickNewest(UpdateFeed.parseList(data), channel: ch)) else { return }
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.lastCheckKey)
         if UpdateFeed.isNewer(info.version, than: current) {
             release = info

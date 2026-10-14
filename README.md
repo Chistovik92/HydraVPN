@@ -5,7 +5,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.7.20** (пре-релиз **0.8.0-rc4** — «Мои серверы», [скачать](https://github.com/Chistovik92/HydraVPN/releases/tag/v0.8.0-rc4)) · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md) · [Документация](docs/README.md)
+- Статус: **0.8.0** — «Мои серверы» · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · пре-релиз [0.8.1-b](https://github.com/Chistovik92/HydraVPN/releases/tag/v0.8.1-b) (панели) — канал «Разработчик» в «Участвовать в бета-тестировании» · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md) · [Документация](docs/README.md)
 
 ## Скачать
 

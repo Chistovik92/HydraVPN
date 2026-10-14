@@ -82,4 +82,11 @@
     <string name="a11y_dismiss">Закрыть</string>
     <string name="a11y_more_actions">Другие действия</string>
     <string name="a11y_selected">Выбран</string>
+    <string name="upd_beta">Участвовать в бета-тестировании</string>
+    <string name="upd_beta_desc">Выключено — только выпуски. Включено — ещё и пре-релизы выбранного уровня. В пре-релизах возможны ошибки.</string>
+    <string name="upd_beta_level">Уровень бета-тестирования</string>
+    <string name="upd_level_rc">Релиз-кандидаты</string>
+    <string name="upd_level_rc_desc">Версии -rc1, -rc2…: почти готовые, нужна неглубокая проверка.</string>
+    <string name="upd_level_dev">Разработчик</string>
+    <string name="upd_level_dev_desc">Ещё и альфы (-a) и беты (-b): новое раньше всех, код не проверен.</string>
 </resources>

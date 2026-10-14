@@ -1074,6 +1074,30 @@ private fun AboutContent(vm: MainViewModel) {
             checked = autoCheck,
             onCheckedChange = { vm.setUpdateCheck(it) }
         )
+        // Бета-тестирование (0.8.0): выключено — только выпуски; включено — уровень «релиз-кандидаты» (rcX) или «разработчик» (+ -a, -b)
+        val channel by vm.updateChannel.collectAsState()
+        SecurityToggleCard(
+            title = stringResource(R.string.upd_beta),
+            description = stringResource(R.string.upd_beta_desc),
+            checked = channel != ru.gidravpn.hydra.update.UpdateChannel.STABLE,
+            onCheckedChange = { on -> vm.setUpdateChannel(if (on) ru.gidravpn.hydra.update.UpdateChannel.RC else ru.gidravpn.hydra.update.UpdateChannel.STABLE) }
+        )
+        if (channel != ru.gidravpn.hydra.update.UpdateChannel.STABLE) Card(Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.upd_beta_level), color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            listOf(
+                Triple(ru.gidravpn.hydra.update.UpdateChannel.RC, R.string.upd_level_rc, R.string.upd_level_rc_desc),
+                Triple(ru.gidravpn.hydra.update.UpdateChannel.DEV, R.string.upd_level_dev, R.string.upd_level_dev_desc),
+            ).forEach { (c, t, d) ->
+                Row(Modifier.fillMaxWidth().clickableNoRipple { vm.setUpdateChannel(c) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.RadioButton(selected = channel == c, onClick = { vm.setUpdateChannel(c) })
+                    Column {
+                        Text(stringResource(t), color = TextPrimary, fontSize = 13.sp)
+                        Text(stringResource(d), color = TextMuted, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
     }
 }
 
