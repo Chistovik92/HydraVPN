@@ -359,7 +359,8 @@ val generateIcons by tasks.registering {
 
 // ---- JavaFX (сайт панели внутри приложения, 0.8.2-a2) ------------------------------
 val javafxVersion = "21.0.5"
-val javafxPlatform: String = run {
+// HYDRA_FX_PLATFORM — подменить платформу (проверка ветки linux-aarch64 на другой машине)
+val javafxPlatform: String = System.getenv("HYDRA_FX_PLATFORM") ?: run {
     val os = System.getProperty("os.name").lowercase()
     val arm = System.getProperty("os.arch").lowercase().let { it == "aarch64" || it == "arm64" }
     when {
@@ -380,7 +381,12 @@ dependencies {
     implementation("net.java.dev.jna:jna-platform:5.14.0")
     // Сайт панели внутри Hydra (0.8.2-a2): WebView из JavaFX — встроенного браузера в Compose Desktop нет. Нативная часть — под
     // платформу сборки (как compose.desktop.currentOs: каждый пакет собирается на своей ОС); в Hydra Classic JavaFX не входит.
-    listOf("base", "graphics", "controls", "media", "web", "swing").forEach { implementation("org.openjfx:javafx-$it:$javafxVersion:$javafxPlatform") }
+    // У JavaFX 21 нет сборки под linux-aarch64 (CI 0.8.2-a2: «Could not find javafx-web-21.0.5-linux-aarch64.jar»): там классы — только
+    // для компиляции (они одинаковы на всех платформах), в пакет JavaFX не входит, и сайт панели открывается в браузере (PanelWebFx.available).
+    listOf("base", "graphics", "controls", "media", "web", "swing").forEach {
+        if (javafxPlatform == "linux-aarch64") { compileOnly("org.openjfx:javafx-$it:$javafxVersion:linux"); testImplementation("org.openjfx:javafx-$it:$javafxVersion:linux") }
+        else implementation("org.openjfx:javafx-$it:$javafxVersion:$javafxPlatform")
+    }
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
