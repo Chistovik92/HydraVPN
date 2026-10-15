@@ -357,6 +357,18 @@ val generateIcons by tasks.registering {
     }
 }
 
+// ---- JavaFX (сайт панели внутри приложения, 0.8.2-a2) ------------------------------
+val javafxVersion = "21.0.5"
+val javafxPlatform: String = run {
+    val os = System.getProperty("os.name").lowercase()
+    val arm = System.getProperty("os.arch").lowercase().let { it == "aarch64" || it == "arm64" }
+    when {
+        os.contains("win") -> "win"
+        os.contains("mac") -> if (arm) "mac-aarch64" else "mac"
+        else -> if (arm) "linux-aarch64" else "linux"
+    }
+}
+
 // ---- Зависимости ---------------------------------------------------------------
 dependencies {
     implementation(project(":shared"))
@@ -366,6 +378,9 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.json:json:20240303")
     implementation("net.java.dev.jna:jna-platform:5.14.0")
+    // Сайт панели внутри Hydra (0.8.2-a2): WebView из JavaFX — встроенного браузера в Compose Desktop нет. Нативная часть — под
+    // платформу сборки (как compose.desktop.currentOs: каждый пакет собирается на своей ОС); в Hydra Classic JavaFX не входит.
+    listOf("base", "graphics", "controls", "media", "web", "swing").forEach { implementation("org.openjfx:javafx-$it:$javafxVersion:$javafxPlatform") }
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
@@ -427,7 +442,9 @@ compose.desktop {
             // Модули JRE сверх java.base/java.desktop: OkHttp (logging, TLS с EC-шифрами),
             // JNA (jdk.unsupported), Compose (management/naming/accessibility). java.net.http не нужен: всё идёт через OkHttp и HttpURLConnection.
             modules("java.logging", "java.naming", "java.management",
-                "jdk.crypto.ec", "jdk.unsupported", "jdk.accessibility")
+                "jdk.crypto.ec", "jdk.unsupported", "jdk.accessibility",
+                // JavaFX WebView (0.8.2-a2): мост JavaScript ↔ Java и DOM
+                "jdk.jsobject", "jdk.xml.dom", "java.scripting")
 
             windows {
                 iconFile.set(iconsDir.map { it.file("hydra.ico") })

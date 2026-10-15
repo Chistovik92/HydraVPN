@@ -451,11 +451,21 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
     val local = p.local && ssh
     val tunnel = s.tunnels[srv.id]
     var openWhenReady by remember { mutableStateOf(false) }
+    // сайт панели внутри Hydra (0.8.2-a2): адрес открытого окна; в браузере — как раньше
+    var inApp by remember { mutableStateOf<String?>(null) }
+    var viaBrowser by remember { mutableStateOf(false) }
     var askLocal by remember { mutableStateOf<Boolean?>(null) }
     var createConn by remember { mutableStateOf(false) }
-    val open = { url: String ->
+    val browser = { url: String ->
         if (p.password.isNotBlank()) { copySecret(p.password); c.toast("Пароль скопирован на 30 секунд — вставьте его на странице входа") }
         openUrl(url)
+    }
+    val open = { url: String ->
+        if (!viaBrowser && PanelWebFx.available && PanelWebFx.start()) {
+            if (url.contains("://127.0.0.1:")) runCatching { java.net.URL(url).port }.getOrNull()?.let { PanelWebFx.tunnelPorts += it }
+            inApp = url
+        } else browser(url)
+        viaBrowser = false
     }
     // закрытая извне панель (0.8.1-rc2): сайт — через SSH-туннель; адрес туннеля приходит после подключения к серверу
     LaunchedEffect(tunnel, openWhenReady) { if (openWhenReady && tunnel != null) { openWhenReady = false; open(tunnel) } }
@@ -479,6 +489,14 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
                 else -> { openWhenReady = true; m.openPanelTunnel(srv.id) }
             }
         }, enabled = !(local && tunnel == null && busy)) { Text("Открыть панель") }
+        OutlinedButton(onClick = {
+            viaBrowser = true
+            when {
+                !local -> open(p.baseUrl)
+                tunnel != null -> open(tunnel)
+                else -> { openWhenReady = true; m.openPanelTunnel(srv.id) }
+            }
+        }, enabled = !(local && tunnel == null && busy)) { Text("В браузере") }
         if (p.password.isNotBlank()) OutlinedButton(onClick = { copySecret(p.password); c.toast("Пароль скопирован на 30 секунд") }) { Text("Скопировать пароль") }
         if (tunnel != null) OutlinedButton(onClick = { m.closePanelTunnel(srv.id) }) { Text("Закрыть туннель") }
         if (ssh) OutlinedButton(onClick = { askLocal = !p.local }, enabled = !busy) { Text(if (p.local) "Открыть панель извне" else "Закрыть панель извне") }
@@ -491,6 +509,12 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
     }
     if (p.token.isBlank()) Text("Пользователей и подключения заводите на сайте панели; ссылку подключения из панели можно вставить в «Серверы».",
         fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    inApp?.let { url ->
+        PanelWebWindow(p, srv.name, url, onFailed = { if (p.password.isNotBlank()) copySecret(p.password) }) {
+            inApp = null
+            if (url.contains("://127.0.0.1:")) m.closePanelTunnel(srv.id)
+        }
+    }
     if (createConn) {
         var type by remember { mutableStateOf(ru.gidravpn.hydra.servers.XuiConnection.VLESS_GRPC_REALITY) }
         var port by remember { mutableStateOf((20000 + java.security.SecureRandom().nextInt(40000)).toString()) }
