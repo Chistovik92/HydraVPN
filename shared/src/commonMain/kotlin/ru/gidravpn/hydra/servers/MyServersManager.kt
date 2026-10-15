@@ -18,13 +18,13 @@ class ServerForm(
 
 /** Служба, которую можно поставить на свой сервер. */
 enum class ServerKind {
-    AMNEZIAWG, OPENFLUX, PANEL_3XUI, PANEL_SUI, PANEL_XUI, PANEL_PASARGUARD;
+    AMNEZIAWG, OPENFLUX, PANEL_3XUI, PANEL_SUI, PANEL_XUI, PANEL_PASARGUARD, PANEL_REMNAWAVE;
 
     /** Вид панели для служб-панелей; null — не панель. */
-    val panel: PanelKind? get() = when (this) { PANEL_3XUI -> PanelKind.XUI3; PANEL_SUI -> PanelKind.SUI; PANEL_XUI -> PanelKind.XUI; PANEL_PASARGUARD -> PanelKind.PASARGUARD; else -> null }
+    val panel: PanelKind? get() = when (this) { PANEL_3XUI -> PanelKind.XUI3; PANEL_SUI -> PanelKind.SUI; PANEL_XUI -> PanelKind.XUI; PANEL_PASARGUARD -> PanelKind.PASARGUARD; PANEL_REMNAWAVE -> PanelKind.REMNAWAVE; else -> null }
 
     companion object {
-        fun ofPanel(k: PanelKind) = when (k) { PanelKind.XUI3 -> PANEL_3XUI; PanelKind.SUI -> PANEL_SUI; PanelKind.XUI -> PANEL_XUI; PanelKind.PASARGUARD -> PANEL_PASARGUARD }
+        fun ofPanel(k: PanelKind) = when (k) { PanelKind.XUI3 -> PANEL_3XUI; PanelKind.SUI -> PANEL_SUI; PanelKind.XUI -> PANEL_XUI; PanelKind.PASARGUARD -> PANEL_PASARGUARD; PanelKind.REMNAWAVE -> PANEL_REMNAWAVE }
     }
 }
 
@@ -322,6 +322,7 @@ class MyServersManager(
                     service.planPreviewPanel(spec.kind, panelTag, f.openFirewall, pre, f.sslIp, srv.host)
                 }
                 ServerKind.PANEL_PASARGUARD -> service.planPreviewPasarGuard()
+                ServerKind.PANEL_REMNAWAVE -> service.planPreviewRemnawave(srv.host)
             }
             update(srv.copy(osName = pre.osName.ifBlank { srv.osName }, arch = pre.arch))
             _ui.update { it.copy(install = InstallUi(id, f, InstallStage.READY, pre, plan)) }
@@ -347,6 +348,7 @@ class MyServersManager(
                 ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> service.deployPanel(srv, f.kind.panel!!,
                     panelTag.ifBlank { OtherPanels.latestTag(OtherPanels.spec(f.kind.panel!!)!!) }, f.openFirewall, pre, inst, f.sslIp, ::log)
                 ServerKind.PANEL_PASARGUARD -> service.deployPasarGuard(ssh, srv, inst, ::log)
+                ServerKind.PANEL_REMNAWAVE -> service.deployRemnawave(ssh, srv, inst, ::log)
             }
             when (res) {
                 is DeployResult.Ok -> {
@@ -385,7 +387,7 @@ class MyServersManager(
             ServerKind.AMNEZIAWG -> service.restartAwg(inst)
             ServerKind.OPENFLUX -> service.restartOfx(srv, inst)
             ServerKind.PANEL_3XUI -> service.restartXui(inst)
-            ServerKind.PANEL_SUI, ServerKind.PANEL_XUI, ServerKind.PANEL_PASARGUARD -> service.restartPanel(kind.panel!!, inst)
+            ServerKind.PANEL_SUI, ServerKind.PANEL_XUI, ServerKind.PANEL_PASARGUARD, ServerKind.PANEL_REMNAWAVE -> service.restartPanel(kind.panel!!, inst)
         }
         if (!ok) throw OpFailed(_ui.value.error ?: "Служба не перезапустилась")
         log("Служба перезапущена")
@@ -596,7 +598,7 @@ class MyServersManager(
     fun createPanelConnection(id: String, type: XuiConnection, port: Int, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK) {
         if (find(id)?.panel?.kind == PanelKind.XUI) return createXuiAlirezaConnection(id, type, port, mask)
         if (find(id)?.panel?.kind == PanelKind.SUI) return createSuiConnection(id, type, port, mask)
-        if (find(id)?.panel?.kind == PanelKind.PASARGUARD) return createPasarGuardConnection(id, type, port, mask)
+        if (find(id)?.panel?.kind?.tunnelOnly == true) return createPasarGuardConnection(id, type, port, mask)
         val srv = find(id)?.takeIf { it.panel?.kind == PanelKind.XUI3 && it.panel.token.isNotBlank() } ?: return
         if (port !in 1..65535) return _ui.update { it.copy(error = "Порт — число от 1 до 65535", opServer = id) }
         fun create(s: MyServer, api: XuiApi): Pair<String, List<String>> {
@@ -765,22 +767,25 @@ class MyServersManager(
      */
     private fun createPasarGuardConnection(id: String, type: XuiConnection, port: Int, mask: XuiPanel.RealityMask) {
         if (find(id)?.fingerprint.isNullOrBlank()) return
-        if (type !in PasarGuardPanel.TYPES) return _ui.update { it.copy(error = "${type.title} в PasarGuard из Hydra пока не создаётся — выберите другой тип", opServer = id) }
+        val kindTitle = find(id)?.panel?.kind?.title ?: "панели"
+        if (type !in OtherPanelConnections.typesFor(find(id)?.panel?.kind ?: PanelKind.PASARGUARD)) return _ui.update { it.copy(error = "${type.title} в $kindTitle из Hydra пока не создаётся — выберите другой тип", opServer = id) }
         if (port !in 1..65535) return _ui.update { it.copy(error = "Порт — число от 1 до 65535", opServer = id) }
-        op(id, "Создаю подключение ${type.title} в PasarGuard…") { s, ssh, inst ->
+        op(id, "Создаю подключение ${type.title} в $kindTitle…") { s, ssh, inst ->
             val p = s.panel ?: throw OpFailed("Панели нет")
             inst.addSecret(p.password)
-            val links = try { PasarGuardApi(ssh, p.username, p.password).createConnection(type, port, s.host, mask) }
+            val rw = p.kind == PanelKind.REMNAWAVE
+            val links = try { if (rw) RemnawaveApi(ssh, p.username, p.password).createConnection(type, port, s.host, mask)
+                else PasarGuardApi(ssh, p.username, p.password).createConnection(type, port, s.host, mask) }
                 catch (e: XuiApiException) { throw OpFailed("Панель: ${e.message}") }
                 catch (e: org.json.JSONException) { throw OpFailed("Панель ответила не так, как ожидалось: ${e.message}") }
             val proto = if (type.udp) "udp" else "tcp"
             val pre = service.preflight(ssh, 0)
             ServerOps.openPortStep(pre.firewall, "$port/$proto")?.let { st ->
-                inst.run(listOf(st, Step("pg-port", "Запомнить порт подключения PasarGuard", "echo '$port/$proto' >> ${PasarGuardPanel.PORTS}")))
+                inst.run(listOf(st, Step("pg-port", "Запомнить порт подключения $kindTitle", "echo '$port/$proto' >> ${if (rw) RemnawavePanel.PORTS else PasarGuardPanel.PORTS}")))
             }
             links.forEach { importConf(s.name, it) }
-            _ui.update { it.copy(shown = "${type.title} · PasarGuard" to links.joinToString("\n").ifBlank { "Подключение создано; ссылка — на сайте панели у пользователя ${PasarGuardApi.USER}" },
-                log = it.log + "Создано подключение ${type.title} на порту $port/$proto (пользователь ${PasarGuardApi.USER})" +
+            _ui.update { it.copy(shown = "${type.title} · $kindTitle" to links.joinToString("\n").ifBlank { "Подключение создано; ссылка — на сайте панели у пользователя hydra" },
+                log = it.log + "Создано подключение ${type.title} на порту $port/$proto (пользователь hydra)" +
                     (if (links.isNotEmpty()) "; ссылка добавлена в «Серверы»" else "")) }
         }
     }

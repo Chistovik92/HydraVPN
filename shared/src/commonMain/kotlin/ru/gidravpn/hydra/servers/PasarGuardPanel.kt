@@ -64,7 +64,7 @@ object PasarGuardPanel {
     /** Порты подключений, открытые Hydra для PasarGuard (по строке «порт/протокол»), — чтобы закрыть их при удалении. */
     val PORTS = "${ServerOps.STATE_DIR}/pasarguard.ports"
 
-    fun closePortsCommand(): String = "if [ -f $PORTS ]; then while read -r p; do ${ServerOps.closePortCommand("\$p").replace("'", "\"")}; done < $PORTS; rm -f $PORTS; fi; true"
+    fun closePortsCommand(file: String = PORTS): String = "if [ -f $file ]; then while read -r p; do ${ServerOps.closePortCommand("\$p").replace("'", "\"")}; done < $file; rm -f $file; fi; true"
 
     /** Удаление панели и ноды (копия базы — до этого, шагом [ServerOps.backupPanelsStep]); Docker остаётся. */
     fun uninstallCommand(): String =

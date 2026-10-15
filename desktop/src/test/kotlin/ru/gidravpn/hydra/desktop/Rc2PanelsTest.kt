@@ -72,7 +72,7 @@ class Rc2PanelsTest {
 
     @Test fun httpsStepsPerPanel() {
         // PasarGuard — только через туннель, без сертификата на IP
-        for (kind in PanelKind.entries - PanelKind.PASARGUARD) {
+        for (kind in PanelKind.entries.filterNot { it.tunnelOnly }) {
             val steps = XuiPanel.httpsSteps(kind, "203.0.113.5", true, "ufw", 31000, "/abc/")
             val svc = OtherPanels.serviceOf(kind)
             assertTrue(steps.single { it.id == "cert-install" }.command!!.contains("--reloadcmd 'systemctl restart $svc'"), kind.name)
@@ -82,7 +82,7 @@ class Rc2PanelsTest {
             when (kind) {
                 PanelKind.XUI3 -> assertTrue("x-ui cert -webCert" in apply && "sqlite3" !in apply)
                 PanelKind.XUI -> assertTrue("x-ui cert -webCert" in apply && "subCertFile" in apply && "/etc/x-ui/x-ui.db" in apply)
-                PanelKind.PASARGUARD -> error("не бывает")
+                PanelKind.PASARGUARD, PanelKind.REMNAWAVE -> error("не бывает")
                 PanelKind.SUI -> assertTrue("webCertFile" in apply && "webKeyFile" in apply && "/usr/local/s-ui/db/s-ui.db" in apply && "x-ui" !in apply)
             }
             assertTrue(steps.single { it.id == "cert-check" }.command!!.contains("https://127.0.0.1:31000/abc/"), kind.name)

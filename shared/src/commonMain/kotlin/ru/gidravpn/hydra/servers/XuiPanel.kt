@@ -17,6 +17,11 @@ enum class PanelKind(val title: String, val repo: String) {
     XUI("x-ui", "alireza0/x-ui"),
     /** PasarGuard (наследник Marzban, Docker) — 0.8.2-a3: установка, вход на сайт, подключения ([PasarGuardPanel]). */
     PASARGUARD("PasarGuard", "PasarGuard/panel"),
+    /** Remnawave (Docker, за прокси Caddy на 127.0.0.1) — 0.8.2-a3 ([RemnawavePanel]). */
+    REMNAWAVE("Remnawave", "remnawave/panel");
+
+    /** Панель в Docker, видна только с самого сервера: сайт — через туннель Hydra, без сертификата на IP и «открыть извне». */
+    val tunnelOnly: Boolean get() = this == PASARGUARD || this == REMNAWAVE
 }
 
 /**
@@ -358,7 +363,7 @@ object XuiPanel {
             PanelKind.XUI -> "/usr/local/x-ui/x-ui cert -webCert $crt -webCertKey $key >/dev/null && " +
                 OtherPanels.settingsCommand(kind, mapOf("subCertFile" to crt, "subKeyFile" to key))
             PanelKind.SUI -> OtherPanels.settingsCommand(kind, mapOf("webCertFile" to crt, "webKeyFile" to key, "subCertFile" to crt, "subKeyFile" to key))
-            PanelKind.PASARGUARD -> error("PasarGuard в Hydra — только через туннель, без сертификата на IP")
+            PanelKind.PASARGUARD, PanelKind.REMNAWAVE -> error("${kind.title} в Hydra — только через туннель, без сертификата на IP")
         }
         add(Step("cert-panel", "Включить HTTPS у панели и подписки",
             "$cmd && systemctl restart $svc && sleep 2 && systemctl is-active $svc",

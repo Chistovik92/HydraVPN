@@ -416,7 +416,7 @@ private fun PanelSection(c: AppController, srv: MyServer, st: ServerStatus?, m: 
     Text(p?.let { "Панель ${it.kind.title}" } ?: "Панель управления", fontWeight = FontWeight.SemiBold)
     if (p == null) {
         Text("Не установлена. Сайт-панель, где вы сами заводите пользователей и выдаёте им ссылки — удобно, если VPN нужен нескольким людям. " +
-            "3x-ui Hydra ведёт сама (пользователи и ссылки прямо здесь); в s-ui, x-ui и PasarGuard Hydra создаёт подключения, остальное — на их сайте.",
+            "3x-ui Hydra ведёт сама (пользователи и ссылки прямо здесь); в s-ui, x-ui, PasarGuard и Remnawave Hydra создаёт подключения, остальное — на их сайте.",
             fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         val foreign = (st?.xuiInstalled == true && !st.xuiByHydra && !st.xuiAlirezaByHydra) || (st?.suiInstalled == true && !st.suiByHydra)
         if (foreign) Text("На сервере уже стоит панель, поставленная не Hydra: 3x-ui подключите кнопкой «У меня уже есть панель» (адрес и токен).",
@@ -426,6 +426,7 @@ private fun PanelSection(c: AppController, srv: MyServer, st: ServerStatus?, m: 
             if (st?.suiInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_SUI) }, enabled = !busy) { Text("Установить s-ui") }
             if (st?.xuiInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_XUI) }, enabled = !busy) { Text("Установить x-ui") }
             if (st?.pgInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_PASARGUARD) }, enabled = !busy) { Text("Установить PasarGuard") }
+            if (st?.rwInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_REMNAWAVE) }, enabled = !busy) { Text("Установить Remnawave") }
         }
         return
     }
@@ -477,7 +478,7 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
         fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
     if (tunnel != null) Text("Туннель открыт: $tunnel", fontFamily = FontFamily.Monospace, fontSize = 11.sp)
     // PasarGuard слушает только 127.0.0.1 сервера: http:// идёт внутри SSH-туннеля — предупреждение не нужно
-    if (!XuiPanel.isHttps(p.baseUrl) && p.kind != PanelKind.PASARGUARD) {
+    if (!XuiPanel.isHttps(p.baseUrl) && !p.kind.tunnelOnly) {
         Text("Панель открывается по http:// — пароль на сайте идёт без шифрования, а провайдер может обрывать такие страницы. " +
             "Включите HTTPS (бесплатный сертификат Let's Encrypt на IP сервера) или входите при включённом VPN.",
             fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -502,7 +503,7 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
         }, enabled = !(local && tunnel == null && busy)) { Text("В браузере") }
         if (p.password.isNotBlank()) OutlinedButton(onClick = { copySecret(p.password); c.toast("Пароль скопирован на 30 секунд") }) { Text("Скопировать пароль") }
         if (tunnel != null) OutlinedButton(onClick = { m.closePanelTunnel(srv.id) }) { Text("Закрыть туннель") }
-        if (ssh && p.kind != PanelKind.PASARGUARD) OutlinedButton(onClick = { askLocal = !p.local }, enabled = !busy) { Text(if (p.local) "Открыть панель извне" else "Закрыть панель извне") }
+        if (ssh && !p.kind.tunnelOnly) OutlinedButton(onClick = { askLocal = !p.local }, enabled = !busy) { Text(if (p.local) "Открыть панель извне" else "Закрыть панель извне") }
         // пользователи через API — только у 3x-ui (токен); у s-ui и x-ui — на сайте панели
         if (p.token.isNotBlank()) {
             OutlinedButton(onClick = { m.loadPanelClients(srv.id) }, enabled = !busy) { Text("Пользователи") }
@@ -650,6 +651,11 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
                     Checkbox(sslIp, { sslIp = it }); Text("HTTPS для панели: бесплатный сертификат Let's Encrypt на IP (нужен открытый 80/tcp; не выйдет — панель останется на HTTP)", fontSize = 13.sp)
                 }
             }
+            if (kind == ServerKind.PANEL_REMNAWAVE) {
+                Text("Hydra поставит Docker (если его нет), панель Remnawave закреплённой версии с базой и кэшем, небольшой прокси для её сайта и ноду, создаст владельца с надёжным логином и паролем. " +
+                    "Панель будет видна только через защищённый туннель Hydra. Подключения (VLESS / Trojan + REALITY) — кнопкой «Создать подключение». Установка занимает 3–10 минут.",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             if (kind == ServerKind.PANEL_PASARGUARD) {
                 Text("Hydra поставит Docker (если его нет), панель PasarGuard и её ноду официальными установщиками закреплённой версии, создаст владельца с надёжным логином и паролем. " +
                     "Панель будет видна только через защищённый туннель Hydra. Подключения (VLESS / Trojan + REALITY, VMess) — кнопкой «Создать подключение». Установка занимает 3–10 минут.",
@@ -694,7 +700,7 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
                 ServerKind.AMNEZIAWG -> aport in 1024..65535
                 ServerKind.OPENFLUX -> OfxNodeSpec.validChannel(channel)
                 ServerKind.PANEL_3XUI -> (accessPort.toIntOrNull() ?: 0) in 1..65535
-                ServerKind.PANEL_SUI, ServerKind.PANEL_XUI, ServerKind.PANEL_PASARGUARD -> true
+                ServerKind.PANEL_SUI, ServerKind.PANEL_XUI, ServerKind.PANEL_PASARGUARD, ServerKind.PANEL_REMNAWAVE -> true
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(enabled = ok && !busy, onClick = { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443, sslIp = sslIp, mask = mask, transport = transport)) }) { Text("Проверить сервер и показать план") }

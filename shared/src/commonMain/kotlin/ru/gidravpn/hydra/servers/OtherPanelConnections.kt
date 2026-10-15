@@ -30,6 +30,7 @@ object OtherPanelConnections {
         PanelKind.XUI -> XUI
         PanelKind.SUI -> SUI
         PanelKind.PASARGUARD -> PasarGuardPanel.TYPES
+        PanelKind.REMNAWAVE -> RemnawavePanel.TYPES
     }
 
     // ------------------------------------------------------------------------------------------ s-ui (sing-box)

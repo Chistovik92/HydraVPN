@@ -15,7 +15,7 @@ import kotlin.test.fail
 /**
  * 0.8.2-a3: PasarGuard — установка мастером (Docker, панель, нода, владелец), затем каждый тип «как кнопкой»
  * ([MyServersManager.createPanelConnection]) и трафик по выданной ссылке ядром, которое выберет Hydra; в конце — удаление панели.
- * HYDRA_SSH_TEST, HYDRA_PG_LIVE=1, HYDRA_XRAY, HYDRA_SINGBOX; HYDRA_XUI_TYPES — только эти типы; HYDRA_XUI_KEEP — не удалять.
+ * HYDRA_SSH_TEST, HYDRA_PG_LIVE=1, HYDRA_XRAY, HYDRA_SINGBOX; HYDRA_XUI_TYPES — только эти типы; HYDRA_XUI_KEEP — не удалять; HYDRA_PANEL=RW — то же для Remnawave.
  */
 class PasarGuardLiveTest {
     @Test fun pasarGuardInstallConnectionsTraffic() {
@@ -24,6 +24,8 @@ class PasarGuardLiveTest {
         val p = v!!.split(":", limit = 4)
         val login = SshTarget(p[0], p[1].toInt(), p[2], password = p[3])
         val xray = System.getenv("HYDRA_XRAY"); val sb = System.getenv("HYDRA_SINGBOX")
+        val rw = System.getenv("HYDRA_PANEL") == "RW"
+        val kind = if (rw) ServerKind.PANEL_REMNAWAVE else ServerKind.PANEL_PASARGUARD
         var saved = emptyList<MyServer>()
         val imported = mutableListOf<String>()
         val m = MyServersManager(CoroutineScope(SupervisorJob() + Dispatchers.IO), { saved }, { saved = it }, { error("") }, MemoryVault()) { _, c -> imported += c }
@@ -34,11 +36,11 @@ class PasarGuardLiveTest {
             fail("таймаут: $what; ${m.ui.value.error}; ${m.ui.value.log.takeLast(12)}")
         }
         // стенд: убрать прежнюю PasarGuard (в том числе поставленную вручную)
-        SshConnector.connect(login, SshConnector.fingerprint(login)).use { ssh -> ssh.exec(PasarGuardPanel.uninstallCommand()) }
+        SshConnector.connect(login, SshConnector.fingerprint(login)).use { ssh -> ssh.exec(if (rw) RemnawavePanel.uninstallCommand() else PasarGuardPanel.uninstallCommand()) }
         m.begin(ServerForm("pg", login)); waitFor("отпечаток") { m.ui.value.stage == Stage.CONFIRM_FINGERPRINT }
         m.confirmFingerprint(); waitFor("добавление") { m.ui.value.stage == Stage.DONE }
         val id = saved.single().id
-        m.prepareInstall(id, ServiceForm(ServerKind.PANEL_PASARGUARD))
+        m.prepareInstall(id, ServiceForm(kind))
         waitFor("план") { !m.ui.value.busy && m.ui.value.install?.stage == InstallStage.READY }
         m.runInstall()
         waitFor("установка") { !m.ui.value.busy && m.ui.value.install?.stage in setOf(InstallStage.DONE, InstallStage.FAILED) }
@@ -46,15 +48,16 @@ class PasarGuardLiveTest {
         assertEquals(InstallStage.DONE, m.ui.value.install?.stage, "${m.ui.value.error}")
         m.closeInstall()
         val panel = saved.single().panel!!
-        assertEquals(PanelKind.PASARGUARD, panel.kind); assertTrue(panel.local)
+        assertEquals(kind.panel, panel.kind); assertTrue(panel.local)
         // проверка состояния видит панель и не теряет её
         m.refresh(id); waitFor("проверка") { !m.ui.value.busy && m.ui.value.status[id] != null }
-        assertTrue(m.ui.value.status[id]!!.pgInstalled && m.ui.value.status[id]!!.pgByHydra)
-        assertEquals(PanelKind.PASARGUARD, saved.single().panel?.kind)
+        val st = m.ui.value.status[id]!!
+        assertTrue(if (rw) st.rwInstalled && st.rwByHydra else st.pgInstalled && st.pgByHydra)
+        assertEquals(kind.panel, saved.single().panel?.kind)
 
         val results = mutableListOf<Pair<String, String>>()
         var port = 27000
-        for (type in OtherPanelConnections.typesFor(PanelKind.PASARGUARD).filter { t -> System.getenv("HYDRA_XUI_TYPES")?.split(",")?.contains(t.name) ?: true }) {
+        for (type in OtherPanelConnections.typesFor(kind.panel!!).filter { t -> System.getenv("HYDRA_XUI_TYPES")?.split(",")?.contains(t.name) ?: true }) {
             m.hideShown()
             m.createPanelConnection(id, type, port++)
             waitFor("подключение $type") { !m.ui.value.busy && (m.ui.value.shown != null || m.ui.value.error != null) }
@@ -71,11 +74,11 @@ class PasarGuardLiveTest {
         }
         println("PGIMPORTED ${imported.size}")
         if (System.getenv("HYDRA_XUI_KEEP") == null) {
-            m.uninstallService(id, ServerKind.PANEL_PASARGUARD); waitFor("удаление") { !m.ui.value.busy }
+            m.uninstallService(id, kind); waitFor("удаление") { !m.ui.value.busy }
             assertEquals(null, saved.single().panel, "${m.ui.value.error}")
             SshConnector.connect(login, saved.single().fingerprint).use { ssh ->
-                assertEquals("", ssh.exec("ls -d ${PasarGuardPanel.DIR} ${PasarGuardPanel.NODE_DIR} 2>/dev/null").out.trim())
-                assertTrue(ssh.exec("ls /root/hydra-backups/ 2>/dev/null").out.contains("pasarguard-"), "нет копии базы")
+                assertEquals("", ssh.exec("ls -d ${if (rw) RemnawavePanel.DIR + " " + RemnawavePanel.NODE_DIR else PasarGuardPanel.DIR + " " + PasarGuardPanel.NODE_DIR} 2>/dev/null").out.trim())
+                assertTrue(ssh.exec("ls /root/hydra-backups/ 2>/dev/null").out.contains(if (rw) "remnawave-" else "pasarguard-"), "нет копии базы")
             }
         }
         val bad = results.filter { ": ok" !in it.second }

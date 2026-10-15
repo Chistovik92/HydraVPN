@@ -41,13 +41,13 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
 
         // панель, поставленная по SSH, исчезла с сервера — убираем; подключённую без SSH (panelOnly) не трогаем
         if (s.panel != null && !s.panelOnly) {
-            val present = when (s.panel.kind) { PanelKind.SUI -> st.suiInstalled; PanelKind.PASARGUARD -> st.pgInstalled; else -> st.xuiInstalled }
+            val present = when (s.panel.kind) { PanelKind.SUI -> st.suiInstalled; PanelKind.PASARGUARD -> st.pgInstalled; PanelKind.REMNAWAVE -> st.rwInstalled; else -> st.xuiInstalled }
             if (!present) r = r.copy(panel = null)
         }
         // копия записи панели на сервере (любой вид) — второе устройство берёт панель под управление
         if (r.panel == null && st.panelStateJson.trim().startsWith("{")) {
             runCatching { PanelInstance.fromJson(org.json.JSONObject(st.panelStateJson)) }.getOrNull()
-                ?.takeIf { when (it.kind) { PanelKind.SUI -> st.suiInstalled; PanelKind.PASARGUARD -> st.pgInstalled; else -> st.xuiInstalled } }
+                ?.takeIf { when (it.kind) { PanelKind.SUI -> st.suiInstalled; PanelKind.PASARGUARD -> st.pgInstalled; PanelKind.REMNAWAVE -> st.rwInstalled; else -> st.xuiInstalled } }
                 ?.let { r = r.copy(panel = it) }
         }
         // панель поставлена Hydra с другого устройства — берём под управление по её install-result.env
@@ -212,7 +212,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
      * Панель не поднялась с сертификатом — пути к нему стираются, панель возвращается на HTTP.
      */
     fun enablePanelHttps(s: MyServer, pre: Preflight, openFirewall: Boolean, installer: Installer): MyServer? {
-        val panel = s.panel?.takeIf { it.kind != PanelKind.PASARGUARD } ?: return null
+        val panel = s.panel?.takeIf { !it.kind.tunnelOnly } ?: return null
         if (!issueAndApplyCert(s.host, panel, pre, openFirewall, installer)) return null
         val upd = panel.copy(baseUrl = XuiPanel.toHttps(panel.baseUrl))
         installer.run(OtherPanels.stateSteps(upd))
@@ -244,8 +244,8 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
      * через SSH-туннель, а API 3x-ui вызывает `curl`-ом на сервере.
      */
     fun setPanelLocal(s: MyServer, local: Boolean, pre: Preflight, installer: Installer): MyServer? {
-        // PasarGuard без сертификата слушает только 127.0.0.1 (так её ставит установщик) — открыть извне нельзя
-        val panel = s.panel?.takeIf { it.kind != PanelKind.PASARGUARD } ?: return null
+        // PasarGuard и Remnawave в Hydra слушают только 127.0.0.1 — открыть извне нельзя
+        val panel = s.panel?.takeIf { !it.kind.tunnelOnly } ?: return null
         if (!installer.run(OtherPanels.listenSteps(panel, local, pre.firewall))) return null
         val upd = panel.copy(local = local)
         installer.run(OtherPanels.stateSteps(upd))
@@ -342,6 +342,33 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
         return DeployResult.Ok(srv.copy(panel = panel))
     }
 
+    fun planPreviewRemnawave(host: String): List<Step> = RemnawavePanel.installSteps(host) + RemnawavePanel.setupPreviewSteps()
+
+    /**
+     * Установка Remnawave (0.8.2-a3): панель в Docker (закреплённые образы) за Caddy на 127.0.0.1; владелец — регистрацией
+     * (открыта, пока владельца нет; наружу панель не видна), нода — с ключом от панели, на адресе шлюза сети Docker.
+     */
+    fun deployRemnawave(ssh: SshSession, srv: MyServer, installer: Installer, onLog: (String) -> Unit = {}): DeployResult {
+        val user = "hy" + XuiPanel.random(6).lowercase(); val pass = RemnawavePanel.newPassword()
+        installer.addSecret(pass)
+        if (!installer.run(RemnawavePanel.installSteps(srv.host))) return DeployResult.Failed("Установка остановлена")
+        val api = RemnawaveApi(ssh, user, pass)
+        try {
+            api.register()
+            onLog("Владелец панели создан")
+            val key = api.secretKey()
+            installer.addSecret(key)
+            if (!installer.run(RemnawavePanel.nodeSteps(key))) return DeployResult.Failed("Нода Remnawave не запустилась")
+            val gw = ssh.exec("docker network inspect remnawave-network -f '{{range .IPAM.Config}}{{.Gateway}} {{end}}'").out.trim().split(' ').firstOrNull { it.contains('.') } ?: "172.17.0.1"
+            api.addLocalNode(gw)
+            onLog(if (api.waitNodeConnected()) "Нода подключена к панели" else "Нода пока не подключилась — проверьте её на сайте панели")
+        } catch (e: XuiApiException) { return DeployResult.Failed("Remnawave: ${e.message}") }
+        val host = if (srv.host.contains(':')) "[${srv.host}]" else srv.host
+        val panel = PanelInstance(PanelKind.REMNAWAVE, "http://$host:${RemnawavePanel.WEB_PORT}/", user, pass, "", RemnawavePanel.TAG, local = true)
+        installer.run(OtherPanels.stateSteps(panel))
+        return DeployResult.Ok(srv.copy(panel = panel))
+    }
+
     /** Удалить панель любого вида с сервера; порт панели закрывается, если его открывала Hydra. */
     fun uninstallPanel(s: MyServer, installer: Installer): MyServer? {
         val panel = s.panel ?: return null
@@ -349,6 +376,11 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
         if (panel.kind == PanelKind.PASARGUARD) return if (installer.run(listOf(ServerOps.backupPanelsStep(),
                 Step("panel-remove", "Удалить PasarGuard (панель и ноду) с сервера", PasarGuardPanel.uninstallCommand() + "; test ! -e ${PasarGuardPanel.DIR}", failHint = "Панель удалить не удалось"),
                 Step("panel-fw-close", "Закрыть порты подключений PasarGuard, если их открывала Hydra", PasarGuardPanel.closePortsCommand()))))
+            s.copy(panel = null) else null
+        if (panel.kind == PanelKind.REMNAWAVE) return if (installer.run(listOf(
+                Step("panel-backup", "Сохранить копию базы панели (пользователи, настройки) в ${ServerOps.BACKUP_DIR}", RemnawavePanel.backupCommand()),
+                Step("panel-remove", "Удалить Remnawave (панель и ноду) с сервера", RemnawavePanel.uninstallCommand() + "; test ! -e ${RemnawavePanel.DIR}", failHint = "Панель удалить не удалось"),
+                Step("panel-fw-close", "Закрыть порты подключений Remnawave, если их открывала Hydra", PasarGuardPanel.closePortsCommand(RemnawavePanel.PORTS)))))
             s.copy(panel = null) else null
         val spec = OtherPanels.spec(panel.kind) ?: return null
         val port = runCatching { java.net.URL(panel.baseUrl).port }.getOrDefault(-1)
@@ -365,6 +397,10 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
             "cd ${PasarGuardPanel.DIR} && docker compose -p pasarguard restart >/dev/null 2>&1 && cd ${PasarGuardPanel.NODE_DIR} && docker compose restart >/dev/null 2>&1 && sleep 5 && " +
                 "curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:${PasarGuardPanel.PORT}/api/admin/token",
             accept = { it.out.trim().startsWith("4") || it.out.trim().startsWith("2") }, failHint = "Панель не запустилась (docker compose -p pasarguard logs)")))
+        if (kind == PanelKind.REMNAWAVE) return installer.run(listOf(Step("restart", "Перезапустить панель и ноду Remnawave",
+            "cd ${RemnawavePanel.DIR} && docker compose restart >/dev/null 2>&1 && cd ${RemnawavePanel.NODE_DIR} && docker compose restart >/dev/null 2>&1; " +
+                "for i in \$(seq 1 30); do c=\$(curl -s -o /dev/null -w '%{http_code}' ${RemnawaveApi.HEADERS} http://127.0.0.1:${RemnawavePanel.API_PORT}/api/auth/status); [ \"\$c\" = 200 ] && break; sleep 3; done; echo \$c",
+            accept = { it.out.trim().endsWith("200") }, failHint = "Панель не запустилась (cd ${RemnawavePanel.DIR} && docker compose logs)")))
         val svc = OtherPanels.spec(kind)?.service ?: "x-ui"
         return installer.run(listOf(Step("restart", "Перезапустить панель", "systemctl restart $svc && systemctl is-active $svc", failHint = "Панель не запустилась (journalctl -u $svc)")))
     }

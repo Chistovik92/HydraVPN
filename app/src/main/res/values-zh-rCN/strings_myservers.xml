@@ -213,4 +213,5 @@
     <string name="ms_conn_udp">基于 UDP 工作——端口将以 UDP 方式开放。部分移动网络会限制 UDP，此时请选择 VLESS/Trojan + REALITY。</string>
     <string name="ms_conn_cert">需要服务器证书：请先为面板点击“启用 HTTPS”。</string>
     <string name="ms_panel_pg_hint">Hydra 将安装 Docker（如未安装）、PasarGuard 面板及其节点（使用固定版本的官方安装程序），并以强登录名和密码创建所有者。面板只能通过 Hydra 的安全隧道访问。连接（VLESS / Trojan + REALITY、VMess）可通过“创建连接”按钮创建。安装需要 3–10 分钟。</string>
+    <string name="ms_panel_rw_hint">Hydra 将安装 Docker（如未安装）、固定版本的 Remnawave 面板（含数据库和缓存）、用于其网站的小型代理以及节点，并以强登录名和密码创建所有者。面板只能通过 Hydra 的安全隧道访问。连接（VLESS / Trojan + REALITY）可通过“创建连接”按钮创建。安装需要 3–10 分钟。</string>
 </resources>

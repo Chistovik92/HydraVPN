@@ -28,7 +28,7 @@ object OtherPanels {
     val SUI = Spec(PanelKind.SUI, "alireza0/s-ui", "/usr/local/s-ui", "s-ui", "${ServerOps.STATE_DIR}/sui.installed")
     val XUI = Spec(PanelKind.XUI, "alireza0/x-ui", "/usr/local/x-ui", "x-ui", "${ServerOps.STATE_DIR}/xui-alireza.installed")
 
-    fun spec(kind: PanelKind): Spec? = when (kind) { PanelKind.SUI -> SUI; PanelKind.XUI -> XUI; PanelKind.XUI3, PanelKind.PASARGUARD -> null }
+    fun spec(kind: PanelKind): Spec? = when (kind) { PanelKind.SUI -> SUI; PanelKind.XUI -> XUI; PanelKind.XUI3, PanelKind.PASARGUARD, PanelKind.REMNAWAVE -> null }
 
     fun latestTag(s: Spec, timeoutMs: Int = 15_000): String {
         val c = URL("https://api.github.com/repos/${s.repo}/releases/latest").openConnection() as HttpURLConnection
@@ -59,7 +59,7 @@ object OtherPanels {
         PanelKind.XUI -> "set -e\n/usr/local/x-ui/x-ui setting -username '${p.username}' -password '${p.password}' -port ${p.port} -webBasePath '/${p.path}/'\n" +
             "systemctl restart x-ui\n"
         PanelKind.XUI3 -> error("3x-ui ставится через XuiPanel")
-        PanelKind.PASARGUARD -> error("PasarGuard ставится через PasarGuardPanel")
+        PanelKind.PASARGUARD, PanelKind.REMNAWAVE -> error("${s.kind.title} ставится в Docker своим классом")
     }
 
     fun installSteps(s: Spec, p: Params, openFirewall: Boolean, firewall: String): List<Step> = buildList {
