@@ -27,8 +27,12 @@ object RemnawavePanel {
     fun composeUrl() = "https://raw.githubusercontent.com/remnawave/backend/$TAG/docker-compose-prod.yml"
     fun envUrl() = "https://raw.githubusercontent.com/remnawave/backend/$TAG/.env.sample"
 
-    /** Caddy: http на 127.0.0.1 с заголовками «за прокси по HTTPS»; CSP и HSTS панели убираем — сайт открывается по http через туннель. */
-    const val CADDYFILE = ":$WEB_PORT {\n\treverse_proxy remnawave:$API_PORT {\n\t\theader_up X-Forwarded-Proto https\n\t\theader_up X-Forwarded-For {remote_host}\n" +
+    /**
+     * Caddy: http на 127.0.0.1 с заголовками «за прокси по HTTPS»; CSP и HSTS панели убираем — сайт открывается по http через
+     * туннель. Окно панели на ПК (JavaFX) шлёт `Upgrade: h2c`: Caddy передал бы его панели как «смену протокола», та отвечает
+     * 404, и JavaFX бросает загрузку, — заголовок убираем (WebSocket не трогаем), сервер — только HTTP/1.1.
+     */
+    const val CADDYFILE = "{\n\tservers {\n\t\tprotocols h1\n\t}\n}\n:$WEB_PORT {\n\t@h2c header Upgrade h2c\n\trequest_header @h2c -Upgrade\n\treverse_proxy remnawave:$API_PORT {\n\t\theader_up X-Forwarded-Proto https\n\t\theader_up X-Forwarded-For {remote_host}\n" +
         "\t\theader_down -Content-Security-Policy\n\t\theader_down -Strict-Transport-Security\n\t}\n}\n"
 
     const val OVERRIDE = "services:\n  remnawave:\n    image: remnawave/backend:$TAG\n  hydra-caddy:\n    image: $CADDY\n    container_name: hydra-caddy\n" +

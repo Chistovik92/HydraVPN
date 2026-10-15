@@ -22,6 +22,8 @@ class PanelWebFxLiveTest {
             val eng = javafx.scene.web.WebEngine()
             var tried = false
             eng.loadWorker.stateProperty().addListener { _, _, st ->
+                println("FX state $st ${eng.location}")
+                if (st == javafx.concurrent.Worker.State.FAILED) { result = "FAILED ${eng.loadWorker.exception}"; done.countDown() }
                 if (st == javafx.concurrent.Worker.State.SUCCEEDED && !tried) {
                     tried = true
                     // formOnly: запасной путь выключен — проверяется именно подстановка в форму
@@ -72,6 +74,53 @@ class PanelWebFxLiveTest {
             println("FX formOnly=$formOnly result=$r location=$loc")
             // первый проход — вход формой; второй — сессия WebKit уже есть (cookie движка живут до перезапуска), панель открыта сразу
             if (formOnly) assertEquals("ok", r, "вход формой: $loc")
+            assertTrue(loc.contains("password-field=0"), "панель не открылась: $loc")
+        }
+    }
+
+    /**
+     * 0.8.2-a3: PasarGuard / Remnawave — панели только для самого сервера: сайт через SSH-туннель, вход формой. Панель — стоящая
+     * на стенде (`PasarGuardLiveTest` с HYDRA_XUI_KEEP=1), запись — копия `/etc/hydra/panel.json`. HYDRA_SSH_TEST, HYDRA_FX_TUNNEL=1.
+     */
+    @Test fun formLoginThroughTunnel() {
+        val v = System.getenv("HYDRA_SSH_TEST")
+        assumeTrue(v != null && System.getenv("HYDRA_FX_TUNNEL") != null)
+        val p = v!!.split(":", limit = 4)
+        val login = SshTarget(p[0], p[1].toInt(), p[2], password = p[3])
+        SshConnector.connect(login, SshConnector.fingerprint(login)).use { ssh ->
+            val panel = PanelInstance.fromJson(org.json.JSONObject(ssh.exec("cat ${OtherPanels.PANEL_STATE}").out))
+            assertTrue(panel.kind.tunnelOnly && panel.local)
+            val port = ssh.forwardLocal(System.getenv("HYDRA_FX_RPORT")?.toIntOrNull() ?: PanelWeb.remotePort(panel.baseUrl))
+            val url = PanelWeb.tunnelUrl(panel.baseUrl, port)
+            // HYDRA_FX_HOLD=секунды: туннель остаётся открытым — проверить сайт обычным браузером
+            System.getenv("HYDRA_FX_HOLD")?.toLongOrNull()?.let { println("FX tunnel $url"); System.out.flush(); java.io.File(System.getenv("HYDRA_FX_HOLD_FILE") ?: "fxhold.txt").let { f ->
+                java.io.File(f.path + ".js").writeText(PanelWeb.script(PanelWeb.login(panel, url)!!)); f.writeText(url) }; Thread.sleep(it * 1000) }
+            assertTrue(PanelWebFx.start(), "JavaFX не запустился")
+            java.net.CookieHandler.setDefault(java.net.CookieManager())
+            if (System.getenv("HYDRA_FX_PROBE") != null) {
+                println("FX java " + runCatching { (java.net.URL(url).openConnection() as java.net.HttpURLConnection).let { c -> c.connectTimeout = 5000; c.readTimeout = 10000; "${c.responseCode} ${c.inputStream.readBytes().size} proxy=${java.net.ProxySelector.getDefault()?.select(java.net.URI(url))}" } }.getOrElse { it.toString() })
+                val l = CountDownLatch(1)
+                javafx.application.Platform.runLater {
+                    com.sun.javafx.webkit.WebConsoleListener.setDefaultListener { _, m, ln, src -> println("FX console $src:$ln $m") }
+                    val eng = javafx.scene.web.WebEngine()
+                    eng.loadWorker.exceptionProperty().addListener { _, _, e -> println("FX exception $e") }
+                    eng.locationProperty().addListener { _, _, x -> println("FX location $x") }
+                    eng.loadWorker.stateProperty().addListener { _, _, st -> println("FX state $st") }
+                    val hs = com.sun.net.httpserver.HttpServer.create(java.net.InetSocketAddress("127.0.0.1", 0), 0)
+                    hs.createContext("/") { ex -> val b = "<html><head><title>hello</title></head><body>hi</body></html>".toByteArray(); ex.responseHeaders.add("Content-Type", "text/html;charset=utf-8"); (System.getenv("HYDRA_FX_HDR") ?: "").split("|").filter { ":" in it }.forEach { h -> ex.responseHeaders.add(h.substringBefore(":").trim(), h.substringAfter(":").trim()) }; ex.sendResponseHeaders(200, b.size.toLong()); ex.responseBody.use { it.write(b) } }
+                    hs.start()
+                    val probe = System.getenv("HYDRA_FX_PROBE").removePrefix("1")
+                    eng.load(if (probe == "local") "http://127.0.0.1:${hs.address.port}/" else url + probe)
+                    java.util.Timer(true).schedule(object : java.util.TimerTask() { override fun run() = javafx.application.Platform.runLater {
+                        println("FX probe title=${eng.title} body=" + runCatching { eng.executeScript("document.body?document.body.innerHTML.length:-1") }.getOrNull() +
+                            " ua=" + eng.userAgent)
+                        l.countDown() } }, 20000)
+                }
+                l.await(40, TimeUnit.SECONDS)
+            }
+            val (r, loc) = runLogin(url, PanelWeb.login(panel, url)!!, formOnly = true)
+            println("FX ${panel.kind} result=$r location=$loc")
+            assertEquals("ok", r, "вход формой: $loc")
             assertTrue(loc.contains("password-field=0"), "панель не открылась: $loc")
         }
     }

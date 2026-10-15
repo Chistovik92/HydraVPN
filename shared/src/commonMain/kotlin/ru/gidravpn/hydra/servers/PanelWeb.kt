@@ -35,8 +35,10 @@ object PanelWeb {
         return when (p.kind) {
             PanelKind.SUI -> Login(b + "api/login", "user=${enc(p.username)}&pass=${enc(p.password)}", b, p.username, p.password)
             PanelKind.XUI3, PanelKind.XUI -> Login(b + "login", "username=${enc(p.username)}&password=${enc(p.password)}", b, p.username, p.password)
-            // PasarGuard: форма входа React; запасной путь — запрос токена (JWT кладёт в localStorage сама страница — только форма)
-            PanelKind.PASARGUARD -> Login(b + "api/admin/token", "username=${enc(p.username)}&password=${enc(p.password)}", b + "dashboard/", p.username, p.password)
+            // PasarGuard: сайт — /dashboard/ (в корне заставка), форма входа React; запасной путь — запрос токена (JWT в localStorage
+            // кладёт сама страница — главное форма)
+            PanelKind.PASARGUARD -> java.net.URL(b).let { u -> "${u.protocol}://${u.authority}/" }.let { o ->
+                Login(o + "api/admin/token", "username=${enc(p.username)}&password=${enc(p.password)}", o + "dashboard/", p.username, p.password) }
             // Remnawave: форма входа React; запасной путь — запрос входа (JWT страница кладёт сама — главное форма)
             PanelKind.REMNAWAVE -> Login(b + "api/auth/login", "username=${enc(p.username)}&password=${enc(p.password)}", b, p.username, p.password)
         }

@@ -337,7 +337,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
             onLog(if (api.waitNodeConnected()) "Нода подключена к панели" else "Нода пока не подключилась — проверьте её на сайте панели")
         } catch (e: XuiApiException) { return DeployResult.Failed("PasarGuard: ${e.message}") }
         val host = if (srv.host.contains(':')) "[${srv.host}]" else srv.host
-        val panel = PanelInstance(PanelKind.PASARGUARD, "http://$host:${PasarGuardPanel.PORT}/", user, pass, "", api.version(), local = true)
+        val panel = PanelInstance(PanelKind.PASARGUARD, "http://$host:${PasarGuardPanel.PORT}/dashboard/", user, pass, "", api.version(), local = true)
         installer.run(OtherPanels.stateSteps(panel))
         return DeployResult.Ok(srv.copy(panel = panel))
     }
