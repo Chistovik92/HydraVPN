@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.8.0** (выпуск 15.10.2026, versionCode 69; `master`). Ветка панелей — 0.8.1-b (`claude/0-8-1-alpha`, versionCode 68 — при следующей бете поднять выше 69).
+- Текущая версия: **0.8.1** (выпуск 15.10.2026, versionCode 72; `master`). Следующая — 0.8.2-a в ветке `claude/0-8-2-alpha` (versionCode 73+), план — `docs/versions/0.8.2.md`.
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -178,11 +178,12 @@ desktop/src/lite/…           Hydra Classic (Swing, Windows 7/32-бит, Linux 
 ios/                         SwiftUI + Network Extension: Hydra/ (экраны), HydraTunnel/, HydraAWG/, Packages/HydraKit (общая логика), Packages/CiaDPI, Bridge/ (gomobile)
 scripts/                     release.sh, build-{awg,olcrtc,openflux,byedpi}.sh, check-updates.sh, package-*.sh, desktop-e2e.sh
 docs/   ROUTING · PROTOCOLS · SECURITY · BUILD · ARCHITECTURE · SERVICES · PANELS · ECOSYSTEM · MULTIPLATFORM · ROADMAP · HISTORY · HANDOFF_ROUTERS …
-CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.8.0-rc4 (главный источник контекста); docs/README.md — карта документации
+CHANGELOG.md   — детальный лог по версиям 0.1.0 → 0.8.1 (главный источник контекста); docs/README.md — карта документации
 ```
 
 ## Честные оговорки
 
+- **0.8.1 — панели 3x-ui, s-ui, x-ui (выпуск 15.10.2026 = 0.8.1-rc2).** Проверено: тесты Android 196 / ПК 150; живой Linux (WSL) — три панели, трафик через REALITY ядром Xray; эмулятор с release-APK. **Не проверено:** телефон и VPS владельца на rc2 (трафик из РФ через Xray, сертификаты s-ui/x-ui, WebView, туннель); AWG arm64/armv7.
 - **0.8.1-b — панели (бета, ветка `claude/0-8-1-alpha`).** Проверено: тесты Android 195 / ПК 132; живой Linux (WSL): 3x-ui, s-ui 1.6.4, x-ui 1.14.0 —
   установка, вход, второе устройство, удаление и очистка; AmneziaWG — весь путь rc4. **Не проверено:** VPS, телефон владельца, HTTPS панелей, WebView.
 - **Windows: Kaspersky (0.7.20+) может блокировать Hydra** (`PDM:Trojan.Win32.Generic`) — не исправлено: предупреждение в README и заметках релизов, план — `docs/versions/0.7.21.md`.
