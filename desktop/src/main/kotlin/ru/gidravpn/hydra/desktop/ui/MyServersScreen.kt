@@ -504,8 +504,8 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
         if (p.token.isNotBlank()) {
             OutlinedButton(onClick = { m.loadPanelClients(srv.id) }, enabled = !busy) { Text("Пользователи") }
             OutlinedButton(onClick = onAddUser, enabled = !busy) { Text("Добавить пользователя") }
-            if (p.kind == ru.gidravpn.hydra.servers.PanelKind.XUI3) OutlinedButton(onClick = { createConn = true }, enabled = !busy) { Text("Создать подключение") }
         }
+        if (ru.gidravpn.hydra.servers.OtherPanelConnections.canCreate(srv)) OutlinedButton(onClick = { createConn = true }, enabled = !busy) { Text("Создать подключение") }
     }
     if (p.token.isBlank()) Text("Пользователей и подключения заводите на сайте панели; ссылку подключения из панели можно вставить в «Серверы».",
         fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -524,8 +524,8 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
             title = { Text("Новое подключение в панели") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Hydra создаст его в 3x-ui и подключит к основному пользователю панели — его подписка в «Серверах» получит подключение сама.", fontSize = 13.sp)
-                    ChipRow { ru.gidravpn.hydra.servers.XuiConnection.entries.forEach { t -> FilterChip(selected = type == t, onClick = { type = t }, label = { Text(t.title) }) } }
+                    Text("Hydra создаст его в панели и подключит к основному пользователю панели — его подписка в «Серверах» получит подключение сама.", fontSize = 13.sp)
+                    ChipRow { ru.gidravpn.hydra.servers.OtherPanelConnections.typesFor(p.kind).forEach { t -> FilterChip(selected = type == t, onClick = { type = t }, label = { Text(t.title) }) } }
                     if (type.reality) ChipRow {
                         Text("Маскировка:", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
                         XuiPanel.RealityMask.entries.forEach { r -> FilterChip(selected = mask == r, onClick = { mask = r }, label = { Text(r.sni) }) }

@@ -208,7 +208,7 @@
     <!-- 0.8.2-a2: все типы подключений 3x-ui -->
     <string name="ms_conn_create">Створити підключення</string>
     <string name="ms_conn_title">Нове підключення в панелі</string>
-    <string name="ms_conn_text">Hydra створить його в 3x-ui і підключить до основного користувача панелі — його підписка в «Серверах» отримає підключення сама.</string>
+    <string name="ms_conn_text">Hydra створить його в панелі і підключить до основного користувача панелі — його підписка в «Серверах» отримає підключення сама.</string>
     <string name="ms_conn_port">Порт</string>
     <string name="ms_conn_udp">Працює по UDP — порт відкриється як UDP. Частина мобільних мереж ріже UDP: тоді виберіть VLESS/Trojan + REALITY.</string>
     <string name="ms_conn_cert">Потрібен сертифікат сервера: спершу натисніть «Увімкнути HTTPS» у панелі.</string>

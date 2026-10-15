@@ -209,7 +209,7 @@
     <!-- 0.8.2-a2: все типы подключений 3x-ui -->
     <string name="ms_conn_create">Create connection</string>
     <string name="ms_conn_title">New connection in the panel</string>
-    <string name="ms_conn_text">Hydra creates it in 3x-ui and adds it to the panel\'s main user: their subscription in Servers picks it up by itself.</string>
+    <string name="ms_conn_text">Hydra creates it in the panel and adds it to the panel\'s main user: their subscription in Servers picks it up by itself.</string>
     <string name="ms_conn_port">Port</string>
     <string name="ms_conn_udp">Works over UDP: the port will be opened as UDP. Some mobile networks in Russia throttle UDP — then pick VLESS/Trojan + REALITY.</string>
     <string name="ms_conn_cert">Needs a server certificate: first tap «Enable HTTPS» for the panel.</string>

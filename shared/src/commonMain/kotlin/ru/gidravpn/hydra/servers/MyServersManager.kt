@@ -592,6 +592,7 @@ class MyServersManager(
      * в файрволе (UDP для WireGuard, AmneziaWG, Hysteria 2, TUIC) и API идёт по SSH; иначе — напрямую по токену.
      */
     fun createPanelConnection(id: String, type: XuiConnection, port: Int, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK) {
+        if (find(id)?.panel?.kind == PanelKind.XUI) return createXuiAlirezaConnection(id, type, port, mask)
         val srv = find(id)?.takeIf { it.panel?.kind == PanelKind.XUI3 && it.panel.token.isNotBlank() } ?: return
         if (port !in 1..65535) return _ui.update { it.copy(error = "Порт — число от 1 до 65535", opServer = id) }
         fun create(s: MyServer, api: XuiApi): Pair<String, List<String>> {
@@ -629,6 +630,66 @@ class MyServersManager(
             show(email, links, if (fwStep != null) "Порт $port/${if (type.udp) "udp" else "tcp"} открыт в файрволе" else "")
         }
         withPanel(id) { s, api -> val (email, links) = create(s, api); show(email, links, "Откройте порт $port/${if (type.udp) "udp" else "tcp"} в файрволе хостинга, если он закрыт") }
+    }
+
+    /**
+     * Подключение в x-ui (alireza0, 0.8.2-a2): по SSH (API x-ui — cookie-сессией на самом сервере). Учётные данные придумывает
+     * Hydra; все подключения Hydra в этой панели — у одного пользователя-подписки ([OtherPanelConnections.subId]), подписку панели
+     * Hydra включает сама (порт 2096). Ссылка — из этой подписки; WireGuard x-ui в подписку не кладёт — конфиг собирает Hydra.
+     */
+    private fun createXuiAlirezaConnection(id: String, type: XuiConnection, port: Int, mask: XuiPanel.RealityMask) {
+        val srv0 = find(id)?.takeIf { it.fingerprint.isNotBlank() } ?: return
+        if (type !in OtherPanelConnections.XUI) return _ui.update { it.copy(error = "${type.title} в x-ui нет — выберите другой тип", opServer = id) }
+        if (port !in 1..65535) return _ui.update { it.copy(error = "Порт — число от 1 до 65535", opServer = id) }
+        op(id, "Создаю подключение ${type.title} в x-ui…") { s, ssh, inst ->
+            val p = s.panel ?: throw OpFailed("Панели нет")
+            inst.addSecret(p.password)
+            val db = OtherPanels.dbPath(PanelKind.XUI)
+            fun setting(k: String) = ssh.exec("sqlite3 $db \"select value from settings where key='$k'\" 2>/dev/null").out.trim()
+            // sqlite3 нужен и для чтения настроек — ставится тем же шагом, что пишет их
+            inst.run(listOf(Step("xui-sqlite", "Проверить доступ к настройкам x-ui", OtherPanels.settingsCommand(PanelKind.XUI, emptyMap()) + " >/dev/null; command -v sqlite3",
+                failHint = "Не удалось поставить sqlite3")))
+            if (setting("subEnable") != "true") {
+                if (!inst.run(listOf(Step("xui-sub", "Включить подписку x-ui (порт 2096): по ней Hydra забирает подключения",
+                        OtherPanels.settingsCommand(PanelKind.XUI, mapOf("subEnable" to "true")) + " && systemctl restart x-ui && sleep 3 && systemctl is-active x-ui",
+                        accept = { r -> r.out.lineSequence().any { it.trim() == "active" } }, failHint = "x-ui не запустилась")))) throw OpFailed(_ui.value.error ?: "Подписку x-ui включить не удалось")
+            }
+            val host = runCatching { java.net.URL(p.baseUrl).host }.getOrNull()?.removePrefix("[")?.removeSuffix("]")?.ifBlank { null } ?: s.host
+            val cert = if (!type.needsCert) null else {
+                val crt = setting("webCertFile"); val key = setting("webKeyFile")
+                if (crt.isBlank() || key.isBlank()) throw OpFailed("Для ${type.title} нужен сертификат сервера: сначала нажмите «Включить HTTPS» у панели")
+                XuiConnection.Companion.Cert(crt, key, host)
+            }
+            SessionPanelApi(ssh, p).use { api ->
+                try {
+                    api.login()
+                    if (api.xuiInbounds().let { a -> (0 until a.length()).any { a.getJSONObject(it).optInt("port") == port } })
+                        throw XuiApiException("Порт $port уже занят другим подключением панели — выберите другой")
+                    val keys = if (type.reality) {
+                        val out = ssh.exec("/usr/local/x-ui/bin/xray-linux-* x25519 2>/dev/null").out
+                        val priv = Regex("(?i)private\\s*key:\\s*(\\S+)").find(out)?.groupValues?.get(1)
+                        val pub = Regex("(?i)(public\\s*key|password)[^:]*:\\s*(\\S+)").find(out)?.groupValues?.get(2)
+                        if (priv == null || pub == null) throw XuiApiException("Не удалось получить ключи REALITY от Xray панели")
+                        priv to pub
+                    } else ("" to "")
+                    val creds = OtherPanelConnections.newCreds(type, OtherPanelConnections.subId(p))
+                    inst.addSecret(creds.uuid); inst.addSecret(creds.password); inst.addSecret(creds.ssKey); inst.addSecret(creds.wgPriv)
+                    val ib = OtherPanelConnections.xuiInbound(type, port, creds, mask, keys.first, keys.second, cert)
+                    api.xuiAddInbound(ib)
+                    val pre = service.preflight(ssh, 0)
+                    val proto = if (type.udp) "udp" else "tcp"
+                    ServerOps.openPortStep(pre.firewall, "$port/$proto")?.let { inst.run(listOf(it)) }
+                    ServerOps.openPortStep(pre.firewall, "2096/tcp")?.let { inst.run(listOf(it)) }
+                    Thread.sleep(3000)   // x-ui применяет инбаунд перезапуском Xray
+                    val subHttps = setting("subCertFile").isNotBlank()
+                    val subUrl = "${if (subHttps) "https" else "http"}://${if (':' in host) "[$host]" else host}:2096/sub/${creds.subId}"
+                    val links = if (type == XuiConnection.WIREGUARD) listOf(OtherPanelConnections.wireguardConf(ib.getJSONObject("settings").getString("secretKey"), host, port, creds))
+                        else api.subscription(2096, "/sub/", creds.subId, subHttps).filter { l -> ":$port" in l.substringBefore("#") || linkBodyHasPort(l, port) }
+                    _ui.update { it.copy(shown = "${type.title} · x-ui" to links.joinToString("\n").ifBlank { subUrl },
+                        log = it.log + "Создано подключение ${type.title} на порту $port/$proto. Подписка всех подключений Hydra в этой панели: $subUrl") }
+                } catch (e: XuiApiException) { throw OpFailed("Панель: ${e.message}") }
+            }
+        }
     }
 
     /** У ссылок vmess:// и vpn:// порт внутри base64. */
