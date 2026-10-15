@@ -67,4 +67,12 @@ class UpdateChannelTest {
         assertEquals("0.8.2-a", UpdateFeed.pickNewest(l, UpdateChannel.DEV)?.version)
         assertTrue(UpdateFeed.isNewer("0.8.2-a", "0.8.1"))
     }
+
+    /** 0.8.2-a2: стоящему на 0.8.2-a «Разработчик» предлагает a2; остальные уровни — 0.8.1. */
+    @Test fun alpha2After082a() {
+        val l = UpdateFeed.parseList(JSONArray(listOf(rel("0.8.2-a2", true), rel("0.8.2-a", true), rel("0.8.1", false))).toString())
+        assertEquals("0.8.2-a2", UpdateFeed.pickNewest(l, UpdateChannel.DEV)?.version)
+        assertEquals("0.8.1", UpdateFeed.pickNewest(l, UpdateChannel.RC)?.version)
+        assertTrue(UpdateFeed.isNewer("0.8.2-a2", "0.8.2-a") && !UpdateFeed.isNewer("0.8.2-a", "0.8.2-a2"))
+    }
 }
