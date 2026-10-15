@@ -23,6 +23,8 @@ object XuiTraffic {
         .put("inbounds", JSONArray().put(JSONObject().put("type", "mixed").put("tag", "in").put("listen", "127.0.0.1").put("listen_port", port)))
         .put("outbounds", JSONArray().put(SingBoxConfigBuilder.nodeOutbound(p, "proxy")!!).put(JSONObject().put("type", "direct").put("tag", "direct")))
         .put("route", JSONObject().put("final", "proxy"))
+        // как в приложении: WireGuard — эндпоинтом sing-box 1.11+ (старый outbound не запускается без переменной окружения)
+        .also { ru.gidravpn.hydra.desktop.core.DesktopConfig.convertWireGuard(it) }
 
     /**
      * То же ядром Xray Hydra: конфиг — [ru.gidravpn.hydra.data.subscription.XrayConfigBuilder] (как в приложении), вход — SOCKS,
@@ -41,7 +43,7 @@ object XuiTraffic {
             val out = c.inputStream.readBytes().toString(Charsets.UTF_8).trim(); c.waitFor()
             val parts = out.split(" ")
             return if (parts.getOrNull(0)?.startsWith("2") == true && (parts.getOrNull(1)?.toDoubleOrNull() ?: 0.0) > 100_000) "ok ${parts[1].toDouble().toInt() / 1024} КБ за ${parts.getOrNull(2)} с"
-            else "curl: $out; ${log.readText().takeLast(1200)}"
+            else "curl: $out; ${log.readText().lines().filter { "Penetrates" !in it && "A unified" !in it }.takeLast(8).joinToString(" | ").takeLast(1200)}"
         } finally {
             proc.destroy(); proc.waitFor()
             dir.deleteRecursively()

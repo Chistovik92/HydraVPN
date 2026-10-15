@@ -248,7 +248,7 @@ object DesktopConfig {
     }
 
     /** outbound type=wireguard (удалён в sing-box 1.13) → endpoint wireguard. */
-    private fun convertWireGuard(root: JSONObject) {
+    internal fun convertWireGuard(root: JSONObject) {
         val outbounds = root.getJSONArray("outbounds")
         val idx = (0 until outbounds.length()).firstOrNull {
             outbounds.getJSONObject(it).optString("type") == "wireguard"

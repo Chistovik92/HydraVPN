@@ -135,6 +135,14 @@ class XuiApi(private val t: XuiTransport) {
      */
     fun subscriptionUrl(host: String, subId: String): String? = XuiPanel.subscriptionUrl(settings(), host, subId)
 
+    /**
+     * Подключить уже существующего пользователя к другому инбаунду (0.8.2-a2, `POST /panel/api/clients/{email}/attach`): его
+     * подписка сама получает новое подключение, учётные данные под протокол панель заполняет сама.
+     */
+    fun attachClient(email: String, inboundIds: List<Int>) {
+        obj(t.call("POST", "/panel/api/clients/${java.net.URLEncoder.encode(email, "UTF-8")}/attach", JSONObject().put("inboundIds", JSONArray(inboundIds)).toString()))
+    }
+
     fun delClient(email: String) { obj(t.call("POST", "/panel/api/clients/del/${java.net.URLEncoder.encode(email, "UTF-8")}")) }
 
     /** Готовые ссылки (`vless://…`) клиента по всем его инбаундам. */
