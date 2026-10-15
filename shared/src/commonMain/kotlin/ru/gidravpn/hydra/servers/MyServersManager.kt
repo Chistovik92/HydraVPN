@@ -593,6 +593,7 @@ class MyServersManager(
      */
     fun createPanelConnection(id: String, type: XuiConnection, port: Int, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK) {
         if (find(id)?.panel?.kind == PanelKind.XUI) return createXuiAlirezaConnection(id, type, port, mask)
+        if (find(id)?.panel?.kind == PanelKind.SUI) return createSuiConnection(id, type, port, mask)
         val srv = find(id)?.takeIf { it.panel?.kind == PanelKind.XUI3 && it.panel.token.isNotBlank() } ?: return
         if (port !in 1..65535) return _ui.update { it.copy(error = "Порт — число от 1 до 65535", opServer = id) }
         fun create(s: MyServer, api: XuiApi): Pair<String, List<String>> {
@@ -690,6 +691,76 @@ class MyServersManager(
                 } catch (e: XuiApiException) { throw OpFailed("Панель: ${e.message}") }
             }
         }
+    }
+
+    /**
+     * Подключение в s-ui (0.8.2-a2): по SSH (API s-ui — cookie-сессией на сервере). Объект TLS (REALITY — ключами от самой s-ui,
+     * или сертификат панели для Hysteria 2 / TUIC) → инбаунд sing-box → пользователь с учётными данными Hydra; ссылку s-ui
+     * считает сама (`links` пользователя).
+     */
+    private fun createSuiConnection(id: String, type: XuiConnection, port: Int, mask: XuiPanel.RealityMask) {
+        if (find(id)?.fingerprint.isNullOrBlank()) return
+        if (type !in OtherPanelConnections.SUI) return _ui.update { it.copy(error = "${type.title} в s-ui нет — выберите другой тип", opServer = id) }
+        if (port !in 1..65535) return _ui.update { it.copy(error = "Порт — число от 1 до 65535", opServer = id) }
+        op(id, "Создаю подключение ${type.title} в s-ui…") { s, ssh, inst ->
+            val p = s.panel ?: throw OpFailed("Панели нет")
+            inst.addSecret(p.password)
+            val host = runCatching { java.net.URL(p.baseUrl).host }.getOrNull()?.removePrefix("[")?.removeSuffix("]")?.ifBlank { null } ?: s.host
+            SessionPanelApi(ssh, p).use { api ->
+                try {
+                    api.login()
+                    val state = api.suiLoad()
+                    val inbounds = state.optJSONArray("inbounds") ?: org.json.JSONArray()
+                    if ((0 until inbounds.length()).any { inbounds.getJSONObject(it).optInt("listen_port") == port })
+                        throw XuiApiException("Порт $port уже занят другим подключением панели — выберите другой")
+                    val creds = OtherPanelConnections.newCreds(type, OtherPanelConnections.subId(p))
+                    inst.addSecret(creds.uuid); inst.addSecret(creds.password); inst.addSecret(creds.ssKey)
+                    val tag = creds.email
+                    // TLS: REALITY или сертификат панели
+                    val tlsId = when {
+                        type.reality -> {
+                            val kp = org.json.JSONArray(api.suiRaw("api/keypairs?k=reality").let { org.json.JSONObject(it).opt("obj").toString() })
+                            val priv = (0 until kp.length()).map { kp.getString(it) }.firstOrNull { it.startsWith("PrivateKey") }?.substringAfter(":")?.trim()
+                            val pub = (0 until kp.length()).map { kp.getString(it) }.firstOrNull { it.startsWith("PublicKey") }?.substringAfter(":")?.trim()
+                            if (priv == null || pub == null) throw XuiApiException("s-ui не выдала ключи REALITY")
+                            val sid = XuiPanel.random(8).lowercase().map { "%02x".format(it.code % 256) }.joinToString("").take(16)
+                            api.suiSave("tls", "new", OtherPanelConnections.suiRealityTls(tag, mask.sni, priv, pub, sid))
+                            suiId(api, "tls", tag)
+                        }
+                        type.needsCert -> {
+                            val db = OtherPanels.dbPath(PanelKind.SUI)
+                            fun setting(k: String) = ssh.exec("sqlite3 $db \"select value from settings where key='$k'\" 2>/dev/null").out.trim()
+                            val crt = setting("webCertFile"); val key = setting("webKeyFile")
+                            if (crt.isBlank() || key.isBlank()) throw XuiApiException("Для ${type.title} нужен сертификат сервера: сначала нажмите «Включить HTTPS» у панели")
+                            api.suiSave("tls", "new", OtherPanelConnections.suiCertTls(tag, XuiConnection.Companion.Cert(crt, key, host), listOf("h3")))
+                            suiId(api, "tls", tag)
+                        }
+                        else -> 0
+                    }
+                    api.suiSave("inbounds", "new", OtherPanelConnections.suiInbound(type, tag, port, tlsId, creds.ssKey))
+                    val inboundId = suiId(api, "inbounds", tag, key = "tag")
+                    api.suiSave("clients", "new", OtherPanelConnections.suiClient(creds, inboundId))
+                    val pre = service.preflight(ssh, 0)
+                    val proto = if (type.udp) "udp" else "tcp"
+                    ServerOps.openPortStep(pre.firewall, "$port/$proto")?.let { inst.run(listOf(it)) }
+                    Thread.sleep(2000)
+                    // список пользователей в api/load — без ссылок; целиком (со ссылками) — api/clients?id=
+                    val cid = suiId(api, "clients", creds.email)
+                    val client = runCatching { org.json.JSONObject(api.suiRaw("api/clients?id=$cid")).optJSONObject("obj")?.optJSONArray("clients")?.optJSONObject(0) }.getOrNull()
+                    val links = client?.let(OtherPanelConnections::suiLinks).orEmpty().filter { l -> ":$port" in l.substringBefore("#") || linkBodyHasPort(l, port) }
+                    _ui.update { it.copy(shown = "${type.title} · s-ui" to links.joinToString("\n").ifBlank { "Подключение создано; ссылка — на сайте панели у пользователя ${creds.email}" },
+                        log = it.log + "Создано подключение ${type.title} на порту $port/$proto (пользователь ${creds.email})") }
+                } catch (e: XuiApiException) { throw OpFailed("Панель: ${e.message}") }
+                catch (e: org.json.JSONException) { throw OpFailed("Панель ответила не так, как ожидалось: ${e.message}") }
+            }
+        }
+    }
+
+    /** id объекта s-ui по имени ([key] = name) или тегу. */
+    private fun suiId(api: SessionPanelApi, obj: String, value: String, key: String = "name"): Int {
+        val a = api.suiLoad().optJSONArray(obj) ?: throw XuiApiException("s-ui не вернула список $obj")
+        return (0 until a.length()).map { a.getJSONObject(it) }.firstOrNull { it.optString(key) == value }?.optInt("id")
+            ?: throw XuiApiException("s-ui не сохранила $obj «$value»")
     }
 
     /** У ссылок vmess:// и vpn:// порт внутри base64. */

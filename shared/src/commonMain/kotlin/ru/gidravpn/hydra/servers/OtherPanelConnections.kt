@@ -11,17 +11,77 @@ import java.security.SecureRandom
  */
 object OtherPanelConnections {
     /**
-     * Что Hydra создаёт в x-ui v1.14.0 — проверено трафиком на стенде (0.8.2-a2). AmneziaWG и TUIC в x-ui нет; Hysteria 2 x-ui
-     * принимает, но на стенде клиент не дождался рукопожатия (своя версия Xray) — пока не предлагается, есть в 3x-ui.
+     * Что Hydra создаёт в x-ui v1.14.0 — проверено трафиком на стенде (0.8.2-a2; UDP — клиентом на самом стенде). AmneziaWG и
+     * TUIC в x-ui нет.
      */
     val XUI = listOf(XuiConnection.VLESS_GRPC_REALITY, XuiConnection.VLESS_XHTTP_REALITY, XuiConnection.VLESS_TCP_REALITY, XuiConnection.TROJAN_REALITY,
-        XuiConnection.VMESS_WS, XuiConnection.SHADOWSOCKS_2022, XuiConnection.WIREGUARD)
+        XuiConnection.VMESS_WS, XuiConnection.SHADOWSOCKS_2022, XuiConnection.WIREGUARD, XuiConnection.HYSTERIA2)
+
+    /**
+     * Что Hydra создаёт в s-ui 1.6.4 (sing-box). XHTTP в sing-box нет; WireGuard в s-ui — «эндпоинт», а не инбаунд, и
+     * AmneziaWG нет вовсе — для них есть 3x-ui и AmneziaWG от самой Hydra.
+     */
+    val SUI = listOf(XuiConnection.VLESS_TCP_REALITY, XuiConnection.VLESS_GRPC_REALITY, XuiConnection.TROJAN_REALITY, XuiConnection.VMESS_WS,
+        XuiConnection.SHADOWSOCKS_2022, XuiConnection.HYSTERIA2, XuiConnection.TUIC)
 
     /** Какие подключения Hydra умеет создавать в панели этого вида (пусто — только на сайте панели). */
     fun typesFor(kind: PanelKind): List<XuiConnection> = when (kind) {
         PanelKind.XUI3 -> XuiConnection.entries
         PanelKind.XUI -> XUI
-        PanelKind.SUI -> emptyList()
+        PanelKind.SUI -> SUI
+    }
+
+    // ------------------------------------------------------------------------------------------ s-ui (sing-box)
+
+    /** Объект TLS s-ui с REALITY ([sni] — сайт маскировки, ключи — от `api/keypairs?k=reality`). */
+    fun suiRealityTls(name: String, sni: String, priv: String, pub: String, sid: String): JSONObject = JSONObject().put("name", name)
+        .put("server", JSONObject().put("enabled", true).put("server_name", sni)
+            .put("reality", JSONObject().put("enabled", true).put("handshake", JSONObject().put("server", sni).put("server_port", 443))
+                .put("private_key", priv).put("short_id", JSONArray(listOf(sid)))))
+        .put("client", JSONObject().put("utls", JSONObject().put("enabled", true).put("fingerprint", "chrome"))
+            .put("reality", JSONObject().put("enabled", true).put("public_key", pub).put("short_id", sid)))
+
+    /** Объект TLS s-ui с сертификатом сервера (Hysteria 2, TUIC). */
+    fun suiCertTls(name: String, cert: XuiConnection.Companion.Cert, alpn: List<String>): JSONObject = JSONObject().put("name", name)
+        .put("server", JSONObject().put("enabled", true).put("server_name", cert.serverName).put("alpn", JSONArray(alpn))
+            .put("certificate_path", cert.certFile).put("key_path", cert.keyFile))
+        .put("client", JSONObject().put("alpn", JSONArray(alpn)))
+
+    /** Инбаунд s-ui (формат sing-box) для [type]; [tlsId] — объект TLS (0 — без TLS). */
+    fun suiInbound(type: XuiConnection, tag: String, port: Int, tlsId: Int, ssServerKey: String, r: SecureRandom = SecureRandom()): JSONObject {
+        require(type in SUI) { "${type.title} в s-ui нет" }
+        val o = JSONObject().put("tag", tag).put("listen", "::").put("listen_port", port)
+        when (type) {
+            XuiConnection.VLESS_TCP_REALITY -> o.put("type", "vless").put("tls_id", tlsId).put("transport", JSONObject())
+            XuiConnection.VLESS_GRPC_REALITY -> o.put("type", "vless").put("tls_id", tlsId)
+                .put("transport", JSONObject().put("type", "grpc").put("service_name", XuiPanel.random(10, r).lowercase()))
+            XuiConnection.TROJAN_REALITY -> o.put("type", "trojan").put("tls_id", tlsId).put("transport", JSONObject())
+            XuiConnection.VMESS_WS -> o.put("type", "vmess").put("tls_id", 0)
+                .put("transport", JSONObject().put("type", "ws").put("path", "/" + XuiPanel.random(10, r).lowercase()))
+            XuiConnection.SHADOWSOCKS_2022 -> o.put("type", "shadowsocks").put("method", "2022-blake3-aes-256-gcm").put("password", ssServerKey)
+            XuiConnection.HYSTERIA2 -> o.put("type", "hysteria2").put("tls_id", tlsId)
+            XuiConnection.TUIC -> o.put("type", "tuic").put("tls_id", tlsId).put("congestion_control", "bbr")
+            else -> error("${type.title} в s-ui нет")
+        }
+        return o
+    }
+
+    /** Клиент s-ui: учётные данные под каждый протокол (как `randomConfigs` фронтенда s-ui), подключён к [inboundId]. */
+    fun suiClient(c: Creds, inboundId: Int): JSONObject = JSONObject().put("enable", true).put("name", c.email)
+        .put("config", JSONObject()
+            .put("vless", JSONObject().put("name", c.email).put("uuid", c.uuid).put("flow", ""))
+            .put("vmess", JSONObject().put("name", c.email).put("uuid", c.uuid).put("alterId", 0))
+            .put("trojan", JSONObject().put("name", c.email).put("password", c.password))
+            .put("shadowsocks", JSONObject().put("name", c.email).put("password", c.ssKey))
+            .put("tuic", JSONObject().put("name", c.email).put("uuid", c.uuid).put("password", c.password))
+            .put("hysteria2", JSONObject().put("name", c.email).put("password", c.password)))
+        .put("inbounds", JSONArray(listOf(inboundId))).put("links", JSONArray()).put("volume", 0).put("expiry", 0)
+        .put("up", 0).put("down", 0).put("desc", "Hydra").put("group", "").put("remark", "")
+
+    /** Ссылки клиента s-ui из ответа `api/load`: массив строк или объектов с `uri`. */
+    fun suiLinks(client: JSONObject): List<String> {
+        val a = client.optJSONArray("links") ?: return emptyList()
+        return (0 until a.length()).mapNotNull { i -> a.opt(i).let { v -> (v as? JSONObject)?.optString("uri") ?: (v as? String) } }.filter { "://" in it }
     }
 
     /** Можно ли создать подключение из приложения: 3x-ui — по токену API, остальные — по SSH. */

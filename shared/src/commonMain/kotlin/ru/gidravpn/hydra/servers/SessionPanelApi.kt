@@ -14,11 +14,12 @@ class SessionPanelApi(private val ssh: SshSession, private val panel: PanelInsta
     val local = "${u.protocol}://127.0.0.1:${u.port}${u.path.trimEnd('/')}/"
     private val jar = "/tmp/.hydra-panel-${XuiPanel.random(8).lowercase()}.cookie"
     private val host = u.host.removePrefix("[").removeSuffix("]")
-    /** s-ui без заголовка Origin вход не принимает. */
-    private val origin = "${u.protocol}://127.0.0.1:${u.port}"
+    /** Внешний адрес панели с портом: s-ui сверяет Origin с Host и без совпадения молча отказывает (пустой ответ). */
+    private val authority = if (u.port > 0) "${u.host}:${u.port}" else u.host
+    private val origin = "${u.protocol}://$authority"
 
     private fun curl(args: String): String {
-        val r = ssh.exec("umask 077; curl -ksS -m 25 -b $jar -c $jar -H ${Installer.shq("Host: $host")} $args")
+        val r = ssh.exec("umask 077; curl -ksS -m 25 -b $jar -c $jar -H ${Installer.shq("Host: $authority")} $args")
         if (r.out.isBlank()) throw XuiApiException("Панель не ответила (curl код ${r.exit})")
         return r.out
     }

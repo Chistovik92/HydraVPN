@@ -50,6 +50,21 @@ object XuiTraffic {
         }
     }
 
+    /**
+     * Тот же конфиг Hydra, но sing-box запускается **на самом стенде** (`/tmp/sb/sing-box` в WSL): UDP-протоколы (Hysteria 2, TUIC,
+     * WireGuard) с Windows до WSL идут через TUN рабочей Hydra владельца и теряются — проверка с самого стенда честнее.
+     */
+    fun throughOnServer(ssh: ru.gidravpn.hydra.servers.SshSession, p: ServerProfile): String {
+        ssh.exec("[ -x /tmp/sb/sing-box ] || (cd /tmp && curl -fsSL -o sb.tgz https://github.com/SagerNet/sing-box/releases/download/v1.12.25/sing-box-1.12.25-linux-amd64.tar.gz && mkdir -p sb && tar xzf sb.tgz -C sb --strip-components=1)")
+        ssh.upload(config(p, 20911).toString(2).toByteArray(), "/tmp/hydra-sb.json", 384)
+        val r = ssh.exec("(/tmp/sb/sing-box run -c /tmp/hydra-sb.json > /tmp/hydra-sb.log 2>&1 &); sleep 2; " +
+            "curl -s -o /dev/null -w '%{http_code} %{size_download} %{time_total}' --max-time 30 -x http://127.0.0.1:20911 'https://speed.cloudflare.com/__down?bytes=2000000'; " +
+            "pkill -f /tmp/hydra-sb.json; echo; tail -2 /tmp/hydra-sb.log; rm -f /tmp/hydra-sb.json")
+        val parts = r.out.lines().first().split(" ")
+        return if (parts.getOrNull(0)?.startsWith("2") == true && (parts.getOrNull(1)?.toDoubleOrNull() ?: 0.0) > 100_000) "ok ${parts[1].toDouble().toInt() / 1024} КБ за ${parts.getOrNull(2)} с (на стенде)"
+            else "на стенде: ${r.out.take(400)}"
+    }
+
     /** «ok …» — страница скачана; иначе причина и хвост журнала sing-box. */
     fun through(singBox: String, p: ServerProfile, url: String = "https://speed.cloudflare.com/__down?bytes=2000000"): String {
         val port = java.net.ServerSocket(0).use { it.localPort }
