@@ -39,6 +39,29 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
             }
         } else if (s.awg != null) r = r.copy(awg = null, clients = emptyList())
 
+        // панель, поставленная по SSH, исчезла с сервера — убираем; подключённую без SSH (panelOnly) не трогаем
+        if (s.panel != null && !s.panelOnly) {
+            val present = when (s.panel.kind) { PanelKind.SUI -> st.suiInstalled; else -> st.xuiInstalled }
+            if (!present) r = r.copy(panel = null)
+        }
+        // копия записи панели на сервере (любой вид) — второе устройство берёт панель под управление
+        if (r.panel == null && st.panelStateJson.trim().startsWith("{")) {
+            runCatching { PanelInstance.fromJson(org.json.JSONObject(st.panelStateJson)) }.getOrNull()
+                ?.takeIf { (it.kind == PanelKind.SUI && st.suiInstalled) || (it.kind != PanelKind.SUI && st.xuiInstalled) }
+                ?.let { r = r.copy(panel = it) }
+        }
+        // панель поставлена Hydra с другого устройства — берём под управление по её install-result.env
+        if (r.panel == null && st.xuiInstalled && st.xuiByHydra && st.xuiResult.isNotBlank()) {
+            val res = XuiPanel.parseResult(st.xuiResult)
+            val token = res["XUI_API_TOKEN"].orEmpty()
+            val port = res["XUI_PANEL_PORT"]?.toIntOrNull()
+            if (token.isNotBlank() && port != null) {
+                val path = res["XUI_WEB_BASE_PATH"].orEmpty().trim('/')
+                r = r.copy(panel = PanelInstance(PanelKind.XUI3, "http://${if (s.host.contains(':')) "[${s.host}]" else s.host}:$port/$path",
+                    res["XUI_USERNAME"].orEmpty(), res["XUI_PASSWORD"].orEmpty(), token, res["XUI_VERSION"].orEmpty()))
+            }
+        }
+
         val ofxStates = st.ofxStateJson.mapNotNull { runCatching { OfxNodeSpec.fromJson(org.json.JSONObject(it)) }.getOrNull() }
         val ofx = s.ofx?.takeIf { it.channel in st.ofxChannels } ?: ofxStates.firstOrNull { it.channel in st.ofxChannels }?.copy(host = s.host)
         r = r.copy(ofx = ofx)
@@ -122,11 +145,200 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
         installer.run(listOf(Step("restart", "Перезапустить узел OpenFlux «${it.channel}»", OpenFluxNode.restartCommand(it.channel), failHint = "Узел не запустился")))
     } ?: false
 
+    // ---------------------------------------------------------------------------------------------------- Панель 3x-ui (0.8.1)
+
+    /** Что будет выполнено при установке панели — для показа до запуска. */
+    fun planPreviewXui(tag: String, openFirewall: Boolean, pre: Preflight, sslIp: Boolean = false, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK,
+                       transport: XuiPanel.Transport = XuiPanel.Transport.GRPC): List<Step> =
+        XuiPanel.installSteps(XuiPanel.InstallParams(tag, "••••", "••••", 0, "••••", sslIp), openFirewall, pre.firewall) + listOf(
+            Step("xui-access", "Создать доступ: инбаунд VLESS + ${transport.title} + Reality (маскировка под ${mask.sni}) и клиент — через API панели, по токену",
+                "curl … /panel/api/inbounds/add, /panel/api/clients/add"),
+            Step("xui-import", "Добавить подписку клиента в «Серверы» — правки на сайте панели будут приходить сами"),
+        )
+
+    fun deployXui(
+        ssh: SshSession, srv: MyServer, tag: String, accessPort: Int, openFirewall: Boolean, pre: Preflight,
+        installer: Installer, sslIp: Boolean = false, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK,
+        transport: XuiPanel.Transport = XuiPanel.Transport.GRPC, onLog: (String) -> Unit,
+    ): DeployResult {
+        // сертификат: на IPv4 — профиль shortlived Let's Encrypt, на имя — обычный; IPv6-адрес установщик 3x-ui не поддерживает
+        val v4 = Regex("""^\d{1,3}(\.\d{1,3}){3}$""").matches(srv.host)
+        val ssl = sslIp && (v4 || ':' !in srv.host)
+        val params = XuiPanel.InstallParams(tag, sslIp = ssl, domain = if (ssl && !v4) srv.host else "")
+        installer.addSecret(params.password); installer.addSecret(params.username)
+        if (!installer.run(XuiPanel.installSteps(params, openFirewall, pre.firewall))) return DeployResult.Failed("Установка остановлена")
+        val res = XuiPanel.parseResult(ssh.exec("cat ${XuiPanel.RESULT}").out)
+        val token = res["XUI_API_TOKEN"].orEmpty()
+        val port = res["XUI_PANEL_PORT"]?.toIntOrNull() ?: params.port
+        val path = (res["XUI_WEB_BASE_PATH"] ?: params.webPath).trim('/')
+        if (token.isBlank()) return DeployResult.Failed("Установщик не выдал API-токен (${XuiPanel.RESULT})")
+        installer.addSecret(token)
+        // HTTPS: XUI_ACCESS_URL установщик пишет с https:// даже тогда, когда сертификат не выдался (проверено в rc2 на стенде) —
+        // поэтому спрашиваем саму панель: отвечает ли она по https на сервере
+        // (панель поднимается несколько секунд; http-запрос к https-панели Go отвечает 400 — его успехом не считаем)
+        val https = ssl && ssh.exec("for i in \$(seq 1 20); do for s in https http; do c=\$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 \$s://127.0.0.1:$port/$path/); " +
+            "case \$c in 2*|3*) echo \$s; exit 0;; esac; done; sleep 2; done; echo none").out.trim().lines().lastOrNull() == "https"
+        if (ssl) onLog(if (https) "Сертификат на IP выдан — панель и подписка по HTTPS" else "Сертификат выдать не удалось (порт 80 закрыт снаружи?) — панель пока по HTTP")
+        val scheme = if (https) "https" else "http"
+        val api = XuiApi(SshXuiTransport(ssh, "$scheme://127.0.0.1:$port/$path", token, srv.host))
+        try {
+            val version = res["XUI_VERSION"].orEmpty().ifBlank { tag }
+            waitPanelReady(api, onLog) // служба запущена, но порт панель открывает не сразу; заодно проверяется токен
+            onLog("Токен принят, панель отвечает")
+            val (priv, pub) = api.newRealityKeys()
+            val inboundId = api.addInbound(XuiPanel.defaultInbound(accessPort, priv, pub, mask, remark = "Hydra", transport = transport))
+            if (openFirewall) ServerOps.openPortStep(pre.firewall, "$accessPort/tcp")?.let { installer.run(listOf(it)) }
+            val email = "hydra-1"
+            val subId = XuiPanel.random(16).lowercase()
+            api.addClient(email, subId, listOf(inboundId), flow = "")
+            val links = api.links(email)
+            if (links.isEmpty()) return DeployResult.Failed("Панель не выдала ссылку клиента")
+            onLog("Создан инбаунд VLESS + ${transport.title} + Reality (маскировка под ${mask.sni}) на порту $accessPort и клиент $email")
+            // подписка вместо голой ссылки: правки инбаунда на сайте панели приложение заберёт само (запрос владельца 15.10.2026)
+            val sub = runCatching { api.subscriptionUrl(srv.host, subId) }.getOrNull()
+            if (sub != null) onLog("Подписка клиента: ${sub.substringBeforeLast('/')}/…")
+            val panel = PanelInstance(PanelKind.XUI3, "$scheme://${if (srv.host.contains(':')) "[${srv.host}]" else srv.host}:$port/$path",
+                params.username, params.password, token, version, inboundId, email)
+            installer.run(OtherPanels.stateSteps(panel))
+            return DeployResult.Ok(srv.copy(panel = panel), sub?.let { listOf(it) } ?: links)
+        } catch (e: XuiApiException) {
+            return DeployResult.Failed("Панель установлена, но доступ создать не удалось: ${e.message}. Адрес: http://${srv.host}:$port/$path")
+        }
+    }
+
+    /**
+     * HTTPS для уже стоящей панели (3x-ui — 0.8.1-rc1, s-ui и x-ui — 0.8.1-rc2): сертификат Let's Encrypt на IP сервера (или на
+     * домен) — [XuiPanel.httpsSteps]. Адрес панели в записи переходит на `https://`; подписки после этого тоже отдаются по HTTPS.
+     * Панель не поднялась с сертификатом — пути к нему стираются, панель возвращается на HTTP.
+     */
+    fun enablePanelHttps(s: MyServer, pre: Preflight, openFirewall: Boolean, installer: Installer): MyServer? {
+        val panel = s.panel ?: return null
+        if (!issueAndApplyCert(s.host, panel, pre, openFirewall, installer)) return null
+        val upd = panel.copy(baseUrl = XuiPanel.toHttps(panel.baseUrl))
+        installer.run(OtherPanels.stateSteps(upd))
+        return s.copy(panel = upd)
+    }
+
+    @Deprecated("0.8.1-rc2: для всех панелей", ReplaceWith("enablePanelHttps(s, pre, openFirewall, installer)"))
+    fun enableXuiHttps(s: MyServer, pre: Preflight, openFirewall: Boolean, installer: Installer): MyServer? =
+        s.panel?.takeIf { it.kind == PanelKind.XUI3 }?.let { enablePanelHttps(s, pre, openFirewall, installer) }
+
+    private fun issueAndApplyCert(host: String, panel: PanelInstance, pre: Preflight, openFirewall: Boolean, installer: Installer): Boolean {
+        val url = java.net.URL(panel.baseUrl)
+        val h = host.removePrefix("[").removeSuffix("]")
+        if (!installer.run(XuiPanel.certIssueSteps(h, openFirewall, pre.firewall, OtherPanels.serviceOf(panel.kind)))) return false
+        if (installer.run(XuiPanel.certApplySteps(panel.kind, url.port, url.path))) return true
+        installer.run(listOf(certRevertStep(panel.kind)))
+        return false
+    }
+
+    /** Вернуть панель на HTTP: пути к сертификату в её настройках стираются. */
+    fun certRevertStep(kind: PanelKind): Step {
+        val svc = OtherPanels.serviceOf(kind)
+        return Step("cert-revert", "Вернуть панель на HTTP (с сертификатом она не запустилась)",
+            OtherPanels.settingsCommand(kind, listOf("webCertFile", "webKeyFile", "subCertFile", "subKeyFile").associateWith { "" }) + "; systemctl restart $svc")
+    }
+
+    /**
+     * Закрыть порт панели извне или открыть снова (0.8.1-rc2) — [OtherPanels.listenSteps]. Закрытую панель приложение открывает
+     * через SSH-туннель, а API 3x-ui вызывает `curl`-ом на сервере.
+     */
+    fun setPanelLocal(s: MyServer, local: Boolean, pre: Preflight, installer: Installer): MyServer? {
+        val panel = s.panel ?: return null
+        if (!installer.run(OtherPanels.listenSteps(panel, local, pre.firewall))) return null
+        val upd = panel.copy(local = local)
+        installer.run(OtherPanels.stateSteps(upd))
+        return s.copy(panel = upd)
+    }
+
+    /** После установки панель поднимается несколько секунд: ждём ответ (до ~60 с); неверный токен и ошибки панели — сразу. */
+    private fun waitPanelReady(api: XuiApi, onLog: (String) -> Unit) {
+        var last: XuiApiException? = null
+        repeat(30) {
+            try { api.settings(); return } catch (e: XuiApiException) {
+                if (!e.message.orEmpty().startsWith("Панель не ответила")) throw e
+                last = e
+                if (it == 0) onLog("Жду, пока панель начнёт отвечать…")
+                Thread.sleep(2000)
+            }
+        }
+        throw last ?: XuiApiException("Панель не ответила")
+    }
+
+    /** Удаление панели с сервера (скрипт самой панели, без вопросов); порт панели закрывается, если его открывала Hydra. */
+    fun uninstallXui(s: MyServer, installer: Installer): MyServer? {
+        val port = runCatching { java.net.URL(s.panel?.baseUrl ?: "").port }.getOrDefault(-1)
+        val ok = installer.run(listOfNotNull(
+            ServerOps.backupPanelsStep(),
+            Step("xui-remove", "Удалить 3x-ui с сервера", "printf 'y\\n' | /usr/bin/x-ui uninstall; test ! -e /usr/local/x-ui/x-ui && rm -f ${ServerOps.XUI_MARK}",
+                failHint = "3x-ui не удалось удалить"),
+            port.takeIf { it > 0 }?.let { Step("xui-fw-close", "Закрыть порт панели $it/tcp, если его открывала Hydra", ServerOps.closePortCommand("$it/tcp")) },
+        ))
+        return if (ok) s.copy(panel = null) else null
+    }
+
+    // ---------------------------------------------------------------------------------------------------- s-ui, x-ui (0.8.1)
+
+    fun planPreviewPanel(kind: PanelKind, tag: String, openFirewall: Boolean, pre: Preflight, sslIp: Boolean = false, host: String = ""): List<Step> {
+        val s = OtherPanels.spec(kind) ?: return emptyList()
+        val h = host.removePrefix("[").removeSuffix("]")
+        val cert = if (sslIp && ':' !in h && h.isNotBlank())
+            runCatching { XuiPanel.certIssueSteps(h, openFirewall, pre.firewall, s.service) + XuiPanel.certApplySteps(kind) }.getOrDefault(emptyList()) else emptyList()
+        return OtherPanels.installSteps(s, OtherPanels.Params(tag, "••••", "••••", 0, "••••"), openFirewall, pre.firewall) + cert +
+            Step("panel-state", "Сохранить копию данных панели на сервере (только для root)")
+    }
+
+    /**
+     * Установка s-ui / x-ui. [sslIp] (0.8.1-rc2) — сразу HTTPS сертификатом Let's Encrypt на IP или имя сервера; не вышло
+     * (порт 80 закрыт снаружи) — панель остаётся на HTTP, сертификат можно получить позже кнопкой «Включить HTTPS».
+     */
+    fun deployPanel(srv: MyServer, kind: PanelKind, tag: String, openFirewall: Boolean, pre: Preflight, installer: Installer,
+                    sslIp: Boolean = false, onLog: (String) -> Unit = {}): DeployResult {
+        val s = OtherPanels.spec(kind) ?: return DeployResult.Failed("Неизвестная панель")
+        val p = OtherPanels.Params(tag)
+        installer.addSecret(p.password); installer.addSecret(p.username)
+        if (!installer.run(OtherPanels.installSteps(s, p, openFirewall, pre.firewall))) return DeployResult.Failed("Установка остановлена")
+        val host = if (srv.host.contains(':')) "[${srv.host}]" else srv.host
+        var panel = PanelInstance(kind, "http://$host:${p.port}/${p.path}/", p.username, p.password, "", tag)
+        // IPv6-адрес acme.sh standalone не проверит так же надёжно — сертификат только на IPv4 или имя
+        if (sslIp && ':' !in srv.host) {
+            if (issueAndApplyCert(srv.host, panel, pre, openFirewall, installer)) {
+                panel = panel.copy(baseUrl = XuiPanel.toHttps(panel.baseUrl))
+                onLog("Сертификат выдан — панель работает по HTTPS")
+            } else onLog("Сертификат выдать не удалось (порт 80 закрыт снаружи?) — панель пока по HTTP, HTTPS можно включить позже")
+        }
+        installer.run(OtherPanels.stateSteps(panel))
+        return DeployResult.Ok(srv.copy(panel = panel))
+    }
+
+    /** Удалить панель любого вида с сервера; порт панели закрывается, если его открывала Hydra. */
+    fun uninstallPanel(s: MyServer, installer: Installer): MyServer? {
+        val panel = s.panel ?: return null
+        if (panel.kind == PanelKind.XUI3) return uninstallXui(s, installer)?.also { installer.run(listOf(Step("panel-state-rm", "Удалить копию данных панели", "rm -f ${OtherPanels.PANEL_STATE}"))) }
+        val spec = OtherPanels.spec(panel.kind) ?: return null
+        val port = runCatching { java.net.URL(panel.baseUrl).port }.getOrDefault(-1)
+        val ok = installer.run(listOfNotNull(
+            ServerOps.backupPanelsStep(),
+            Step("panel-remove", "Удалить ${panel.kind.title} с сервера", OtherPanels.uninstallCommand(spec) + "; test ! -e ${spec.home}", failHint = "Панель удалить не удалось"),
+            port.takeIf { it > 0 }?.let { Step("panel-fw-close", "Закрыть порт панели $it/tcp, если его открывала Hydra", ServerOps.closePortCommand("$it/tcp")) },
+        ))
+        return if (ok) s.copy(panel = null) else null
+    }
+
+    fun restartPanel(kind: PanelKind, installer: Installer): Boolean {
+        val svc = OtherPanels.spec(kind)?.service ?: "x-ui"
+        return installer.run(listOf(Step("restart", "Перезапустить панель", "systemctl restart $svc && systemctl is-active $svc", failHint = "Панель не запустилась (journalctl -u $svc)")))
+    }
+
+    fun restartXui(installer: Installer): Boolean = installer.run(listOf(
+        Step("restart", "Перезапустить панель 3x-ui", "systemctl restart x-ui && systemctl is-active x-ui", failHint = "Панель не запустилась (journalctl -u x-ui)"),
+    ))
+
     // ---------------------------------------------------------------------------------------------------- Сервер целиком
 
     /** Полная очистка сервера от всего, что ставила Hydra; запись остаётся (с ней можно снова что-то поставить). */
     fun wipe(s: MyServer, installer: Installer): MyServer? =
-        if (installer.run(ServerOps.wipeSteps())) s.copy(awg = null, ofx = null, clients = emptyList()) else null
+        if (installer.run(ServerOps.wipeSteps())) s.copy(awg = null, ofx = null, panel = null, clients = emptyList()) else null
 
     /** Перезагрузка сервера: команда уходит в фон, сеанс закрывается сам. */
     fun reboot(ssh: SshSession) { ssh.exec("nohup sh -c 'sleep 2; systemctl reboot' >/dev/null 2>&1 &") }

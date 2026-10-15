@@ -55,13 +55,15 @@ class ServerFirstTest {
         assertNull(r3.awg); assertTrue(r3.clients.isEmpty())
     }
 
-    /** Запись не теряет поля более новой версии (например, `panel` из 0.8.1) при пересохранении. */
+    /** Запись не теряет поля более новой версии при пересохранении (так в rc4 потерялось поле panel из 0.8.1-a). */
     @Test fun unknownFieldsSurviveRoundTrip() {
         val json = org.json.JSONObject().put("id", "1").put("name", "n").put("host", "h").put("fingerprint", "SHA256:x")
-            .put("panel", org.json.JSONObject().put("kind", "XUI3")).put("clients", org.json.JSONArray())
-        val back = MyServer.fromJson(json).copy(name = "renamed").toJson()
-        assertEquals("XUI3", back.getJSONObject("panel").getString("kind"))
+            .put("futureThing", org.json.JSONObject().put("a", 1)).put("clients", org.json.JSONArray())
+        val s = MyServer.fromJson(json)
+        val back = s.copy(name = "renamed").toJson()
+        assertEquals(1, back.getJSONObject("futureThing").getInt("a"))
         assertEquals("renamed", back.getString("name"))
+        assertTrue(MyServer("2", "n", "h", fingerprint = "").broken)
     }
 
     @Test fun vaultEncryptsAndSurvivesReload() {

@@ -7,16 +7,27 @@ data class Friendly(val title: String, val advice: String, val raw: String)
 data class CheckItem(val ok: Boolean, val title: String, val help: String)
 
 /**
- * Простые тексты для экранов «Мои серверы» (0.8.0-rc4; из 0.8.1-a): без жаргона — ни «SSH», ни «systemd», ни «NAT» в первой строке.
- * Технические подробности остаются в журнале и под кнопкой «Подробности». Язык: русский по умолчанию, английский — `en = true`
- * (Android выбирает по языку приложения; остальные языки показывают английский).
+ * Простые тексты для экранов «Мои серверы» (0.8.1-a): без жаргона — ни «SSH», ни «systemd», ни «NAT» в первой строке.
+ * Технические подробности остаются в журнале и под кнопкой «Подробности». Язык ([UiLang]): русский по умолчанию, английский,
+ * с 0.8.1-rc2 — украинский, персидский и китайский ([FriendlyI18n]; Android выбирает по языку приложения).
  */
 object FriendlyText {
 
-    private fun t(en: Boolean, ru: String, enText: String) = if (en) enText else ru
+    private fun t(l: UiLang, ru: String, enText: String) = when (l) {
+        UiLang.RU -> ru
+        UiLang.EN -> enText
+        else -> FriendlyI18n.tr(l, enText) ?: enText
+    }
+
+    /** `%s` по порядку (без `String.format`: у персидской локали он меняет цифры). */
+    private fun fmt(s: String, vararg a: String): String { var r = s; a.forEach { r = r.replaceFirst("%s", it) }; return r }
+
+    private fun lang(en: Boolean) = if (en) UiLang.EN else UiLang.RU
 
     /** Превращает ошибку подключения/установки в объяснение и совет. */
-    fun explain(raw: String, en: Boolean = false): Friendly {
+    fun explain(raw: String, en: Boolean = false): Friendly = explain(raw, lang(en))
+
+    fun explain(raw: String, en: UiLang): Friendly {
         val r = raw.lowercase()
         fun f(ru: String, ruAdvice: String, enTitle: String, enAdvice: String) = Friendly(t(en, ru, enTitle), t(en, ruAdvice, enAdvice), raw)
         return when {
@@ -65,11 +76,31 @@ object FriendlyText {
                     "Сервер не выходит в интернет или GitHub для него недоступен. Проверьте это в панели хостинга или напишите в их поддержку.",
                     "The server could not download the files",
                     "The server has no internet or cannot reach GitHub. Check it in the hosting panel or ask their support.")
+            "let's encrypt" in r || "порт 80" in r || "сертификат" in r && ("получить" in r || "не появились" in r || "не запустилась" in r) ->
+                f("Не удалось получить сертификат для панели",
+                    "Для сертификата нужен открытый снаружи порт 80. Откройте его в панели хостинга (или выключите там файрвол) и нажмите «Включить HTTPS» ещё раз. Пока панель работает без шифрования.",
+                    "Could not get a certificate for the panel",
+                    "The certificate needs port 80 open from outside. Open it in the hosting panel (or turn off its firewall) and tap “Enable HTTPS” again. The panel keeps working without encryption for now.")
+            "туннель к панели" in r ->
+                f("Не получилось открыть защищённый туннель к панели",
+                    "Панель закрыта извне, поэтому Hydra открывает её через сервер. Проверьте, что сервер включён и данные входа верны, и повторите.",
+                    "Could not open the secure tunnel to the panel",
+                    "The panel is closed from outside, so Hydra opens it through the server. Check that the server is on and the sign-in data is correct, then try again.")
             "порт" in r && ("занят" in r || "busy" in r) ->
                 f("Этот порт уже занят",
                     "Откройте «Дополнительно» и выберите другой порт, например 443 или любой от 20000 до 60000.",
                     "This port is already in use",
                     "Open “Advanced” and choose another port, for example 443 or any from 20000 to 60000.")
+            "панель недоступна по сети" in r ->
+                f("Не получилось связаться с панелью",
+                    "Скорее всего, порт панели закрыт файрволом хостинга. Откройте этот порт в панели хостинга или управляйте панелью через её сайт.",
+                    "Could not reach the panel",
+                    "The panel port is probably closed by the hosting firewall. Open it in the hosting panel or manage the panel through its website.")
+            "уже стоит 3x-ui" in r ->
+                f("На сервере уже есть 3x-ui",
+                    "Повторно ставить её не нужно. Откройте её сайт и создайте пользователя там, либо подключите уже установленную панель.",
+                    "3x-ui is already on this server",
+                    "No need to install it again. Open its website and create a user there.")
             else -> f("Что-то пошло не так",
                 "Нажмите «Скопировать подробности» и отправьте нам — разберёмся. Установка остановлена, ничего лишнего на сервере не осталось.",
                 "Something went wrong",
@@ -78,9 +109,11 @@ object FriendlyText {
     }
 
     /** Результат проверки сервера — списком «зелёных галочек» с понятными подсказками. */
-    fun checklist(pre: Preflight, en: Boolean = false): List<CheckItem> = listOf(
+    fun checklist(pre: Preflight, en: Boolean = false): List<CheckItem> = checklist(pre, lang(en))
+
+    fun checklist(pre: Preflight, en: UiLang): List<CheckItem> = listOf(
         CheckItem(pre.arch in setOf("amd64", "arm64", "armv7"),
-            t(en, "Подходящая система: ${pre.osName.ifBlank { "Linux" }} (${pre.arch})", "Suitable system: ${pre.osName.ifBlank { "Linux" }} (${pre.arch})"),
+            fmt(t(en, "Подходящая система: %s (%s)", "Suitable system: %s (%s)"), pre.osName.ifBlank { "Linux" }, pre.arch),
             t(en, "Нужен Linux на обычном процессоре. Лучше всего подходят Debian и Ubuntu.", "Linux on a regular processor is needed. Debian and Ubuntu work best.")),
         CheckItem(pre.root, t(en, "Есть права администратора", "Administrator rights are available"),
             t(en, "Войдите под пользователем root — его пароль указан в письме хостинга.", "Sign in as user root — its password is in the hosting email.")),
@@ -93,7 +126,10 @@ object FriendlyText {
     )
 
     /** Что реально произойдёт на сервере — по одной простой фразе на шаг (команды видны под спойлером «Подробности»). */
-    fun planSentences(kind: ServerKind, openFirewall: Boolean, en: Boolean = false): List<String> = when (kind) {
+    fun planSentences(kind: ServerKind, openFirewall: Boolean, en: Boolean = false): List<String> = planSentences(kind, openFirewall, lang(en))
+
+    /** [https] — у панелей s-ui / x-ui сразу получить сертификат (0.8.1-rc2). */
+    fun planSentences(kind: ServerKind, openFirewall: Boolean, en: UiLang, https: Boolean = false): List<String> = when (kind) {
         ServerKind.AMNEZIAWG -> buildList {
             add(t(en, "Загрузим на сервер программу VPN (проверим, что файлы не повреждены)", "Download the VPN program to the server (we verify the files are intact)"))
             add(t(en, "Создадим ключи и настройки — они хранятся у вас на устройстве и копией на самом сервере (только для администратора)", "Create keys and settings — they are kept on your device and as a copy on the server itself (admin only)"))
@@ -108,11 +144,28 @@ object FriendlyText {
             t(en, "Выберем свободный порт", "Pick a free port"),
             t(en, "Проверим, что узел запустился, и покажем готовую ссылку для подключения", "Check the node started and show the ready connection link"),
         )
+        ServerKind.PANEL_3XUI -> listOf(
+            t(en, "Скачаем официальную панель 3x-ui указанной версии", "Download the official 3x-ui panel of the stated version"),
+            t(en, "Установим её и придумаем надёжный логин и пароль", "Install it and generate a strong login and password"),
+            t(en, "Создадим первого пользователя и готовое подключение (VLESS + Reality)", "Create the first user and a ready connection (VLESS + Reality)"),
+            t(en, "Добавим это подключение в «Серверы» — останется нажать «Подключить»", "Add this connection to “Servers” — you only need to tap “Connect”"),
+        )
+        ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> listOfNotNull(
+            fmt(t(en, "Скачаем официальную панель %s указанной версии", "Download the official %s panel of the stated version"), kind.panel!!.title),
+            t(en, "Установим её и зададим надёжный логин, пароль и случайный адрес панели", "Install it and set a strong login, password and a random panel address"),
+            if (https) t(en, "Получим бесплатный сертификат, чтобы панель открывалась по HTTPS", "Get a free certificate so the panel opens over HTTPS") else null,
+            t(en, "Проверим, что панель открывается", "Check that the panel opens"),
+            t(en, "Пользователей и подключения вы заведёте на сайте панели — кнопка «Открыть панель»", "You create users and connections on the panel website — the “Open panel” button"),
+        )
     }
 
     /** Рекомендация по умолчанию: что поставить, если человек не знает. */
-    fun recommendation(kind: ServerKind, en: Boolean = false): String = when (kind) {
+    fun recommendation(kind: ServerKind, en: Boolean = false): String = recommendation(kind, lang(en))
+
+    fun recommendation(kind: ServerKind, en: UiLang): String = when (kind) {
         ServerKind.AMNEZIAWG -> t(en, "Рекомендуем: самый простой путь к своему VPN. Подойдёт большинству.", "Recommended: the simplest way to your own VPN. Fits most people.")
         ServerKind.OPENFLUX -> t(en, "Для опытных: обходит блокировки через сервисы вроде Яндекс Документов.", "For experienced users: bypasses blocking through services like Yandex Docs.")
+        ServerKind.PANEL_3XUI -> t(en, "Для тех, кто хочет сам управлять пользователями на сайте-панели.", "For those who want to manage users on a panel website.")
+        ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> t(en, "Если вы привыкли к этой панели: всё управление — на её сайте.", "If you are used to this panel: everything is managed on its website.")
     }
 }

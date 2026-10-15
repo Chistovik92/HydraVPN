@@ -34,8 +34,9 @@ class NativeCoreFactory : CoreFactory {
             else -> when {
                 proto?.engine == Engine.AWG -> AmneziaWgCore()
                 // Тумблеры ядер (0.6.22): Xray берёт VLESS/VMess/Trojan/SS, если он предпочтён или
-                // sing-box выключен. Что ядро вообще разрешено, HydraVpnService проверяет до фабрики.
-                toggles().engineFor(proto, BuildConfig.XRAY_AVAILABLE) == EngineToggles.Kind.XRAY -> XrayCore()
+                // sing-box выключен; с 0.8.1-rc2 — и любой профиль с REALITY (новые серверы Xray не пускают sing-box).
+                // Что ядро вообще разрешено, HydraVpnService проверяет до фабрики.
+                toggles().engineFor(profile, BuildConfig.XRAY_AVAILABLE) == EngineToggles.Kind.XRAY -> XrayCore()
                 else -> SingBoxCore()
             }
         }

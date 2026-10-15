@@ -107,9 +107,17 @@ if [[ -n "$(git status --porcelain)" ]]; then
        всё, что должно попасть в релиз, должно быть закоммичено и запушено."
 fi
 git fetch -q origin
-[[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/master)" ]] || err \
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+if [[ "$VERSION" =~ -(a|b|rc)[0-9]*$ && "$BRANCH" != "master" ]]; then
+  # Схема версий владельца (12.10.2026): альфа, бета и кандидат (X.Y.Z-a, -b, -rcN) выходят из своей ветки и в master не вливаются до проверки.
+  [[ "$(git rev-parse HEAD)" == "$(git rev-parse "origin/$BRANCH" 2>/dev/null)" ]] || err \
+"HEAD не совпадает с origin/$BRANCH — сначала запушьте ветку (CI соберёт тег именно отсюда)."
+  echo "    дерево чистое, HEAD = origin/$BRANCH (пре-релиз $VERSION из ветки)"
+else
+  [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/master)" ]] || err \
 "HEAD не совпадает с origin/master — сначала запушьте master (CI соберёт тег именно отсюда)."
-echo "    дерево чистое, HEAD = origin/master"
+  echo "    дерево чистое, HEAD = origin/master"
+fi
 
 # --- 3. Сборка Android --------------------------------------------------------
 step "Сборка stub-варианта"

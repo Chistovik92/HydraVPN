@@ -55,4 +55,7 @@ class MyServersViewModel(app: Application) : AndroidViewModel(app) {
             .getOrElse { ru.gidravpn.hydra.servers.MemoryVault() },
         importConf = { name, conf -> importConf(name, conf) },
     )
+
+    /** Туннели к закрытым извне панелям (0.8.1-rc2) не переживают экран. */
+    override fun onCleared() { manager.closeAllTunnels() }
 }

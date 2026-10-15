@@ -24,6 +24,18 @@ data class ServerStatus(
     val awgStateJson: String = "",
     val awgServerConf: String = "",
     val ofxStateJson: List<String> = emptyList(),
+    /** Панель 3x-ui на сервере (0.8.1): установлена ли, поставила ли её Hydra (метка) и состояние службы x-ui. */
+    val xuiInstalled: Boolean = false,
+    val xuiByHydra: Boolean = false,
+    val xuiState: String = "",
+    /** `/etc/x-ui/install-result.env` панели, поставленной Hydra, — чтобы другое устройство взяло её под управление. */
+    val xuiResult: String = "",
+    /** s-ui на сервере и метки панелей, поставленных Hydra (0.8.1). */
+    val suiInstalled: Boolean = false,
+    val suiByHydra: Boolean = false,
+    val xuiAlirezaByHydra: Boolean = false,
+    /** Копия записи панели `/etc/hydra/panel.json`. */
+    val panelStateJson: String = "",
     /** Ошибка проверки (сервер недоступен и т. п.); null — проверка прошла. */
     val error: String? = null,
 ) {
@@ -39,6 +51,24 @@ object ServerOps {
     const val AWG_STATE = "$STATE_DIR/awg.json"
     /** Открытые Hydra порты файрвола (`ufw 51820/udp`, `firewalld 51820/udp`) — их закрывает очистка. */
     const val FW_LIST = "$STATE_DIR/fw.list"
+    /**
+     * Копии баз панелей перед удалением (0.8.1-b): `/root/hydra-backups/<панель>-<дата>.db`, только для root. Каталог вне
+     * `/etc/hydra`, поэтому полная очистка его не трогает — пользователей и настройки панели можно вернуть или перенести.
+     */
+    const val BACKUP_DIR = "/root/hydra-backups"
+
+    /** Где панели хранят базу (SQLite). */
+    val PANEL_DBS = mapOf("x-ui" to "/etc/x-ui/x-ui.db", "s-ui" to "/usr/local/s-ui/db/s-ui.db")
+
+    /** Скопировать базы стоящих панелей в [BACKUP_DIR] (если базы нет — ничего не делает). */
+    fun backupPanelsCommand(): String = "mkdir -p $BACKUP_DIR && chmod 700 $BACKUP_DIR; d=\$(date +%Y%m%d-%H%M%S); " +
+        PANEL_DBS.entries.joinToString(" ") { (n, f) -> "if [ -f $f ]; then cp -a $f $BACKUP_DIR/$n-\$d.db && chmod 600 $BACKUP_DIR/$n-\$d.db && echo \"копия базы $n: $BACKUP_DIR/$n-\$d.db\"; fi;" } +
+        " true"
+
+    fun backupPanelsStep() = Step("panel-backup", "Сохранить копию базы панели (пользователи, настройки) в $BACKUP_DIR", backupPanelsCommand())
+
+    /** Метка «3x-ui поставила Hydra»: только такую панель снимает полная очистка. */
+    const val XUI_MARK = "$STATE_DIR/xui.installed"
     fun ofxState(channel: String) = "$STATE_DIR/ofx-$channel.json"
 
     private const val AWG_ENV = "WG_QUICK_USERSPACE_IMPLEMENTATION=amneziawg-go"
@@ -53,10 +83,18 @@ object ServerOps {
         append("echo AWG_UNIT=\$([ -f /etc/systemd/system/${AwgInstallPlan.SERVICE}.service ] && echo 1 || echo 0); ")
         append("echo AWG_STATE=\$(systemctl is-active ${AwgInstallPlan.SERVICE} 2>/dev/null); ")
         append("echo OFX=\$(systemctl list-units --all --plain --no-legend 'openflux-node@*' 2>/dev/null | awk '{n=\$1; sub(/^openflux-node@/,\"\",n); sub(/\\.service\$/,\"\",n); printf \"%s:%s \", n, \$3}'); ")
+        append("echo XUI=\$([ -e /usr/local/x-ui/x-ui ] && echo 1 || echo 0); ")
+        append("echo XUI_MARK=\$([ -f $XUI_MARK ] && echo 1 || echo 0); ")
+        append("echo XUI_STATE=\$(systemctl is-active x-ui 2>/dev/null); ")
+        append("echo SUI=\$([ -e /usr/local/s-ui ] && echo 1 || echo 0); ")
+        append("echo SUI_MARK=\$([ -f ${OtherPanels.SUI.mark} ] && echo 1 || echo 0); ")
+        append("echo XUIA_MARK=\$([ -f ${OtherPanels.XUI.mark} ] && echo 1 || echo 0); ")
         append("echo '---AWGDUMP'; $AWG_ENV ${AwgInstallPlan.BIN_DIR}/awg show $iface dump 2>/dev/null; ")
         append("echo '---AWGSTATE'; cat $AWG_STATE 2>/dev/null; echo; ")
         append("echo '---AWGCONF'; cat ${AwgInstallPlan.CONF_DIR}/$iface.conf 2>/dev/null; ")
         append("echo '---OFXSTATE'; for f in $STATE_DIR/ofx-*.json; do [ -f \"\$f\" ] && cat \"\$f\" && echo; done; ")
+        append("echo '---PANELSTATE'; cat ${OtherPanels.PANEL_STATE} 2>/dev/null; echo; ")
+        append("echo '---XUIRESULT'; [ -f $XUI_MARK ] && cat ${XuiPanel.RESULT} 2>/dev/null; ")
         append("echo '---END'")
     }
 
@@ -82,6 +120,10 @@ object ServerOps {
             awgStateJson = sections["AWGSTATE"].orEmpty().joinToString("\n").trim(),
             awgServerConf = sections["AWGCONF"].orEmpty().joinToString("\n").trim(),
             ofxStateJson = sections["OFXSTATE"].orEmpty().filter { it.trim().startsWith("{") },
+            xuiInstalled = kv["XUI"] == "1", xuiByHydra = kv["XUI_MARK"] == "1", xuiState = kv["XUI_STATE"].orEmpty(),
+            xuiResult = sections["XUIRESULT"].orEmpty().joinToString("\n").trim(),
+            suiInstalled = kv["SUI"] == "1", suiByHydra = kv["SUI_MARK"] == "1", xuiAlirezaByHydra = kv["XUIA_MARK"] == "1",
+            panelStateJson = sections["PANELSTATE"].orEmpty().joinToString("\n").trim(),
         )
     }
 
@@ -139,6 +181,14 @@ object ServerOps {
         Step("wipe-ofx", "Удалить узел OpenFlux (все каналы, ядро, автообновление)",
             "if [ -f /opt/openflux-node/node-install.sh ]; then sh /opt/openflux-node/node-install.sh uninstall; else echo 'OpenFlux: не установлен'; fi; " +
                 "rm -f ${OpenFluxNode.SCRIPT}; true"),
+        backupPanelsStep(),
+        Step("wipe-xui", "Удалить панель 3x-ui, если её ставила Hydra",
+            "if [ -f $XUI_MARK ] && [ -x /usr/bin/x-ui ]; then printf 'y\\n' | /usr/bin/x-ui uninstall >/dev/null 2>&1; echo '3x-ui: удалена'; " +
+                "else echo '3x-ui: не ставилась Hydra'; fi; true"),
+        Step("wipe-panels", "Удалить панели s-ui и x-ui, если их ставила Hydra",
+            listOf(OtherPanels.SUI, OtherPanels.XUI).joinToString(" ") { s ->
+                "if [ -f ${s.mark} ]; then ${OtherPanels.uninstallCommand(s)}; echo '${s.kind.title}: удалена'; fi;"
+            } + " rm -f ${OtherPanels.PANEL_STATE}; true"),
         Step("wipe-fw", "Закрыть порты, которые открывала Hydra",
             "if [ -f $FW_LIST ]; then while read -r fw p; do case \"\$fw\" in " +
                 "ufw) ufw delete allow \"\$p\" >/dev/null 2>&1 && echo \"закрыт \$p (ufw)\";; " +

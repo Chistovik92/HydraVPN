@@ -56,6 +56,7 @@ import ru.gidravpn.hydra.servers.ServerStatus
 import ru.gidravpn.hydra.servers.ServiceForm
 import ru.gidravpn.hydra.servers.SshTarget
 import ru.gidravpn.hydra.servers.Stage
+import ru.gidravpn.hydra.servers.XuiPanel
 
 private val Ok = Color(0xFF22C55E)
 
@@ -71,6 +72,8 @@ internal fun MyServersScreen(c: AppController, ui: UiState) {
     var confirm by remember { mutableStateOf<Confirm?>(null) }
     var addClientFor by remember { mutableStateOf<MyServer?>(null) }
     var loginFor by remember { mutableStateOf<MyServer?>(null) }
+    var connectPanel by remember { mutableStateOf(false) }
+    var addUserFor by remember { mutableStateOf<MyServer?>(null) }
 
     // при первом показе — проверить серверы с сохранённым входом (без журнала, по одному: операции идут по очереди)
     LaunchedEffect(Unit) {
@@ -84,6 +87,7 @@ internal fun MyServersScreen(c: AppController, ui: UiState) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Header("Мои серверы") {
             Button(onClick = { m.reset(); wizard = true }, enabled = !s.busy) { Text("Добавить сервер") }
+            OutlinedButton(onClick = { m.reset(); connectPanel = true }, enabled = !s.busy) { Text("У меня уже есть панель") }
         }
         Text(
             "Ваш собственный сервер (VPS). Hydra входит на него по SSH, ставит VPN и обслуживает его: устройства, перезапуск, удаление, " +
@@ -93,11 +97,27 @@ internal fun MyServersScreen(c: AppController, ui: UiState) {
         )
         Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (wizard || s.stage != Stage.IDLE) AddServerCard(m, s) { wizard = false; m.reset() }
+            // ошибка/ход подключения готовой панели (без сервера в списке)
+            if (!wizard && s.stage == Stage.IDLE && s.opServer == null) {
+                if (s.busy) Busy(s.progress)
+                s.error?.let { ErrorBox(it) }
+                if (!s.busy && s.progress == "Панель подключена") Text("Панель подключена — она в списке ниже.", color = Ok, fontSize = 13.sp)
+            }
             if (ui.data.myServers.isEmpty() && !wizard && s.stage == Stage.IDLE)
                 Empty("Серверов пока нет. Нужен VPS с Debian или Ubuntu, вход root по паролю или ключу.")
             ui.data.myServers.forEach { srv ->
-                ServerCard(srv, m, s,
+                if (srv.broken) Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(srv.name, style = MaterialTheme.typography.titleMedium)
+                        Text("Запись повреждена: так выглядит панель, подключённая в 0.8.1-a, после открытия в 0.8.0-rc4. Уберите её и подключите панель заново кнопкой «У меня уже есть панель».",
+                            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = { m.forget(srv.id) }) { Text("Убрать из списка") }
+                    }
+                }
+                else if (srv.panelOnly) PanelOnlyCard(c, srv, m, s, onAddUser = { addUserFor = srv }, onConfirm = { confirm = it })
+                else ServerCard(c, srv, m, s,
                     onAddClient = { addClientFor = srv },
+                    onAddUser = { addUserFor = srv },
                     onLogin = { loginFor = srv },
                     onConfirm = { confirm = it })
             }
@@ -119,6 +139,24 @@ internal fun MyServersScreen(c: AppController, ui: UiState) {
                 TextButton(enabled = name.isNotBlank() && srv.clients.none { it.name == name }, onClick = { addClientFor = null; m.addClient(srv.id, name) }) { Text("Добавить") }
             },
             dismissButton = { TextButton(onClick = { addClientFor = null }) { Text("Отмена") } },
+        )
+    }
+    if (connectPanel) ConnectPanelDialog(onClose = { connectPanel = false }) { name, address, token ->
+        connectPanel = false; m.connectPanel(name, address, token)
+    }
+    addUserFor?.let { srv ->
+        var name by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { addUserFor = null },
+            title = { Text("Новый пользователь панели") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Панель создаст пользователя и выдаст ссылку для подключения.", fontSize = 13.sp)
+                    OutlinedTextField(name, { name = it.filter { ch -> ch.isLetterOrDigit() || ch in "-_" }.take(24) }, singleLine = true, label = { Text("Имя латиницей, например anna") })
+                }
+            },
+            confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { addUserFor = null; m.addPanelClient(srv.id, name) }) { Text("Создать") } },
+            dismissButton = { TextButton(onClick = { addUserFor = null }) { Text("Отмена") } },
         )
     }
     confirm?.let { k ->
@@ -238,7 +276,7 @@ private fun AddServerCard(m: MyServersManager, s: MyServersUi, onClose: () -> Un
 // ------------------------------------------------------------------------------------------------ Карточка сервера
 
 @Composable
-private fun ServerCard(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddClient: () -> Unit, onLogin: () -> Unit, onConfirm: (Confirm) -> Unit) {
+private fun ServerCard(c: AppController, srv: MyServer, m: MyServersManager, s: MyServersUi, onAddClient: () -> Unit, onAddUser: () -> Unit, onLogin: () -> Unit, onConfirm: (Confirm) -> Unit) {
     val st = s.status[srv.id]
     val mine = s.opServer == srv.id
     val busy = s.busy
@@ -270,6 +308,8 @@ private fun ServerCard(srv: MyServer, m: MyServersManager, s: MyServersUi, onAdd
             AwgSection(srv, st, m, busy, onAddClient, onConfirm) { installKind = ServerKind.AMNEZIAWG }
             HorizontalDivider(Modifier.padding(vertical = 4.dp))
             OfxSection(srv, st, m, busy, onConfirm) { installKind = ServerKind.OPENFLUX }
+            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            PanelSection(c, srv, st, m, s, onAddUser, onConfirm) { k -> installKind = k }
 
             val inst = s.install?.takeIf { it.serverId == srv.id }
             if (installKind != null && inst == null) InstallForm(installKind!!, busy, onCancel = { installKind = null }) { f -> m.prepareInstall(srv.id, f) }
@@ -283,7 +323,7 @@ private fun ServerCard(srv: MyServer, m: MyServersManager, s: MyServersUi, onAdd
             ChipRow {
                 TextButton(onClick = {
                     onConfirm(Confirm("Очистить сервер «${srv.name}»?",
-                        "С сервера ${srv.host} будет удалено всё, что ставила Hydra: AmneziaWG, узел OpenFlux, их настройки, правила файрвола и копии ключей. " +
+                        "С сервера ${srv.host} будет удалено всё, что ставила Hydra: AmneziaWG, узел OpenFlux, панель 3x-ui, их настройки, правила файрвола и копии ключей. " +
                             "Подключения к этому серверу в «Серверах» перестанут работать. Чужие программы не трогаются. Сервер останется в списке — на него можно поставить всё заново.",
                         "Очистить") { m.wipe(srv.id) })
                 }, enabled = !busy) { Text("Очистить сервер полностью", color = Danger) }
@@ -367,6 +407,173 @@ private fun OfxSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, bu
     }
 }
 
+/** Панель 3x-ui на сервере, управляемом по SSH (0.8.1): сайт панели, пользователи, перезапуск, удаление. */
+@Composable
+private fun PanelSection(c: AppController, srv: MyServer, st: ServerStatus?, m: MyServersManager, s: MyServersUi, onAddUser: () -> Unit, onConfirm: (Confirm) -> Unit, onInstall: (ServerKind) -> Unit) {
+    val p = srv.panel
+    val busy = s.busy
+    Text(p?.let { "Панель ${it.kind.title}" } ?: "Панель управления", fontWeight = FontWeight.SemiBold)
+    if (p == null) {
+        Text("Не установлена. Сайт-панель, где вы сами заводите пользователей и выдаёте им ссылки — удобно, если VPN нужен нескольким людям. " +
+            "3x-ui Hydra ведёт сама (пользователи и ссылки прямо здесь); s-ui и x-ui — только вход на их сайт.",
+            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val foreign = (st?.xuiInstalled == true && !st.xuiByHydra && !st.xuiAlirezaByHydra) || (st?.suiInstalled == true && !st.suiByHydra)
+        if (foreign) Text("На сервере уже стоит панель, поставленная не Hydra: 3x-ui подключите кнопкой «У меня уже есть панель» (адрес и токен).",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ChipRow {
+            if (st?.xuiInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_3XUI) }, enabled = !busy) { Text("Установить 3x-ui (рекомендуем)") }
+            if (st?.suiInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_SUI) }, enabled = !busy) { Text("Установить s-ui") }
+            if (st?.xuiInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_XUI) }, enabled = !busy) { Text("Установить x-ui") }
+        }
+        return
+    }
+    val kind = ServerKind.ofPanel(p.kind)
+    val state = st?.takeIf { it.error == null }?.xuiState?.takeIf { it.isNotBlank() }
+    Text("Версия ${p.version.ifBlank { "—" }}" + (state?.let { " · служба: $it" } ?: ""), fontSize = 12.sp,
+        color = if (state == "active") Ok else MaterialTheme.colorScheme.onSurfaceVariant)
+    PanelBody(c, srv, m, s, onAddUser)
+    ChipRow {
+        OutlinedButton(onClick = { m.restartService(srv.id, kind) }, enabled = !busy) { Text("Перезапустить") }
+        TextButton(onClick = {
+            onConfirm(Confirm("Удалить панель ${p.kind.title} с «${srv.name}»?", "Панель, её ядро и все пользователи панели будут удалены с сервера. Ссылки, выданные панелью, перестанут работать. " +
+                    "Копия базы панели (пользователи, настройки) останется на сервере в /root/hydra-backups.",
+                "Удалить") { m.uninstallService(srv.id, kind) })
+        }, enabled = !busy) { Text("Удалить панель", color = Danger) }
+    }
+}
+
+/** Общее для панели на своём сервере и подключённой готовой: адрес, вход на сайт, пользователи. */
+@Composable
+private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: MyServersUi, onAddUser: () -> Unit) {
+    val p = srv.panel ?: return
+    val busy = s.busy
+    val ssh = srv.fingerprint.isNotBlank()
+    val local = p.local && ssh
+    val tunnel = s.tunnels[srv.id]
+    var openWhenReady by remember { mutableStateOf(false) }
+    var askLocal by remember { mutableStateOf<Boolean?>(null) }
+    val open = { url: String ->
+        if (p.password.isNotBlank()) { copySecret(p.password); c.toast("Пароль скопирован на 30 секунд — вставьте его на странице входа") }
+        openUrl(url)
+    }
+    // закрытая извне панель (0.8.1-rc2): сайт — через SSH-туннель; адрес туннеля приходит после подключения к серверу
+    LaunchedEffect(tunnel, openWhenReady) { if (openWhenReady && tunnel != null) { openWhenReady = false; open(tunnel) } }
+    SelectionContainer { Text("Адрес: ${p.baseUrl}" + (if (p.username.isNotBlank()) "\nЛогин: ${p.username}" else ""), fontFamily = FontFamily.Monospace, fontSize = 12.sp) }
+    if (local) Text("Панель закрыта извне: её сайт открывается только через Hydra — по защищённому туннелю к серверу." +
+        if (XuiPanel.isHttps(p.baseUrl)) " Браузер предупредит о сертификате: он выписан на IP сервера, а туннель открыт на 127.0.0.1 — это ожидаемо, соединение защищено SSH." else "",
+        fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+    if (tunnel != null) Text("Туннель открыт: $tunnel", fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+    if (!XuiPanel.isHttps(p.baseUrl)) {
+        Text("Панель открывается по http:// — пароль на сайте идёт без шифрования, а провайдер может обрывать такие страницы. " +
+            "Включите HTTPS (бесплатный сертификат Let's Encrypt на IP сервера) или входите при включённом VPN.",
+            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // сертификат ставится по SSH — только у панели на своём сервере (у подключённой по токену SSH нет); с rc2 — у всех трёх
+        if (ssh) OutlinedButton(onClick = { m.enablePanelHttps(srv.id) }, enabled = !busy) { Text("Включить HTTPS") }
+    }
+    ChipRow {
+        Button(onClick = {
+            when {
+                !local -> open(p.baseUrl)
+                tunnel != null -> open(tunnel)
+                else -> { openWhenReady = true; m.openPanelTunnel(srv.id) }
+            }
+        }, enabled = !(local && tunnel == null && busy)) { Text("Открыть панель") }
+        if (p.password.isNotBlank()) OutlinedButton(onClick = { copySecret(p.password); c.toast("Пароль скопирован на 30 секунд") }) { Text("Скопировать пароль") }
+        if (tunnel != null) OutlinedButton(onClick = { m.closePanelTunnel(srv.id) }) { Text("Закрыть туннель") }
+        if (ssh) OutlinedButton(onClick = { askLocal = !p.local }, enabled = !busy) { Text(if (p.local) "Открыть панель извне" else "Закрыть панель извне") }
+        // пользователи через API — только у 3x-ui (токен); у s-ui и x-ui — на сайте панели
+        if (p.token.isNotBlank()) {
+            OutlinedButton(onClick = { m.loadPanelClients(srv.id) }, enabled = !busy) { Text("Пользователи") }
+            OutlinedButton(onClick = onAddUser, enabled = !busy) { Text("Добавить пользователя") }
+        }
+    }
+    if (p.token.isBlank()) Text("Пользователей и подключения заводите на сайте панели; ссылку подключения из панели можно вставить в «Серверы».",
+        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    askLocal?.let { close ->
+        AlertDialog(onDismissRequest = { askLocal = null },
+            title = { Text(if (close) "Закрыть панель извне?" else "Открыть панель извне?") },
+            text = { Text(if (close) "Сайт панели перестанет открываться из интернета: Hydra будет открывать его через защищённое подключение к серверу. VPN-подключения пользователей работают как прежде."
+                else "Сайт панели снова будет открываться по своему адресу из интернета. Лучше включить HTTPS.") },
+            confirmButton = { TextButton(onClick = { askLocal = null; m.setPanelLocal(srv.id, close) }) { Text(if (close) "Закрыть" else "Открыть") } },
+            dismissButton = { TextButton(onClick = { askLocal = null }) { Text("Отмена") } })
+    }
+    s.panelClients[srv.id]?.let { emails ->
+        if (emails.isEmpty()) Text("Пользователей пока нет.", fontSize = 12.sp)
+        emails.forEach { email ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("• $email", Modifier.width(200.dp), fontSize = 13.sp)
+                OutlinedButton(onClick = { m.showPanelLinks(srv.id, email) }, enabled = !busy) { Text("Ссылка") }
+                TextButton(onClick = { m.removePanelClient(srv.id, email) }, enabled = !busy) { Text("Удалить", color = Danger) }
+            }
+        }
+    }
+}
+
+/** Готовая панель, подключённая по адресу и токену (без SSH): только API панели. */
+@Composable
+private fun PanelOnlyCard(c: AppController, srv: MyServer, m: MyServersManager, s: MyServersUi, onAddUser: () -> Unit, onConfirm: (Confirm) -> Unit) {
+    val st = s.status[srv.id]
+    val mine = s.opServer == srv.id
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(srv.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                StatusChip(st)
+            }
+            Text("Панель 3x-ui, подключена по токену (без входа на сервер)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            PanelBody(c, srv, m, s, onAddUser)
+            if (mine && s.busy) Busy(s.progress.ifBlank { "Работаю…" })
+            if (mine && s.error != null) ErrorBox(s.error!!)
+            ChipRow {
+                OutlinedButton(onClick = { m.refresh(srv.id) }, enabled = !s.busy) { Text("Проверить") }
+                TextButton(onClick = {
+                    onConfirm(Confirm("Убрать «${srv.name}» из списка?", "Hydra забудет адрес и токен панели. Сама панель и её пользователи не изменятся.", "Убрать") { m.forget(srv.id) })
+                }, enabled = !s.busy) { Text("Убрать из списка") }
+            }
+        }
+    }
+}
+
+/** «У меня уже есть панель» (0.8.1-a): адрес и токен доступа 3x-ui — без установки и без входа на сервер. */
+@Composable
+private fun ConnectPanelDialog(onClose: () -> Unit, onOk: (name: String, address: String, token: String) -> Unit) {
+    var name by remember { mutableStateOf("Моя панель") }
+    var address by remember { mutableStateOf("") }
+    var token by remember { mutableStateOf("") }
+    val plain = address.isNotBlank() && !XuiPanel.isHttps(XuiPanel.normalizeUrl(address).orEmpty())
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("Подключить свою панель 3x-ui") },
+        text = {
+            Column(Modifier.width(520.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Если панель 3x-ui уже стоит на вашем сервере, Hydra подключится к ней и сможет заводить пользователей и выдавать ссылки. Устанавливать ничего не нужно.", fontSize = 13.sp)
+                OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Название") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(address, { address = it }, singleLine = true, label = { Text("Адрес панели (как в браузере)") },
+                    placeholder = { Text("http://203.0.113.5:2053/путь") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(token, { token = it }, singleLine = true, label = { Text("Токен доступа (API)") },
+                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                Text("Где взять токен: на сервере команда  x-ui setting -getApiToken  (или файл /etc/x-ui/install-result.env, строка XUI_API_TOKEN).", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (plain) Text("Адрес начинается с http:// — токен пойдёт без шифрования. Подключайтесь при включённом VPN или используйте https://.", fontSize = 12.sp, color = Danger)
+            }
+        },
+        confirmButton = { TextButton(enabled = address.isNotBlank() && token.isNotBlank(), onClick = { onOk(name, address, token) }) { Text("Подключить") } },
+        dismissButton = { TextButton(onClick = onClose) { Text("Отмена") } },
+    )
+}
+
+private const val MASK_RU = "Сайт из «белых списков»: подключение пройдёт и тогда, когда мобильный оператор пускает только разрешённые сайты. " +
+    "Минус: российский сайт на зарубежном IP — заметный признак для ТСПУ."
+private const val MASK_FOREIGN = "Зарубежный сайт без своих узлов в России: адрес сервера не спорит с маскировкой. Минус: не пройдёт при «белых списках» мобильных операторов."
+
+/** Пароль панели в буфер на 30 секунд: потом очищается, если там всё ещё он. */
+private fun copySecret(text: String) {
+    setClipboard(text)
+    kotlin.concurrent.thread(isDaemon = true, name = "clipboard-clear") {
+        Thread.sleep(30_000)
+        if (runCatching { clipboard() }.getOrNull() == text) setClipboard("")
+    }
+}
+
 @Composable
 private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, onNext: (ServiceForm) -> Unit) {
     var gen by remember { mutableStateOf(AwgGeneration.V2_0) }
@@ -375,17 +582,45 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
     var channel by remember { mutableStateOf("hydra") }
     var yandex by remember { mutableStateOf("") }
     var mailru by remember { mutableStateOf("") }
+    var accessPort by remember { mutableStateOf("443") }
+    var sslIp by remember { mutableStateOf(true) }
+    var mask by remember { mutableStateOf(XuiPanel.RealityMask.VK) }
+    var transport by remember { mutableStateOf(XuiPanel.Transport.GRPC) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(if (kind == ServerKind.AMNEZIAWG) "Установка AmneziaWG" else "Установка узла OpenFlux", fontWeight = FontWeight.SemiBold)
-            if (kind == ServerKind.AMNEZIAWG) {
+            Text(when (kind) { ServerKind.AMNEZIAWG -> "Установка AmneziaWG"; ServerKind.OPENFLUX -> "Установка узла OpenFlux"; else -> "Установка панели ${kind.panel!!.title}" }, fontWeight = FontWeight.SemiBold)
+            if (kind == ServerKind.PANEL_SUI || kind == ServerKind.PANEL_XUI) {
+                Text("Hydra поставит последнюю версию ${kind.panel!!.title} официальным установщиком и задаст надёжный логин, пароль и случайный адрес панели. Пользователей вы заведёте на сайте панели.",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(sslIp, { sslIp = it }); Text("HTTPS для панели: бесплатный сертификат Let's Encrypt на IP (нужен открытый 80/tcp; не выйдет — панель останется на HTTP)", fontSize = 13.sp)
+                }
+            }
+            if (kind == ServerKind.PANEL_3XUI) {
+                Text("Hydra поставит последнюю версию 3x-ui официальным установщиком, придумает надёжный логин и пароль, создаст подключение " +
+                    "VLESS + gRPC + Reality и первого пользователя, а в «Серверы» добавит его подписку — правки на сайте панели будут приходить сами.",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(accessPort, { accessPort = it.filter(Char::isDigit).take(5) }, Modifier.width(220.dp), singleLine = true, label = { Text("Порт подключения (TCP)") })
+                ChipRow {
+                    Text("Транспорт:", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                    XuiPanel.Transport.entries.forEach { t -> FilterChip(selected = transport == t, onClick = { transport = t }, label = { Text(if (t == XuiPanel.Transport.GRPC) "${t.title} (рекомендуем)" else t.title) }) }
+                }
+                ChipRow {
+                    Text("Маскировка:", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                    XuiPanel.RealityMask.entries.forEach { r -> FilterChip(selected = mask == r, onClick = { mask = r }, label = { Text(r.sni) }) }
+                }
+                Text(if (mask == XuiPanel.RealityMask.GITHUB) MASK_FOREIGN else MASK_RU, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(sslIp, { sslIp = it }); Text("HTTPS для панели и подписки: бесплатный сертификат Let's Encrypt на IP (нужен открытый 80/tcp)", fontSize = 13.sp)
+                }
+            } else if (kind == ServerKind.AMNEZIAWG) {
                 ChipRow {
                     Text("Версия:", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
                     AwgGeneration.entries.forEach { g -> FilterChip(selected = gen == g, onClick = { gen = g }, label = { Text(if (g == AwgGeneration.V2_0) "${g.label} (рекомендуем)" else g.label) }) }
                 }
                 Text(genHint(gen), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(awgPort, { awgPort = it.filter(Char::isDigit).take(5) }, Modifier.width(160.dp), singleLine = true, label = { Text("UDP-порт") })
-            } else {
+            } else if (kind == ServerKind.OPENFLUX) {
                 Text("Узел ставится официальным скриптом OpenFlux закреплённой версии (с проверкой SHA-256); порт выберет скрипт. Транспорты Яндекс / Mail.ru — по желанию.",
                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(channel, { channel = it.lowercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' }.take(31) }, Modifier.width(260.dp), singleLine = true, label = { Text("Имя канала (a-z, 0-9, дефис)") })
@@ -396,9 +631,14 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
                 Checkbox(openFw, { openFw = it }); Text("Открыть порт в файрволе сервера (ufw/firewalld), если он включён", fontSize = 13.sp)
             }
             val aport = awgPort.toIntOrNull() ?: 0
-            val ok = if (kind == ServerKind.AMNEZIAWG) aport in 1024..65535 else OfxNodeSpec.validChannel(channel)
+            val ok = when (kind) {
+                ServerKind.AMNEZIAWG -> aport in 1024..65535
+                ServerKind.OPENFLUX -> OfxNodeSpec.validChannel(channel)
+                ServerKind.PANEL_3XUI -> (accessPort.toIntOrNull() ?: 0) in 1..65535
+                ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> true
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(enabled = ok && !busy, onClick = { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru)) }) { Text("Проверить сервер и показать план") }
+                Button(enabled = ok && !busy, onClick = { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443, sslIp = sslIp, mask = mask, transport = transport)) }) { Text("Проверить сервер и показать план") }
                 TextButton(onClick = onCancel) { Text("Отмена") }
             }
         }
@@ -410,7 +650,11 @@ private fun InstallPanel(i: ru.gidravpn.hydra.servers.InstallUi, s: MyServersUi,
     var details by remember { mutableStateOf(false) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(if (i.form.kind == ServerKind.AMNEZIAWG) "Установка AmneziaWG ${i.form.generation.label}" else "Установка узла OpenFlux «${i.form.channel}»", fontWeight = FontWeight.SemiBold)
+            Text(when (i.form.kind) {
+                ServerKind.AMNEZIAWG -> "Установка AmneziaWG ${i.form.generation.label}"
+                ServerKind.OPENFLUX -> "Установка узла OpenFlux «${i.form.channel}»"
+                else -> "Установка панели ${i.form.kind.panel!!.title}"
+            }, fontWeight = FontWeight.SemiBold)
             when (i.stage) {
                 InstallStage.CHECKING -> Busy(s.progress.ifBlank { "Проверяю сервер…" })
                 InstallStage.READY -> {
@@ -421,7 +665,7 @@ private fun InstallPanel(i: ru.gidravpn.hydra.servers.InstallUi, s: MyServersUi,
                         }
                     }
                     Text("Что будет сделано:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    FriendlyText.planSentences(i.form.kind, i.form.openFirewall).forEachIndexed { n, t -> Text("${n + 1}. $t", fontSize = 13.sp) }
+                    FriendlyText.planSentences(i.form.kind, i.form.openFirewall, ru.gidravpn.hydra.servers.UiLang.RU, https = i.form.sslIp).forEachIndexed { n, t -> Text("${n + 1}. $t", fontSize = 13.sp) }
                     TextButton(onClick = { details = !details }) { Text(if (details) "Скрыть команды" else "Показать команды") }
                     if (details) SelectionContainer {
                         Column {
@@ -442,7 +686,8 @@ private fun InstallPanel(i: ru.gidravpn.hydra.servers.InstallUi, s: MyServersUi,
                     OutlinedButton(onClick = { m.stop() }) { Text("Остановить") }
                 }
                 InstallStage.DONE -> {
-                    Text("Готово! Подключение добавлено в «Серверы» — осталось выбрать его и нажать «Подключить».", color = Ok, fontSize = 13.sp)
+                    Text(if (i.form.kind == ServerKind.PANEL_SUI || i.form.kind == ServerKind.PANEL_XUI) "Готово! Панель установлена — откройте её кнопкой «Открыть панель» на карточке сервера."
+                        else "Готово! Подключение добавлено в «Серверы» — осталось выбрать его и нажать «Подключить».", color = Ok, fontSize = 13.sp)
                     LogBox(s.log)
                     Button(onClick = onClose) { Text("Закрыть") }
                 }

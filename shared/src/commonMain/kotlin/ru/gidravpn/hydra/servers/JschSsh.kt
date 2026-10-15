@@ -140,5 +140,7 @@ class JschSshSession internal constructor(private val s: Session) : SshSession {
         } finally { ch.disconnect() }
     }
 
+    override fun forwardLocal(remotePort: Int): Int = s.setPortForwardingL("127.0.0.1", 0, "127.0.0.1", remotePort)
+
     override fun close() = s.disconnect()
 }

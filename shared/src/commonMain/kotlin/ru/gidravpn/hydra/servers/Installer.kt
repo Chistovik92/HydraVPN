@@ -16,6 +16,11 @@ interface SshSession : AutoCloseable {
     fun exec(command: String, onLine: (String) -> Unit = {}): ExecResult
     /** Записать файл (SFTP) с правами [mode] (восьмеричными, напр. 0x1A4 = 0644). */
     fun upload(data: ByteArray, remotePath: String, mode: Int = 420)
+    /**
+     * Туннель (0.8.1-rc2): порт на этом устройстве (только 127.0.0.1) ведёт на `127.0.0.1:[remotePort]` сервера.
+     * Живёт, пока открыт сеанс. Возвращает выбранный локальный порт.
+     */
+    fun forwardLocal(remotePort: Int): Int = throw UnsupportedOperationException("Туннель не поддерживается")
 }
 
 /** Один шаг установки: показывается пользователю до запуска. */

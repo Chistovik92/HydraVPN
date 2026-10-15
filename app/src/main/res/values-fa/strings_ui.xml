@@ -349,4 +349,5 @@
     <string name="split_preset_ru">برنامه‌های روسی مستقیم</string>
     <string name="split_preset_done">به استثناها افزوده شد: %1$d. حالت: همه به جز انتخاب‌شده‌ها.</string>
     <string name="split_preset_none">برنامه‌ی روسی مناسبی نصب نیست</string>
+    <string name="manual_bad">از این فیلدها سرور کارآمدی ساخته نمی‌شود — نشانی، کلیدها و درگاه را بررسی کنید.</string>
 </resources>

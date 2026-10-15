@@ -34,4 +34,16 @@ class EngineTogglesTest {
         // PPTP недоступен в принципе — это не «выключенный тумблер»
         assertFalse(EngineToggles().isDisabled(Protocol.PPTP, true))
     }
+
+    /** 0.8.1-rc2: REALITY — через Xray (Xray-core ≥ 26.9.8 на сервере не пускает sing-box). */
+    @Test fun realityGoesToXray() {
+        val r = ServerProfile(name = "r", protocolId = Protocol.VLESS.id, address = "203.0.113.5", port = 443, security = "reality", transport = "grpc")
+        val tls = r.copy(security = "tls")
+        assertEquals(Kind.XRAY, EngineToggles().engineFor(r, true))
+        assertEquals(Kind.SINGBOX, EngineToggles().engineFor(tls, true))          // обычный TLS — как раньше, sing-box
+        assertEquals(Kind.SINGBOX, EngineToggles().engineFor(r, false))           // Xray не собран (stub) — sing-box
+        assertEquals(Kind.SINGBOX, EngineToggles(xray = false).engineFor(r, true)) // Xray выключен пользователем — sing-box
+        assertNull(EngineToggles(singBox = false, xray = false).engineFor(r, true))
+        assertEquals(Kind.XRAY, EngineToggles(preferXray = true).engineFor(tls, true))
+    }
 }

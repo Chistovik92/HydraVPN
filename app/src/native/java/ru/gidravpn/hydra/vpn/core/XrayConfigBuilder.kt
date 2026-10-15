@@ -175,9 +175,10 @@ object XrayConfigBuilder {
                 put("serviceName", p.transportPath)
                 put("multiMode", extra.optBoolean("grpc_multi", false))
             })
-            "http" -> stream.put("httpSettings", JSONObject().apply {
+            // XHTTP (0.8.1-rc2): запасной транспорт инбаунда Hydra в 3x-ui; раньше уходил как tcp — подключение не работало
+            "xhttp" -> stream.put("xhttpSettings", JSONObject().apply {
                 put("path", p.transportPath.ifBlank { "/" })
-                if (p.sni.isNotBlank()) put("host", JSONArray().put(p.sni))
+                if (p.sni.isNotBlank()) put("host", p.sni)
             })
             "httpupgrade" -> stream.put("httpupgradeSettings", JSONObject().apply {
                 put("path", p.transportPath.ifBlank { "/" })
@@ -195,8 +196,13 @@ object XrayConfigBuilder {
         return stream
     }
 
+    /**
+     * Транспорт в терминах Xray — как на ПК (shared XrayConfigBuilder). «http»/«h2» в Xray-core 24+ удалён (в приложении —
+     * 26.9.30): ближайшая замена с тем же поведением — xhttp.
+     */
     private fun transportName(t: String): String = when (t.lowercase()) {
-        "ws", "grpc", "http", "httpupgrade", "h2" -> if (t == "h2") "http" else t
+        "ws", "grpc", "httpupgrade", "xhttp" -> t.lowercase()
+        "http", "h2", "splithttp" -> "xhttp"
         else -> "tcp"
     }
 }

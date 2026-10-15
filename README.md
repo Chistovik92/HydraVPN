@@ -5,7 +5,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.8.0** — «Мои серверы» · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · пре-релиз [0.8.1-b](https://github.com/Chistovik92/HydraVPN/releases/tag/v0.8.1-b) (панели 3x-ui, s-ui, x-ui) — канал «Разработчик» в «Участвовать в бета-тестировании» · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md) · [Документация](docs/README.md)
+- Статус: **0.8.1** — панели 3x-ui, s-ui, x-ui на своём сервере · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md) · [Документация](docs/README.md)
 
 > **⚠️ Windows: с версии 0.7.20 антивирус может ругаться.** Kaspersky блокирует установку и `Hydra.exe`, ссылаясь на поведенческий анализ
 > (`PDM:Trojan.Win32.Generic`); другие антивирусы могут вести себя так же. Мы считаем это ложным срабатыванием: код открыт (GPL-3.0), SHA-256 файлов указан в релизе.

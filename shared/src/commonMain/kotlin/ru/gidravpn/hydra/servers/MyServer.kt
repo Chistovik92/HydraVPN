@@ -23,6 +23,11 @@ data class MyServer(
     val awg: AwgServerSpec? = null,
     /** Узел OpenFlux (0.8.0). С 0.8.0-rc4 может стоять вместе с [awg]. */
     val ofx: OfxNodeSpec? = null,
+    /**
+     * Панель 3x-ui (0.8.1): поставленная Hydra по SSH или подключённая готовая по адресу и токену. У подключённой нет SSH
+     * ([fingerprint] пуст) — с ней работают только через API панели. Токен и пароль хранятся так же, как ключи AmneziaWG.
+     */
+    val panel: PanelInstance? = null,
     val clients: List<AwgClient> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
     /** Что показала последняя проверка: система и архитектура (для карточки; пусто — ещё не проверяли). */
@@ -34,7 +39,11 @@ data class MyServer(
      */
     val unknown: String = "{}",
 ) {
-    val hasServices get() = awg != null || ofx != null
+    val hasServices get() = awg != null || ofx != null || panel != null
+    /** Панель, подключённая без SSH: ни проверки, ни установки служб, ни очистки — только API панели. */
+    val panelOnly get() = fingerprint.isBlank() && panel != null
+    /** Запись без отпечатка и без панели — её не к чему подключать (так выглядит панель 0.8.1-a, пересохранённая 0.8.0-rc4). */
+    val broken get() = fingerprint.isBlank() && panel == null
 
     fun toJson(): JSONObject = (runCatching { JSONObject(unknown) }.getOrNull() ?: JSONObject())
         .put("id", id).put("name", name).put("host", host).put("sshPort", sshPort).put("sshUser", sshUser)
@@ -42,6 +51,7 @@ data class MyServer(
         .also { o ->
             awg?.let { o.put("awg", it.toJson()) }
             ofx?.let { o.put("ofx", it.toJson()) }
+            panel?.let { o.put("panel", it.toJson()) }
             o.put("clients", clientsToJson(clients))
         }
 
@@ -50,12 +60,13 @@ data class MyServer(
             o.getString("id"), o.getString("name"), o.getString("host"), o.optInt("sshPort", 22),
             o.optString("sshUser", "root"), o.getString("fingerprint"),
             o.optJSONObject("awg")?.let(AwgServerSpec::fromJson), o.optJSONObject("ofx")?.let(OfxNodeSpec::fromJson),
+            o.optJSONObject("panel")?.let(PanelInstance::fromJson),
             clientsFromJson(o.optJSONArray("clients")),
             o.optLong("createdAt"), o.optString("osName"), o.optString("arch"),
             JSONObject().also { u -> o.keys().forEach { k -> if (k !in KNOWN) u.put(k, o.get(k)) } }.toString(),
         )
 
-        private val KNOWN = setOf("id", "name", "host", "sshPort", "sshUser", "fingerprint", "awg", "ofx", "clients", "createdAt", "osName", "arch")
+        private val KNOWN = setOf("id", "name", "host", "sshPort", "sshUser", "fingerprint", "awg", "ofx", "panel", "clients", "createdAt", "osName", "arch")
 
         fun clientsToJson(l: List<AwgClient>) = JSONArray(l.map {
             JSONObject().put("name", it.name).put("priv", it.privateKey).put("pub", it.publicKey)

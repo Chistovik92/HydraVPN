@@ -48,13 +48,18 @@ class RoutingConfigTest {
 
     @Test
     fun `engine selection follows toggles`() {
-        val vless = parse(xrayLinks.getValue("vless-reality"))
+        val vless = parse(xrayLinks.getValue("vless-ws-tls"))
+        val reality = parse(xrayLinks.getValue("vless-reality"))
         val hy2 = parse("hysteria2://pw@example.com:443?sni=example.com#HY2")
         val def = DesktopSettings()
         assertEquals(EngineToggles.Kind.SINGBOX, DesktopConfig.engineFor(vless, def, xrayAvailable = true))
         assertEquals(EngineToggles.Kind.XRAY, DesktopConfig.engineFor(vless, def.copy(preferXray = true), xrayAvailable = true))
         assertEquals(EngineToggles.Kind.SINGBOX, DesktopConfig.engineFor(vless, def.copy(preferXray = true), xrayAvailable = false))
         assertEquals(EngineToggles.Kind.XRAY, DesktopConfig.engineFor(vless, def.copy(singBoxEnabled = false), xrayAvailable = true))
+        // 0.8.1-rc2: REALITY — через Xray (сервер Xray-core ≥ 26.9.8 не пускает sing-box); Xray выключен или не собран — sing-box
+        assertEquals(EngineToggles.Kind.XRAY, DesktopConfig.engineFor(reality, def, xrayAvailable = true))
+        assertEquals(EngineToggles.Kind.SINGBOX, DesktopConfig.engineFor(reality, def.copy(xrayEnabled = false), xrayAvailable = true))
+        assertEquals(EngineToggles.Kind.SINGBOX, DesktopConfig.engineFor(reality, def, xrayAvailable = false))
         assertNull(DesktopConfig.engineFor(hy2, def.copy(singBoxEnabled = false), xrayAvailable = true), "Hysteria2 Xray не обслуживает")
     }
 

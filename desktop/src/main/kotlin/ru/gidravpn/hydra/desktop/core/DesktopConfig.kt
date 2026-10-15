@@ -47,7 +47,7 @@ object DesktopConfig {
 
     /** Кто обслужит профиль с текущими тумблерами движков; null — подходящий движок выключен. */
     fun engineFor(p: ServerProfile, settings: DesktopSettings, xrayAvailable: Boolean): EngineToggles.Kind? =
-        if (!isSupported(p) || p.protocol == Protocol.PPTP) null else settings.engines.engineFor(p.protocol, xrayAvailable)
+        if (!isSupported(p) || p.protocol == Protocol.PPTP) null else settings.engines.engineFor(p, xrayAvailable)
 
     data class Api(val port: Int, val secret: String)
 
