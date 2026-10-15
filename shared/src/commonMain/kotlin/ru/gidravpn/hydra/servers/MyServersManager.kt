@@ -585,6 +585,60 @@ class MyServersManager(
         _ui.update { it.copy(shown = email to accessText(s, api, email, subId), panelClients = it.panelClients + (s.id to api.clientEmails())) }
     }
 
+    /**
+     * Создать подключение любого типа в панели 3x-ui (0.8.2-a2, [XuiConnection]): инбаунд + основной пользователь панели
+     * подключается к нему — его подписка в «Серверах» получает подключение сама. Ссылка показывается в окне (её можно добавить и
+     * отдельно). Hysteria 2 и TUIC — с сертификатом панели (`webCertFile`; «Включить HTTPS»). Есть вход по SSH — порт открывается
+     * в файрволе (UDP для WireGuard, AmneziaWG, Hysteria 2, TUIC) и API идёт по SSH; иначе — напрямую по токену.
+     */
+    fun createPanelConnection(id: String, type: XuiConnection, port: Int, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK) {
+        val srv = find(id)?.takeIf { it.panel?.kind == PanelKind.XUI3 && it.panel.token.isNotBlank() } ?: return
+        if (port !in 1..65535) return _ui.update { it.copy(error = "Порт — число от 1 до 65535", opServer = id) }
+        fun create(s: MyServer, api: XuiApi): Pair<String, List<String>> {
+            val host = runCatching { java.net.URL(s.panel!!.baseUrl).host }.getOrNull()?.removePrefix("[")?.removeSuffix("]")?.ifBlank { null } ?: s.host
+            val settings = api.settings()
+            val cert = if (!type.needsCert) null else {
+                val crt = settings.optString("webCertFile"); val key = settings.optString("webKeyFile")
+                if (crt.isBlank() || key.isBlank()) throw XuiApiException("Для ${type.title} нужен сертификат сервера: сначала нажмите «Включить HTTPS» у панели")
+                XuiConnection.Companion.Cert(crt, key, host)
+            }
+            val keys = if (type.reality) api.newRealityKeys() else ("" to "")
+            if (api.inbounds().let { a -> (0 until a.length()).any { a.getJSONObject(it).optInt("port") == port } })
+                throw XuiApiException("Порт $port уже занят другим подключением панели — выберите другой")
+            val inboundId = api.addInbound(XuiConnection.inbound(type, port, "Hydra ${type.title}", mask, keys.first, keys.second, cert))
+            // основной пользователь: созданный мастером, иначе первый в панели, иначе новый
+            val email = s.panel!!.clientEmail.takeIf { e -> e.isNotBlank() && e in api.clientEmails() } ?: api.clientEmails().firstOrNull()
+                ?: "hydra-1".also { api.addClient(it, XuiPanel.random(16).lowercase(), listOf(inboundId), flow = "") }
+            api.attachClient(email, listOf(inboundId))
+            val links = api.links(email).filter { l -> ":$port" in l.substringBefore("#") || linkBodyHasPort(l, port) }
+            return email to links
+        }
+        fun show(email: String, links: List<String>, fw: String) = _ui.update {
+            it.copy(shown = "${type.title} · $email" to (links.joinToString("\n").ifBlank { "Подключение создано; ссылку панель выдаст в подписке пользователя $email." }),
+                progress = "", panelClients = it.panelClients - id, log = it.log + listOfNotNull("Создано подключение ${type.title} на порту $port — подписка пользователя $email обновится сама", fw.ifBlank { null }))
+        }
+        if (srv.fingerprint.isNotBlank()) return op(id, "Создаю подключение ${type.title}…") { s, ssh, inst ->
+            val p = s.panel!!
+            inst.addSecret(p.token)
+            val u = java.net.URL(p.baseUrl)
+            val api = XuiApi(SshXuiTransport(ssh, "${u.protocol}://127.0.0.1:${u.port}${u.path}", p.token, u.host.removePrefix("[").removeSuffix("]")))
+            val (email, links) = try { create(s, api) } catch (e: XuiApiException) { throw OpFailed("Панель: ${e.message}") }
+            val pre = service.preflight(ssh, 0)
+            val fwStep = ServerOps.openPortStep(pre.firewall, "$port/${if (type.udp) "udp" else "tcp"}")
+            if (fwStep != null) inst.run(listOf(fwStep))
+            show(email, links, if (fwStep != null) "Порт $port/${if (type.udp) "udp" else "tcp"} открыт в файрволе" else "")
+        }
+        withPanel(id) { s, api -> val (email, links) = create(s, api); show(email, links, "Откройте порт $port/${if (type.udp) "udp" else "tcp"} в файрволе хостинга, если он закрыт") }
+    }
+
+    /** У ссылок vmess:// и vpn:// порт внутри base64. */
+    private fun linkBodyHasPort(l: String, port: Int): Boolean {
+        if (!l.startsWith("vmess://") && !l.startsWith("vpn://")) return false
+        val b = l.substringAfter("://").substringBefore("#").replace('-', '+').replace('_', '/').let { it + "=".repeat((4 - it.length % 4) % 4) }
+        val t = runCatching { String(java.util.Base64.getDecoder().decode(b)) }.getOrDefault("")
+        return ":$port" in t || Regex("\"port\"\\s*:\\s*\"?$port\"?").containsMatchIn(t)
+    }
+
     /** Ссылки уже созданного пользователя панели. */
     fun showPanelLinks(id: String, email: String) = withPanel(id) { s, api ->
         _ui.update { it.copy(shown = email to accessText(s, api, email, api.subIdOf(email))) }

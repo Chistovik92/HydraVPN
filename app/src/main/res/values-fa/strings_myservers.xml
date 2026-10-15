@@ -205,4 +205,11 @@
     <string name="ms_panel_open_msg">وب‌سایت پنل دوباره با نشانی خودش از اینترنت باز می‌شود. بهتر است HTTPS را فعال کنید.</string>
     <string name="ms_panel_open_btn">باز کردن</string>
     <string name="ms_panel_https_install">HTTPS برای پنل: گواهی رایگان Let\'s Encrypt برای IP سرور (پورت 80/tcp باید باز باشد؛ اگر نشد، پنل روی HTTP می‌ماند)</string>
+    <!-- 0.8.2-a2: все типы подключений 3x-ui -->
+    <string name="ms_conn_create">ساخت اتصال</string>
+    <string name="ms_conn_title">اتصال جدید در پنل</string>
+    <string name="ms_conn_text">Hydra آن را در 3x-ui می‌سازد و به کاربر اصلی پنل وصل می‌کند — اشتراک او در «سرورها» خودش اتصال را می‌گیرد.</string>
+    <string name="ms_conn_port">پورت</string>
+    <string name="ms_conn_udp">روی UDP کار می‌کند — پورت به‌صورت UDP باز می‌شود. برخی شبکه‌های موبایل UDP را محدود می‌کنند؛ در این صورت VLESS/Trojan + REALITY را انتخاب کنید.</string>
+    <string name="ms_conn_cert">گواهی سرور لازم است: ابتدا «فعال‌سازی HTTPS» پنل را بزنید.</string>
 </resources>

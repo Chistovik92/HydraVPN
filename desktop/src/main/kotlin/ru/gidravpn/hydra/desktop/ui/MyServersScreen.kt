@@ -452,6 +452,7 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
     val tunnel = s.tunnels[srv.id]
     var openWhenReady by remember { mutableStateOf(false) }
     var askLocal by remember { mutableStateOf<Boolean?>(null) }
+    var createConn by remember { mutableStateOf(false) }
     val open = { url: String ->
         if (p.password.isNotBlank()) { copySecret(p.password); c.toast("Пароль скопирован на 30 секунд — вставьте его на странице входа") }
         openUrl(url)
@@ -485,10 +486,36 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
         if (p.token.isNotBlank()) {
             OutlinedButton(onClick = { m.loadPanelClients(srv.id) }, enabled = !busy) { Text("Пользователи") }
             OutlinedButton(onClick = onAddUser, enabled = !busy) { Text("Добавить пользователя") }
+            if (p.kind == ru.gidravpn.hydra.servers.PanelKind.XUI3) OutlinedButton(onClick = { createConn = true }, enabled = !busy) { Text("Создать подключение") }
         }
     }
     if (p.token.isBlank()) Text("Пользователей и подключения заводите на сайте панели; ссылку подключения из панели можно вставить в «Серверы».",
         fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (createConn) {
+        var type by remember { mutableStateOf(ru.gidravpn.hydra.servers.XuiConnection.VLESS_GRPC_REALITY) }
+        var port by remember { mutableStateOf((20000 + java.security.SecureRandom().nextInt(40000)).toString()) }
+        var mask by remember { mutableStateOf(XuiPanel.RealityMask.VK) }
+        val https = XuiPanel.isHttps(p.baseUrl)
+        AlertDialog(onDismissRequest = { createConn = false },
+            title = { Text("Новое подключение в панели") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Hydra создаст его в 3x-ui и подключит к основному пользователю панели — его подписка в «Серверах» получит подключение сама.", fontSize = 13.sp)
+                    ChipRow { ru.gidravpn.hydra.servers.XuiConnection.entries.forEach { t -> FilterChip(selected = type == t, onClick = { type = t }, label = { Text(t.title) }) } }
+                    if (type.reality) ChipRow {
+                        Text("Маскировка:", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                        XuiPanel.RealityMask.entries.forEach { r -> FilterChip(selected = mask == r, onClick = { mask = r }, label = { Text(r.sni) }) }
+                    }
+                    OutlinedTextField(port, { port = it.filter(Char::isDigit).take(5) }, singleLine = true, label = { Text("Порт") })
+                    if (type.udp) Text("Работает по UDP — порт откроется как UDP. Часть мобильных сетей в РФ режет UDP: тогда выберите VLESS/Trojan + REALITY.",
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (type.needsCert && !https) Text("Нужен сертификат сервера: сначала нажмите «Включить HTTPS» у панели.", fontSize = 12.sp, color = Danger)
+                }
+            },
+            confirmButton = { TextButton(enabled = (port.toIntOrNull() ?: 0) in 1..65535 && (!type.needsCert || https),
+                onClick = { createConn = false; m.createPanelConnection(srv.id, type, port.toInt(), mask) }) { Text("Создать") } },
+            dismissButton = { TextButton(onClick = { createConn = false }) { Text("Отмена") } })
+    }
     askLocal?.let { close ->
         AlertDialog(onDismissRequest = { askLocal = null },
             title = { Text(if (close) "Закрыть панель извне?" else "Открыть панель извне?") },

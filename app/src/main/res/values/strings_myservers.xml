@@ -206,4 +206,11 @@
     <string name="ms_panel_open_msg">The panel website will open from the internet at its address again. It is better to enable HTTPS.</string>
     <string name="ms_panel_open_btn">Open</string>
     <string name="ms_panel_https_install">HTTPS for the panel: a free Let\'s Encrypt certificate for the server IP (needs port 80/tcp open; if it fails, the panel stays on HTTP)</string>
+    <!-- 0.8.2-a2: все типы подключений 3x-ui -->
+    <string name="ms_conn_create">Create connection</string>
+    <string name="ms_conn_title">New connection in the panel</string>
+    <string name="ms_conn_text">Hydra creates it in 3x-ui and adds it to the panel\'s main user: their subscription in Servers picks it up by itself.</string>
+    <string name="ms_conn_port">Port</string>
+    <string name="ms_conn_udp">Works over UDP: the port will be opened as UDP. Some mobile networks in Russia throttle UDP — then pick VLESS/Trojan + REALITY.</string>
+    <string name="ms_conn_cert">Needs a server certificate: first tap «Enable HTTPS» for the panel.</string>
 </resources>

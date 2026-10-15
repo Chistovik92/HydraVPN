@@ -294,6 +294,28 @@ class XuiLiveTest {
             }
             cases.forEach { (n, pr) -> println("TRAFFIC sing-box $n: ${XuiTraffic.through(sb, pr).take(160)}") }
         }
+        // 0.8.2-a2: «Создать подключение» — как кнопка в приложении (менеджер, SSH, файрвол), ссылка от панели несёт трафик
+        for ((type, port) in listOf(XuiConnection.SHADOWSOCKS_2022 to 24460, XuiConnection.WIREGUARD to 24461)) {
+            m.hideShown()
+            m.createPanelConnection(srv.id, type, port)
+            waitFor("подключение $type") { !m.ui.value.busy && (m.ui.value.shown != null || m.ui.value.error != null) }
+            val link = m.ui.value.shown?.second ?: fail("${type}: ${m.ui.value.error}")
+            println("CREATED $type: ${link.take(30)}…")
+            assertTrue(link.startsWith(if (type == XuiConnection.WIREGUARD) "wireguard://" else "ss://"), link.take(40))
+            System.getenv("HYDRA_SINGBOX")?.let { sb ->
+                Thread.sleep(5000)
+                val r = XuiTraffic.through(sb, ru.gidravpn.hydra.data.subscription.LinkParser.parseLine(link.lines().first())!!)
+                println("CREATED TRAFFIC $type: $r"); assertTrue(r.startsWith("ok"), r)
+            }
+        }
+        // занятый порт — понятный отказ, панель не трогается
+        m.createPanelConnection(srv.id, XuiConnection.VMESS_WS, 24460)
+        waitFor("занятый порт") { !m.ui.value.busy }
+        assertTrue(m.ui.value.error.orEmpty().contains("уже занят"), m.ui.value.error.toString())
+        // Hysteria 2 без HTTPS у панели — отказ с подсказкой
+        m.createPanelConnection(srv.id, XuiConnection.HYSTERIA2, 24462)
+        waitFor("без сертификата") { !m.ui.value.busy }
+        assertTrue(m.ui.value.error.orEmpty().contains("Включить HTTPS"), m.ui.value.error.toString())
         // HYDRA_XUI_KEEP — оставить панель на стенде (проверка на эмуляторе): ссылка клиента hydra-1 в журнал теста
         if (System.getenv("HYDRA_XUI_KEEP") != null) { println("KEEP_LINK=" + api.links("hydra-1").first()); println("KEEP_SUB=$sub"); return }
         // полная очистка снимает и панель

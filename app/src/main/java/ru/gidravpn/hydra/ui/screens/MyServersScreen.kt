@@ -527,6 +527,13 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
             MsChip(stringResource(R.string.ms_panel_add_user), AccentCyan) { if (!busy) onAddUser() }
         }
     }
+    // все типы подключений 3x-ui (0.8.2-a2)
+    var createConn by remember { mutableStateOf(false) }
+    if (p.kind == ru.gidravpn.hydra.servers.PanelKind.XUI3 && p.token.isNotBlank())
+        MsRow { MsChip(stringResource(R.string.ms_conn_create), AccentCyan) { if (!busy) createConn = true } }
+    if (createConn) CreateConnectionDialog(https = XuiPanel.isHttps(p.baseUrl), onClose = { createConn = false }) { type, port, mask ->
+        createConn = false; m.createPanelConnection(srv.id, type, port, mask)
+    }
     if (p.token.isBlank()) Text(stringResource(R.string.ms_panel_site_only), color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
     // «ничего наружу без согласия» (0.8.1-rc2): панель слушает только сам сервер, сайт — через защищённый туннель
     if (ssh) {
@@ -608,6 +615,37 @@ private fun ConnectPanelDialog(onClose: () -> Unit, onOk: (name: String, address
             }
         },
         confirmButton = { TextButton(enabled = address.isNotBlank() && token.isNotBlank(), onClick = { onOk(name, address, token) }) { Text(stringResource(R.string.ms_cp_connect), color = AccentCyan) } },
+        dismissButton = { TextButton(onClose) { Text(stringResource(R.string.ms_cancel), color = TextMuted) } },
+    )
+}
+
+/** Создать подключение в 3x-ui (0.8.2-a2): тип, порт, маскировка для REALITY. */
+@Composable
+private fun CreateConnectionDialog(https: Boolean, onClose: () -> Unit, onOk: (ru.gidravpn.hydra.servers.XuiConnection, Int, XuiPanel.RealityMask) -> Unit) {
+    var type by remember { mutableStateOf(ru.gidravpn.hydra.servers.XuiConnection.VLESS_GRPC_REALITY) }
+    var port by remember { mutableStateOf((20000 + java.security.SecureRandom().nextInt(40000)).toString()) }
+    var mask by remember { mutableStateOf(XuiPanel.RealityMask.VK) }
+    AlertDialog(
+        onDismissRequest = onClose, containerColor = Surface,
+        title = { Text(stringResource(R.string.ms_conn_title), color = TextPrimary) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(stringResource(R.string.ms_conn_text), color = TextSecondary, fontSize = 13.sp)
+                MsRow { ru.gidravpn.hydra.servers.XuiConnection.entries.forEach { t -> MsChip(t.title, TextSecondary, selected = type == t) { type = t } } }
+                if (type.reality) {
+                    Text(stringResource(R.string.ms_xui_mask), color = TextSecondary, fontSize = 13.sp)
+                    MsRow { XuiPanel.RealityMask.entries.forEach { r -> MsChip(r.sni, TextSecondary, selected = mask == r) { mask = r } } }
+                }
+                MsField(stringResource(R.string.ms_conn_port), port) { port = it.filter(Char::isDigit).take(5) }
+                if (type.udp) Text(stringResource(R.string.ms_conn_udp), color = TextMuted, fontSize = 12.sp)
+                if (type.needsCert && !https) Text(stringResource(R.string.ms_conn_cert), color = Danger, fontSize = 12.sp)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = (port.toIntOrNull() ?: 0) in 1..65535 && (!type.needsCert || https), onClick = { onOk(type, port.toInt(), mask) }) {
+                Text(stringResource(R.string.ms_create), color = AccentCyan)
+            }
+        },
         dismissButton = { TextButton(onClose) { Text(stringResource(R.string.ms_cancel), color = TextMuted) } },
     )
 }

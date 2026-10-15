@@ -205,4 +205,11 @@
     <string name="ms_panel_open_msg">面板网站将再次可以通过其地址从互联网打开。建议启用 HTTPS。</string>
     <string name="ms_panel_open_btn">开放</string>
     <string name="ms_panel_https_install">面板 HTTPS：为服务器 IP 申请免费的 Let\'s Encrypt 证书（需开放 80/tcp；失败时面板保持 HTTP）</string>
+    <!-- 0.8.2-a2: все типы подключений 3x-ui -->
+    <string name="ms_conn_create">创建连接</string>
+    <string name="ms_conn_title">在面板中新建连接</string>
+    <string name="ms_conn_text">Hydra 会在 3x-ui 中创建它并添加给面板主用户——其在“服务器”中的订阅会自动获得该连接。</string>
+    <string name="ms_conn_port">端口</string>
+    <string name="ms_conn_udp">基于 UDP 工作——端口将以 UDP 方式开放。部分移动网络会限制 UDP，此时请选择 VLESS/Trojan + REALITY。</string>
+    <string name="ms_conn_cert">需要服务器证书：请先为面板点击“启用 HTTPS”。</string>
 </resources>
