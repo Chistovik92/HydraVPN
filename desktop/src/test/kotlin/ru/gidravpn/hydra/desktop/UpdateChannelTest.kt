@@ -50,4 +50,12 @@ class UpdateChannelTest {
         // стоящему на бете 0.8.1-b «Разработчик» тоже предлагает rc1
         assertTrue(UpdateFeed.isNewer("0.8.1-rc1", "0.8.1-b"))
     }
+
+    /** 0.8.1-rc2: стоящему на rc1 и на 0.8.0 его предлагают «Релиз-кандидаты» и «Разработчик»; обычный канал остаётся на 0.8.0. */
+    @Test fun rc2OfferedFromRc1And080() {
+        val l = UpdateFeed.parseList(JSONArray(listOf(rel("0.8.1-rc2", true), rel("0.8.1-rc1", true), rel("0.8.0", false))).toString())
+        assertEquals("0.8.0", UpdateFeed.pickNewest(l, UpdateChannel.STABLE)?.version)
+        for (ch in listOf(UpdateChannel.RC, UpdateChannel.DEV)) assertEquals("0.8.1-rc2", UpdateFeed.pickNewest(l, ch)?.version, ch.id)
+        assertTrue(UpdateFeed.isNewer("0.8.1-rc2", "0.8.1-rc1") && UpdateFeed.isNewer("0.8.1-rc2", "0.8.0") && !UpdateFeed.isNewer("0.8.1-rc1", "0.8.1-rc2"))
+    }
 }
