@@ -29,6 +29,7 @@ object OtherPanelConnections {
         PanelKind.XUI3 -> XuiConnection.entries
         PanelKind.XUI -> XUI
         PanelKind.SUI -> SUI
+        PanelKind.PASARGUARD -> PasarGuardPanel.TYPES
     }
 
     // ------------------------------------------------------------------------------------------ s-ui (sing-box)
@@ -82,6 +83,15 @@ object OtherPanelConnections {
     fun suiLinks(client: JSONObject): List<String> {
         val a = client.optJSONArray("links") ?: return emptyList()
         return (0 until a.length()).mapNotNull { i -> a.opt(i).let { v -> (v as? JSONObject)?.optString("uri") ?: (v as? String) } }.filter { "://" in it }
+    }
+
+    /** Ссылка ведёт на [port]: `host:port` в ссылке или `port` в base64-теле `vmess://` / `vpn://`. */
+    fun linkHasPort(l: String, port: Int): Boolean {
+        if (":$port" in l.substringBefore("#").substringBefore("?").let { it.substringAfterLast('@', it) }) return true
+        if (!l.startsWith("vmess://") && !l.startsWith("vpn://")) return false
+        val b = l.substringAfter("://").substringBefore("#").replace('-', '+').replace('_', '/').let { it + "=".repeat((4 - it.length % 4) % 4) }
+        val t = runCatching { String(java.util.Base64.getDecoder().decode(b)) }.getOrDefault("")
+        return ":$port" in t || Regex("\"port\"\\s*:\\s*\"?$port\"?").containsMatchIn(t)
     }
 
     /** Можно ли создать подключение из приложения: 3x-ui — по токену API, остальные — по SSH. */

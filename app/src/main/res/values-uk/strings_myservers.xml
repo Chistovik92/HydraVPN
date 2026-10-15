@@ -212,4 +212,5 @@
     <string name="ms_conn_port">Порт</string>
     <string name="ms_conn_udp">Працює по UDP — порт відкриється як UDP. Частина мобільних мереж ріже UDP: тоді виберіть VLESS/Trojan + REALITY.</string>
     <string name="ms_conn_cert">Потрібен сертифікат сервера: спершу натисніть «Увімкнути HTTPS» у панелі.</string>
+    <string name="ms_panel_pg_hint">Hydra встановить Docker (якщо його немає), панель PasarGuard і її ноду офіційними інсталяторами закріпленої версії та створить власника з надійним логіном і паролем. Панель буде доступна лише через захищений тунель Hydra. Підключення (VLESS / Trojan + REALITY, VMess) — кнопкою «Створити підключення». Встановлення триває 3–10 хвилин.</string>
 </resources>

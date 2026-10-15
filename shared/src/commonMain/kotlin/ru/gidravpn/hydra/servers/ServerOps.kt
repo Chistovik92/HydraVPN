@@ -34,6 +34,9 @@ data class ServerStatus(
     val suiInstalled: Boolean = false,
     val suiByHydra: Boolean = false,
     val xuiAlirezaByHydra: Boolean = false,
+    /** PasarGuard на сервере и метка «поставила Hydra» (0.8.2-a3). */
+    val pgInstalled: Boolean = false,
+    val pgByHydra: Boolean = false,
     /** Копия записи панели `/etc/hydra/panel.json`. */
     val panelStateJson: String = "",
     /** Ошибка проверки (сервер недоступен и т. п.); null — проверка прошла. */
@@ -58,7 +61,7 @@ object ServerOps {
     const val BACKUP_DIR = "/root/hydra-backups"
 
     /** Где панели хранят базу (SQLite). */
-    val PANEL_DBS = mapOf("x-ui" to "/etc/x-ui/x-ui.db", "s-ui" to "/usr/local/s-ui/db/s-ui.db")
+    val PANEL_DBS = mapOf("x-ui" to "/etc/x-ui/x-ui.db", "s-ui" to "/usr/local/s-ui/db/s-ui.db", "pasarguard" to "/var/lib/pasarguard/db.sqlite3")
 
     /** Скопировать базы стоящих панелей в [BACKUP_DIR] (если базы нет — ничего не делает). */
     fun backupPanelsCommand(): String = "mkdir -p $BACKUP_DIR && chmod 700 $BACKUP_DIR; d=\$(date +%Y%m%d-%H%M%S); " +
@@ -89,6 +92,8 @@ object ServerOps {
         append("echo SUI=\$([ -e /usr/local/s-ui ] && echo 1 || echo 0); ")
         append("echo SUI_MARK=\$([ -f ${OtherPanels.SUI.mark} ] && echo 1 || echo 0); ")
         append("echo XUIA_MARK=\$([ -f ${OtherPanels.XUI.mark} ] && echo 1 || echo 0); ")
+        append("echo PG=\$([ -e ${PasarGuardPanel.DIR}/docker-compose.yml ] && echo 1 || echo 0); ")
+        append("echo PG_MARK=\$([ -f ${PasarGuardPanel.MARK} ] && echo 1 || echo 0); ")
         append("echo '---AWGDUMP'; $AWG_ENV ${AwgInstallPlan.BIN_DIR}/awg show $iface dump 2>/dev/null; ")
         append("echo '---AWGSTATE'; cat $AWG_STATE 2>/dev/null; echo; ")
         append("echo '---AWGCONF'; cat ${AwgInstallPlan.CONF_DIR}/$iface.conf 2>/dev/null; ")
@@ -123,6 +128,7 @@ object ServerOps {
             xuiInstalled = kv["XUI"] == "1", xuiByHydra = kv["XUI_MARK"] == "1", xuiState = kv["XUI_STATE"].orEmpty(),
             xuiResult = sections["XUIRESULT"].orEmpty().joinToString("\n").trim(),
             suiInstalled = kv["SUI"] == "1", suiByHydra = kv["SUI_MARK"] == "1", xuiAlirezaByHydra = kv["XUIA_MARK"] == "1",
+            pgInstalled = kv["PG"] == "1", pgByHydra = kv["PG_MARK"] == "1",
             panelStateJson = sections["PANELSTATE"].orEmpty().joinToString("\n").trim(),
         )
     }
@@ -185,10 +191,11 @@ object ServerOps {
         Step("wipe-xui", "Удалить панель 3x-ui, если её ставила Hydra",
             "if [ -f $XUI_MARK ] && [ -x /usr/bin/x-ui ]; then printf 'y\\n' | /usr/bin/x-ui uninstall >/dev/null 2>&1; echo '3x-ui: удалена'; " +
                 "else echo '3x-ui: не ставилась Hydra'; fi; true"),
-        Step("wipe-panels", "Удалить панели s-ui и x-ui, если их ставила Hydra",
+        Step("wipe-panels", "Удалить панели s-ui, x-ui и PasarGuard, если их ставила Hydra",
             listOf(OtherPanels.SUI, OtherPanels.XUI).joinToString(" ") { s ->
                 "if [ -f ${s.mark} ]; then ${OtherPanels.uninstallCommand(s)}; echo '${s.kind.title}: удалена'; fi;"
-            } + " rm -f ${OtherPanels.PANEL_STATE}; true"),
+            } + " if [ -f ${PasarGuardPanel.MARK} ]; then ${PasarGuardPanel.uninstallCommand()}; echo 'PasarGuard: удалена'; fi;" +
+                " rm -f ${OtherPanels.PANEL_STATE}; true"),
         Step("wipe-fw", "Закрыть порты, которые открывала Hydra",
             "if [ -f $FW_LIST ]; then while read -r fw p; do case \"\$fw\" in " +
                 "ufw) ufw delete allow \"\$p\" >/dev/null 2>&1 && echo \"закрыт \$p (ufw)\";; " +

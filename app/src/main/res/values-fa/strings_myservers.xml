@@ -212,4 +212,5 @@
     <string name="ms_conn_port">پورت</string>
     <string name="ms_conn_udp">روی UDP کار می‌کند — پورت به‌صورت UDP باز می‌شود. برخی شبکه‌های موبایل UDP را محدود می‌کنند؛ در این صورت VLESS/Trojan + REALITY را انتخاب کنید.</string>
     <string name="ms_conn_cert">گواهی سرور لازم است: ابتدا «فعال‌سازی HTTPS» پنل را بزنید.</string>
+    <string name="ms_panel_pg_hint">Hydra داکر (در صورت نبود)، پنل PasarGuard و نود آن را با نصب‌کننده‌های رسمی نسخهٔ ثابت نصب می‌کند و مالک را با نام کاربری و رمز قوی می‌سازد. پنل فقط از طریق تونل امن Hydra در دسترس است. اتصال‌ها (VLESS / Trojan + REALITY، VMess) — با دکمهٔ «ساخت اتصال». نصب ۳ تا ۱۰ دقیقه طول می‌کشد.</string>
 </resources>

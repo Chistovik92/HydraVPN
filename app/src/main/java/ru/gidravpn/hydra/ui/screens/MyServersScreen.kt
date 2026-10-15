@@ -462,6 +462,7 @@ private fun PanelSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, 
             if (st?.xuiInstalled != true) MsChip(stringResource(R.string.ms_panel_install), AccentViolet) { if (!busy) onInstall(ServerKind.PANEL_3XUI) }
             if (st?.suiInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "s-ui"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_SUI) }
             if (st?.xuiInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "x-ui"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_XUI) }
+            if (st?.pgInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "PasarGuard"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_PASARGUARD) }
         }
         return
     }
@@ -510,7 +511,8 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
     }
     if (local) Text(stringResource(R.string.ms_panel_local), color = Success, fontSize = 11.sp)
     if (tunnel != null) Text(stringResource(R.string.ms_tunnel_open, tunnel), color = TextMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-    if (!XuiPanel.isHttps(p.baseUrl)) {
+    // PasarGuard слушает только 127.0.0.1 сервера: http:// идёт внутри SSH-туннеля
+    if (!XuiPanel.isHttps(p.baseUrl) && p.kind != ru.gidravpn.hydra.servers.PanelKind.PASARGUARD) {
         Text(stringResource(R.string.ms_panel_http), color = TextMuted, fontSize = 11.sp)
         // сертификат на IP ставится по SSH — только у панели на своём сервере (у подключённой по токену SSH нет); с rc2 — у всех трёх
         if (ssh) MsRow { MsChip(stringResource(R.string.ms_panel_https), AccentCyan) { if (!busy) m.enablePanelHttps(srv.id) } }
@@ -536,7 +538,7 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
     }
     if (p.token.isBlank()) Text(stringResource(R.string.ms_panel_site_only), color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
     // «ничего наружу без согласия» (0.8.1-rc2): панель слушает только сам сервер, сайт — через защищённый туннель
-    if (ssh) {
+    if (ssh && p.kind != ru.gidravpn.hydra.servers.PanelKind.PASARGUARD) {
         val onConfirm = LocalConfirm.current
         MsRow {
             if (!p.local) MsChip(stringResource(R.string.ms_panel_close_ext), TextSecondary) {
@@ -683,6 +685,7 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
                 Text(stringResource(R.string.ms_panel_https_install), color = TextSecondary, fontSize = 13.sp)
             }
         }
+        if (kind == ServerKind.PANEL_PASARGUARD) Text(stringResource(R.string.ms_panel_pg_hint), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
         Spacer(Modifier.height(6.dp))
         if (kind == ServerKind.PANEL_3XUI) {
             Text(stringResource(R.string.ms_xui_hint), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
@@ -730,7 +733,7 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
             ServerKind.AMNEZIAWG -> aport in 1024..65535
             ServerKind.OPENFLUX -> OfxNodeSpec.validChannel(channel)
             ServerKind.PANEL_3XUI -> (accessPort.toIntOrNull() ?: 0) in 1..65535
-            ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> true
+            ServerKind.PANEL_SUI, ServerKind.PANEL_XUI, ServerKind.PANEL_PASARGUARD -> true
         }
         Spacer(Modifier.height(8.dp))
         MsRow {
@@ -788,7 +791,7 @@ private fun InstallPanel(i: InstallUi, s: MyServersUi, m: MyServersManager, onCl
                 MsChip(stringResource(R.string.ms_stop), Danger) { m.stop() }
             }
             InstallStage.DONE -> {
-                Text(stringResource(if (i.form.kind == ServerKind.PANEL_SUI || i.form.kind == ServerKind.PANEL_XUI) R.string.ms_install_done_panel else R.string.ms_install_done), color = Success, fontSize = 13.sp)
+                Text(stringResource(if (i.form.kind.panel != null && i.form.kind != ServerKind.PANEL_3XUI) R.string.ms_install_done_panel else R.string.ms_install_done), color = Success, fontSize = 13.sp)
                 Spacer(Modifier.height(6.dp)); LogBox(s.log); Spacer(Modifier.height(6.dp))
                 MsChip(stringResource(R.string.ms_close), AccentCyan) { onClose() }
             }

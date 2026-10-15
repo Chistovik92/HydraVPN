@@ -15,6 +15,8 @@ enum class PanelKind(val title: String, val repo: String) {
     SUI("s-ui", "alireza0/s-ui"),
     /** x-ui (alireza0) — 0.8.1: так же, как s-ui. */
     XUI("x-ui", "alireza0/x-ui"),
+    /** PasarGuard (наследник Marzban, Docker) — 0.8.2-a3: установка, вход на сайт, подключения ([PasarGuardPanel]). */
+    PASARGUARD("PasarGuard", "PasarGuard/panel"),
 }
 
 /**
@@ -356,6 +358,7 @@ object XuiPanel {
             PanelKind.XUI -> "/usr/local/x-ui/x-ui cert -webCert $crt -webCertKey $key >/dev/null && " +
                 OtherPanels.settingsCommand(kind, mapOf("subCertFile" to crt, "subKeyFile" to key))
             PanelKind.SUI -> OtherPanels.settingsCommand(kind, mapOf("webCertFile" to crt, "webKeyFile" to key, "subCertFile" to crt, "subKeyFile" to key))
+            PanelKind.PASARGUARD -> error("PasarGuard в Hydra — только через туннель, без сертификата на IP")
         }
         add(Step("cert-panel", "Включить HTTPS у панели и подписки",
             "$cmd && systemctl restart $svc && sleep 2 && systemctl is-active $svc",
