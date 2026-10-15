@@ -294,6 +294,8 @@ class XuiLiveTest {
             }
             cases.forEach { (n, pr) -> println("TRAFFIC sing-box $n: ${XuiTraffic.through(sb, pr).take(160)}") }
         }
+        // HYDRA_XUI_KEEP — оставить панель на стенде (проверка на эмуляторе): ссылка клиента hydra-1 в журнал теста
+        if (System.getenv("HYDRA_XUI_KEEP") != null) { println("KEEP_LINK=" + api.links("hydra-1").first()); println("KEEP_SUB=$sub"); return }
         // полная очистка снимает и панель
         m.wipe(id)
         waitFor("очистка") { !m.ui.value.busy && saved.single().panel == null }
