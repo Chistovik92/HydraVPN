@@ -157,7 +157,7 @@ fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTa
                 Box(Modifier.fillMaxSize().padding(24.dp)) {
                     when (tab) {
                         Tab.HOME -> HomeScreen(c, ui, onRelaunchAdmin, openServers = { tab = Tab.SERVERS })
-                        Tab.SERVERS -> ServersScreen(c, ui)
+                        Tab.SERVERS -> ServersScreen(c, ui, openMyServers = { tab = Tab.MYSERVERS })
                         Tab.SUBS -> SubscriptionsScreen(c, ui)
                         Tab.ROUTING -> RoutingScreen(c, ui)
                         Tab.ROUTERS -> RoutersScreen(c, ui)
@@ -293,7 +293,7 @@ private fun Stat(big: String, small: String) = Column(horizontalAlignment = Alig
 
 // ============================================================== Серверы
 @Composable
-private fun ServersScreen(c: AppController, ui: UiState) {
+private fun ServersScreen(c: AppController, ui: UiState, openMyServers: () -> Unit = {}) {
     var input by remember { mutableStateOf("") }
     var query by remember { mutableStateOf("") }
     var sortByPing by remember { mutableStateOf(false) }
@@ -305,6 +305,9 @@ private fun ServersScreen(c: AppController, ui: UiState) {
     }
     Column(Modifier.fillMaxSize()) {
         Header("Серверы") {
+            // 0.8.2-a2: владелец искал установку своего сервера и «Создать подключение» здесь, а они — во вкладке «Мои серверы»
+            // (на Android вход есть прямо на экране «Серверы»). Теперь и на ПК.
+            Button(onClick = openMyServers) { Text("Мой сервер и панели") }
             FilterChip(selected = sortByPing, onClick = { sortByPing = !sortByPing }, label = { Text("По пингу") })
             OutlinedButton(onClick = { c.import(clipboard()) }) { Text("Вставить из буфера") }
             OutlinedButton(onClick = { manual = true }) { Text("Добавить вручную") }
