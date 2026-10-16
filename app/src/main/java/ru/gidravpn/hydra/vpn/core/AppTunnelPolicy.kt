@@ -25,8 +25,8 @@ object AppTunnelPolicy {
     private val PROTECTED_ENGINES = setOf(Engine.SINGBOX, Engine.USERSPACE)
 
     /**
-     * @param servedByXray обслужит ли профиль на деле Xray (EngineToggles.engineFor: REALITY, «Xray вместо sing-box»), хотя
-     *   по протоколу это sing-box. **Б0 (0.8.2-b):** процесс `:xray` — тот же UID; его сокеты защищены (`protectFd`), но
+     * @param servedByXray обслужит ли профиль на деле ядро без `protect()` своих сокетов — Xray (REALITY, «Xray вместо sing-box»)
+     *   или, с 0.8.2-b, amneziawg-go для обычного WireGuard, — хотя по протоколу это sing-box. **Б0 (0.8.2-b):** процесс `:xray` — тот же UID; его сокеты защищены (`protectFd`), но
      *   системный DNS (адрес сервера-домена, DoT «Частного DNS») уходил в собственный туннель → в тот же Xray, которому этот
      *   адрес и нужен: после смены сети (и сразу — с «Частным DNS») подключение вставало. С 0.8.0-rc3 по 0.8.2-a4 приложение
      *   с такими профилями было в туннеле — отсюда «интернет пропадает при переходе между сетями» на Xray.

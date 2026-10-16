@@ -26,6 +26,10 @@ data class EngineToggles(
             Engine.SINGBOX -> {
                 val canXray = p in XRAY_CAPABLE && xray && xrayAvailable
                 when {
+                    // 0.8.2-b (Б1): обычный WireGuard на Android — ядром amneziawg-go (оно понимает и обычные конфиги); sing-box —
+                    // запасной, если тумблер AmneziaWG выключен. Через sing-box WG на Android качал ~5 КБ/с (эмулятор, x-ui и 3x-ui),
+                    // тот же сервер через amneziawg-go — 10 МБ за минуту.
+                    p == Protocol.WIREGUARD && amneziaWg -> Kind.AWG
                     canXray && (preferXray || !singBox) -> Kind.XRAY
                     singBox -> Kind.SINGBOX
                     else -> null

@@ -62,6 +62,15 @@ class AppTunnelPolicyTest {
         assertTrue(AppTunnelPolicy.needsAppBypass(p(Protocol.TROJAN), cfg, { id -> if (id == 7L) reality.copy(id = 7) else null }, byXray))
     }
 
+    /** 0.8.2-b: обычный WireGuard через amneziawg-go — его сокеты не защищены (урок rc4) — приложение вне туннеля. */
+    @Test fun wireGuardViaAmneziaWgKeepsAppOutside() {
+        val t = ru.gidravpn.hydra.data.model.EngineToggles()
+        val unprotected = { s: ServerProfile -> t.engineFor(s, true) in setOf(ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY, ru.gidravpn.hydra.data.model.EngineToggles.Kind.AWG) }
+        assertTrue(AppTunnelPolicy.needsAppBypass(p(Protocol.WIREGUARD), RouteConfig(), none, unprotected))
+        val sb = ru.gidravpn.hydra.data.model.EngineToggles(amneziaWg = false)
+        assertFalse(AppTunnelPolicy.needsAppBypass(p(Protocol.WIREGUARD), RouteConfig(), none) { s -> sb.engineFor(s, true) in setOf(ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY, ru.gidravpn.hydra.data.model.EngineToggles.Kind.AWG) })
+    }
+
     @Test fun ruleToSubprocessNodeKeepsAppOutside() {
         val cfg = RouteConfig(rules = listOf(RouteRule(RouteKind.SUFFIX, "ru", RouteTarget.node(7))))
         val lookup = { id: Long -> if (id == 7L) p(Protocol.OPENFLUX, id = 7) else null }

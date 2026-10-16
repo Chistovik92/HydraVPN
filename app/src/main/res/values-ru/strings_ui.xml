@@ -289,13 +289,13 @@
     <string name="profile_hwid">Аппаратный ID (HWID)</string>
     <string name="eng_intro">По умолчанию включены все ядра. Выключенное ядро не поднимает туннель, а его серверы помечаются в списке «Серверы».</string>
     <string name="eng_singbox">sing-box</string>
-    <string name="eng_singbox_desc">VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5, WireGuard. Внутри продолжает работать мостом к TUN для Xray, olcRTC и OpenFlux, даже если выключен.</string>
+    <string name="eng_singbox_desc">VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5; WireGuard — если AmneziaWG выключен. Внутри продолжает работать мостом к TUN для Xray, olcRTC и OpenFlux, даже если выключен.</string>
     <string name="eng_xray">Xray Core</string>
     <string name="eng_xray_desc">VLESS, VMess, Trojan, Shadowsocks с XTLS Vision / REALITY, в отдельном процессе. Обслуживает эти протоколы, если выбран ниже или если sing-box выключен.</string>
     <string name="eng_prefer_xray">Использовать Xray вместо sing-box</string>
     <string name="eng_prefer_xray_desc">Для VLESS / VMess / Trojan / SS.</string>
     <string name="eng_awg">AmneziaWG 1.0 – 3.1</string>
-    <string name="eng_awg_desc">Обфусцированный WireGuard, все поколения протокола: 1.0 (Jc/Jmin/Jmax, S1/S2, H1–H4), 1.5 (I1–I5), 2.0 (S3/S4, диапазоны заголовков) и 3.x (ключ защиты заголовков, дополнение содержимого, случайные хвосты, таймеры). Ядро: amneziawg-go 3.1.</string>
+    <string name="eng_awg_desc">Обфусцированный WireGuard, все поколения протокола: 1.0 (Jc/Jmin/Jmax, S1/S2, H1–H4), 1.5 (I1–I5), 2.0 (S3/S4, диапазоны заголовков) и 3.x (ключ защиты заголовков, дополнение содержимого, случайные хвосты, таймеры). Ядро: amneziawg-go 3.1. Обслуживает и обычный WireGuard.</string>
     <string name="eng_ppp">SSTP / L2TP</string>
     <string name="eng_ppp_desc">Собственный PPP-стек на Kotlin (LCP, MS-CHAPv2, IPCP): SSTP поверх TLS с crypto-binding, L2TP по UDP без IPsec.</string>
     <string name="eng_olcrtc">olcRTC</string>

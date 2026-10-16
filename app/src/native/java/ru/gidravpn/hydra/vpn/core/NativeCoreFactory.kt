@@ -33,6 +33,8 @@ class NativeCoreFactory : CoreFactory {
             Protocol.BYEDPI -> ByeDpiCore()
             else -> when {
                 proto?.engine == Engine.AWG -> AmneziaWgCore()
+                // 0.8.2-b: обычный WireGuard — тоже amneziawg-go (EngineToggles), sing-box — запасной
+                toggles().engineFor(profile, BuildConfig.XRAY_AVAILABLE) == EngineToggles.Kind.AWG -> AmneziaWgCore()
                 // Тумблеры ядер (0.6.22): Xray берёт VLESS/VMess/Trojan/SS, если он предпочтён или
                 // sing-box выключен; с 0.8.1-rc2 — и любой профиль с REALITY (новые серверы Xray не пускают sing-box).
                 // Что ядро вообще разрешено, HydraVpnService проверяет до фабрики.

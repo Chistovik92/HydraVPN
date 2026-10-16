@@ -63,4 +63,16 @@ class EngineTogglesTest {
         assertFalse(EngineToggles(xray = false, singBox = false).realityWithoutXray(r, true)) // ядро выключено — об этом своё сообщение
         assertFalse(EngineToggles().realityWithoutXray(hy, false))                // не Xray-протокол
     }
+
+    /** 0.8.2-b (Б1): обычный WireGuard на Android — ядром amneziawg-go, sing-box — запасной. */
+    @Test fun wireGuardViaAmneziaWg() {
+        assertEquals(EngineToggles.Kind.AWG, EngineToggles().engineFor(Protocol.WIREGUARD, true))
+        assertEquals(EngineToggles.Kind.SINGBOX, EngineToggles(amneziaWg = false).engineFor(Protocol.WIREGUARD, true))
+        assertEquals(EngineToggles.Kind.AWG, EngineToggles(singBox = false).engineFor(Protocol.WIREGUARD, true))
+        assertEquals(null, EngineToggles(singBox = false, amneziaWg = false).engineFor(Protocol.WIREGUARD, true))
+        assertFalse(EngineToggles(singBox = false).isDisabled(Protocol.WIREGUARD, true))
+        // остальное — как было
+        assertEquals(EngineToggles.Kind.SINGBOX, EngineToggles().engineFor(Protocol.HYSTERIA2, true))
+        assertEquals(EngineToggles.Kind.AWG, EngineToggles().engineFor(Protocol.AMNEZIAWG, true))
+    }
 }
