@@ -54,6 +54,23 @@ data class EngineToggles(
         return if (k == Kind.SINGBOX && reality && xray && xrayAvailable) Kind.XRAY else k
     }
 
+    /**
+     * A5 (0.8.2-a4): Xray выбран именно из-за REALITY (без REALITY профиль ушёл бы в sing-box) — на экране «Xray (REALITY)»,
+     * чтобы было видно, каким ядром и почему идёт подключение.
+     */
+    fun isRealityViaXray(profile: ServerProfile, xrayAvailable: Boolean): Boolean =
+        isReality(profile) && engineFor(profile.protocol, xrayAvailable) == Kind.SINGBOX && engineFor(profile, xrayAvailable) == Kind.XRAY
+
+    /**
+     * A5: профиль с REALITY пойдёт через sing-box (Xray выключен или его нет в сборке) — новые серверы Xray (3x-ui v3.10 и
+     * свежие панели) такое подключение молча не пустят (SagerNet/sing-box#4520). Показывается предупреждение.
+     */
+    fun realityWithoutXray(profile: ServerProfile, xrayAvailable: Boolean): Boolean =
+        isReality(profile) && engineFor(profile, xrayAvailable) == Kind.SINGBOX
+
+    private fun isReality(profile: ServerProfile) =
+        profile.security.equals("reality", true) && profile.protocol in XRAY_CAPABLE
+
     /** Протокол заблокирован именно выключенным тумблером (а не тем, что он в принципе недоступен). */
     fun isDisabled(protocol: Protocol?, xrayAvailable: Boolean): Boolean {
         val e = protocol?.engine ?: return false

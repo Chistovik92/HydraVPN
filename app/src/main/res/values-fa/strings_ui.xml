@@ -350,4 +350,6 @@
     <string name="split_preset_done">به استثناها افزوده شد: %1$d. حالت: همه به جز انتخاب‌شده‌ها.</string>
     <string name="split_preset_none">برنامه‌ی روسی مناسبی نصب نیست</string>
     <string name="manual_bad">از این فیلدها سرور کارآمدی ساخته نمی‌شود — نشانی، کلیدها و درگاه را بررسی کنید.</string>
+    <string name="main_engine">هسته: %1$s</string>
+    <string name="main_reality_no_xray">REALITY از طریق sing-box: سرورهای جدید Xray اجازه اتصال نمی‌دهند — Xray را روشن کنید (تنظیمات ← تونل)</string>
 </resources>

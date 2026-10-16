@@ -229,8 +229,9 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
                 else {
                     Text("${s.flag} ${s.name}", fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val engine = DesktopConfig.engineFor(s, settings, c.xrayAvailable)
-                    Text(s.summary + " · " + engineLabel(engine), fontSize = 12.sp,
+                    Text(s.summary + " · " + DesktopConfig.engineText(s, settings, c.xrayAvailable, ::engineLabel), fontSize = 12.sp,
                         color = if (engine == null) Danger else MaterialTheme.colorScheme.onSurfaceVariant)
+                    DesktopConfig.realityWarning(s, settings, c.xrayAvailable)?.let { Text(it, fontSize = 12.sp, color = Danger) }
                 }
             }
         }
@@ -376,7 +377,7 @@ private fun ServerRow(c: AppController, ui: UiState, s: ServerProfile, onDelete:
                 (s.protocol?.displayName ?: s.protocolId) + " · " + s.address + ":" + s.port + " · " +
                     when {
                         !supported -> "на ПК недоступно"
-                        else -> engineLabel(engine)
+                        else -> DesktopConfig.engineText(s, ui.data.settings, c.xrayAvailable, ::engineLabel)
                     },
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )

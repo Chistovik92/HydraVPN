@@ -96,8 +96,10 @@ internal class HomePanel(
         } else {
             server.text = "${sel.flag} ${sel.name}"
             val engine = DesktopConfig.engineFor(sel, s, c.xrayAvailable)
-            serverInfo.text = sel.summary + " · " + (engine?.let { TrayController.engineLabel(it) } ?: "ядро выключено")
-            serverInfo.foreground = if (engine == null) Danger else Muted
+            val warn = DesktopConfig.realityWarning(sel, s, c.xrayAvailable)
+            serverInfo.text = sel.summary + " · " + DesktopConfig.engineText(sel, s, c.xrayAvailable) { k -> k?.let { TrayController.engineLabel(it) } ?: "ядро выключено" } +
+                (warn?.let { " · $it" } ?: "")
+            serverInfo.foreground = if (engine == null || warn != null) Danger else Muted
         }
         change.isEnabled = !ui.active
         proxy.set(s.mode == ConnectionMode.PROXY, !ui.active)

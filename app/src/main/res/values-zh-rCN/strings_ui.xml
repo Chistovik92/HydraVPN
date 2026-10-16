@@ -350,4 +350,6 @@
     <string name="split_preset_done">已加入例外：%1$d 个。模式：除所选外全部走 VPN。</string>
     <string name="split_preset_none">未找到匹配的俄罗斯应用</string>
     <string name="manual_bad">这些字段无法组成可用的服务器——请检查地址、密钥和端口。</string>
+    <string name="main_engine">内核：%1$s</string>
+    <string name="main_reality_no_xray">REALITY 走 sing-box：新的 Xray 服务器不会放行 — 请开启 Xray（设置 → 隧道）</string>
 </resources>

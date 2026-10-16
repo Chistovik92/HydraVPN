@@ -359,4 +359,6 @@
     <string name="split_preset_ru">Russian apps go direct</string>
     <string name="split_preset_done">Added to exceptions: %1$d. Mode: everything except selected.</string>
     <string name="split_preset_none">No matching Russian apps installed</string>
+    <string name="main_engine">Core: %1$s</string>
+    <string name="main_reality_no_xray">REALITY via sing-box: new Xray servers will not let it in — turn on Xray (Settings → Tunnel)</string>
 </resources>
