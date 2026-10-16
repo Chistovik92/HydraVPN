@@ -73,8 +73,19 @@ function Snapshot([string]$why) {
   }
 }
 
+# Start-Process -Credential передаёт процессу окружение администратора раннера (TEMP, профиль) — у владельца
+# окружение своё. Подставляем папки пользователя, иначе обёртка EXE не может распаковать MSI во «временную папку»
+# администратора (createTempFile … failed) и висит на окне с ошибкой.
+$userEnv = @{ TEMP = "C:\Users\$user\AppData\Local\Temp"; TMP = "C:\Users\$user\AppData\Local\Temp";
+  USERPROFILE = "C:\Users\$user"; LOCALAPPDATA = "C:\Users\$user\AppData\Local"; APPDATA = "C:\Users\$user\AppData\Roaming"; USERNAME = $user }
+
 function Run-As([string]$name, [string]$file, [string[]]$argv, [bool]$expectWindow = $false) {
   Write-Host "== $name"
+  $saved = @{}; foreach ($k in $userEnv.Keys) { $saved[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, $userEnv[$k]) }
+  try { Run-AsInner $name $file $argv $expectWindow } finally { foreach ($k in $saved.Keys) { [Environment]::SetEnvironmentVariable($k, $saved[$k]) } }
+}
+
+function Run-AsInner([string]$name, [string]$file, [string[]]$argv, [bool]$expectWindow) {
   $p = Start-Process -FilePath $file -ArgumentList $argv -Credential $cred -LoadUserProfile -WorkingDirectory $work -PassThru
   $t0 = Get-Date
   if ($expectWindow) {
@@ -108,8 +119,11 @@ function Run-As([string]$name, [string]$file, [string[]]$argv, [bool]$expectWind
 
 # Окружение пользователя, от имени которого идут установки (TEMP — туда обёртка EXE распаковывает MSI).
 $envOut = Join-Path $work "user-env.txt"
-$pe = Start-Process cmd.exe -ArgumentList @("/c", "set > `"$envOut`" & whoami /groups >> `"$envOut`"") -Credential $cred -LoadUserProfile -WorkingDirectory $work -PassThru -Wait
-Get-Content $envOut -ErrorAction SilentlyContinue | Where-Object { $_ -match '^(TEMP|TMP|USERPROFILE|LOCALAPPDATA)=|Mandatory Label|BUILTIN' } | ForEach-Object { Write-Host "user: $_" }
+$pe = Start-Process cmd.exe -ArgumentList @("/c", "ver") -Credential $cred -LoadUserProfile -WorkingDirectory $work -PassThru -Wait   # создаёт профиль
+foreach ($k in $userEnv.Keys) { [Environment]::SetEnvironmentVariable($k, $userEnv[$k]) }
+New-Item -ItemType Directory -Force $userEnv.TEMP -ErrorAction SilentlyContinue | Out-Null
+$pe = Start-Process cmd.exe -ArgumentList @("/c", "set > `"$envOut`" & whoami /groups >> `"$envOut`" & echo x > `"%TEMP%\hydra-probe.txt`" && echo TEMP-WRITABLE >> `"$envOut`"") -Credential $cred -LoadUserProfile -WorkingDirectory $work -PassThru -Wait
+Get-Content $envOut -ErrorAction SilentlyContinue | Where-Object { $_ -match '^(TEMP|TMP|USERPROFILE|LOCALAPPDATA)=|Mandatory Label|BUILTIN|TEMP-WRITABLE' } | ForEach-Object { Write-Host "user: $_" }
 
 $profileDir = "C:\Users\$user"
 $installed = "$profileDir\AppData\Local\Hydra\Hydra.exe"
