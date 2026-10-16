@@ -5,7 +5,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус: **0.8.1** — панели 3x-ui, s-ui, x-ui на своём сервере · [Скачать](https://github.com/Chistovik92/HydraVPN/releases/latest) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md) · [Документация](docs/README.md)
+- Статус ветки `claude/0-8-2-alpha`: **0.8.2-a4** (альфа, пре-релиз) — ноды панелей, PasarGuard, Remnawave, любые подключения в панелях · последний выпуск: **0.8.1** · [Пре-релизы](https://github.com/Chistovik92/HydraVPN/releases) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md) · [Документация](docs/README.md)
 
 > **⚠️ Windows: с версии 0.7.20 антивирус может ругаться.** Kaspersky блокирует установку и `Hydra.exe`, ссылаясь на поведенческий анализ
 > (`PDM:Trojan.Win32.Generic`); другие антивирусы могут вести себя так же. Мы считаем это ложным срабатыванием: код открыт (GPL-3.0), SHA-256 файлов указан в релизе.
@@ -29,6 +29,8 @@
 **Обновления** приложение скачивает само: кнопка «Обновить» грузит файл под вашу систему (SHA-256 из релиза
 проверяется) и запускает установку: на Android — системный установщик, на ПК — установщик ОС, а **portable-версии (Windows ZIP, Linux tar.gz, macOS .app) заменяют свои файлы сами** и перезапускаются.
 iOS не даёт приложению поставить себя само: оно скачивает `.ipa` и отдаёт его в «Поделиться».
+**Windows, установка вручную:** сначала закройте Hydra (в трее — «Выход»), особенно если она запущена от администратора (режим TUN):
+установщик без прав администратора не может заменить файлы такой Hydra. Если установка прервалась — запустите установщик ещё раз.
 
 ## Скриншоты
 
@@ -75,6 +77,16 @@ Hydra Classic (Windows 7 / 32-бит) — тот же набор экранов 
 - 🎛 **Единый клиент** для нескольких семейств протоколов (что где доступно — таблица ниже):
   sing-box (VLESS/REALITY, VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard), Xray, AmneziaWG 1.0–3.x,
   SSTP и L2TP (userspace-PPP на Kotlin, без root), olcRTC и OpenFlux (BETA); обход DPI — ByeDPI на всех платформах.
+- 🖥 **Мои серверы** (Android и ПК, с 0.8.0): свой VPS — по адресу и паролю/ключу SSH (отпечаток закрепляется, вход можно
+  запомнить зашифрованно). На него из приложения ставится **AmneziaWG** (устройства, конфиг и QR, перезапуск, удаление) и
+  **узел OpenFlux**; «Очистить сервер полностью» убирает всё, что ставила Hydra; тот же сервер виден со второго устройства.
+- 🧩 **Панели на своём сервере** (с 0.8.1): «Установить 3x-ui» (рекомендуем), s-ui или x-ui — официальная версия, логин и пароль
+  придумывает Hydra; у 3x-ui сразу подключение VLESS + gRPC + REALITY (маскировка vk.com / ya.ru / github.com) и **подписка** в
+  «Серверах», пользователи 3x-ui — прямо в Hydra; «У меня уже есть панель» — подключить готовую 3x-ui по адресу и токену. HTTPS
+  сертификатом Let's Encrypt на IP, «Закрыть панель извне» (сайт — через защищённый туннель Hydra), вход в панель внутри приложения
+  (Android), копия базы перед удалением. **Подключения с REALITY идут через ядро Xray** — новые серверы Xray (26.9.8+) не пускают sing-box.
+- 🧪 **Участвовать в бета-тестировании** (с 0.8.0): в настройках обновлений — уровень «Релиз-кандидат» (`-rc`) или «Разработчик»
+  (`-a`, `-b`, `-rc`); без него приходят только выпуски.
 - 👤 **Аккаунт бота «Радар» (Hydra VPN)** — вход по одноразовому коду («VPN» → «Подключить приложение»):
   подписки, выданные в боте, заводятся сами и обновляются раз в 6 часов; смена ссылки у панели обновляет ту
   же подписку, выключенные в боте помечаются; на главном экране — срок и трафик. Токен хранится в Android
@@ -123,6 +135,22 @@ Hydra Classic (Windows 7 / 32-бит) — тот же набор экранов 
 
 Подробности и ограничения — [docs/PROTOCOLS.md](docs/PROTOCOLS.md), сервисы — [docs/SERVICES.md](docs/SERVICES.md).
 
+## Что нового в этой ветке (0.8.2-a … 0.8.2-a4)
+
+Альфа-сборки ветки `claude/0-8-2-alpha` выходят пре-релизами и приходят только уровню «Разработчик»; владельцем на VPS и телефоне
+ещё не проверены. Сверх выпуска 0.8.1:
+
+- **Ноды панелей** (0.8.2-a4): «Ноды» → «Добавить ноду» на карточке 3x-ui, PasarGuard или Remnawave — второй свой сервер становится
+  нодой, Hydra ставит на него всё нужное, порты ноды открыты только для главного сервера, подключения через ноду — в «Серверах».
+- **PasarGuard и Remnawave** (0.8.2-a3): установка из Hydra (Docker), сайт панели только через туннель Hydra, создание подключений.
+- **Любые подключения в панелях** (0.8.2-a2): 3x-ui — VLESS (gRPC / XHTTP / TCP + REALITY), Trojan + REALITY, VMess, Shadowsocks 2022,
+  WireGuard, **AmneziaWG**, Hysteria 2, TUIC; x-ui и s-ui — свои наборы.
+- **Сайт панели внутри Hydra на ПК** и подстановка логина и пароля в форму входа (Android и ПК); кнопка «Мой сервер и панели» на экране «Серверы» ПК.
+- Видно, **каким ядром идёт подключение** («Xray (REALITY)» / «sing-box»), и предупреждение, если REALITY пойдёт через sing-box.
+- Исправлено: **TG WS** снова работает; **обновление на Windows без прав администратора** больше не теряет Hydra, запущенную от администратора.
+
+Дальше — бета 0.8.2-b: обновление ядер Xray, OpenFlux, проверка sing-box 1.14, ноды Nexora — [docs/versions/0.8.2.md](docs/versions/0.8.2.md).
+
 ## Быстрый старт (сборка)
 
 ```bash
@@ -149,7 +177,7 @@ gradle wrapper --gradle-version 8.9             # один раз
 HydraVPN/
 ├── app/       Android (Compose): UI → MainViewModel → репозитории (Room, DataStore) → HydraVpnService → VpnCore
 │              (SingBoxCore, XrayCore, AmneziaWgCore, SstpCore/L2tpCore, OlcRtc/OpenFlux, NoopCore для stub)
-├── shared/    Kotlin Multiplatform: модели, парсеры ссылок, билдеры конфигов sing-box/Xray, PPP-протокол,
+├── shared/    Kotlin Multiplatform: модели, парсеры ссылок, билдеры конфигов sing-box/Xray, PPP-протокол, «Мои серверы» и панели (servers),
 │              маршрутизация (data/routing), обход DPI (data/dpi), Telegram по WebSocket (data/tgws), geo-базы (data/geo),
 │              клиент роутера (router), клиент бота (bot), поиск и загрузка обновлений (update)
 ├── desktop/   Compose Desktop (Windows/Linux/macOS): sing-box и Xray процессами, TUN/прокси, kill switch
@@ -164,14 +192,15 @@ HydraVPN/
 - [docs/PROTOCOLS.md](docs/PROTOCOLS.md) — протоколы, форматы ссылок, ограничения
 - [docs/ROUTING.md](docs/ROUTING.md) — маршрутизация, обход DPI (ByeDPI), подбор стратегий, Telegram по WebSocket, geo-базы
 - [docs/SERVICES.md](docs/SERVICES.md) — сервисы и интеграции (SoftEther, WDTT, olcRTC)
-- [docs/PANELS.md](docs/PANELS.md) — совместимость с панелями подписок
+- [docs/PANELS.md](docs/PANELS.md) — панели: подписки, установка из Hydra, подключения, ноды
+- [docs/versions/](docs/versions/README.md) — заметки к каждой версии (что вошло, как проверено, планы)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/MULTIPLATFORM.md](docs/MULTIPLATFORM.md) — устройство проекта
 - [docs/BUILD.md](docs/BUILD.md) — сборка ядер и приложений · [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) — распространение
 - [docs/SECURITY.md](docs/SECURITY.md) — политика безопасности · [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — как контрибьютить
 - [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md) — olcRTC / OpenFlux / snolc / AmneziaWG: апстримы, статус, клиенты
 - [docs/HANDOFF_ROUTERS.md](docs/HANDOFF_ROUTERS.md) — управление роутером: контракт API и что проверено
 - [desktop/README.md](desktop/README.md) · [ios/README.md](ios/README.md) — клиенты для ПК и iOS
-- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.7.19
+- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.8.2-a4
 - [docs/HISTORY.md](docs/HISTORY.md) — хронология версий с датами и коммитами, журнал идей
 - [docs/LEGACY.md](docs/LEGACY.md) — 32-битные и старые системы: Android x86/TV, Hydra Classic (Windows 7, 32-бит), Windows XP
 
