@@ -1,0 +1,66 @@
+name: Windows installer without admin
+
+# A7 (0.8.2-a4): установщики Hydra (MSI и EXE) ставятся обычным пользователем — без прав администратора.
+# Владелец (15.10.2026): на Windows 10 без прав установщик «зависает». Здесь — тот же сценарий на раннере:
+# обычный пользователь, начисто и поверх прошлой версии, тихо и с окнами, каждый шаг с таймаутом.
+# Без входных данных проверяются установщики выпуска `tag` (по умолчанию — последний пре-релиз);
+# release.yml вызывает с готовыми пакетами сборки (artifact).
+
+on:
+  push:
+    paths: [ 'scripts/installer-nonadmin.ps1', '.github/workflows/installer-nonadmin.yml' ]
+  workflow_dispatch:
+    inputs:
+      tag: { description: "Выпуск, чьи установщики проверить (пусто — последний)", type: string, default: "" }
+      old_tag: { description: "Прошлый выпуск для проверки обновления", type: string, default: "v0.8.1" }
+  workflow_call:
+    inputs:
+      artifact: { type: string, default: "" }
+      old_tag: { type: string, default: "v0.8.1" }
+
+jobs:
+  nonadmin:
+    name: install as standard user (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ windows-2022, windows-2025 ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Пакеты сборки
+        if: inputs.artifact != ''
+        uses: actions/download-artifact@v4
+        with: { name: '${{ inputs.artifact }}', path: pkg }
+
+      - name: Установщики выпуска
+        if: inputs.artifact == ''
+        shell: bash
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          set -e
+          TAG="${{ inputs.tag }}"
+          [ -n "$TAG" ] || TAG=$(gh release list -R "$GITHUB_REPOSITORY" -L 1 --json tagName -q '.[0].tagName')
+          echo "выпуск: $TAG"
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p '*windows-x64.msi' -p '*windows-x64.exe' -D pkg
+
+      - name: Прошлый выпуск
+        shell: bash
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          OLD="${{ inputs.old_tag }}"; OLD="${OLD:-v0.8.1}"
+          gh release download "$OLD" -R "$GITHUB_REPOSITORY" -p '*windows-x64.msi' -D old || echo "прошлого MSI нет"
+
+      - name: Установка обычным пользователем
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem pkg -Recurse -Filter *windows-x64.msi | Select-Object -First 1
+          $exe = Get-ChildItem pkg -Recurse -Filter *windows-x64.exe | Select-Object -First 1
+          $old = Get-ChildItem old -Recurse -Filter *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $msi -or -not $exe) { throw "нет MSI/EXE" }
+          ./scripts/installer-nonadmin.ps1 -Msi $msi.FullName -Exe $exe.FullName -OldMsi ($(if ($old) { $old.FullName } else { "" })) -Out logs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: 'installer-logs-${{ matrix.runner }}', path: logs }
