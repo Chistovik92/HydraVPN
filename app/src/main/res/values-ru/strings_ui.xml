@@ -359,7 +359,6 @@
     <string name="split_preset_done">Добавлено в исключения: %1$d. Режим: всё, кроме выбранных.</string>
     <string name="split_preset_none">Подходящих российских приложений не найдено</string>
     <string name="main_engine">Ядро: %1$s</string>
-    <string name="main_reality_no_xray">REALITY через sing-box: новые серверы Xray его не пустят — включите Xray (Настройки → Туннель)</string>
     <string name="ms_nodes">Ноды</string>
     <string name="ms_nodes_none">Нод пока нет. Нода — второй сервер, на котором работают подключения этой панели.</string>
     <string name="ms_node_add">Добавить ноду</string>

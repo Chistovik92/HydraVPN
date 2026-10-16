@@ -121,10 +121,9 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
                     Spacer(Modifier.height(6.dp))
                     Text(stringResource(R.string.main_engine, name), color = TextMuted, fontSize = 12.sp)
                 }
-                if (toggles.realityWithoutXray(s, xa)) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(stringResource(R.string.main_reality_no_xray), color = ru.gidravpn.hydra.ui.theme.Danger, fontSize = 12.sp)
-                }
+                // Предупреждение «REALITY без Xray» (main_reality_no_xray) на Android с 0.8.2-b не показывается: libbox собран
+                // с scripts/sing-box-reality-mlkem.patch и проходит к Xray ≥ 26.9.8 сам (эмулятор: 50 МБ к Xray 26.10.10).
+                // На ПК sing-box — готовый бинарь апстрима, там предупреждение остаётся (DesktopConfig.REALITY_WARNING).
             }
         }
         Spacer(Modifier.height(32.dp))

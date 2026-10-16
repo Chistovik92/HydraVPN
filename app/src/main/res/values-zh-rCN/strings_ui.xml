@@ -351,7 +351,6 @@
     <string name="split_preset_none">未找到匹配的俄罗斯应用</string>
     <string name="manual_bad">这些字段无法组成可用的服务器——请检查地址、密钥和端口。</string>
     <string name="main_engine">内核：%1$s</string>
-    <string name="main_reality_no_xray">REALITY 走 sing-box：新的 Xray 服务器不会放行 — 请开启 Xray（设置 → 隧道）</string>
     <string name="ms_nodes">节点</string>
     <string name="ms_nodes_none">还没有节点。节点是运行此面板连接的第二台服务器。</string>
     <string name="ms_node_add">添加节点</string>

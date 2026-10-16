@@ -88,7 +88,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: app/libs/libbox.aar
-          key: libbox-${{ env.SING_BOX_VERSION }}-v1
+          key: libbox-${{ env.SING_BOX_VERSION }}-${{ hashFiles('scripts/sing-box-reality-mlkem.patch') }}
       - uses: actions/setup-go@v5
         if: steps.libbox-cache.outputs.cache-hit != 'true'
         with:
@@ -98,6 +98,8 @@ jobs:
         run: |
           set -euo pipefail
           git clone --depth 1 --branch "v${SING_BOX_VERSION}" https://github.com/SagerNet/sing-box /tmp/sing-box
+          # REALITY к Xray-core >= 26.9.8 (0.8.2-b, SagerNet/sing-box#4520).
+          git -C /tmp/sing-box apply "$GITHUB_WORKSPACE/scripts/sing-box-reality-mlkem.patch"
           go install github.com/sagernet/gomobile/cmd/gomobile@latest
           go install github.com/sagernet/gomobile/cmd/gobind@latest
           export PATH="$PATH:$(go env GOPATH)/bin"

@@ -22,10 +22,16 @@ gradle wrapper --gradle-version 8.9   # один раз, если нет gradlew
 
 ### 2.1 sing-box → `libbox.aar`
 
+**С 0.8.2-b — `scripts/build-libbox.sh`:** клон закреплённой версии + `scripts/sing-box-reality-mlkem.patch` (REALITY к Xray-core
+≥ 26.9.8, SagerNet/sing-box#4520), Go 1.25.5, рядом — метка `app/libs/libbox.aar.patch`; `release.sh` без неё не выпустит APK.
+Ручной рецепт ниже — то же самое по шагам.
+
 ```bash
 git clone https://github.com/SagerNet/sing-box
 cd sing-box
 git checkout v1.12.25          # версия, против которой собран/проверен Hydra
+# 0.8.2-b: правка REALITY — без неё нет подключения к Xray-core >= 26.9.8 (SagerNet/sing-box#4520)
+git apply /path/to/Hydra/scripts/sing-box-reality-mlkem.patch
 # инструмент gomobile от SagerNet
 go install github.com/sagernet/gomobile/cmd/gomobile@latest
 go install github.com/sagernet/gomobile/cmd/gobind@latest

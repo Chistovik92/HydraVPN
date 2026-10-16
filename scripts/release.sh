@@ -55,7 +55,12 @@ step "Предполётные проверки"
 [[ -f app/libs/libbox.aar ]] || err \
 "нет app/libs/libbox.aar — full-APK будет нерабочим.
        Соберите ядро по docs/BUILD.md (раздел 2.1) или положите готовый .aar."
-echo "    libbox.aar на месте"
+# 0.8.2-b: libbox — с правкой REALITY (SagerNet/sing-box#4520); метку пишет scripts/build-libbox.sh.
+LIBBOX_PATCH="$(tr -d '\r' < scripts/sing-box-reality-mlkem.patch | sha256sum | cut -d' ' -f1)"
+[[ "$(cat app/libs/libbox.aar.patch 2>/dev/null)" == "$LIBBOX_PATCH" ]] || err \
+"app/libs/libbox.aar собран без текущей scripts/sing-box-reality-mlkem.patch — sing-box не подключится по REALITY
+       к Xray-core >= 26.9.8. Пересоберите: scripts/build-libbox.sh"
+echo "    libbox.aar на месте (с правкой REALITY)"
 
 # Xray — штатное второе ядро: без libXray.aar переключатель «Xray Core» в настройках неактивен
 # (так вышли 0.6.x–0.7.2, пока ядро не было собрано).

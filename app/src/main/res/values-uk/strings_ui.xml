@@ -351,7 +351,6 @@
     <string name="split_preset_none">Відповідних російських застосунків не знайдено</string>
     <string name="manual_bad">Із цих полів не виходить робочий сервер — перевірте адресу, ключі й порт.</string>
     <string name="main_engine">Ядро: %1$s</string>
-    <string name="main_reality_no_xray">REALITY через sing-box: нові сервери Xray його не пустять — увімкніть Xray (Налаштування → Тунель)</string>
     <string name="ms_nodes">Ноди</string>
     <string name="ms_nodes_none">Нод поки немає. Нода — другий сервер, на якому працюють підключення цієї панелі.</string>
     <string name="ms_node_add">Додати ноду</string>
