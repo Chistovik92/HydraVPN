@@ -74,6 +74,15 @@ unzip -p app/libs/libXray.aar jni/arm64-v8a/libgojni.so | grep -ac "xtls/xray-co
        Обновите: scripts/fetch-libxray.sh"
 echo "    libXray.aar на месте (Xray-core $XRAY_COMMIT)"
 
+# AmneziaWG — версия ядра закреплена в scripts/build-awg.sh; до 0.8.2-a4 в выпуски уходил v3.1.20260814 вместо закреплённого.
+AWG_GO="$(sed -n 's/^AWG_GO_VERSION="${AWG_GO_VERSION:-\([^}]*\)}".*/\1/p' scripts/build-awg.sh | head -1)"
+for abi in arm64-v8a armeabi-v7a x86_64 x86; do
+  grep -ac "amneziawg-go/v3.$AWG_GO" "app/libs/awg/$abi/libwg-go.so" >/dev/null 2>&1 || err \
+"в app/libs/awg/$abi/libwg-go.so не amneziawg-go $AWG_GO — ядро AmneziaWG устарело.
+       Пересоберите: scripts/build-awg.sh"
+done
+echo "    AmneziaWG: amneziawg-go $AWG_GO"
+
 [[ -f keystore.properties ]] || err \
 "нет keystore.properties в корне проекта — без него release-сборка уйдёт
        неподписанной/подписанной debug-ключом (см. docs/HANDOFF.md, «Честные
