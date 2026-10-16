@@ -488,7 +488,13 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             val routeCfg = ru.gidravpn.hydra.data.repository.RoutingRepository(applicationContext).routeConfig.firstOrNull()
                 ?: ru.gidravpn.hydra.data.routing.RouteConfig()
             val serverRepo = ru.gidravpn.hydra.data.repository.ServerRepository(applicationContext)
-            !ru.gidravpn.hydra.vpn.core.AppTunnelPolicy.needsAppBypass(profile, routeCfg) { id -> kotlinx.coroutines.runBlocking { serverRepo.byId(id) } }
+            val toggles = ru.gidravpn.hydra.data.repository.EngineRepository(applicationContext).toggles.firstOrNull()
+                ?: ru.gidravpn.hydra.data.model.EngineToggles()
+            val xrayServes = { p: ru.gidravpn.hydra.data.model.ServerProfile ->
+                toggles.engineFor(p, ru.gidravpn.hydra.BuildConfig.XRAY_AVAILABLE) == ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY
+            }
+            !ru.gidravpn.hydra.vpn.core.AppTunnelPolicy.needsAppBypass(profile, routeCfg,
+                lookup = { id -> kotlinx.coroutines.runBlocking { serverRepo.byId(id) } }, servedByXray = xrayServes)
         }
         VpnState.log(if (appInTunnel) "Трафик самой Hydra (SSH, подписки) идёт через туннель"
             else "Трафик самой Hydra идёт мимо туннеля (настройка выключена или режим с подпроцессами)")
