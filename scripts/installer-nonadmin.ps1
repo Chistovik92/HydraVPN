@@ -29,7 +29,7 @@ New-LocalUser $user -Password $sec -PasswordNeverExpires -AccountNeverExpires | 
 Add-LocalGroupMember -SID "S-1-5-32-545" -Member $user -ErrorAction SilentlyContinue
 $cred = New-Object Management.Automation.PSCredential("$env:COMPUTERNAME\$user", $sec)
 $isAdmin = (Get-LocalGroupMember -SID "S-1-5-32-544" | Where-Object { $_.Name -like "*\$user" })
-if ($isAdmin) { throw "$user — администратор, проверка бессмысленна" }
+if ($isAdmin) { throw "${user} — администратор, проверка бессмысленна" }
 
 # Файлы установщиков должны быть доступны пользователю.
 $work = "C:\hydra-installer-test"
@@ -41,7 +41,7 @@ $exeW = Join-Path $work (Split-Path $Exe -Leaf)
 $oldW = if ($OldMsi) { Join-Path $work (Split-Path $OldMsi -Leaf) } else { "" }
 
 function Snapshot([string]$why) {
-  "--- $why: процессы и окна" | Out-File -Append "$Out\windows.txt"
+  "--- ${why}: процессы и окна" | Out-File -Append "$Out\windows.txt"
   Get-Process | Where-Object { $_.Name -match 'msiexec|Hydra|consent|java|sing-box|xray' -or $_.MainWindowTitle } |
     Select-Object Id, Name, SessionId, MainWindowTitle | Format-Table -AutoSize | Out-String -Width 300 |
     Out-File -Append "$Out\windows.txt"
@@ -56,11 +56,11 @@ function Run-As([string]$name, [string]$file, [string[]]$argv, [bool]$expectWind
     $seen = $null
     while (((Get-Date) - $t0).TotalSeconds -lt 120 -and -not $seen) {
       Start-Sleep 3
-      if (Get-Process consent -ErrorAction SilentlyContinue) { Snapshot "$name: запрос прав"; $script:failed += "$name: Windows просит права администратора (UAC)"; break }
+      if (Get-Process consent -ErrorAction SilentlyContinue) { Snapshot "${name}: запрос прав"; $script:failed += "${name}: Windows просит права администратора (UAC)"; break }
       $seen = Get-Process msiexec -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -match 'Hydra' }
     }
-    Snapshot "$name: через $([int]((Get-Date) - $t0).TotalSeconds) с"
-    if (-not $seen) { $script:failed += "$name: окно установщика не появилось за 120 с" }
+    Snapshot "${name}: через $([int]((Get-Date) - $t0).TotalSeconds) с"
+    if (-not $seen) { $script:failed += "${name}: окно установщика не появилось за 120 с" }
     else { Write-Host "окно: $($seen.MainWindowTitle -join ', ') через $([int]((Get-Date) - $t0).TotalSeconds) с" }
     Get-Process msiexec, consent -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $null } | ForEach-Object { try { $_.Kill() } catch {} }
     try { $p.Kill() } catch {}
@@ -68,8 +68,8 @@ function Run-As([string]$name, [string]$file, [string[]]$argv, [bool]$expectWind
     return
   }
   if (-not $p.WaitForExit($TimeoutSec * 1000)) {
-    Snapshot "$name: зависла"
-    $script:failed += "$name: не закончилась за $TimeoutSec с"
+    Snapshot "${name}: зависла"
+    $script:failed += "${name}: не закончилась за $TimeoutSec с"
     Get-Process msiexec -ErrorAction SilentlyContinue | ForEach-Object { try { $_.Kill() } catch {} }
     try { $p.Kill() } catch {}
     return
@@ -77,17 +77,17 @@ function Run-As([string]$name, [string]$file, [string[]]$argv, [bool]$expectWind
   $code = $p.ExitCode
   $sec = [int]((Get-Date) - $t0).TotalSeconds
   Write-Host "код $code за $sec с"
-  if ($code -ne 0 -and $code -ne 3010) { $script:failed += "$name: код $code" }
+  if ($code -ne 0 -and $code -ne 3010) { $script:failed += "${name}: код $code" }
 }
 
 $profileDir = "C:\Users\$user"
 $installed = "$profileDir\AppData\Local\Hydra\Hydra.exe"
 function Check-Installed([string]$name) {
-  if (Test-Path $installed) { Write-Host "$name: $installed на месте" }
-  else { $script:failed += "$name: нет $installed" }
+  if (Test-Path $installed) { Write-Host "${name}: $installed на месте" }
+  else { $script:failed += "${name}: нет $installed" }
 }
 function Uninstall([string]$name) {
-  Run-As "$name: удаление" "msiexec.exe" @("/x", "`"$msiW`"", "/qn", "/l*v", "`"$work\$name-uninstall.log`"")
+  Run-As "${name}: удаление" "msiexec.exe" @("/x", "`"$msiW`"", "/qn", "/l*v", "`"$work\$name-uninstall.log`"")
 }
 
 # 1. MSI начисто, тихо.
