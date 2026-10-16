@@ -5,7 +5,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус ветки `claude/0-8-2-alpha`: **0.8.2-a4** (альфа, пре-релиз) — ноды панелей, PasarGuard, Remnawave, любые подключения в панелях · последний выпуск: **0.8.1** · [Пре-релизы](https://github.com/Chistovik92/HydraVPN/releases) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md) · [Документация](docs/README.md)
+- Статус ветки `claude/0-8-2-alpha`: **0.8.2-b** (бета, пре-релиз) — свежие ядра, интернет не пропадает при смене сети, ноды панелей, PasarGuard, Remnawave · последний выпуск: **0.8.1** · [Пре-релизы](https://github.com/Chistovik92/HydraVPN/releases) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md) · [Документация](docs/README.md)
 
 > **⚠️ Windows: с версии 0.7.20 антивирус может ругаться.** Kaspersky блокирует установку и `Hydra.exe`, ссылаясь на поведенческий анализ
 > (`PDM:Trojan.Win32.Generic`); другие антивирусы могут вести себя так же. Мы считаем это ложным срабатыванием: код открыт (GPL-3.0), SHA-256 файлов указан в релизе.
@@ -135,11 +135,14 @@ Hydra Classic (Windows 7 / 32-бит) — тот же набор экранов 
 
 Подробности и ограничения — [docs/PROTOCOLS.md](docs/PROTOCOLS.md), сервисы — [docs/SERVICES.md](docs/SERVICES.md).
 
-## Что нового в этой ветке (0.8.2-a … 0.8.2-a4)
+## Что нового в этой ветке (0.8.2-a … 0.8.2-b)
 
 Альфа-сборки ветки `claude/0-8-2-alpha` выходят пре-релизами и приходят только уровню «Разработчик»; владельцем на VPS и телефоне
 ещё не проверены. Сверх выпуска 0.8.1:
 
+- **Бета 0.8.2-b:** Xray-core 26.10.10, OpenFlux 0.7.3 (Telemost, Avito), AmneziaWG 3.1.20260828; sing-box снова подключается по REALITY
+  к новым серверам Xray (Android, iOS); **интернет больше не пропадает при смене сети** на подключениях через Xray; обычный WireGuard на
+  Android — быстрым ядром AmneziaWG.
 - **Ноды панелей** (0.8.2-a4): «Ноды» → «Добавить ноду» на карточке 3x-ui, PasarGuard или Remnawave — второй свой сервер становится
   нодой, Hydra ставит на него всё нужное, порты ноды открыты только для главного сервера, подключения через ноду — в «Серверах».
 - **PasarGuard и Remnawave** (0.8.2-a3): установка из Hydra (Docker), сайт панели только через туннель Hydra, создание подключений.
@@ -149,7 +152,7 @@ Hydra Classic (Windows 7 / 32-бит) — тот же набор экранов 
 - Видно, **каким ядром идёт подключение** («Xray (REALITY)» / «sing-box»), и предупреждение, если REALITY пойдёт через sing-box.
 - Исправлено: **TG WS** снова работает; **обновление на Windows без прав администратора** больше не теряет Hydra, запущенную от администратора.
 
-Дальше — бета 0.8.2-b: обновление ядер Xray, OpenFlux, проверка sing-box 1.14, ноды Nexora — [docs/versions/0.8.2.md](docs/versions/0.8.2.md).
+Дальше — проверка беты владельцем на телефоне и VPS, затем 0.8.2-rc1 — [docs/versions/0.8.2.md](docs/versions/0.8.2.md).
 
 ## Быстрый старт (сборка)
 
@@ -200,7 +203,7 @@ HydraVPN/
 - [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md) — olcRTC / OpenFlux / snolc / AmneziaWG: апстримы, статус, клиенты
 - [docs/HANDOFF_ROUTERS.md](docs/HANDOFF_ROUTERS.md) — управление роутером: контракт API и что проверено
 - [desktop/README.md](desktop/README.md) · [ios/README.md](ios/README.md) — клиенты для ПК и iOS
-- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.8.2-a4
+- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.8.2-b
 - [docs/HISTORY.md](docs/HISTORY.md) — хронология версий с датами и коммитами, журнал идей
 - [docs/LEGACY.md](docs/LEGACY.md) — 32-битные и старые системы: Android x86/TV, Hydra Classic (Windows 7, 32-бит), Windows XP
 
