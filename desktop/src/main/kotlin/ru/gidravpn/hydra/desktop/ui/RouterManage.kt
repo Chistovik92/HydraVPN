@@ -50,7 +50,7 @@ import ru.gidravpn.hydra.router.RouterUi
 // (`/api/v1/sections`, `/radar`, `/check`), — раньше экран умел только смотреть.
 
 @Composable
-private fun MCard(title: String, content: @Composable () -> Unit) {
+internal fun MCard(title: String, content: @Composable () -> Unit) {
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, fontWeight = FontWeight.Medium)
@@ -60,12 +60,12 @@ private fun MCard(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Hint(text: String) = Text(text, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+internal fun Hint(text: String) = Text(text, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
 private val ACTIONS = listOf("connection" to "Через VPN", "bypass" to "Мимо VPN", "block" to "Блокировать")
 private val PROVIDERS = listOf("singbox", "zapret", "zapret2", "byedpi", "auto")
 
-private fun lines(s: String) = s.lines().map { it.trim() }.filter { it.isNotEmpty() }
+internal fun lines(s: String) = s.lines().map { it.trim() }.filter { it.isNotEmpty() }
 
 /** Диалог «раздел»: имя задаётся только при добавлении. */
 @Composable

@@ -35,6 +35,7 @@
 | 1.2.3 | **аккаунт «Радар» на роутере**: `GET/POST/DELETE /api/v1/radar…` (бот 5.9.1) — клиент использует |
 | 1.2.4 | **самообновление из веб-интерфейса**: `GET /api/v1/update`, `POST /api/v1/update/check`, `POST /api/v1/update` — клиент Hydra пока не вызывает |
 | 1.2.5 | типы доменных правил (`namespace:`, `full:`/`exact:`, `wildcard:`, `regexp:`, `keyword:`) в разделах и `rules[]`; `domainmap`, `genconfig`, Keenetic через `ndmc` (`POST /api/v1/domainmap`, `POST /api/v1/genconfig`, `GET /api/v1/keenetic`, `POST /api/v1/keenetic/proxy`); файлы релиза по именам ОС: `hydravpn-router-<версия>-<openwrt|keeneticos|routeros>-<arch>` (до 1.2.5 — `-linux-<arch>`); `.ipk` для Entware KeeneticOS; `install.rsc` для RouterOS; в `status` появился блок `update` |
+| 1.3.0 | **полное управление**: `/api/v1/capabilities` (api 3), `rules`, `lists`, `settings` (GET, PATCH/POST; `api_*` и пути — только чтение), PUT `servers/{name}` и `subscriptions/{index}`, запись раздела/сервера из замаскированной копии сохраняет ключи (`sections.unmask`), `cores` (+`versions`, `install`), `sms`, Telegram-бот на роутере; узлы Xray (xhttp), OpenFlux, olcRTC, AmneziaWG — на роутере |
 
 Эндпоинты `/api/v1/*`, **которые использует клиент:** `version`, `status`, `sections` (GET/POST, PUT/DELETE `{name}`), `subscriptions`
 (GET/POST, `{index}/refresh`, DELETE), `nodes` (+`select`, `test`), `logs`, `reload`, `restart`, `check/{name}`, `radar`
