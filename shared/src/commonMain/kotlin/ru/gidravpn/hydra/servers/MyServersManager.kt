@@ -825,12 +825,16 @@ class MyServersManager(
                         PanelKind.XUI3 -> addXuiNode(srv, sshA, nodeSrv, sshB, instB, preB, name, ::openFrom, ::openAll)
                         PanelKind.PASARGUARD -> {
                             val key = UUID.randomUUID().toString(); instB.addSecret(key)
-                            if (!instB.run(PanelNodes.pgNodeSteps(key))) throw OpFailed(_ui.value.error ?: "Нода PasarGuard не установилась")
+                            if (!instB.run(PanelNodes.pgNodeSteps(key, nodeSrv.host))) throw OpFailed(_ui.value.error ?: "Нода PasarGuard не установилась")
                             PanelNodes.PG_NODE_PORTS.split(',').forEach { openFrom("$it/tcp") }
                             val ca = sshB.exec("cat ${PasarGuardPanel.NODE_CERT}").out.trim()
                             val api = PasarGuardApi(sshA, p.username, p.password)
                             val id = api.addRemoteNode(name, nodeSrv.host, key, ca)
-                            api.waitNodeConnected(id)?.let { log("Нода пока не подключилась: $it") } ?: log("Нода подключена к панели")
+                            api.waitNodeConnected(id)?.let { err ->
+                                runCatching { api.removeNode(id, nodeSrv.host) }; instB.run(listOf(Step("pgn-undo", "Убрать неподключившуюся ноду", PanelNodes.pgNodeUninstallCommand())))
+                                throw OpFailed("Нода PasarGuard не подключилась к панели ($err). Порты 62050–62051/tcp ноды должны быть доступны с главного сервера")
+                            }
+                            log("Нода подключена к панели")
                             val ports = api.addNodeHosts(nodeSrv.host, name).map { "$it/tcp" }
                             ports.forEach { openAll(it) }
                             PanelNode(nodeSrv.id, nodeSrv.name, nodeSrv.host, id.toString(), ports) to retryLinks { linksToHost(api.userLinks(), nodeSrv.host) }
@@ -841,7 +845,11 @@ class MyServersManager(
                             if (!instB.run(PanelNodes.rwNodeSteps(key))) throw OpFailed(_ui.value.error ?: "Нода Remnawave не запустилась")
                             openFrom("${RemnawavePanel.NODE_PORT}/tcp")
                             val uuid = api.addRemoteNode(name, nodeSrv.host)
-                            api.waitNodeConnected(uuid)?.let { log("Нода пока не подключилась: $it") } ?: log("Нода подключена к панели")
+                            api.waitNodeConnected(uuid)?.let { err ->
+                                runCatching { api.removeNode(uuid, nodeSrv.host) }; instB.run(listOf(Step("rwn-undo", "Убрать неподключившуюся ноду", PanelNodes.rwNodeUninstallCommand())))
+                                throw OpFailed("Нода Remnawave не подключилась к панели ($err). Порт ${RemnawavePanel.NODE_PORT}/tcp ноды должен быть доступен с главного сервера")
+                            }
+                            log("Нода подключена к панели")
                             val ports = api.addNodeHosts(nodeSrv.host, name).map { "$it/tcp" }
                             ports.forEach { openAll(it) }
                             PanelNode(nodeSrv.id, nodeSrv.name, nodeSrv.host, uuid, ports) to retryLinks { linksToHost(api.userLinks(), nodeSrv.host) }
@@ -891,7 +899,7 @@ class MyServersManager(
         val nodes = XuiNodesApi(SshXuiTransport(sshA, "${u.protocol}://127.0.0.1:${u.port}${u.path}", p.token, u.host.removePrefix("[").removeSuffix("]")))
         nodes.list().firstOrNull { it.optString("name") == name }?.let { nodes.delete(it.optInt("id")) }   // осталась от прошлой попытки
         val id = nodes.add(PanelNodes.xuiNodeBody(name, scheme, nodeSrv.host, port, path, token))
-        nodes.waitOnline(id)?.let { throw OpFailed("Главная панель не достучалась до ноды ($it). Порт $port/tcp ноды должен быть доступен с главного сервера") }
+        nodes.waitOnline(id)?.let { runCatching { nodes.delete(id) }; throw OpFailed("Главная панель не достучалась до ноды ($it). Порт $port/tcp ноды должен быть доступен с главного сервера") }
         log("Нода подключена к панели")
         // подключение на ноде: порт 443, если свободен у главной панели, иначе следующий свободный
         val used = apiA.inbounds().let { a -> (0 until a.length()).map { a.getJSONObject(it).optInt("port") }.toSet() }

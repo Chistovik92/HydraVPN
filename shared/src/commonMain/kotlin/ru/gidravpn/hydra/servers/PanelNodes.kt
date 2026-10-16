@@ -74,7 +74,7 @@ object PanelNodes {
     // ------------------------------------------------------------------------------------------------ PasarGuard
 
     /** Нода PasarGuard на отдельном сервере: Docker и `pg-node.sh` закреплённого выпуска, ключ ноды придумывает Hydra. */
-    fun pgNodeSteps(apiKey: String): List<Step> = listOf(
+    fun pgNodeSteps(apiKey: String, host: String): List<Step> = listOf(
         Step("pgn-exists", "Проверить, что ноды PasarGuard на сервере ещё нет", "test ! -e ${PasarGuardPanel.NODE_DIR}",
             failHint = "На сервере уже стоит нода PasarGuard"),
         Step("pgn-docker", "Поставить Docker, если его нет (нода работает в контейнере)",
@@ -84,8 +84,12 @@ object PanelNodes {
             "curl -fsSL ${Installer.shq(PasarGuardPanel.scriptUrl("pg-node.sh"))} -o $PG_NODE_SH && chmod 700 $PG_NODE_SH && sha256sum $PG_NODE_SH",
             rollback = "rm -f $PG_NODE_SH", failHint = "Не удалось скачать установщик с GitHub"),
         Step("pgn-install", "Установить ноду PasarGuard (ядро Xray)",
-            "bash $PG_NODE_SH install --api-key ${Installer.shq(apiKey)} -y < /dev/null > /tmp/.hydra-pgn.log 2>&1; rc=\$?; " +
-                "if [ \$rc -ne 0 ]; then tail -n 6 /tmp/.hydra-pgn.log | sed -E 's/[0-9a-f]{8}-[0-9a-f-]{27}/***/g'; fi; rm -f /tmp/.hydra-pgn.log $PG_NODE_SH; test -s ${PasarGuardPanel.NODE_CERT}",
+            // сертификат ноды — и на её адрес: главная панель сверяет его при подключении (без этого «IP address mismatch»)
+            "bash $PG_NODE_SH install --api-key ${Installer.shq(apiKey)} --san-entries ${Installer.shq(host.removePrefix("[").removeSuffix("]"))} -y < /dev/null > /tmp/.hydra-pgn.log 2>&1; rc=\$?; " +
+                "if [ \$rc -ne 0 ]; then tail -n 6 /tmp/.hydra-pgn.log | sed -E 's/[0-9a-f]{8}-[0-9a-f-]{27}/***/g'; fi; rm -f /tmp/.hydra-pgn.log $PG_NODE_SH; test -s ${PasarGuardPanel.NODE_CERT} && " +
+                // сертификат появляется раньше контейнера: ждём, пока нода начнёт слушать свой порт
+                "for i in \$(seq 1 30); do ss -ltnH 2>/dev/null | awk '{print \$4}' | grep -Eq ':62050\$' && { echo 'нода слушает 62050'; exit 0; }; sleep 2; done; " +
+                "(cd ${PasarGuardPanel.NODE_DIR} && docker compose logs --tail 6 2>&1 | tail -n 6); exit 1",
             rollback = pgNodeUninstallCommand(), failHint = "Нода PasarGuard не установилась"),
         Step("pgn-mark", "Отметить, что ноду поставила Hydra", "mkdir -p ${ServerOps.STATE_DIR} && chmod 700 ${ServerOps.STATE_DIR} && touch $PG_NODE_MARK"),
     )
@@ -105,7 +109,9 @@ object PanelNodes {
         Step("rwn-files", "Файлы ноды Remnawave", "mkdir -p ${RemnawavePanel.NODE_DIR} && chmod 700 ${RemnawavePanel.NODE_DIR}"),
         Step("rwn-compose", "Настройки ноды (ключ от главной панели)", upload = Step.Upload("${RemnawavePanel.NODE_DIR}/docker-compose.yml", RemnawavePanel.nodeCompose(secretKey).toByteArray(), 384)),
         Step("rwn-up", "Запустить ноду Remnawave ${RemnawavePanel.NODE_TAG} (ядро Xray)",
-            "cd ${RemnawavePanel.NODE_DIR} && docker compose up -d > /tmp/.hydra-rwn.log 2>&1; rc=\$?; [ \$rc -ne 0 ] && tail -n 8 /tmp/.hydra-rwn.log; rm -f /tmp/.hydra-rwn.log; exit \$rc",
+            "cd ${RemnawavePanel.NODE_DIR} && docker compose up -d > /tmp/.hydra-rwn.log 2>&1; rc=\$?; [ \$rc -ne 0 ] && { tail -n 8 /tmp/.hydra-rwn.log; rm -f /tmp/.hydra-rwn.log; exit \$rc; }; rm -f /tmp/.hydra-rwn.log; " +
+                "for i in \$(seq 1 30); do ss -ltnH 2>/dev/null | awk '{print \$4}' | grep -Eq ':${RemnawavePanel.NODE_PORT}\$' && { echo 'нода слушает ${RemnawavePanel.NODE_PORT}'; exit 0; }; sleep 2; done; " +
+                "docker compose logs --tail 6 2>&1 | tail -n 6; exit 1",
             rollback = rwNodeUninstallCommand(), failHint = "Нода Remnawave не запустилась"),
         Step("rwn-mark", "Отметить, что ноду поставила Hydra", "mkdir -p ${ServerOps.STATE_DIR} && chmod 700 ${ServerOps.STATE_DIR} && touch $RW_NODE_MARK"),
     )

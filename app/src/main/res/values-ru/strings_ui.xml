@@ -360,4 +360,15 @@
     <string name="split_preset_none">Подходящих российских приложений не найдено</string>
     <string name="main_engine">Ядро: %1$s</string>
     <string name="main_reality_no_xray">REALITY через sing-box: новые серверы Xray его не пустят — включите Xray (Настройки → Туннель)</string>
+    <string name="ms_nodes">Ноды</string>
+    <string name="ms_nodes_none">Нод пока нет. Нода — второй сервер, на котором работают подключения этой панели.</string>
+    <string name="ms_node_add">Добавить ноду</string>
+    <string name="ms_node_remove">Убрать</string>
+    <string name="ms_node_remove_q">Убрать ноду «%1$s»?</string>
+    <string name="ms_node_remove_msg">Нода будет убрана из панели, а с сервера %1$s — всё, что Hydra ставила для неё. Подключения через этот сервер перестанут работать.</string>
+    <string name="ms_node_pick_title">Нода для панели %1$s</string>
+    <string name="ms_node_pick_none">Нет свободного сервера: добавьте второй сервер в «Мои серверы» — на нём не должно быть служб Hydra.</string>
+    <string name="ms_node_pick_hint">Hydra поставит на выбранный сервер всё нужное для ноды и подключит её к панели. Порты ноды откроются только для этого сервера. 2–5 минут.</string>
+    <string name="ms_node_of">Нода панели %1$s сервера «%2$s»</string>
+    <string name="ms_node_of_hint">Подключения панели работают и через этот сервер. Убрать ноду — на карточке «%1$s».</string>
 </resources>

@@ -352,4 +352,15 @@
     <string name="manual_bad">از این فیلدها سرور کارآمدی ساخته نمی‌شود — نشانی، کلیدها و درگاه را بررسی کنید.</string>
     <string name="main_engine">هسته: %1$s</string>
     <string name="main_reality_no_xray">REALITY از طریق sing-box: سرورهای جدید Xray اجازه اتصال نمی‌دهند — Xray را روشن کنید (تنظیمات ← تونل)</string>
+    <string name="ms_nodes">نودها</string>
+    <string name="ms_nodes_none">هنوز نودی نیست. نود سرور دومی است که اتصال‌های این پنل روی آن کار می‌کند.</string>
+    <string name="ms_node_add">افزودن نود</string>
+    <string name="ms_node_remove">حذف</string>
+    <string name="ms_node_remove_q">نود «%1$s» حذف شود؟</string>
+    <string name="ms_node_remove_msg">نود از پنل حذف می‌شود و هر چه Hydra برای آن نصب کرده از %1$s پاک می‌شود. اتصال‌ها از این سرور دیگر کار نمی‌کنند.</string>
+    <string name="ms_node_pick_title">نود برای پنل %1$s</string>
+    <string name="ms_node_pick_none">سرور آزادی نیست: سرور دومی به «سرورهای من» اضافه کنید — نباید سرویس Hydra داشته باشد.</string>
+    <string name="ms_node_pick_hint">Hydra همه چیز لازم را روی سرور انتخاب‌شده نصب و آن را به پنل وصل می‌کند. پورت‌های نود فقط برای این سرور باز می‌شوند. ۲ تا ۵ دقیقه.</string>
+    <string name="ms_node_of">نود پنل %1$s سرور «%2$s»</string>
+    <string name="ms_node_of_hint">اتصال‌های پنل از این سرور هم کار می‌کنند. حذف نود — در کارت «%1$s».</string>
 </resources>

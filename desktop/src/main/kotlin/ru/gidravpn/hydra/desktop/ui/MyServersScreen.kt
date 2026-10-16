@@ -306,11 +306,19 @@ private fun ServerCard(c: AppController, srv: MyServer, m: MyServersManager, s: 
             }
 
             HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            // нода чужой панели (0.8.2-a4): службы на ней ставит и снимает главная панель
+            srv.nodeOf?.let { r ->
+                Text("Нода панели ${r.kind.title} сервера «${r.mainName}»", fontWeight = FontWeight.Medium)
+                Text("Подключения этой панели работают и через этот сервер. Убрать ноду — на карточке «${r.mainName}», в разделе «Ноды».",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (srv.nodeOf == null) {
             AwgSection(srv, st, m, busy, onAddClient, onConfirm) { installKind = ServerKind.AMNEZIAWG }
             HorizontalDivider(Modifier.padding(vertical = 4.dp))
             OfxSection(srv, st, m, busy, onConfirm) { installKind = ServerKind.OPENFLUX }
             HorizontalDivider(Modifier.padding(vertical = 4.dp))
             PanelSection(c, srv, st, m, s, onAddUser, onConfirm) { k -> installKind = k }
+            }
 
             val inst = s.install?.takeIf { it.serverId == srv.id }
             if (installKind != null && inst == null) InstallForm(installKind!!, busy, onCancel = { installKind = null }) { f -> m.prepareInstall(srv.id, f) }
@@ -552,6 +560,7 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
             confirmButton = { TextButton(onClick = { askLocal = null; m.setPanelLocal(srv.id, close) }) { Text(if (close) "Закрыть" else "Открыть") } },
             dismissButton = { TextButton(onClick = { askLocal = null }) { Text("Отмена") } })
     }
+    if (ssh && ru.gidravpn.hydra.servers.PanelNodes.supports(p.kind)) PanelNodesSection(srv, m, s)
     s.panelClients[srv.id]?.let { emails ->
         if (emails.isEmpty()) Text("Пользователей пока нет.", fontSize = 12.sp)
         emails.forEach { email ->
@@ -561,6 +570,50 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
                 TextButton(onClick = { m.removePanelClient(srv.id, email) }, enabled = !busy) { Text("Удалить", color = Danger) }
             }
         }
+    }
+}
+
+/**
+ * Ноды панели (0.8.2-a4): список, «Добавить ноду» (второй сервер из «Моих серверов»), «Убрать». Подключения Hydra работают и на
+ * ноде; у 3x-ui на новой ноде Hydra сразу создаёт подключение VLESS + gRPC + REALITY.
+ */
+@Composable
+private fun PanelNodesSection(srv: MyServer, m: MyServersManager, s: MyServersUi) {
+    val p = srv.panel ?: return
+    var pick by remember { mutableStateOf(false) }
+    var remove by remember { mutableStateOf<ru.gidravpn.hydra.servers.PanelNode?>(null) }
+    Text("Ноды", fontWeight = FontWeight.Medium, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+    if (p.nodes.isEmpty()) Text("Нод пока нет. Нода — второй сервер, на котором работают подключения этой панели: пользователи получают и его адрес.",
+        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    p.nodes.forEach { n ->
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("• ${n.name} — ${n.host}", Modifier.width(260.dp), fontSize = 13.sp)
+            TextButton(onClick = { remove = n }, enabled = !s.busy) { Text("Убрать", color = Danger) }
+        }
+    }
+    OutlinedButton(onClick = { pick = true }, enabled = !s.busy) { Text("Добавить ноду") }
+    if (pick) {
+        val list = m.nodeCandidates(srv.id)
+        AlertDialog(onDismissRequest = { pick = false },
+            title = { Text("Нода для панели ${p.kind.title}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (list.isEmpty()) Text("Нет свободного сервера: добавьте второй сервер в «Мои серверы» (кнопка «Добавить сервер») — на нём не должно быть служб Hydra.", fontSize = 13.sp)
+                    else {
+                        Text("Hydra поставит на выбранный сервер всё нужное для ноды и подключит её к панели. Порты ноды откроются только для этого сервера. Займёт 2–5 минут.", fontSize = 13.sp)
+                        ru.gidravpn.hydra.servers.PanelNodes.planPreview(p.kind, srv.name).forEach { Text("• ${it.title}", fontSize = 12.sp) }
+                        list.forEach { cand -> OutlinedButton(onClick = { pick = false; m.addPanelNode(srv.id, cand.id) }) { Text("${cand.name} (${cand.host})") } }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { pick = false }) { Text("Отмена") } })
+    }
+    remove?.let { n ->
+        AlertDialog(onDismissRequest = { remove = null },
+            title = { Text("Убрать ноду «${n.name}»?") },
+            text = { Text("Нода будет убрана из панели, а с сервера ${n.host} — всё, что Hydra ставила для неё. Подключения через этот сервер перестанут работать.") },
+            confirmButton = { TextButton(onClick = { remove = null; m.removePanelNode(srv.id, n.serverId) }) { Text("Убрать", color = Danger) } },
+            dismissButton = { TextButton(onClick = { remove = null }) { Text("Отмена") } })
     }
 }
 

@@ -14,6 +14,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -337,11 +338,18 @@ private fun ServerCard(srv: MyServer, m: MyServersManager, s: MyServersUi, onAdd
         }
 
         Divider()
+        // нода чужой панели (0.8.2-a4): службы на ней ставит и снимает главная панель
+        srv.nodeOf?.let { r ->
+            Text(stringResource(R.string.ms_node_of, r.kind.title, r.mainName), color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.ms_node_of_hint, r.mainName), color = TextMuted, fontSize = 12.sp)
+        }
+        if (srv.nodeOf == null) {
         AwgSection(srv, st, m, busy, onAddClient, onConfirm) { installKind = ServerKind.AMNEZIAWG }
         Divider()
         OfxSection(srv, st, m, busy, onConfirm) { installKind = ServerKind.OPENFLUX }
         Divider()
         PanelSection(srv, st, m, s, onAddUser, onConfirm) { k -> installKind = k }
+        }
 
         val inst = s.install?.takeIf { it.serverId == srv.id }
         if (installKind != null && inst == null) { Spacer(Modifier.height(8.dp)); InstallForm(installKind!!, busy, onCancel = { installKind = null }) { f -> m.prepareInstall(srv.id, f) } }
@@ -549,6 +557,7 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
             }
         }
     }
+    if (ssh && ru.gidravpn.hydra.servers.PanelNodes.supports(p.kind)) PanelNodesSection(srv, m, s)
     s.panelClients[srv.id]?.let { emails ->
         if (emails.isEmpty()) Text(stringResource(R.string.ms_panel_no_users), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         emails.forEach { email ->
@@ -560,6 +569,43 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
                 }
             }
         }
+    }
+}
+
+/** Ноды панели (0.8.2-a4): список, «Добавить ноду» (второй сервер из «Моих серверов»), «Убрать». */
+@Composable
+private fun PanelNodesSection(srv: MyServer, m: MyServersManager, s: MyServersUi) {
+    val p = srv.panel ?: return
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val onConfirm = LocalConfirm.current
+    var pick by remember { mutableStateOf(false) }
+    Text(stringResource(R.string.ms_nodes), color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+    if (p.nodes.isEmpty()) Text(stringResource(R.string.ms_nodes_none), color = TextMuted, fontSize = 11.sp)
+    p.nodes.forEach { n ->
+        Column(Modifier.padding(vertical = 3.dp)) {
+            Text("• ${n.name} — ${n.host}", color = TextSecondary, fontSize = 13.sp)
+            MsRow {
+                MsChip(stringResource(R.string.ms_node_remove), Danger) {
+                    if (!s.busy) onConfirm(Confirm(ctx.getString(R.string.ms_node_remove_q, n.name), ctx.getString(R.string.ms_node_remove_msg, n.host), ctx.getString(R.string.ms_node_remove)) { m.removePanelNode(srv.id, n.serverId) })
+                }
+            }
+        }
+    }
+    MsRow { MsChip(stringResource(R.string.ms_node_add), AccentCyan) { if (!s.busy) pick = true } }
+    if (pick) {
+        val list = m.nodeCandidates(srv.id)
+        AlertDialog(onDismissRequest = { pick = false },
+            title = { Text(stringResource(R.string.ms_node_pick_title, p.kind.title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (list.isEmpty()) Text(stringResource(R.string.ms_node_pick_none), fontSize = 13.sp)
+                    else {
+                        Text(stringResource(R.string.ms_node_pick_hint), fontSize = 13.sp)
+                        list.forEach { cand -> OutlinedButton(onClick = { pick = false; m.addPanelNode(srv.id, cand.id) }) { Text("${cand.name} (${cand.host})") } }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { pick = false }) { Text(stringResource(android.R.string.cancel)) } })
     }
 }
 

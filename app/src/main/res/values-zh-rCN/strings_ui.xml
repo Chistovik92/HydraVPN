@@ -352,4 +352,15 @@
     <string name="manual_bad">这些字段无法组成可用的服务器——请检查地址、密钥和端口。</string>
     <string name="main_engine">内核：%1$s</string>
     <string name="main_reality_no_xray">REALITY 走 sing-box：新的 Xray 服务器不会放行 — 请开启 Xray（设置 → 隧道）</string>
+    <string name="ms_nodes">节点</string>
+    <string name="ms_nodes_none">还没有节点。节点是运行此面板连接的第二台服务器。</string>
+    <string name="ms_node_add">添加节点</string>
+    <string name="ms_node_remove">移除</string>
+    <string name="ms_node_remove_q">移除节点“%1$s”？</string>
+    <string name="ms_node_remove_msg">节点将从面板移除，Hydra 为它在 %1$s 上安装的一切也将删除。经此服务器的连接将停止工作。</string>
+    <string name="ms_node_pick_title">%1$s 面板的节点</string>
+    <string name="ms_node_pick_none">没有空闲服务器：请在“我的服务器”中添加第二台服务器（上面不能有 Hydra 服务）。</string>
+    <string name="ms_node_pick_hint">Hydra 会在所选服务器上安装节点所需的一切并连接到面板。节点端口只对本服务器开放。需要 2–5 分钟。</string>
+    <string name="ms_node_of">服务器“%2$s”上 %1$s 面板的节点</string>
+    <string name="ms_node_of_hint">面板的连接也通过此服务器工作。移除节点请到“%1$s”卡片。</string>
 </resources>

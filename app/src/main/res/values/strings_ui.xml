@@ -361,4 +361,15 @@
     <string name="split_preset_none">No matching Russian apps installed</string>
     <string name="main_engine">Core: %1$s</string>
     <string name="main_reality_no_xray">REALITY via sing-box: new Xray servers will not let it in — turn on Xray (Settings → Tunnel)</string>
+    <string name="ms_nodes">Nodes</string>
+    <string name="ms_nodes_none">No nodes yet. A node is a second server that runs the connections of this panel.</string>
+    <string name="ms_node_add">Add node</string>
+    <string name="ms_node_remove">Remove</string>
+    <string name="ms_node_remove_q">Remove node “%1$s”?</string>
+    <string name="ms_node_remove_msg">The node will be removed from the panel, and everything Hydra installed for it will be removed from %1$s. Connections through this server will stop working.</string>
+    <string name="ms_node_pick_title">Node for %1$s</string>
+    <string name="ms_node_pick_none">No free server: add a second server to “My servers” — it must have no Hydra services.</string>
+    <string name="ms_node_pick_hint">Hydra will install everything the node needs on the chosen server and connect it to the panel. Node ports open only for this server. 2–5 minutes.</string>
+    <string name="ms_node_of">Node of %1$s panel on “%2$s”</string>
+    <string name="ms_node_of_hint">Connections of the panel also run through this server. Remove the node on the “%1$s” card.</string>
 </resources>
