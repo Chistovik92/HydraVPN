@@ -60,7 +60,7 @@ object XuiTraffic {
         val r = ssh.exec("(/tmp/sb/sing-box run -c /tmp/hydra-sb.json > /tmp/hydra-sb.log 2>&1 &); sleep 2; " +
             "curl -s -o /dev/null -w '%{http_code} %{size_download} %{time_total}' --max-time 30 -x http://127.0.0.1:20911 'https://speed.cloudflare.com/__down?bytes=2000000'; " +
             "pkill -f /tmp/hydra-sb.json; echo; tail -2 /tmp/hydra-sb.log; rm -f /tmp/hydra-sb.json")
-        val parts = r.out.lines().first().split(" ")
+        val parts = r.out.lines().first { it.isNotBlank() }.trim().split(" ")
         return if (parts.getOrNull(0)?.startsWith("2") == true && (parts.getOrNull(1)?.toDoubleOrNull() ?: 0.0) > 100_000) "ok ${parts[1].toDouble().toInt() / 1024} КБ за ${parts.getOrNull(2)} с (на стенде)"
             else "на стенде: ${r.out.take(400)}"
     }
@@ -71,7 +71,7 @@ object XuiTraffic {
      */
     fun throughOnWsl(distro: String, p: ServerProfile): String {
         fun wsl(cmd: String): String {
-            val pr = ProcessBuilder("wsl", "-d", distro, "-u", "root", "--", "bash", "-c", cmd).redirectErrorStream(true).start()
+            val pr = ProcessBuilder("wsl", "-d", distro, "-u", "root", "-e", "bash", "-c", cmd).redirectErrorStream(true).start()
             val out = pr.inputStream.readBytes().toString(Charsets.UTF_8).replace("\u0000", ""); pr.waitFor()
             return out.lines().filter { "localhost" !in it }.joinToString("\n").trim()
         }

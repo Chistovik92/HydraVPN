@@ -205,7 +205,47 @@ object SingBoxConfigBuilder {
             put("default_domain_resolver", "local")
         })
 
+        wireGuardToEndpoints(root)
         return root
+    }
+
+    /**
+     * 0.8.2-b: WireGuard — эндпоинтом sing-box 1.11+ (как на ПК, DesktopConfig.convertWireGuard), а не устаревшим outbound
+     * `wireguard`. Со старым outbound WG на Android подключался, но качал ~5 КБ/с (эмулятор, WG от x-ui и 3x-ui: 0,3 МБ за
+     * минуту против 10 МБ у того же сервера через amneziawg-go). Тег сохраняется — правила, группы и цепочки ссылаются на него.
+     */
+    internal fun wireGuardToEndpoints(root: JSONObject) {
+        val outbounds = root.optJSONArray("outbounds") ?: return
+        val endpoints = root.optJSONArray("endpoints") ?: JSONArray()
+        var i = 0
+        while (i < outbounds.length()) {
+            val wg = outbounds.getJSONObject(i)
+            if (wg.optString("type") != "wireguard") { i++; continue }
+            outbounds.remove(i)
+            val peer = JSONObject()
+                .put("address", wg.getString("server"))
+                .put("port", wg.getInt("server_port"))
+                .put("public_key", wg.optString("peer_public_key"))
+                .put("allowed_ips", JSONArray().put("0.0.0.0/0").put("::/0"))
+            wg.optString("pre_shared_key").takeIf { it.isNotEmpty() }?.let { peer.put("pre_shared_key", it) }
+            wg.optInt("keepalive", 0).takeIf { it > 0 }?.let { peer.put("persistent_keepalive_interval", it) }
+            val endpoint = JSONObject()
+                .put("type", "wireguard").put("tag", wg.optString("tag", "proxy"))
+                .put("address", JSONArray(wgAddresses(wg.optJSONArray("local_address"))))
+                .put("private_key", wg.optString("private_key"))
+                .put("peers", JSONArray().put(peer))
+            if (wg.has("mtu")) endpoint.put("mtu", wg.getInt("mtu"))
+            endpoints.put(endpoint)
+        }
+        if (endpoints.length() > 0) root.put("endpoints", endpoints)
+    }
+
+    /** sing-box требует префикс: "10.0.0.2" → "10.0.0.2/32", IPv6 → /128. */
+    private fun wgAddresses(raw: JSONArray?): List<String> {
+        val list = raw?.let { a -> (0 until a.length()).map { a.optString(it).trim() } }.orEmpty()
+            .filter { it.isNotEmpty() }
+            .map { if ('/' in it) it else if (':' in it) "$it/128" else "$it/32" }
+        return list.ifEmpty { listOf("172.19.0.2/32") }
     }
 
     /**
@@ -259,6 +299,7 @@ object SingBoxConfigBuilder {
                     ))
                 if (extra.has("preshared_key")) o.put("pre_shared_key", extra.optString("preshared_key"))
                 if (extra.has("mtu")) o.put("mtu", extra.optInt("mtu", 1408))
+                extra.optString("keepalive").toIntOrNull()?.takeIf { it > 0 }?.let { o.put("keepalive", it) }   // → эндпоинт (wireGuardToEndpoints)
             }
             Protocol.TUIC -> {
                 o.put("type", "tuic").put("uuid", p.uuidOrPassword)

@@ -20,7 +20,9 @@ import kotlin.test.fail
  */
 class XuiAlirezaConnectionsLiveTest {
     @Test fun everyXuiTypeCarriesTraffic() {
-        val v = System.getenv("HYDRA_SSH_TEST")
+        // 0.8.2-b: без пароля стенда — HYDRA_WSL_STAND=<distro> (WslSession), HYDRA_SSH_TEST тогда — «host:port:root:-»
+        val wsl = WslSession.install()
+        val v = System.getenv("HYDRA_SSH_TEST") ?: if (wsl) "${System.getenv("HYDRA_WSL_TARGET") ?: "172.29.99.250"}:22:root:-" else null
         assumeTrue(v != null && System.getenv("HYDRA_XUIA_LIVE") != null)
         val p = v!!.split(":", limit = 4)
         val login = SshTarget(p[0], p[1].toInt(), p[2], password = p[3])
@@ -66,9 +68,12 @@ class XuiAlirezaConnectionsLiveTest {
             val r = runCatching {
                 val link = m.ui.value.shown?.second ?: error("${m.ui.value.error}")
                 println("XLINK $type: " + link.lines().first().replace(Regex("(pbk|password|PrivateKey)( = |=)[^&\\s]+"), "$1$2…").take(220))
+                System.getenv("HYDRA_XUI_LINKS_OUT")?.let { java.io.File(it).appendText("$kind-${type.name} " + java.util.Base64.getEncoder().encodeToString(link.trim().toByteArray()) + "\n") }
                 var prof = LinkParser.parseLine(link.trim()) ?: error("Hydra не разобрала ссылку")
                 if (type.needsCert) prof = prof.copy(extra = JSONObject(prof.extra).put("insecure", true).toString())
-                fun once() = if (type.udp && System.getenv("HYDRA_UDP_ON_SERVER") != null)
+                fun once() = if (type.udp && wsl)
+                        "sing-box: " + XuiTraffic.throughOnServer(WslSession(System.getenv("HYDRA_WSL_STAND")!!, if (login.host == (System.getenv("HYDRA_WSL_HOST") ?: "172.29.99.246")) null else "nodeb"), prof)
+                    else if (type.udp && System.getenv("HYDRA_UDP_ON_SERVER") != null)
                         "sing-box: " + SshConnector.connect(login, saved.single().fingerprint).use { XuiTraffic.throughOnServer(it, prof) }
                     else if (EngineToggles().engineFor(prof, true) == EngineToggles.Kind.XRAY && xray != null) "xray: " + XuiTraffic.throughXray(xray, prof)
                     else if (sb != null) "sing-box: " + XuiTraffic.through(sb, prof) else "ядро не задано"
