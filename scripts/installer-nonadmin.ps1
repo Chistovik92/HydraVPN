@@ -131,8 +131,40 @@ function Check-Installed([string]$name) {
   if (Test-Path $installed) { Write-Host "${name}: $installed на месте" }
   else { $script:failed += "${name}: нет $installed" }
 }
+# Удаляем по коду продукта: у MSI внутри EXE свой код пакета, и `msiexec /x <другой .msi>` отвечает 1638.
+function ProductCode([string]$file) {
+  $wi = New-Object -ComObject WindowsInstaller.Installer
+  $db = $wi.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $wi, @($file, 0))
+  $v = $db.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $db, @("SELECT Value FROM Property WHERE Property='ProductCode'"))
+  $v.GetType().InvokeMember("Execute", "InvokeMethod", $null, $v, $null) | Out-Null
+  $r = $v.GetType().InvokeMember("Fetch", "InvokeMethod", $null, $v, $null)
+  $r.GetType().InvokeMember("StringData", "GetProperty", $null, $r, @(1))
+}
+$codes = @(ProductCode $msiW) + $(if ($oldW) { @(ProductCode $oldW) } else { @() }) | Select-Object -Unique
 function Uninstall([string]$name) {
-  Run-As "${name}: удаление" "msiexec.exe" @("/x", "`"$msiW`"", "/qn", "/l*v", "`"$work\$name-uninstall.log`"")
+  foreach ($c in $codes) {
+    $p = Start-Process msiexec.exe -ArgumentList @("/x", $c, "/qn", "/l*v", "`"$work\$name-uninstall.log`"") -Credential $cred -LoadUserProfile -WorkingDirectory $work -PassThru
+    if (-not $p.WaitForExit(180000)) { $script:failed += "${name}: удаление не закончилось"; try { $p.Kill() } catch {} }
+    elseif ($p.ExitCode -notin 0, 1605, 3010) { $script:failed += "${name}: удаление, код $($p.ExitCode)" }
+  }
+  if (Test-Path $installed) { $script:failed += "${name}: после удаления $installed остался" }
+}
+
+# Запущенная Hydra держит свои файлы (jar, runtime, ядра). [elevated] — запуск от администратора раннера, как у владельца
+# («Перезапустить от администратора» для TUN): обычному пользователю такой процесс не закрыть.
+function Start-Hydra([bool]$elevated) {
+  $a = @{ FilePath = $installed; PassThru = $true; WorkingDirectory = (Split-Path $installed) }
+  if (-not $elevated) { $a.Credential = $cred; $a.LoadUserProfile = $true }
+  $h = Start-Process @a
+  Start-Sleep 25
+  $alive = Get-Process -Id $h.Id -ErrorAction SilentlyContinue
+  Write-Host "Hydra запущена (pid $($h.Id), от администратора: $elevated, жива: $([bool]$alive))"
+  Snapshot "Hydra запущена"
+  $h
+}
+function Stop-Tree([int]$id) {
+  Get-CimInstance Win32_Process -Filter "ParentProcessId=$id" -ErrorAction SilentlyContinue | ForEach-Object { Stop-Tree $_.ProcessId }
+  Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
 }
 
 # 1. MSI начисто, тихо.
@@ -153,7 +185,23 @@ Run-As "exe-fresh" $exeW @("/qn", "/l*v", "`"$work\exe-fresh.log`"")
 Check-Installed "exe-fresh"
 Uninstall "exe-fresh"
 
-# 4. С окнами — так ставит владелец двойным щелчком.
+# 4. Обновление поверх запущенной Hydra (встроенное обновление запускает установщик и закрывает Hydra; если она
+#    не закрылась или запущена от администратора — установщику нужно заменить занятые файлы).
+if ($oldW) {
+  foreach ($elev in @($false, $true)) {
+    $n = if ($elev) { "upgrade-over-elevated" } else { "upgrade-over-running" }
+    Run-As "${n}: старая" "msiexec.exe" @("/i", "`"$oldW`"", "/qn", "/l*v", "`"$work\$n-old.log`"")
+    $h = Start-Hydra $elev
+    Run-As $n "msiexec.exe" @("/i", "`"$msiW`"", "/qn", "/l*v", "`"$work\$n.log`"")
+    Snapshot "$n: после установки"
+    Stop-Tree $h.Id
+    Start-Sleep 3
+    Check-Installed $n
+    Uninstall $n
+  }
+}
+
+# 5. С окнами — так ставит владелец двойным щелчком.
 Run-As "msi-ui" "msiexec.exe" @("/i", "`"$msiW`"", "/l*v", "`"$work\msi-ui.log`"") $true
 Run-As "exe-ui" $exeW @() $true
 
