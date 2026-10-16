@@ -167,6 +167,36 @@ object ServerOps {
         else -> null
     }
 
+    /**
+     * Открыть порт только для одного адреса (0.8.2-a4: порт ноды — только главному серверу) и запомнить это в [FW_LIST]
+     * строкой `ufw-from <ip> <порт/протокол>` — её закрывают [closePortFromCommand] и очистка сервера.
+     */
+    fun openPortFromStep(firewall: String, port: String, fromIp: String): Step? {
+        require(Regex("""^\d{1,3}(\.\d{1,3}){3}$""").matches(fromIp)) { "Неверный адрес $fromIp" }
+        require(Regex("""^\d{1,5}/(tcp|udp)$""").matches(port)) { "Неверный порт $port" }
+        val (n, proto) = port.split('/')
+        return when (firewall) {
+            "ufw" -> Step("fw-from", "Открыть $port в ufw только для $fromIp",
+                "ufw allow from $fromIp to any port $n proto $proto && $MKDIR && echo 'ufw-from $fromIp $port' >> $FW_LIST",
+                rollback = "ufw delete allow from $fromIp to any port $n proto $proto")
+            "firewalld" -> {
+                val rule = "rule family=ipv4 source address=$fromIp port port=$n protocol=$proto accept"
+                Step("fw-from", "Открыть $port в firewalld только для $fromIp",
+                    "firewall-cmd --permanent --add-rich-rule='$rule' && firewall-cmd --reload && $MKDIR && echo 'firewalld-from $fromIp $port' >> $FW_LIST",
+                    rollback = "firewall-cmd --permanent --remove-rich-rule='$rule' && firewall-cmd --reload")
+            }
+            else -> null
+        }
+    }
+
+    /** Закрыть порт, открытый [openPortFromStep]. */
+    fun closePortFromCommand(port: String, fromIp: String): String {
+        val (n, proto) = port.split('/')
+        return "if grep -qx 'ufw-from $fromIp $port' $FW_LIST 2>/dev/null; then ufw delete allow from $fromIp to any port $n proto $proto >/dev/null 2>&1; fi; " +
+            "if grep -qx 'firewalld-from $fromIp $port' $FW_LIST 2>/dev/null; then firewall-cmd --permanent --remove-rich-rule='rule family=ipv4 source address=$fromIp port port=$n protocol=$proto accept' >/dev/null 2>&1 && firewall-cmd --reload >/dev/null 2>&1; fi; " +
+            "[ -f $FW_LIST ] && sed -i '\\|-from $fromIp $port\$|d' $FW_LIST; true"
+    }
+
     /** Закрыть порт, если его открывала Hydra (есть в [FW_LIST]). */
     fun closePortCommand(port: String) =
         "if grep -qx 'ufw $port' $FW_LIST 2>/dev/null; then ufw delete allow $port >/dev/null 2>&1; fi; " +
@@ -201,10 +231,14 @@ object ServerOps {
                 "if [ -f ${s.mark} ]; then ${OtherPanels.uninstallCommand(s)}; echo '${s.kind.title}: удалена'; fi;"
             } + " if [ -f ${PasarGuardPanel.MARK} ]; then ${PasarGuardPanel.uninstallCommand()}; echo 'PasarGuard: удалена'; fi;" +
                 " if [ -f ${RemnawavePanel.MARK} ]; then ${RemnawavePanel.backupCommand()}; ${RemnawavePanel.uninstallCommand()}; echo 'Remnawave: удалена'; fi;" +
+                " if [ -f ${PanelNodes.PG_NODE_MARK} ]; then ${PanelNodes.pgNodeUninstallCommand()}; echo 'нода PasarGuard: удалена'; fi;" +
+                " if [ -f ${PanelNodes.RW_NODE_MARK} ]; then ${PanelNodes.rwNodeUninstallCommand()}; echo 'нода Remnawave: удалена'; fi;" +
                 " rm -f ${OtherPanels.PANEL_STATE}; true"),
         Step("wipe-fw", "Закрыть порты, которые открывала Hydra",
-            "if [ -f $FW_LIST ]; then while read -r fw p; do case \"\$fw\" in " +
+            "if [ -f $FW_LIST ]; then while read -r fw p q; do case \"\$fw\" in " +
                 "ufw) ufw delete allow \"\$p\" >/dev/null 2>&1 && echo \"закрыт \$p (ufw)\";; " +
+                "ufw-from) ufw delete allow from \"\$p\" to any port \"\${q%/*}\" proto \"\${q#*/}\" >/dev/null 2>&1 && echo \"закрыт \$q для \$p (ufw)\";; " +
+                "firewalld-from) firewall-cmd --permanent --remove-rich-rule=\"rule family=ipv4 source address=\$p port port=\${q%/*} protocol=\${q#*/} accept\" >/dev/null 2>&1 && echo \"закрыт \$q для \$p (firewalld)\";; " +
                 "firewalld) firewall-cmd --permanent --remove-port=\"\$p\" >/dev/null 2>&1 && echo \"закрыт \$p (firewalld)\";; esac; done < $FW_LIST; " +
                 "command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --reload >/dev/null 2>&1; fi; true"),
         Step("wipe-state", "Удалить копии настроек и временные файлы Hydra",

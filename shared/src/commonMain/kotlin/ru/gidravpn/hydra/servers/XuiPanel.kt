@@ -44,15 +44,19 @@ data class PanelInstance(
      * приложения, API 3x-ui — `curl` на сервере по SSH. [baseUrl] остаётся внешним адресом (на него выписан сертификат).
      */
     val local: Boolean = false,
+    /** Ноды панели на других серверах (0.8.2-a4). */
+    val nodes: List<PanelNode> = emptyList(),
 ) {
     fun toJson(): JSONObject = JSONObject().put("kind", kind.name).put("baseUrl", baseUrl).put("user", username).put("password", password)
         .put("token", token).put("version", version).put("inboundId", inboundId).put("client", clientEmail).put("local", local)
+        .also { if (nodes.isNotEmpty()) it.put("nodes", PanelNode.listToJson(nodes)) }
 
     companion object {
         fun fromJson(o: JSONObject) = PanelInstance(
             runCatching { PanelKind.valueOf(o.optString("kind", "XUI3")) }.getOrDefault(PanelKind.XUI3),
             o.getString("baseUrl"), o.optString("user"), o.optString("password"), o.getString("token"),
             o.optString("version"), o.optInt("inboundId"), o.optString("client"), o.optBoolean("local"),
+            PanelNode.listFromJson(o.optJSONArray("nodes")),
         )
     }
 }

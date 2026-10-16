@@ -413,7 +413,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
 
     /** Полная очистка сервера от всего, что ставила Hydra; запись остаётся (с ней можно снова что-то поставить). */
     fun wipe(s: MyServer, installer: Installer): MyServer? =
-        if (installer.run(ServerOps.wipeSteps())) s.copy(awg = null, ofx = null, panel = null, clients = emptyList()) else null
+        if (installer.run(ServerOps.wipeSteps())) s.copy(awg = null, ofx = null, panel = null, nodeOf = null, clients = emptyList()) else null
 
     /** Перезагрузка сервера: команда уходит в фон, сеанс закрывается сам. */
     fun reboot(ssh: SshSession) { ssh.exec("nohup sh -c 'sleep 2; systemctl reboot' >/dev/null 2>&1 &") }
