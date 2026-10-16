@@ -40,11 +40,37 @@ $msiW = Join-Path $work (Split-Path $Msi -Leaf)
 $exeW = Join-Path $work (Split-Path $Exe -Leaf)
 $oldW = if ($OldMsi) { Join-Path $work (Split-Path $OldMsi -Leaf) } else { "" }
 
+# Текст окон (в т. ч. окна-сообщения об ошибке): заголовок и подписи дочерних элементов.
+Add-Type @"
+using System; using System.Text; using System.Collections.Generic; using System.Runtime.InteropServices;
+public static class Win {
+  delegate bool EnumProc(IntPtr h, IntPtr l);
+  [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
+  [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr p, EnumProc f, IntPtr l);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+  static string T(IntPtr h) { var s = new StringBuilder(1024); GetWindowText(h, s, 1024); return s.ToString(); }
+  public static List<string> Texts(uint pid) {
+    var r = new List<string>();
+    EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p);
+      if (p == pid) { var line = (IsWindowVisible(h) ? "[видно] " : "[скрыто] ") + T(h);
+        EnumChildWindows(h, (c, l2) => { var t = T(c); if (t.Length > 0) line += " | " + t; return true; }, IntPtr.Zero);
+        r.Add(line); }
+      return true; }, IntPtr.Zero);
+    return r;
+  }
+}
+"@
+
 function Snapshot([string]$why) {
   "--- ${why}: процессы и окна" | Out-File -Append "$Out\windows.txt"
-  Get-Process | Where-Object { $_.Name -match 'msiexec|Hydra|consent|java|sing-box|xray' -or $_.MainWindowTitle } |
-    Select-Object Id, Name, SessionId, MainWindowTitle | Format-Table -AutoSize | Out-String -Width 300 |
+  $ps = Get-Process | Where-Object { $_.Name -match 'msiexec|Hydra|consent|java|sing-box|xray' -or $_.MainWindowTitle }
+  $ps | Select-Object Id, Name, SessionId, MainWindowTitle | Format-Table -AutoSize | Out-String -Width 300 |
     Out-File -Append "$Out\windows.txt"
+  foreach ($x in $ps | Where-Object { $_.Name -match 'msiexec|Hydra' }) {
+    foreach ($t in [Win]::Texts([uint32]$x.Id)) { "  окно $($x.Name)#$($x.Id): $t" | Out-File -Append "$Out\windows.txt"; Write-Host "окно $($x.Name): $t" }
+  }
 }
 
 function Run-As([string]$name, [string]$file, [string[]]$argv, [bool]$expectWindow = $false) {
@@ -79,6 +105,11 @@ function Run-As([string]$name, [string]$file, [string[]]$argv, [bool]$expectWind
   Write-Host "код $code за $sec с"
   if ($code -ne 0 -and $code -ne 3010) { $script:failed += "${name}: код $code" }
 }
+
+# Окружение пользователя, от имени которого идут установки (TEMP — туда обёртка EXE распаковывает MSI).
+$envOut = Join-Path $work "user-env.txt"
+$pe = Start-Process cmd.exe -ArgumentList @("/c", "set > `"$envOut`" & whoami /groups >> `"$envOut`"") -Credential $cred -LoadUserProfile -WorkingDirectory $work -PassThru -Wait
+Get-Content $envOut -ErrorAction SilentlyContinue | Where-Object { $_ -match '^(TEMP|TMP|USERPROFILE|LOCALAPPDATA)=|Mandatory Label|BUILTIN' } | ForEach-Object { Write-Host "user: $_" }
 
 $profileDir = "C:\Users\$user"
 $installed = "$profileDir\AppData\Local\Hydra\Hydra.exe"
