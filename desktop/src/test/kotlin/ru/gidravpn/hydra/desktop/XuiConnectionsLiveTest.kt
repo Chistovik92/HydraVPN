@@ -20,14 +20,25 @@ class XuiConnectionsLiveTest {
     private fun unwrap(l: String): String = if (l.startsWith("vmess://") || l.startsWith("vpn://"))
         runCatching { String(java.util.Base64.getDecoder().decode(l.substringAfter("://").substringBefore("#").replace('-', '+').replace('_', '/').let { it + "=".repeat((4 - it.length % 4) % 4) })) }.getOrDefault(l) else l
 
+    /**
+     * 0.8.2-b: без SSH — API панели напрямую (DirectXuiTransport), если пароля стенда нет: HYDRA_XUI_RESULT_FILE — копия
+     * /etc/x-ui/install-result.env, HYDRA_XUI_HOST — адрес панели. Сертификат для Hysteria 2 / TUIC здесь не сделать (он ставится
+     * по SSH) — эти типы пропускаются; WireGuard и AmneziaWG его не требуют.
+     */
     @Test fun everyConnectionTypeCarriesTraffic() {
+        assumeTrue(System.getenv("HYDRA_XUI_CONN_LIVE") != null)
         val v = System.getenv("HYDRA_SSH_TEST")
-        assumeTrue(v != null && System.getenv("HYDRA_XUI_CONN_LIVE") != null)
-        val p = v!!.split(":", limit = 4)
+        val direct = System.getenv("HYDRA_XUI_RESULT_FILE")?.let { java.io.File(it) }
+        assumeTrue(v != null || (direct != null && System.getenv("HYDRA_XUI_HOST") != null))
+        if (v == null) {
+            val host = System.getenv("HYDRA_XUI_HOST")!!
+            val res = XuiPanel.parseResult(direct!!.readText())
+            val path = res["XUI_WEB_BASE_PATH"].orEmpty().trim('/')
+            run(XuiApi(DirectXuiTransport("http://$host:${res.getValue("XUI_PANEL_PORT")}/$path", res.getValue("XUI_API_TOKEN"))), host, null)
+            return
+        }
+        val p = v.split(":", limit = 4)
         val login = SshTarget(p[0], p[1].toInt(), p[2], password = p[3])
-        val xray = System.getenv("HYDRA_XRAY"); val sb = System.getenv("HYDRA_SINGBOX")
-        val only = System.getenv("HYDRA_XUI_TYPES")?.split(",")?.map { it.trim() }?.toSet()
-        val results = mutableListOf<Pair<String, String>>()
         SshConnector.connect(login, SshConnector.fingerprint(login)).use { ssh ->
             val res = XuiPanel.parseResult(ssh.exec("cat ${XuiPanel.RESULT}").out)
             val port = res.getValue("XUI_PANEL_PORT"); val path = res["XUI_WEB_BASE_PATH"].orEmpty().trim('/')
@@ -36,12 +47,22 @@ class XuiConnectionsLiveTest {
             val dir = "/root/cert/hydra-test"
             ssh.exec("mkdir -p $dir && openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 2 -subj /CN=${login.host} " +
                 "-addext subjectAltName=IP:${login.host} -keyout $dir/privkey.pem -out $dir/fullchain.pem >/dev/null 2>&1")
-            val cert = XuiConnection.Companion.Cert("$dir/fullchain.pem", "$dir/privkey.pem", login.host)
+            run(api, login.host, XuiConnection.Companion.Cert("$dir/fullchain.pem", "$dir/privkey.pem", login.host))
+        }
+    }
+
+    private fun run(api: XuiApi, host: String, cert: XuiConnection.Companion.Cert?) {
+        val xray = System.getenv("HYDRA_XRAY"); val sb = System.getenv("HYDRA_SINGBOX")
+        val only = System.getenv("HYDRA_XUI_TYPES")?.split(",")?.map { it.trim() }?.toSet()
+        val wslDistro = System.getenv("HYDRA_WSL_DISTRO")
+        val results = mutableListOf<Pair<String, String>>()
+        run {
             // старые тестовые инбаунды — прочь
             api.inbounds().let { a -> (0 until a.length()).map { a.getJSONObject(it) }.filter { it.optString("remark").startsWith("t-") }.forEach { api.delInbound(it.getInt("id")) } }
             var n = 25000
             for (type in XuiConnection.entries) {
                 if (only != null && type.name !in only) continue
+                if (type.needsCert && cert == null) { results += type.name to "пропущено (нужен сертификат, режим без SSH)"; continue }
                 val portN = n++
                 val res1 = runCatching {
                     val keys = if (type.reality) api.newRealityKeys() else ("" to "")
@@ -58,6 +79,8 @@ class XuiConnectionsLiveTest {
                     val engine = EngineToggles().engineFor(prof, true)
                     fun once() = when {
                         type == XuiConnection.AMNEZIAWG -> "ссылка разобрана (${prof.protocolId}); трафик AmneziaWG — на Android"
+                        // UDP с Windows до WSL ловит TUN рабочей Hydra — UDP-типы проверяем sing-box на самом стенде (без SSH — через wsl).
+                        type.udp && engine != EngineToggles.Kind.XRAY && wslDistro != null -> "sing-box: " + XuiTraffic.throughOnWsl(wslDistro, prof)
                         engine == EngineToggles.Kind.XRAY && xray != null -> "xray: " + XuiTraffic.throughXray(xray, prof)
                         sb != null -> "sing-box: " + XuiTraffic.through(sb, prof)
                         else -> "ядро не задано"
@@ -68,7 +91,7 @@ class XuiConnectionsLiveTest {
                 results += type.name to res1
             }
         }
-        val bad = results.filter { !it.second.startsWith("xray: ok") && !it.second.startsWith("sing-box: ok") && !it.second.startsWith("ссылка разобрана") }
+        val bad = results.filter { !it.second.startsWith("xray: ok") && !it.second.startsWith("sing-box: ok") && !it.second.startsWith("ссылка разобрана") && !it.second.startsWith("пропущено") }
         assertTrue(bad.isEmpty(), bad.joinToString("\n"))
     }
 }
