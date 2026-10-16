@@ -118,10 +118,10 @@ public enum ManualLink {
             return r
         case "openflux":
             return [
-                f("transport", "Транспорт", "Transport", .choice, def: "direct", choices: ["direct", "vyandex", "yandex", "mailru", "cupsonline", "oneme"]),
+                f("transport", "Транспорт", "Transport", .choice, def: "direct", choices: ["direct", "vyandex", "yandex", "mailru", "cupsonline", "avito", "telemost", "oneme"]),
                 f("url", "Адрес узла host:порт / ссылка на документ", "Node host:port / document link", required: true,
                   hintRu: "direct — 203.0.113.5:24680; Яндекс — https://docs.yandex.ru/edit/d/…", hintEn: "direct — 203.0.113.5:24680; Yandex — https://docs.yandex.ru/edit/d/…",
-                  showIf: ("transport", ["direct", "vyandex", "yandex", "mailru", "cupsonline"])),
+                  showIf: ("transport", ["direct", "vyandex", "yandex", "mailru", "cupsonline", "avito", "telemost"])),
                 f("maxToken", "Токен MAX", "MAX token", .secret, required: true, showIf: ("transport", ["oneme"])),
                 f("maxUid", "ID пользователя MAX", "MAX user ID", required: true, showIf: ("transport", ["oneme"])),
                 f("key", "Ключ шифрования (64 hex или пароль)", "Encryption key (64 hex or password)", .secret),

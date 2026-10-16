@@ -130,5 +130,27 @@ class OpenFluxLinkTest {
         assertEquals("10.0.0.5:9000", OpenFluxLink.parse(oldOut)!!.address)
     }
 
+    /** OpenFlux 0.7.3 (0.8.2-b): Telemost и Avito — известные ядру типы ссылок (share.knownTypes). */
+    @Test fun telemostAndAvitoLinks() {
+        // Как TestTelemostLink ядра: узел Telemost без ключа делится конференцией классической ссылкой.
+        val tm = OpenFluxShare.encode(OpenFluxShare.Config(name = "Телемост",
+            transports = listOf(OpenFluxShare.Transport("telemost", url = "https://telemost.yandex.ru/j/88936358186517"))))
+        val p = OpenFluxLink.parse(tm)!!
+        assertEquals("Телемост", p.name)
+        val args = OpenFluxArgs.build(p, 1080, null)
+        assertTrue(args.toString(), args.containsAll(listOf("--transport", "telemost", "--url", "https://telemost.yandex.ru/j/88936358186517")))
+        assertTrue(args.toString(), "--inbound" in args && "socks5" in args) // Telemost не работает под --inbound=tun
+
+        // Avito в сессии: адрес — своим флагом --avito-url.
+        val av = OpenFluxShare.encode(OpenFluxShare.Config(negotiate = true, secret = "0123456789abcdef0123", transports = listOf(
+            OpenFluxShare.Transport("avito", url = """{"v":2,"rooms":["a","b"]}""", priority = 80),
+            OpenFluxShare.Transport("direct", dial = "10.0.0.5:9000", priority = 100))))
+        val a = OpenFluxArgs.build(OpenFluxLink.parse(av)!!, 1080, "/k")
+        val i = a.indexOf("--avito-url")
+        assertTrue(a.toString(), i >= 0 && a[i + 1] == """{"v":2,"rooms":["a","b"]}""")
+        assertEquals("ok", code { OpenFluxShare.validate(OpenFluxShare.decode(av)) })
+        assertTrue(OpenFluxLink.parse("openflux://telemost?url=https%3A%2F%2Ftelemost.yandex.ru%2Fj%2F1") != null)
+    }
+
     private fun code(f: () -> Unit): String = try { f(); "ok" } catch (e: OpenFluxShare.ShareException) { e.code }
 }

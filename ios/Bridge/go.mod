@@ -207,8 +207,8 @@ require (
 // поэтому оба берутся из клона закреплённого коммита (build.sh кладёт его в third_party/OpenFlux).
 replace (
 	github.com/p1neappleXpress/OpenFlux => ./third_party/OpenFlux
-	// OpenFlux 0.4.2 ждёт pion transport/v5, а olcRTC собран на v4: в одном бинарнике — одна версия pion (как у olcRTC);
-	// OpenFlux использует только webrtc/v4 (oneme).
+	// OpenFlux (0.4.2–0.7.3) ждёт pion transport/v5, а olcRTC собран на v4: в одном бинарнике — одна версия pion (как у olcRTC);
+	// OpenFlux использует webrtc/v4 (oneme) и с 0.7.3 rtp/rtcp/sdp (Telemost) — сборка под darwin/arm64 с этими версиями проверена.
 	github.com/pion/datachannel => github.com/pion/datachannel v1.6.0
 	github.com/pion/dtls/v3 => github.com/pion/dtls/v3 v3.1.4
 	github.com/pion/ice/v4 => github.com/pion/ice/v4 v4.2.7

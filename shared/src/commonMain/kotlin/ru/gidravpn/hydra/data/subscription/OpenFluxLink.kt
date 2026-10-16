@@ -17,14 +17,14 @@ import java.net.URLEncoder
  *
  *   openflux://<transport>?url=<url>&maxToken=<t>&maxUid=<u>&codec=<batched|legacy>&key=<секрет>#<имя>
  *
- * transport: yandex | vyandex | oneme | cupsonline | mailru | direct (обычный TCP до своего exit-узла: `url=host:port`). Для `oneme` вместо url — maxToken и maxUid.
+ * transport: yandex | vyandex | oneme | cupsonline | avito | mailru | telemost | direct (обычный TCP до своего exit-узла: `url=host:port`). Для `oneme` вместо url — maxToken и maxUid.
  * key — общий секрет шифрования AES-256-GCM (`--encryption-key-file`), необязателен.
  * Соответствие профилю: transport = transport, address = url, uuidOrPassword = key,
  * extra = {maxToken, maxUid, codec}; порт не используется (0).
  */
 object OpenFluxLink {
 
-    val TRANSPORTS = listOf("yandex", "vyandex", "oneme", "cupsonline", "mailru", "direct")
+    val TRANSPORTS = listOf("yandex", "vyandex", "oneme", "cupsonline", "avito", "mailru", "telemost", "direct")
 
     /** Код ошибки ядра (`damaged`, `short_secret`, …) для ссылки `openflux://v1/`, которую нельзя использовать; null — всё в порядке. */
     fun errorCode(link: String): String? {
