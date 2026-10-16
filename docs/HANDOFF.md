@@ -73,7 +73,7 @@
 ## Открытые задачи (TODO)
 
 1. ✅ **Нативные ядра** (`docs/BUILD.md`) — все собраны и входят в full-APK (состояние на 0.7.15): `libbox.aar` (sing-box 1.12.25),
-   `libXray.aar` (Xray 26.9.30), AmneziaWG (`libwg-go.so`, v3.1.20260828), `libolcrtc.so`, `libopenflux.so` (v0.4.2), `libciadpi.so` (ByeDPI 0.17.3).
+   `libXray.aar` (Xray 26.10.10, `scripts/fetch-libxray.sh`), AmneziaWG (`libwg-go.so`, v3.1.20260828), `libolcrtc.so`, `libopenflux.so` (v0.4.2), `libciadpi.so` (ByeDPI 0.17.3).
    Сборка — `scripts/build-*.sh` (результаты в `app/libs/`, в git не входят); сверка версий — `scripts/check-updates.sh` перед каждым релизом;
    WDTT не берём. Перед `release.sh` пересобирать OpenFlux и olcRTC (устаревший клиент уже уходил в релиз).
 2. **On-device проверка SSTP/L2TP**: согласование PPP, MS-CHAPv2, IPCP, SNAT/чек-суммы

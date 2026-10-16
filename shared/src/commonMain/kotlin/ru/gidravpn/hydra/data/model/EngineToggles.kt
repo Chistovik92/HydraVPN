@@ -46,7 +46,7 @@ data class EngineToggles(
      * есть в сборке. Сервер Xray-core ≥ 26.9.8 (его ставит 3x-ui v3.10, проверено на стенде: Xray 26.10.10) требует в ClientHello
      * гибридный ключ X25519MLKEM768, а sing-box (все версии, в т. ч. 1.12.25 приложения) его не шлёт — сервер молча отдаёт сайт
      * маскировки, и подключение «подключено, 12 КБ и тишина» (sing-box: «reality verification failed»; SagerNet/sing-box#4520).
-     * Xray-core Hydra (26.9.30) этот ключ шлёт — на стенде через тот же инбаунд 1,9 МБ за 1,3 с.
+     * Xray-core Hydra (26.9.30, с 0.8.2-b — 26.10.10) этот ключ шлёт — на стенде через тот же инбаунд 1,9 МБ за 1,3 с.
      */
     fun engineFor(profile: ServerProfile, xrayAvailable: Boolean): Kind? {
         val k = engineFor(profile.protocol, xrayAvailable)

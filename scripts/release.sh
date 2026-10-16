@@ -62,7 +62,12 @@ echo "    libbox.aar на месте"
 [[ -f app/libs/libXray.aar ]] || err \
 "нет app/libs/libXray.aar — в full-APK не будет ядра Xray.
        Соберите его по docs/BUILD.md (раздел 2.2) или положите готовый .aar."
-echo "    libXray.aar на месте"
+# Xray в AAR — тот же коммит, что закреплён в scripts/fetch-libxray.sh (и у ПК): иначе уедет старое ядро (как OpenFlux в 0.7.8).
+XRAY_COMMIT="$(sed -n 's/^LIBXRAY_XRAY_COMMIT="\([0-9a-f]*\)".*/\1/p' scripts/fetch-libxray.sh | head -1)"
+unzip -p app/libs/libXray.aar jni/arm64-v8a/libgojni.so | grep -ac "xtls/xray-core.*$XRAY_COMMIT" >/dev/null || err \
+"в app/libs/libXray.aar не Xray-core $XRAY_COMMIT — ядро устарело.
+       Обновите: scripts/fetch-libxray.sh"
+echo "    libXray.aar на месте (Xray-core $XRAY_COMMIT)"
 
 [[ -f keystore.properties ]] || err \
 "нет keystore.properties в корне проекта — без него release-сборка уйдёт
