@@ -193,7 +193,7 @@ if ($oldW) {
     Run-As "${n}: старая" "msiexec.exe" @("/i", "`"$oldW`"", "/qn", "/l*v", "`"$work\$n-old.log`"")
     $h = Start-Hydra $elev
     Run-As $n "msiexec.exe" @("/i", "`"$msiW`"", "/qn", "/l*v", "`"$work\$n.log`"")
-    Snapshot "$n: после установки"
+    Snapshot "${n}: после установки"
     Stop-Tree $h.Id
     Start-Sleep 3
     Check-Installed $n

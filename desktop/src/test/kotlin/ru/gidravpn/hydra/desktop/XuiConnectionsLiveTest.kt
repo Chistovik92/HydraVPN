@@ -51,6 +51,8 @@ class XuiConnectionsLiveTest {
                     val link = api.links("hydra-1").firstOrNull { l -> ":$portN" in l.substringBefore("#") || ":$portN" in unwrap(l) || "\"$portN\"" in unwrap(l) || "\"port\": $portN" in unwrap(l) }
                         ?: error("панель не выдала ссылку на порт $portN: ${api.links("hydra-1").map { it.take(40) }}")
                     println("LINK ${type.name}: " + link.replace(Regex("(pbk|password|auth|PrivateKey|privatekey)=[^&\\s]+"), "$1=…").take(260))
+                    // 0.8.2-a4: полные ссылки — в файл для проверки на эмуляторе Android (AmneziaWG); в журнал не попадают
+                    System.getenv("HYDRA_XUI_LINKS_OUT")?.let { java.io.File(it).appendText("${type.name} $link\n") }
                     var prof = LinkParser.parseLine(link) ?: LinkParser.parseSubscription(link).firstOrNull() ?: error("Hydra не разобрала ссылку")
                     if (type.needsCert) prof = prof.copy(extra = JSONObject(prof.extra).put("insecure", true).toString())
                     val engine = EngineToggles().engineFor(prof, true)
