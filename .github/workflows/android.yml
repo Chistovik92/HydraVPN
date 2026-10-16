@@ -43,6 +43,16 @@ jobs:
         run: ./gradlew :app:testStubDebugUnitTest --stacktrace
       - name: Assemble stub (no native .aar required)
         run: ./gradlew :app:assembleStubDebug --stacktrace
+      # Долг 0.8.1 (0.8.2-a4): фикс http-подписок в rc1 не действовал в release — манифест не ссылался на
+      # network_security_config, а debug разрешает http сам. Проверяем именно собранный release-манифест.
+      - name: Release manifest keeps networkSecurityConfig (http subscriptions)
+        run: |
+          ./gradlew :app:processStubReleaseManifest --stacktrace
+          M=$(find app/build/intermediates -path '*stubRelease*' -name AndroidManifest.xml | grep -i merged | head -1)
+          echo "манифест: $M"
+          test -n "$M"
+          grep -q 'android:networkSecurityConfig="@xml/network_security_config"' "$M" || { echo "в release-манифесте нет networkSecurityConfig"; exit 1; }
+          grep -q 'cleartextTrafficPermitted="true"' app/src/main/res/xml/network_security_config.xml || { echo "network_security_config не разрешает http"; exit 1; }
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
