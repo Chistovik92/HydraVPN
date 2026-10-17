@@ -108,9 +108,11 @@ data class RouterSubscription(
 data class RouterSection(
     val name: String, val label: String, val enabled: Boolean, val action: String, val provider: String,
     val raw: JSONObject? = null,
+    /** Роутер 1.3.0+ (возможность sections.unmask) сам возвращает скрытые ключи на место при записи раздела. */
+    val serverUnmasks: Boolean = false,
 ) {
-    /** Ссылки и JSON исходящих роутер отдаёт замаскированными («********»): записать такой раздел обратно значило бы стереть ключи. */
-    val editable: Boolean get() = raw == null || listOf("selector_proxy_links", "outbound_jsons").none { k ->
+    /** Ссылки и JSON исходящих роутер отдаёт замаскированными («********»): до 1.3.0 запись такого раздела стёрла бы ключи. */
+    val editable: Boolean get() = serverUnmasks || raw == null || listOf("selector_proxy_links", "outbound_jsons").none { k ->
         raw.optJSONArray(k)?.let { a -> (0 until a.length()).any { a.optString(it).isNotEmpty() } } == true
     }
     fun list(key: String): List<String> = raw?.optJSONArray(key)?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
@@ -118,6 +120,40 @@ data class RouterSection(
 }
 
 data class RouterLogEntry(val time: String, val level: String, val message: String)
+
+/** Что умеет роутер (/api/v1/capabilities, 1.3.0+); у старых роутеров — пусто, и приложение прячет новое. */
+data class RouterCapabilities(val api: Int = 0, val features: Set<String> = emptySet(), val providers: List<String> = emptyList()) {
+    fun has(feature: String) = feature in features
+}
+
+/** Ядро роутера: sing-box, xray, openflux, olcrtc, amneziawg. */
+data class RouterCore(
+    val name: String, val binary: String, val installed: String, val managed: Boolean, val selectable: Boolean,
+    val kept: List<String>, val installState: String, val installVersion: String, val installError: String,
+    val downloaded: Long, val size: Long,
+)
+
+data class RouterRelease(val version: String, val prerelease: Boolean)
+
+/** Правило маршрутизации (rules: в конфиге роутера); [raw] — как отдал роутер, правка идёт поверх него. */
+data class RouterRule(val index: Int, val raw: JSONObject) {
+    val section: String get() = raw.optString("section")
+    val enabled: Boolean get() = raw.optBoolean("enabled")
+    fun list(key: String): List<String> = raw.optJSONArray(key)?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+    /** Краткое описание: домены, адреса, порт. */
+    val summary: String get() = listOf("domain_suffix", "domain", "domain_keyword", "domain_regex", "destination", "source", "geosite", "geoip")
+        .flatMap(::list).plus(listOfNotNull(raw.optString("port").takeIf { it.isNotBlank() }?.let { "порт $it" }))
+        .joinToString(", ").ifBlank { "без условий" }.take(160)
+}
+
+/** Список доменов и адресов (community_lists: в конфиге роутера). */
+data class RouterList(val raw: JSONObject) {
+    val name: String get() = raw.optString("name")
+    val url: String get() = raw.optString("url")
+    val entries: List<String> get() = raw.optJSONArray("entries")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+}
+
+data class RouterSms(val id: String, val modem: String, val from: String, val time: String, val text: String)
 
 /**
  * Клиент управляющего API роутера (`/api/v1/…`, docs/API.md проекта роутера). Только
@@ -202,6 +238,73 @@ class RouterClient(val link: RouterLink, private val timeoutMs: Int = 10_000) {
         request("DELETE", "/api/v1/sections/$name", null)
     }
 
+    // ------------------------------------------------------------ 1.3.0+: полное управление
+
+    /** У роутера до 1.3.0 эндпоинта нет — возвращаем пустые возможности. */
+    fun capabilities(): RouterCapabilities = try {
+        val o = obj(get("/api/v1/capabilities"))
+        RouterCapabilities(o.optInt("api"), o.optJSONArray("features").strings().toSet(), o.optJSONArray("providers").strings())
+    } catch (e: RouterException) {
+        if (e.code == 404) RouterCapabilities() else throw e
+    }
+
+    fun replaceSubscription(index: Int, sub: JSONObject) { request("PUT", "/api/v1/subscriptions/$index", sub) }
+
+    /** Самообновление роутера: current, latest, update_available, state, прогресс, error, supported. */
+    fun updateStatus(): JSONObject = obj(get("/api/v1/update"))
+    fun updateCheck(): JSONObject = obj(post("/api/v1/update/check", null))
+    /** [version] — конкретная версия (в том числе старая: откат); null — последняя. */
+    fun updateInstall(version: String?) {
+        post("/api/v1/update", JSONObject().apply { if (!version.isNullOrBlank()) put("version", version) })
+    }
+
+    // Серверы (входящие подключения на роутере): поля как в servers: конфига.
+    fun servers(): List<JSONObject> = arr(get("/api/v1/servers")).objects()
+    fun addServer(server: JSONObject) { post("/api/v1/servers", server) }
+    fun replaceServer(name: String, server: JSONObject) { request("PUT", "/api/v1/servers/${seg(name)}", server) }
+    fun deleteServer(name: String) { request("DELETE", "/api/v1/servers/${seg(name)}", null) }
+
+    // Правила маршрутизации.
+    fun rules(): List<RouterRule> = arr(get("/api/v1/rules")).objects().map { o ->
+        RouterRule(o.optInt("index"), JSONObject(o.toString()).apply { remove("index") })
+    }
+    fun addRule(rule: JSONObject) { post("/api/v1/rules", rule) }
+    fun replaceRule(index: Int, rule: JSONObject) { request("PUT", "/api/v1/rules/$index", rule) }
+    fun deleteRule(index: Int) { request("DELETE", "/api/v1/rules/$index", null) }
+
+    // Списки доменов и адресов.
+    fun lists(): List<RouterList> = arr(get("/api/v1/lists")).objects().map(::RouterList)
+    fun addList(list: JSONObject) { post("/api/v1/lists", list) }
+    fun replaceList(name: String, list: JSONObject) { request("PUT", "/api/v1/lists/${seg(name)}", list) }
+    fun deleteList(name: String) { request("DELETE", "/api/v1/lists/${seg(name)}", null) }
+
+    /** Настройки роутера по ключам; длительности — строками ("24h0m0s"), токены замаскированы. */
+    fun settings(): JSONObject = obj(get("/api/v1/settings"))
+    /** Меняет только переданные ключи (POST — то же, что PATCH: у HttpURLConnection нет PATCH). */
+    fun patchSettings(patch: JSONObject) { post("/api/v1/settings", patch) }
+
+    // Ядра и их версии.
+    fun cores(): List<RouterCore> = arr(get("/api/v1/cores")).objects().map { o ->
+        val inst = o.optJSONObject("install") ?: JSONObject()
+        RouterCore(o.optString("name"), o.optString("binary"), o.optString("installed"), o.optBoolean("managed"),
+            o.optBoolean("selectable"), o.optJSONArray("kept_versions").strings(), inst.optString("state", "idle"),
+            inst.optString("version"), inst.optString("error"), inst.optLong("downloaded_bytes"), inst.optLong("size_bytes"))
+    }
+    fun coreVersions(name: String): List<RouterRelease> = arr(get("/api/v1/cores/${seg(name)}/versions")).objects()
+        .map { RouterRelease(it.optString("version"), it.optBoolean("prerelease")) }
+    /** [version]: x.y.z, latest (последняя стабильная) или beta (самая новая). */
+    fun installCore(name: String, version: String) {
+        post("/api/v1/cores/${seg(name)}/install", JSONObject().put("version", version))
+    }
+
+    // SMS с модема роутера.
+    fun sms(): Pair<List<String>, List<RouterSms>> = obj(get("/api/v1/sms")).let { o ->
+        o.optJSONArray("modems").strings() to (o.optJSONArray("messages") ?: JSONArray()).objects().map {
+            RouterSms(it.optString("id"), it.optString("modem"), it.optString("from"), it.optString("time"), it.optString("text"))
+        }
+    }
+    fun sendSms(to: String, text: String) { post("/api/v1/sms", JSONObject().put("to", to).put("text", text)) }
+
     // ------------------------------------------------------------ аккаунт бота «Радар» на самом роутере
 
     /** `{"linked":true,"server":"…","username":"…"}`; токен роутер никогда не отдаёт. */
@@ -269,6 +372,13 @@ class RouterClient(val link: RouterLink, private val timeoutMs: Int = 10_000) {
     private fun obj(s: String) = JSONObject(s)
     private fun arr(s: String) = if (s.isBlank() || s.trim() == "null") JSONArray() else JSONArray(s)
     private fun JSONArray.objects() = (0 until length()).mapNotNull { optJSONObject(it) }
+    private fun JSONArray?.strings(): List<String> = this?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+
+    /** Имя в пути (/servers/{name}): кодируется, чтобы пробелы и «/» не ломали адрес. */
+    private fun seg(name: String): String {
+        require(name.isNotBlank() && name.length <= 128) { "имя" }
+        return URLEncoder.encode(name, "UTF-8").replace("+", "%20")
+    }
 
     companion object {
         private const val MAX_RESPONSE = 4 shl 20

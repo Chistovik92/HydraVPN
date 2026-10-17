@@ -77,9 +77,17 @@ fun RoutersScreen(vm: MainViewModel, rvm: RoutersViewModel = viewModel()) {
             if (current != null) {
                 item { Actions(current, r, m) { confirm = it } }
                 item { StatusCard(current, r) }
+                // Роутер 1.3.0+: по его возможностям (capabilities); у старых роутеров этих карточек нет.
+                if (r.caps.has("update")) item { UpdateCard(r, m) { confirm = it } }
                 item { NodesCard(r, m) }
-                item { SectionsCard(r) }
+                item { SectionsCard(r, m) }
+                if (r.caps.has("rules")) item { RulesCard(r, m) { confirm = it } }
+                if (r.caps.has("lists")) item { ListsCard(r, m) { confirm = it } }
                 item { SubscriptionsCard(vm, r, m) { confirm = it } }
+                if (r.caps.has("servers")) item { ServersCard(r, m) { confirm = it } }
+                if (r.caps.has("cores")) item { CoresCard(r, m) { confirm = it } }
+                if (r.caps.has("settings")) item { SettingsCard(r, m) }
+                if (r.caps.has("sms")) item { SmsCard(r, m) }
                 item { LogCard(r) }
             }
         }
@@ -231,15 +239,209 @@ private fun NodesCard(r: RouterUi, m: RouterManager) = Card {
 }
 
 @Composable
-private fun SectionsCard(r: RouterUi) = Card {
+private fun SectionsCard(r: RouterUi, m: RouterManager) = Card {
     Label(stringResource(R.string.rt_sections))
     if (r.sections.isEmpty()) Text(stringResource(R.string.rt_sections_empty), color = TextMuted, fontSize = 12.sp)
     val off = stringResource(R.string.rt_section_off)
     r.sections.forEach { s ->
-        Column(Modifier.padding(vertical = 3.dp)) {
-            Text(s.title, color = TextPrimary, fontSize = 13.sp)
-            Text("${s.action} · ${s.provider}" + if (s.enabled) "" else " · $off", color = TextMuted, fontSize = 12.sp)
+        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(s.title, color = TextPrimary, fontSize = 13.sp)
+                Text("${s.action} · ${s.provider}" + if (s.enabled) "" else " · $off", color = TextMuted, fontSize = 12.sp)
+            }
+            // Включить/выключить раздел (роутер 1.3.0 сам сохранит скрытые ключи раздела).
+            if (s.editable) Chip(stringResource(if (s.enabled) R.string.rt_disable else R.string.rt_enable), TextSecondary) {
+                if (!r.busy) m.setSectionEnabled(s, !s.enabled)
+            }
         }
+    }
+}
+
+private fun csv(s: String) = s.split(',', '\n').map { it.trim() }.filter { it.isNotEmpty() }
+
+@Composable
+private fun UpdateCard(r: RouterUi, m: RouterManager, ask: (Pending) -> Unit) = Card {
+    Label(stringResource(R.string.rt_update))
+    val u = r.update ?: return@Card
+    Text(stringResource(R.string.rt_update_info, u.optString("current"), u.optString("latest").ifBlank { "?" }), color = TextPrimary, fontSize = 13.sp)
+    u.optString("error").takeIf { it.isNotBlank() }?.let { Text(it, color = Danger, fontSize = 12.sp) }
+    val q = stringResource(R.string.rt_update_q, u.optString("latest"))
+    val msg = stringResource(R.string.rt_update_msg)
+    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Chip(stringResource(R.string.rt_update_check), TextSecondary) { if (!r.busy) m.checkUpdate() }
+        if (u.optBoolean("update_available")) Chip(stringResource(R.string.rt_update_install), AccentCyan) {
+            if (!r.busy) ask(Pending(q, msg) { m.installUpdate(null) })
+        }
+    }
+}
+
+@Composable
+private fun CoresCard(r: RouterUi, m: RouterManager, ask: (Pending) -> Unit) = Card {
+    Label(stringResource(R.string.rt_cores))
+    Text(stringResource(R.string.rt_cores_hint), color = TextMuted, fontSize = 12.sp)
+    val none = stringResource(R.string.rt_core_not_installed)
+    val msg = stringResource(R.string.rt_core_install_msg)
+    val qFmt = stringResource(R.string.rt_core_install_q)
+    r.cores.forEach { core ->
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(core.name, color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                Text(core.installed.ifBlank { none } + if (core.installState != "idle") " · ${core.installState} ${core.installError}" else "",
+                    color = TextMuted, fontSize = 12.sp)
+            }
+            if (core.selectable) Chip(stringResource(R.string.rt_core_versions), TextSecondary) { if (!r.busy) m.loadCoreVersions(core.name) }
+        }
+        r.coreVersions[core.name]?.let { rels ->
+            val choices = listOf("latest" to stringResource(R.string.rt_core_latest), "beta" to stringResource(R.string.rt_core_beta)) +
+                rels.take(10).map { it.version to it.version + if (it.prerelease) " β" else "" }
+            Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                choices.forEach { (v, t) ->
+                    Chip(t, AccentViolet, selected = v == core.installed) {
+                        if (!r.busy) ask(Pending(qFmt.format(core.name, t), msg) { m.installCore(core.name, v) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RulesCard(r: RouterUi, m: RouterManager, ask: (Pending) -> Unit) = Card {
+    Label(stringResource(R.string.rt_rules))
+    if (r.rules.isEmpty()) Text(stringResource(R.string.rt_rules_empty), color = TextMuted, fontSize = 12.sp)
+    val delMsg = stringResource(R.string.rt_delete_msg)
+    val delFmt = stringResource(R.string.rt_delete_q)
+    r.rules.forEach { rule ->
+        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("→ ${rule.section}" + if (rule.enabled) "" else " · ${stringResource(R.string.rt_section_off)}", color = TextPrimary, fontSize = 13.sp)
+                Text(rule.summary, color = TextMuted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Chip(stringResource(R.string.rt_delete), Danger) { if (!r.busy) ask(Pending(delFmt.format(rule.summary), delMsg) { m.deleteRule(rule.index) }) }
+        }
+    }
+    if (r.sections.isEmpty()) return@Card
+    var section by remember(r.sections) { mutableStateOf(r.sections.first().name) }
+    var domains by remember { mutableStateOf("") }
+    Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        r.sections.forEach { s -> Chip(s.title, TextSecondary, selected = section == s.name) { section = s.name } }
+    }
+    Field(stringResource(R.string.rt_rule_domains), domains) { domains = it }
+    if (domains.isNotBlank()) Box(Modifier.padding(top = 8.dp)) {
+        Chip(stringResource(R.string.rt_rule_add), AccentCyan) {
+            if (!r.busy) {
+                m.saveRule(null, org.json.JSONObject().put("section", section).put("enabled", true).put("domain_suffix", org.json.JSONArray(csv(domains))))
+                domains = ""
+            }
+        }
+    }
+}
+
+@Composable
+private fun ListsCard(r: RouterUi, m: RouterManager, ask: (Pending) -> Unit) = Card {
+    Label(stringResource(R.string.rt_lists))
+    val delMsg = stringResource(R.string.rt_delete_msg)
+    val delFmt = stringResource(R.string.rt_delete_q)
+    r.lists.forEach { l ->
+        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(l.name, color = TextPrimary, fontSize = 13.sp)
+                Text(l.url.ifBlank { l.entries.joinToString(", ") }, color = TextMuted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Chip(stringResource(R.string.rt_delete), Danger) { if (!r.busy) ask(Pending(delFmt.format(l.name), delMsg) { m.deleteList(l.name) }) }
+        }
+    }
+    var name by remember { mutableStateOf("") }
+    var entries by remember { mutableStateOf("") }
+    Spacer(Modifier.height(6.dp))
+    Field(stringResource(R.string.rt_list_name), name) { name = it.filter { c -> c.isLetterOrDigit() || c in "_.-" } }
+    Spacer(Modifier.height(6.dp))
+    Field(stringResource(R.string.rt_list_entries), entries) { entries = it }
+    if (name.isNotBlank() && entries.isNotBlank()) Box(Modifier.padding(top = 8.dp)) {
+        Chip(stringResource(R.string.rt_list_add), AccentCyan) {
+            if (!r.busy) {
+                m.saveList(null, org.json.JSONObject().put("name", name).put("type", "domain").put("entries", org.json.JSONArray(csv(entries))))
+                name = ""; entries = ""
+            }
+        }
+    }
+}
+
+@Composable
+private fun ServersCard(r: RouterUi, m: RouterManager, ask: (Pending) -> Unit) = Card {
+    Label(stringResource(R.string.rt_servers))
+    val delMsg = stringResource(R.string.rt_delete_msg)
+    val delFmt = stringResource(R.string.rt_delete_q)
+    val off = stringResource(R.string.rt_section_off)
+    r.servers.forEach { s ->
+        val name = s.optString("name")
+        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(name + if (s.optBoolean("enabled")) "" else " · $off", color = TextPrimary, fontSize = 13.sp)
+                Text(stringResource(R.string.rt_server_info, s.optString("protocol"), s.optInt("listen_port")), color = TextMuted, fontSize = 12.sp)
+            }
+            Chip(stringResource(if (s.optBoolean("enabled")) R.string.rt_disable else R.string.rt_enable), TextSecondary) {
+                // Секреты сервера приходят замаскированными — роутер 1.3.0 оставит их прежними.
+                if (!r.busy) m.saveServer(name, org.json.JSONObject(s.toString()).put("enabled", !s.optBoolean("enabled")))
+            }
+            Spacer(Modifier.width(6.dp))
+            Chip(stringResource(R.string.rt_delete), Danger) { if (!r.busy) ask(Pending(delFmt.format(name), delMsg) { m.deleteServer(name) }) }
+        }
+    }
+}
+
+@Composable
+private fun SettingsCard(r: RouterUi, m: RouterManager) = Card {
+    Label(stringResource(R.string.rt_settings))
+    val s = r.settings ?: return@Card
+    @Composable
+    fun toggle(key: String, title: String) {
+        if (s.has(key)) Box(Modifier.padding(top = 6.dp)) {
+            Chip((if (s.optBoolean(key)) "✓ " else "") + title, TextSecondary, selected = s.optBoolean(key)) { if (!r.busy) m.setSetting(key, !s.optBoolean(key)) }
+        }
+    }
+    toggle("disable_quic", stringResource(R.string.rt_set_quic))
+    toggle("exclude_ntp", stringResource(R.string.rt_set_ntp))
+    toggle("enable_ipv6", stringResource(R.string.rt_set_ipv6))
+    if (!s.has("telegram_bot_token")) return@Card
+    Text(stringResource(R.string.rt_telegram), color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+    var token by remember { mutableStateOf("") }
+    var chats by remember(s) {
+        mutableStateOf(s.optJSONArray("telegram_chat_ids")?.let { a -> (0 until a.length()).joinToString(", ") { a.optLong(it).toString() } }.orEmpty())
+    }
+    Spacer(Modifier.height(6.dp))
+    Field(stringResource(R.string.rt_tg_token), token, secret = true) { token = it.trim() }
+    if (token.contains(':')) Box(Modifier.padding(top = 6.dp)) {
+        Chip(stringResource(R.string.rt_save), AccentCyan) { if (!r.busy) { m.setSetting("telegram_bot_token", token); token = "" } }
+    }
+    Spacer(Modifier.height(6.dp))
+    Field(stringResource(R.string.rt_tg_chats), chats) { chats = it }
+    Box(Modifier.padding(top = 6.dp)) {
+        Chip(stringResource(R.string.rt_save), AccentCyan) { if (!r.busy) m.setSetting("telegram_chat_ids", csv(chats).mapNotNull { it.toLongOrNull() }) }
+    }
+    toggle("telegram_via_proxy", stringResource(R.string.rt_tg_proxy))
+    toggle("sms_forward", stringResource(R.string.rt_sms_forward))
+}
+
+@Composable
+private fun SmsCard(r: RouterUi, m: RouterManager) = Card {
+    Label(stringResource(R.string.rt_sms))
+    if (r.smsModems.isEmpty()) {
+        Text(stringResource(R.string.rt_sms_none), color = TextMuted, fontSize = 12.sp)
+        return@Card
+    }
+    r.sms.takeLast(10).reversed().forEach { s ->
+        Text("${s.from} · ${s.time}", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 6.dp))
+        Text(s.text, color = TextPrimary, fontSize = 13.sp)
+    }
+    var to by remember { mutableStateOf("") }
+    var text by remember { mutableStateOf("") }
+    Spacer(Modifier.height(8.dp))
+    Field(stringResource(R.string.rt_sms_to), to) { to = it.filter { c -> c.isDigit() || c == '+' } }
+    Spacer(Modifier.height(6.dp))
+    Field(stringResource(R.string.rt_sms_text), text) { text = it }
+    if (to.length >= 3 && text.isNotBlank()) Box(Modifier.padding(top = 8.dp)) {
+        Chip(stringResource(R.string.rt_sms_send), AccentCyan) { if (!r.busy) { m.sendSms(to, text); text = "" } }
     }
 }
 
