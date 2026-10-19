@@ -72,6 +72,7 @@ class CoreRunner(
     @Synchronized
     fun start(session: Int, configJson: String, mode: ConnectionMode, xrayConfig: String? = null, xraySocksPort: Int = 0, sidecar: Sidecar? = null, extraSidecars: List<Sidecar> = emptyList()) {
         check(singBox?.alive != true && xray?.alive != true) { "ядро уже запущено" }
+        aborting = false
         val core = Platform.bundledCore()
             ?: error("Не найдено ядро sing-box в пакете приложения — переустановите Hydra")
         val dir = Platform.runDir
@@ -147,15 +148,19 @@ class CoreRunner(
     @Synchronized
     fun stop() {
         AppNet.clear()   // трафик Hydra снова напрямую: прокси ядра больше нет
-        singBox?.stop()
-        singBox = null
-        xray?.stop()
-        xray = null
+        // Каждый шаг отдельно, а ссылки сбрасываем до остановки: сбой одного (macOS: отказ в пароле при остановке
+        // корневого ядра) раньше обрывал stop() — остальные ядра и секреты оставались.
+        val sb = singBox; singBox = null
+        runCatching { sb?.stop() }
+        val xr = xray; xray = null
+        runCatching { xr?.stop() }
         extra.forEach { runCatching { it.stop() } }
         extra.clear()
         synchronized(this) { inProcess.forEach { runCatching { it.close() } }; inProcess.clear() }
         sidecarSecrets.forEach { runCatching { it.delete() } }
         sidecarSecrets = emptyList()
+        // Конфиги с UUID и паролями серверов нужны только работающему ядру.
+        listOf("config.json", "xray.json").forEach { runCatching { File(Platform.runDir, it).delete() } }
         // 0.8.0-rc2: в портативной Windows-сборке sing-box и Xray оставались в диспетчере задач после «Отключить» и выхода.
         // Добиваем всё, что запускали мы (с деревом), и любые процессы с путями наших ядер.
         spawned.toList().forEach { p -> runCatching { killTree(p) }; spawned.remove(p) }
@@ -164,10 +169,14 @@ class CoreRunner(
 
     private fun ownBinaries(): List<File> = listOfNotNull(Platform.bundledCore(), Platform.bundledXray(), Platform.bundledOpenFlux(), Platform.bundledOlcRtc(), Platform.bundledByeDpi())
 
+    /** «Отключить» во время запуска: ожидание готовности дочернего клиента (до 45 с) прерывается сразу, а не держит монитор. */
+    @Volatile private var aborting = false
+    fun abortStart() { aborting = true }
+
     private fun waitPort(port: Int, h: Handle, timeoutMs: Long = 8000): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
-            if (!h.alive) return false
+            if (!h.alive || aborting) return false
             val open = runCatching {
                 Socket(Proxy.NO_PROXY).use { it.connect(InetSocketAddress("127.0.0.1", port), 300) }
             }.isSuccess
@@ -191,6 +200,13 @@ class CoreRunner(
             killStale(XRAY_PID, "xray")
             killStale(SIDECAR_PID, "olcrtc", "openflux")
             (0 until 24).forEach { killStale("sidecar-$it.pid", "olcrtc", "openflux", "ciadpi") }
+            // Остатки прошлого запуска, если Hydra упала: конфиги с паролями серверов и ключи клиентов узлов.
+            runCatching {
+                Platform.runDir.listFiles()?.filter {
+                    it.name == "config.json" || it.name == "xray.json" ||
+                        (it.name.startsWith("openflux-") && it.name.endsWith(".key")) || (it.name.startsWith("olcrtc-client-") && it.name.endsWith(".yaml"))
+                }?.forEach { runCatching { it.delete() } }
+            }
         }
 
         /** Завершает процесс вместе с потомками; на Windows `destroy()` потомков не трогает. */

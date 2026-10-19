@@ -23,6 +23,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.filled.Search
@@ -191,14 +195,25 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
             Status.ERROR -> Danger
             Status.DISCONNECTED -> MaterialTheme.colorScheme.onSurfaceVariant
         }
+        // Сервера нет — ведём туда, где его берут, а не показываем «Выберите сервер».
+        val tapRing = { if (ui.selected == null && !ui.active) openServers() else c.toggle() }
+        // 0.8.2-rc1: «Управление с клавиатуры». Выключено (по умолчанию) — кольцо не берёт фокус, Пробел и Enter его не нажимают;
+        // раньше `clickable` делал кольцо фокусируемым, и случайный пробел включал или отключал VPN.
+        val keyboard = settings.keyboardControl
+        val ringFocus = remember { FocusRequester() }
+        LaunchedEffect(keyboard) { if (keyboard) runCatching { ringFocus.requestFocus() } }
+        val ringInput = if (keyboard) {
+            Modifier.focusRequester(ringFocus).clickable(enabled = ui.status != Status.STOPPING, onClick = tapRing)
+        } else {
+            Modifier.pointerInput(ui.status, ui.selected, ui.active) {
+                detectTapGestures { if (ui.status != Status.STOPPING) tapRing() }
+            }
+        }
         Box(
             Modifier.size(180.dp).clip(CircleShape)
                 .border(6.dp, ringColor, CircleShape)
                 .background(MaterialTheme.colorScheme.surface)
-                .clickable(enabled = ui.status != Status.STOPPING) {
-                    // Сервера нет — ведём туда, где его берут, а не показываем «Выберите сервер».
-                    if (ui.selected == null && !ui.active) openServers() else c.toggle()
-                },
+                .then(ringInput),
             contentAlignment = Alignment.Center,
         ) {
             if (ui.status == Status.CONNECTING || ui.status == Status.STOPPING) {

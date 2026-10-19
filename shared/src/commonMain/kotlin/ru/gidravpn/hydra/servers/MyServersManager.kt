@@ -72,6 +72,8 @@ data class MyServersUi(
     val stage: Stage = Stage.IDLE,
     val busy: Boolean = false,
     val fingerprint: String = "",
+    /** Отпечаток, под которым этот адрес был закреплён раньше, если сейчас сервер показал другой (смена ключей или подмена). */
+    val previousFingerprint: String = "",
     val preflight: Preflight? = null,
     val log: List<String> = emptyList(),
     val progress: String = "",
@@ -153,7 +155,11 @@ class MyServersManager(
         _ui.update { it.copy(stage = Stage.IDLE, busy = true, progress = "Подключаюсь к ${f.target.host}…", error = null, opServer = null, log = emptyList(), addedId = null) }
         scope.launch(Dispatchers.IO) {
             runCatching { SshConnector.fingerprint(f.target) }
-                .onSuccess { fp -> _ui.update { it.copy(stage = Stage.CONFIRM_FINGERPRINT, busy = false, fingerprint = fp, progress = "") } }
+                .onSuccess { fp ->
+                    val old = servers().firstOrNull { it.host.equals(f.target.host, true) && it.sshPort == f.target.port }?.fingerprint.orEmpty()
+                    _ui.update { it.copy(stage = Stage.CONFIRM_FINGERPRINT, busy = false, fingerprint = fp, progress = "",
+                        previousFingerprint = if (old.isNotBlank() && old != fp) old else "") }
+                }
                 .onFailure { e -> _ui.update { it.copy(stage = Stage.FAILED, busy = false, progress = "", error = "Не удалось подключиться по SSH: ${e.message}") } }
         }
     }
@@ -362,6 +368,7 @@ class MyServersManager(
                     _ui.update { it.copy(install = i.copy(stage = InstallStage.DONE)) }
                 }
                 is DeployResult.Failed -> {
+                    res.partial?.let { update(it) }   // панель стоит на сервере — вход не теряем
                     _ui.update { it.copy(install = i.copy(stage = InstallStage.FAILED), error = it.error ?: res.reason) }
                 }
             }

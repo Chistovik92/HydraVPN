@@ -3,7 +3,8 @@ package ru.gidravpn.hydra.servers
 /** Итог операции над сервером. */
 sealed interface DeployResult {
     data class Ok(val server: MyServer, val links: List<String> = emptyList()) : DeployResult
-    data class Failed(val reason: String) : DeployResult
+    /** [partial] — панель уже стоит на сервере: её данные сохраняем, чтобы вход не пропал (пароль и токен есть только в памяти). */
+    data class Failed(val reason: String, val partial: MyServer? = null) : DeployResult
 }
 
 /**
@@ -23,6 +24,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
      * @return обновлённая запись и нужно ли записать копию состояния на сервер (её не было — сервер поставлен rc1–rc3).
      */
     fun reconcile(s: MyServer, st: ServerStatus): Pair<MyServer, Boolean> {
+        if (!st.complete) return s to false   // оборванный вывод: не стираем AWG-клиентов, панель и узел OpenFlux
         var r = s.copy(osName = st.osName.ifBlank { s.osName }, arch = st.arch.ifBlank { s.arch })
         var writeState = false
         if (st.awgInstalled) {
@@ -201,8 +203,12 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
                 params.username, params.password, token, version, inboundId, email)
             installer.run(OtherPanels.stateSteps(panel))
             return DeployResult.Ok(srv.copy(panel = panel), sub?.let { listOf(it) } ?: links)
-        } catch (e: XuiApiException) {
-            return DeployResult.Failed("Панель установлена, но доступ создать не удалось: ${e.message}. Адрес: http://${srv.host}:$port/$path")
+        } catch (e: Exception) {
+            // Не только XuiApiException: панель другой версии отвечает иной формой JSON (JSONException и т. п.).
+            val bare = PanelInstance(PanelKind.XUI3, "$scheme://${if (srv.host.contains(':')) "[${srv.host}]" else srv.host}:$port/$path",
+                params.username, params.password, token, res["XUI_VERSION"].orEmpty().ifBlank { tag })
+            return DeployResult.Failed("Панель установлена, но доступ создать не удалось: ${e.message ?: e::class.simpleName}. Адрес: http://${srv.host}:$port/$path",
+                partial = srv.copy(panel = bare))
         }
     }
 
@@ -335,7 +341,11 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
             val ca = ssh.exec("cat ${PasarGuardPanel.NODE_CERT}").out.trim()
             api.addLocalNode(nodeKey, ca)
             onLog(if (api.waitNodeConnected()) "Нода подключена к панели" else "Нода пока не подключилась — проверьте её на сайте панели")
-        } catch (e: XuiApiException) { return DeployResult.Failed("PasarGuard: ${e.message}") }
+        } catch (e: Exception) {
+            val h = if (srv.host.contains(':')) "[${srv.host}]" else srv.host
+            return DeployResult.Failed("PasarGuard: ${e.message ?: e::class.simpleName}. Панель установлена — вход сохранён в карточке сервера",
+                partial = srv.copy(panel = PanelInstance(PanelKind.PASARGUARD, "http://$h:${PasarGuardPanel.PORT}/dashboard/", user, pass, "", "", local = true)))
+        }
         val host = if (srv.host.contains(':')) "[${srv.host}]" else srv.host
         val panel = PanelInstance(PanelKind.PASARGUARD, "http://$host:${PasarGuardPanel.PORT}/dashboard/", user, pass, "", api.version(), local = true)
         installer.run(OtherPanels.stateSteps(panel))
@@ -362,7 +372,11 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
             val gw = ssh.exec("docker network inspect remnawave-network -f '{{range .IPAM.Config}}{{.Gateway}} {{end}}'").out.trim().split(' ').firstOrNull { it.contains('.') } ?: "172.17.0.1"
             api.addLocalNode(gw)
             onLog(if (api.waitNodeConnected()) "Нода подключена к панели" else "Нода пока не подключилась — проверьте её на сайте панели")
-        } catch (e: XuiApiException) { return DeployResult.Failed("Remnawave: ${e.message}") }
+        } catch (e: Exception) {
+            val h = if (srv.host.contains(':')) "[${srv.host}]" else srv.host
+            return DeployResult.Failed("Remnawave: ${e.message ?: e::class.simpleName}. Панель установлена — вход сохранён в карточке сервера",
+                partial = srv.copy(panel = PanelInstance(PanelKind.REMNAWAVE, "http://$h:${RemnawavePanel.WEB_PORT}/", user, pass, "", RemnawavePanel.TAG, local = true)))
+        }
         val host = if (srv.host.contains(':')) "[${srv.host}]" else srv.host
         val panel = PanelInstance(PanelKind.REMNAWAVE, "http://$host:${RemnawavePanel.WEB_PORT}/", user, pass, "", RemnawavePanel.TAG, local = true)
         installer.run(OtherPanels.stateSteps(panel))

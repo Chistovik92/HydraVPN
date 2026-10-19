@@ -69,7 +69,7 @@ object OtherPanels {
         add(Step("panel-exists", "Проверить, что ${s.kind.title} и другой панели в ${s.home} ещё нет", "test ! -e ${s.home}",
             failHint = "На сервере уже стоит панель в ${s.home} — удалите её или подключите существующую"))
         add(Step("panel-fetch", "Загрузить установщик ${s.kind.title} ${p.tag} (закреплённый тег)",
-            "(curl -fsSL ${Installer.shq(scriptUrl(s, p.tag))} -o $sc || wget -q -O $sc ${Installer.shq(scriptUrl(s, p.tag))}) && chmod 700 $sc && sha256sum $sc",
+            "(curl -fsSL -m 180 ${Installer.shq(scriptUrl(s, p.tag))} -o $sc || wget -q -O $sc ${Installer.shq(scriptUrl(s, p.tag))}) && chmod 700 $sc && sha256sum $sc",
             rollback = "rm -f $sc", failHint = "Не удалось скачать установщик с GitHub"))
         val run = when (s.kind) {
             // s-ui спрашивает «изменить настройки?» — отвечаем «нет»: логин и порт задаём сами следующим шагом
@@ -113,7 +113,7 @@ object OtherPanels {
         val sql = values.entries.joinToString(" ") { (k, v) ->
             "UPDATE settings SET value='$v' WHERE key='$k'; INSERT INTO settings(key, value) SELECT '$k', '$v' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key='$k');"
         }
-        return "(command -v sqlite3 >/dev/null || (apt-get install -y -q sqlite3 || (apt-get update -q && apt-get install -y -q sqlite3) || dnf install -y sqlite || yum install -y sqlite) >/dev/null 2>&1) && " +
+        return "(command -v sqlite3 >/dev/null || (DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y -q sqlite3 || (DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 update -q && DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y -q sqlite3) || dnf install -y sqlite || yum install -y sqlite) >/dev/null 2>&1) && " +
             "sqlite3 ${dbPath(kind)} ${Installer.shq(sql)}"
     }
 

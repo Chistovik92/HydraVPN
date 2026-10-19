@@ -29,7 +29,8 @@ object SystemProxy {
     /** Включает прокси 127.0.0.1:[port]. Ошибка — текст для UI (соединение при этом работает). */
     fun enable(port: Int): Result<Unit> = runCatching {
         if (!backupFile.exists()) {
-            backupFile.writeText(backup().put("pid", ProcessHandle.current().pid()).put("port", port).toString())
+            // Атомарно: оборванная запись оставила бы усечённый JSON, а по нему restore() стёр бы прокси пользователя.
+            ru.gidravpn.hydra.desktop.Store.writePrivateAtomic(backupFile, backup().put("pid", ProcessHandle.current().pid()).put("port", port).toString())
         }
         when (Platform.os) {
             Os.WINDOWS -> { Windows.set(true, "127.0.0.1:$port"); Windows.startGuard(backupFile) }
@@ -45,7 +46,20 @@ object SystemProxy {
     fun restore() {
         val f = backupFile
         if (!f.exists()) return
-        val b = runCatching { JSONObject(f.readText()) }.getOrDefault(JSONObject())
+        val parsed = runCatching { JSONObject(f.readText()) }.getOrNull()
+        if (parsed == null || !parsed.has("pid")) {
+            // Копия нечитаема (сбой записи): «пустую» настройку не применяем — она стёрла бы чужой прокси. Гасим только свой.
+            val ok = runCatching {
+                when (Platform.os) {
+                    Os.WINDOWS -> Windows.disableIfOurs()
+                    Os.MACOS -> MacOs.restore(JSONObject())
+                    Os.LINUX -> Linux.restore(JSONObject())
+                }
+            }.isSuccess
+            if (ok) f.delete()
+            return
+        }
+        val b: JSONObject = parsed
         val ok = runCatching {
             when (Platform.os) {
                 Os.WINDOWS -> Windows.restore(b)
@@ -102,7 +116,16 @@ object SystemProxy {
          * Страж (0.7.16): скрытый PowerShell ждёт выхода Hydra и, если резервная копия этого экземпляра осталась
          * (завершение процесса, сбой, выключение ПК), сам возвращает прокси. Копия чужого pid не трогается.
          */
+        @Volatile private var guard: Process? = null
+
+        /** Резервной копии нет, а в системе стоит наш 127.0.0.1 — выключаем только его (чужой прокси не трогаем). */
+        fun disableIfOurs() {
+            if (readString("ProxyServer").startsWith("127.0.0.1:")) set(false, null, null)
+        }
+
         fun startGuard(backup: File) {
+            // Один страж на экземпляр: раньше каждое переподключение и смена сети оставляли ещё один PowerShell (по 30–60 МБ).
+            if (guard?.isAlive == true) return
             runCatching {
                 // Сценарий не лежит файлом: при запуске от администратора файл в каталоге пользователя могли бы подменить (0.7.17).
                 val head = "${'$'}ParentPid = ${ProcessHandle.current().pid()}; ${'$'}Backup = '${backup.absolutePath.replace("'", "''")}'; "
@@ -110,6 +133,7 @@ object SystemProxy {
                 ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass",
                     "-EncodedCommand", encoded)
                     .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
+                    .also { guard = it }
             }
         }
 
@@ -270,18 +294,29 @@ object SystemProxy {
     private fun which(cmd: String): Boolean =
         System.getenv("PATH").orEmpty().split(File.pathSeparator).any { File(it, cmd).canExecute() }
 
-    private fun exec(vararg cmd: String): String = runCatching {
+    private class Ran(val finished: Boolean, val exit: Int, val out: String)
+
+    /**
+     * Команда с настоящим таймаутом: вывод читается в отдельном потоке. Раньше `readText()` стоял до `waitFor(timeout)` —
+     * зависший `gsettings`/`networksetup` (нет сессии dbus) блокировал чтение до EOF, и таймаут не срабатывал.
+     */
+    private fun runBounded(timeoutSec: Long, vararg cmd: String): Ran {
         val p = ProcessBuilder(*cmd).redirectErrorStream(true).start()
-        val out = p.inputStream.bufferedReader().readText()
-        p.waitFor(10, TimeUnit.SECONDS)
-        out
-    }.getOrDefault("")
+        val buf = StringBuilder()
+        val reader = Thread { runCatching { p.inputStream.bufferedReader().forEachLine { synchronized(buf) { buf.appendLine(it) } } } }
+            .apply { isDaemon = true; start() }
+        val done = p.waitFor(timeoutSec, TimeUnit.SECONDS)
+        if (!done) p.destroyForcibly()
+        reader.join(1_000)
+        return Ran(done, if (done) p.exitValue() else -1, synchronized(buf) { buf.toString() })
+    }
+
+    private fun exec(vararg cmd: String): String = runCatching { runBounded(10, *cmd).out }.getOrDefault("")
 
     private fun execChecked(vararg cmd: String) {
-        val p = ProcessBuilder(*cmd).redirectErrorStream(true).start()
-        val out = p.inputStream.bufferedReader().readText()
-        check(p.waitFor(15, TimeUnit.SECONDS) && p.exitValue() == 0) {
-            "${cmd.first()}: ${out.trim().ifEmpty { "код ${runCatching { p.exitValue() }.getOrNull()}" }}"
+        val r = runBounded(15, *cmd)
+        check(r.finished && r.exit == 0) {
+            "${cmd.first()}: ${r.out.trim().ifEmpty { if (r.finished) "код ${r.exit}" else "нет ответа за 15 с" }}"
         }
     }
 }

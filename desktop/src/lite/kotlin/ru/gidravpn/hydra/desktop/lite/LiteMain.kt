@@ -44,7 +44,7 @@ private fun start(args: Array<String>) {
     lateinit var tray: TrayController
 
     fun quit() {
-        controller.shutdown()
+        controller.shutdownBounded()
         SingleInstance.release()
         tray.remove()
         window.dispose()

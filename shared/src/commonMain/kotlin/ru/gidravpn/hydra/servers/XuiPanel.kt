@@ -72,6 +72,7 @@ class DirectXuiTransport(private val baseUrl: String, private val token: String,
     override fun call(method: String, path: String, body: String?): String {
         val c = URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection
         c.requestMethod = method; c.connectTimeout = timeoutMs; c.readTimeout = timeoutMs
+        c.instanceFollowRedirects = false   // токен администратора не должен уходить на другой адрес по редиректу
         c.setRequestProperty("Authorization", "Bearer $token")
         if (body != null) { c.doOutput = true; c.setRequestProperty("Content-Type", "application/json"); c.outputStream.use { it.write(body.toByteArray()) } }
         val code = c.responseCode
@@ -220,7 +221,7 @@ object XuiPanel {
         add(Step("xui-exists", "Проверить, что 3x-ui на сервере ещё нет", "test ! -e /usr/local/x-ui/x-ui",
             failHint = "На сервере уже стоит 3x-ui — подключите существующую панель по адресу и токену"))
         add(Step("xui-fetch", "Загрузить установщик 3x-ui ${p.tag} (закреплённый тег)",
-            "(curl -fsSL ${Installer.shq(scriptUrl(p.tag))} -o $SCRIPT || wget -q -O $SCRIPT ${Installer.shq(scriptUrl(p.tag))}) && chmod 700 $SCRIPT && sha256sum $SCRIPT",
+            "(curl -fsSL -m 180 ${Installer.shq(scriptUrl(p.tag))} -o $SCRIPT || wget -q -O $SCRIPT ${Installer.shq(scriptUrl(p.tag))}) && chmod 700 $SCRIPT && sha256sum $SCRIPT",
             rollback = "rm -f $SCRIPT", failHint = "Не удалось скачать установщик с GitHub"))
         add(Step("xui-env", "Записать параметры установки (файл 0600; логин и пароль не показываются)",
             upload = Step.Upload(ENV_FILE, ("XUI_NONINTERACTIVE=1\nXUI_USERNAME=${p.username}\nXUI_PASSWORD=${p.password}\nXUI_PANEL_PORT=${p.port}\n" +
@@ -342,8 +343,8 @@ object XuiPanel {
             "! (ss -ltnH 2>/dev/null | awk '{print \$4}' | grep -Eq '(^|:)80\$')",
             failHint = "Порт 80 занят другой программой (веб-сервер?) — сертификат так не выдать"))
         add(Step("cert-acme", "Поставить acme.sh и socat, если их нет",
-            "(command -v socat >/dev/null || (apt-get install -y -q socat || dnf install -y socat || yum install -y socat) >/dev/null 2>&1) && " +
-                "([ -x $acme ] || curl -fsSL https://get.acme.sh | sh >/dev/null 2>&1) && [ -x $acme ]",
+            "(command -v socat >/dev/null || (DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y -q socat || dnf install -y socat || yum install -y socat) >/dev/null 2>&1) && " +
+                "([ -x $acme ] || curl -fsSL -m 180 https://get.acme.sh | sh >/dev/null 2>&1) && [ -x $acme ]",
             failHint = "Не удалось поставить acme.sh"))
         add(Step("cert-issue", "Получить сертификат Let's Encrypt для $host" + if (ip) " (на IP, 6 дней, продлевается сам)" else "",
             "$acme --set-default-ca --server letsencrypt >/dev/null && $acme --issue -d $h --standalone --server letsencrypt --httpport 80 --force" +

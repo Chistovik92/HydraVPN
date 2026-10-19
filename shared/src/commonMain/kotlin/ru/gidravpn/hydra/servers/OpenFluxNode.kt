@@ -79,7 +79,7 @@ object OpenFluxNode {
 
     fun fetchSteps(): List<Step> = listOf(
         Step("ofx-fetch", "Загрузить скрипт установки узла OpenFlux (закреплённый коммит)",
-            "(curl -fsSL ${Installer.shq(SCRIPT_URL)} -o $SCRIPT || wget -q -O $SCRIPT ${Installer.shq(SCRIPT_URL)}) && chmod 700 $SCRIPT",
+            "(curl -fsSL -m 180 ${Installer.shq(SCRIPT_URL)} -o $SCRIPT || wget -q -O $SCRIPT ${Installer.shq(SCRIPT_URL)}) && chmod 700 $SCRIPT",
             rollback = "rm -f $SCRIPT", failHint = "Не удалось скачать скрипт с GitHub"),
         Step("ofx-verify", "Проверить SHA-256 скрипта",
             "echo '$SCRIPT_SHA256  $SCRIPT' | sha256sum -c -", failHint = "Контрольная сумма скрипта не совпала — установка остановлена"),

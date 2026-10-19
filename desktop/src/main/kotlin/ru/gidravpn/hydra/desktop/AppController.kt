@@ -795,14 +795,16 @@ class AppController(
             verify(clash, sessionId, settings, engine)
             if (session == sessionId && runner.isAlive) watchNetwork(sessionId, profile, engine)
         } catch (e: NeedsElevation) {
-            runner.stop()
+            exitHandled = sessionId   // останов ядер после неудачного старта — не авария: onCoreExit не запускает цикл переподключений
+            runCatching { runner.stop() }
             extras.forEach { sc -> sc.secrets.forEach { runCatching { it.delete() } } }
             if (session == sessionId) {
                 SystemProxy.restore()
                 _ui.update { it.copy(status = Status.DISCONNECTED, statusText = "Нужны права администратора", needsElevation = true, connectedId = null, blocked = false) }
             }
         } catch (e: Exception) {
-            runner.stop()
+            exitHandled = sessionId
+            runCatching { runner.stop() }
             extras.forEach { sc -> sc.secrets.forEach { runCatching { it.delete() } } }
             if (session == sessionId) {
                 if (!keepBlocked(settings)) SystemProxy.restore()
@@ -881,6 +883,7 @@ class AppController(
         if (!st.active && !st.blocked && !SystemProxy.engaged) return
         userStopped = true
         session++
+        runner.abortStart()   // запуск ядер ещё идёт — не ждём до 45 с готовности дочернего клиента
         _ui.update { it.copy(status = Status.STOPPING, statusText = "Отключение…") }
         scope.launch(Dispatchers.IO) {
             connLock.withLock {
@@ -961,9 +964,19 @@ class AppController(
     fun shutdown() {
         userStopped = true
         session++
-        SystemProxy.restore()
-        runner.stop()
-        if (WindowsPptp.active) WindowsPptp.disconnect()
+        // Сбой одного шага (например, отказ в пароле macOS при остановке корневого ядра) не должен оставить остальное включённым.
+        runCatching { SystemProxy.restore() }
+        runCatching { runner.stop() }
+        runCatching { if (WindowsPptp.active) WindowsPptp.disconnect() }
+    }
+
+    /**
+     * Выход из приложения: [shutdown] в отдельном потоке и не дольше [timeoutMs] — зависшая внешняя команда или ожидание
+     * дочернего клиента (до 45 с) раньше замораживали окно при выходе. Остаток доделает хук завершения JVM.
+     */
+    fun shutdownBounded(timeoutMs: Long = 10_000) {
+        val worker = Thread({ shutdown() }, "hydra-shutdown").apply { isDaemon = true; start() }
+        worker.join(timeoutMs)
     }
 
     // sing-box красит лог ANSI-кодами даже в пайп (опции отключения в 1.12 нет).

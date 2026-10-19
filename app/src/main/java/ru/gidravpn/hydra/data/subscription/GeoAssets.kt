@@ -64,9 +64,13 @@ object GeoAssets {
             context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime
         }.getOrDefault(Long.MAX_VALUE)
         if (!file.exists() || file.length() == 0L || file.lastModified() < apkUpdated) {
+            // Через временный файл: убитый на середине процесс оставлял обрезанный .srs со свежей датой, который не перезаписывался.
+            val part = File(file.parentFile, "$cc.srs.part").apply { delete() }
             context.assets.open("$dir/$cc.srs").use { input ->
-                file.outputStream().use { output -> input.copyTo(output) }
+                part.outputStream().use { output -> input.copyTo(output) }
             }
+            file.delete()
+            if (!part.renameTo(file)) { part.copyTo(file, overwrite = true); part.delete() }
         }
         return file.absolutePath
     }

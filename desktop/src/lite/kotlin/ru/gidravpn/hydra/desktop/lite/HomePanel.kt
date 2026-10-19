@@ -77,6 +77,11 @@ internal class HomePanel(
 
     override fun render(ui: UiState) {
         val s = ui.data.settings
+        // «Управление с клавиатуры» выключено — кнопка не берёт фокус, и Пробел с Enter её не нажимают (мышь работает как прежде).
+        if (connect.isFocusable != s.keyboardControl) {
+            connect.isFocusable = s.keyboardControl
+            if (s.keyboardControl) connect.requestFocusInWindow()
+        }
         status.text = ui.statusText
         status.foreground = when (ui.status) {
             Status.ERROR -> Danger

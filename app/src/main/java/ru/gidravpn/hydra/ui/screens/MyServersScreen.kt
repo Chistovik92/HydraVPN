@@ -289,6 +289,10 @@ private fun AddServerCard(m: MyServersManager, s: MyServersUi, onClose: () -> Un
                 Text(stringResource(R.string.ms_fp_text), color = TextSecondary, fontSize = 13.sp)
                 Spacer(Modifier.height(6.dp))
                 SelectionContainer { Text(s.fingerprint, fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = TextPrimary) }
+                if (s.previousFingerprint.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(stringResource(R.string.ms_fp_changed, s.previousFingerprint), color = androidx.compose.ui.graphics.Color(0xFFEF4444), fontSize = 13.sp)
+                }
                 Spacer(Modifier.height(10.dp))
                 MsRow {
                     if (!s.busy) MsChip(stringResource(R.string.ms_trust), AccentCyan) { m.confirmFingerprint() }

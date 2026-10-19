@@ -66,7 +66,7 @@ object LinkParser {
         return ServerProfile(
             name = tag(uri) ?: "${protocol.displayName} ${uri.host}",
             protocolId = protocol.id,
-            address = uri.host.orEmpty(),
+            address = uri.host.orEmpty().removeSurrounding("[", "]"),
             port = uri.port.takeIf { it > 0 } ?: defaultPort,
             uuidOrPassword = pass,
             sni = q["sni"].orEmpty(),
@@ -92,7 +92,7 @@ object LinkParser {
         return ServerProfile(
             name = tag(uri) ?: "VLESS ${uri.host}",
             protocolId = Protocol.VLESS.id,
-            address = uri.host.orEmpty(),
+            address = uri.host.orEmpty().removeSurrounding("[", "]"),
             port = uri.port.takeIf { it > 0 } ?: 443,
             uuidOrPassword = uri.userInfo.orEmpty(),
             flow = q["flow"].orEmpty(),
@@ -113,7 +113,7 @@ object LinkParser {
         return ServerProfile(
             name = tag(uri) ?: "Trojan ${uri.host}",
             protocolId = Protocol.TROJAN.id,
-            address = uri.host.orEmpty(),
+            address = uri.host.orEmpty().removeSurrounding("[", "]"),
             port = uri.port.takeIf { it > 0 } ?: 443,
             uuidOrPassword = uri.userInfo.orEmpty(),
             sni = q["sni"] ?: q["peer"].orEmpty(),
@@ -173,7 +173,7 @@ object LinkParser {
         return ServerProfile(
             name = tag(uri) ?: "Hysteria2 ${uri.host}",
             protocolId = Protocol.HYSTERIA2.id,
-            address = uri.host.orEmpty(),
+            address = uri.host.orEmpty().removeSurrounding("[", "]"),
             port = uri.port.takeIf { it > 0 } ?: 443,
             uuidOrPassword = uri.userInfo.orEmpty(),
             sni = q["sni"].orEmpty(),
@@ -196,7 +196,7 @@ object LinkParser {
         return ServerProfile(
             name = tag(uri) ?: "TUIC ${uri.host}",
             protocolId = Protocol.TUIC.id,
-            address = uri.host.orEmpty(),
+            address = uri.host.orEmpty().removeSurrounding("[", "]"),
             port = uri.port.takeIf { it > 0 } ?: 443,
             uuidOrPassword = uuid,
             sni = q["sni"].orEmpty(),

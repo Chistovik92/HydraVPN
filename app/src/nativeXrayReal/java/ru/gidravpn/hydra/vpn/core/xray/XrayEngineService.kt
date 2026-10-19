@@ -69,9 +69,14 @@ private class XrayRuntime private constructor(context: android.content.Context) 
         val dexFile = File(context.codeCacheDir, "libxray.dex")
         if (!dexFile.exists() || dexFile.length() == 0L) {
             dexFile.setWritable(true, true)
+            // Через временный файл: процесс :xray прошивка убивает быстро, и недокопированный dex (длина > 0) раньше принимался
+            // за готовый — DexClassLoader падал на каждой попытке, Xray не стартовал до очистки кэша.
+            val part = File(context.codeCacheDir, "libxray.dex.part").apply { delete() }
             context.assets.open("libxray.dex").use { input ->
-                dexFile.outputStream().use { output -> input.copyTo(output) }
+                part.outputStream().use { output -> input.copyTo(output) }
             }
+            dexFile.delete()
+            check(part.renameTo(dexFile)) { "не удалось подготовить libxray.dex" }
         }
         // ART отказывается грузить dex, который сам процесс ещё может записать («Writable dex file … is not allowed»).
         dexFile.setReadOnly()

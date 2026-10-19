@@ -28,7 +28,15 @@ fun main(args: Array<String>) {
     }
     AppNet.install()
     application(exitProcessOnExit = true) {
-        val scope = rememberCoroutineScope()
+        val composeScope = rememberCoroutineScope()
+        // SupervisorJob: исключение в одной фоновой задаче (например, бот ответил мусором) не должно отменять весь AppController —
+        // с обычным Job после него переставали работать «Подключить» и «Отключить».
+        val scope = remember {
+            kotlinx.coroutines.CoroutineScope(
+                composeScope.coroutineContext + kotlinx.coroutines.SupervisorJob(composeScope.coroutineContext[kotlinx.coroutines.Job]) +
+                    kotlinx.coroutines.CoroutineExceptionHandler { _, e -> System.err.println("Hydra: необработанная ошибка в фоновой задаче: ${e::class.simpleName}: ${e.message}") },
+            )
+        }
         val controller = remember { AppController(scope) }
         val ui by controller.ui.collectAsState()
         val iconBytes = remember { AppController::class.java.getResourceAsStream("/hydra-icon.png")!!.use { it.readBytes() } }
@@ -48,7 +56,7 @@ fun main(args: Array<String>) {
         var visible by remember { mutableStateOf(!(runCatching { java.awt.SystemTray.isSupported() }.getOrDefault(false) && ru.gidravpn.hydra.desktop.core.Autostart.MINIMIZED_ARG in args)) }
 
         fun quit() {
-            controller.shutdown()
+            controller.shutdownBounded()
             SingleInstance.release()
             exitApplication()
         }

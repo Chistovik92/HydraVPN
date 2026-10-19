@@ -53,6 +53,7 @@ internal class SettingsPanel(private val c: AppController) : Renderable {
     // ---- безопасность
     private val kill = Check("Kill switch — не пускать трафик мимо VPN при обрыве (режим прокси: системный прокси остаётся включённым)", quiet) { v -> c.updateSettings { it.copy(killSwitch = v) } }
     private val reconnect = Check("Переподключаться автоматически (через 2, 4, 8, 16, 30 с… до 10 попыток)", quiet) { v -> c.updateSettings { it.copy(autoReconnect = v) } }
+    private val keyboard = Check("Управление с клавиатуры — на главной Пробел или Enter включает и отключает VPN (выключено: кнопка только для мыши)", quiet) { v -> c.updateSettings { it.copy(keyboardControl = v) } }
     private val autoConnect = Check("Подключаться при запуске Hydra", quiet) { v -> c.updateSettings { it.copy(autoConnect = v) } }
     private val login = Check("Запускать Hydra при входе в систему (свёрнутой в трей)", quiet) { c.setLaunchAtLogin(it) }
 
@@ -105,7 +106,7 @@ internal class SettingsPanel(private val c: AppController) : Renderable {
         section("Режим подключения", proxy, tun, tunNote),
         section("Движки", note("Какое ядро обслуживает протокол. Маршрутизация, DNS и режимы TUN/прокси работают одинаково с каждым."),
             singBox, xray, preferXray, olcRtc, openFlux, enginesNote),
-        section("Безопасность", kill, reconnect, autoConnect, login),
+        section("Безопасность", kill, reconnect, keyboard, autoConnect, login),
         section("Прокси", row(JLabel("Порт:"), port), sysProxy),
         section("Права администратора",
             note(when {
@@ -135,7 +136,7 @@ internal class SettingsPanel(private val c: AppController) : Renderable {
         section("Оформление", row(JLabel("Тема:"), themeBox), row(JLabel("Иконка окна и трея:"), iconBox),
             note("Иконка меняется сразу; цвет акцента темы в Classic — после перезапуска. Classic светлая: тёмный фон тем есть в обычной Hydra.")),
         section("О программе",
-            JLabel("Hydra ${Platform.version} (Classic) · sing-box 1.12.25 · Xray-core 26.10.10 · ${System.getProperty("os.name")} ${System.getProperty("os.arch")}"),
+            JLabel("Hydra ${Platform.version} (Classic) · sing-box 1.12.25 · Xray-core 26.10.17 · ${System.getProperty("os.name")} ${System.getProperty("os.arch")}"),
             note("Данные: ${Platform.dataDir.absolutePath}"),
             note("Classic — упрощённая оболочка для 32-битных систем и Windows 7: те же ядра и настройки, что у обычной Hydra. " +
                 "Нет управления роутерами HydraVPN for Router (оно есть в обычной Hydra и на Android). " +
@@ -203,7 +204,7 @@ internal class SettingsPanel(private val c: AppController) : Renderable {
         }
         enginesNote.isVisible = enginesNote.text.isNotEmpty()
 
-        kill.set(s.killSwitch); reconnect.set(s.autoReconnect); autoConnect.set(s.autoConnect)
+        kill.set(s.killSwitch); reconnect.set(s.autoReconnect); keyboard.set(s.keyboardControl); autoConnect.set(s.autoConnect)
         login.set(s.launchAtLogin, Autostart.available)
         port.sync(s.proxyPort.toString()); sysProxy.set(s.setSystemProxy)
 

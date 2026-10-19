@@ -61,10 +61,10 @@ object RemnawavePanel {
         Step("rw-exists", "Проверить, что Remnawave на сервере ещё нет", "test ! -e $DIR && test ! -e $NODE_DIR",
             failHint = "На сервере уже стоит Remnawave — удалите её или подключитесь к ней на сайте"),
         Step("rw-docker", "Поставить Docker, если его нет (Remnawave работает в контейнерах)",
-            "(command -v docker >/dev/null || (curl -fsSL https://get.docker.com | sh) >/tmp/.hydra-docker.log 2>&1) && systemctl enable --now docker >/dev/null 2>&1; docker --version",
+            "(command -v docker >/dev/null || (curl -fsSL -m 180 https://get.docker.com | sh) >/tmp/.hydra-docker.log 2>&1) && systemctl enable --now docker >/dev/null 2>&1; docker --version",
             failHint = "Docker поставить не удалось"),
         Step("rw-fetch", "Загрузить файлы Remnawave $TAG (закреплённый выпуск)",
-            "mkdir -p $DIR && chmod 700 $DIR && curl -fsSL ${Installer.shq(composeUrl())} -o $DIR/docker-compose.yml && curl -fsSL ${Installer.shq(envUrl())} -o $DIR/.env && " +
+            "mkdir -p $DIR && chmod 700 $DIR && curl -fsSL -m 180 ${Installer.shq(composeUrl())} -o $DIR/docker-compose.yml && curl -fsSL -m 180 ${Installer.shq(envUrl())} -o $DIR/.env && " +
                 "chmod 600 $DIR/.env && sha256sum $DIR/docker-compose.yml", rollback = "rm -rf $DIR", failHint = "Не удалось скачать файлы с GitHub"),
         Step("rw-env", "Задать секреты панели (придумывает Hydra)", upload = Step.Upload(ENV_SH, envScript(host).toByteArray(), 384)),
         Step("rw-env-apply", "Записать настройки панели", "sh $ENV_SH; rc=\$?; rm -f $ENV_SH; exit \$rc", failHint = "Не удалось записать настройки"),
@@ -97,8 +97,11 @@ object RemnawavePanel {
 
     /** Копия базы (pg_dump) в [ServerOps.BACKUP_DIR] — до удаления. */
     fun backupCommand() = "mkdir -p ${ServerOps.BACKUP_DIR} && chmod 700 ${ServerOps.BACKUP_DIR}; d=\$(date +%Y%m%d-%H%M%S); " +
-        "if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx remnawave-db; then docker exec remnawave-db pg_dump -U postgres postgres > ${ServerOps.BACKUP_DIR}/remnawave-\$d.sql 2>/dev/null && " +
-        "chmod 600 ${ServerOps.BACKUP_DIR}/remnawave-\$d.sql && echo \"копия базы remnawave: ${ServerOps.BACKUP_DIR}/remnawave-\$d.sql\"; fi; true"
+        // Строго: контейнер базы есть (запускаем, если остановлен), но копия не создана или пуста — код возврата не 0, и удаление не идёт дальше.
+        "if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx remnawave-db; then docker start remnawave-db >/dev/null 2>&1; sleep 3; " +
+        "if docker exec remnawave-db pg_dump -U postgres postgres > ${ServerOps.BACKUP_DIR}/remnawave-\$d.sql 2>/dev/null && [ -s ${ServerOps.BACKUP_DIR}/remnawave-\$d.sql ] && " +
+        "chmod 600 ${ServerOps.BACKUP_DIR}/remnawave-\$d.sql; then echo \"копия базы remnawave: ${ServerOps.BACKUP_DIR}/remnawave-\$d.sql\"; " +
+        "else rm -f ${ServerOps.BACKUP_DIR}/remnawave-\$d.sql; echo 'ОШИБКА: копия базы remnawave не создана'; false; fi; else true; fi"
 
     fun uninstallCommand(): String =
         "(cd $NODE_DIR 2>/dev/null && docker compose down -v >/dev/null 2>&1); (cd $DIR 2>/dev/null && docker compose down -v >/dev/null 2>&1); " +

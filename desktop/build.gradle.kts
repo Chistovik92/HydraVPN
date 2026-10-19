@@ -110,19 +110,19 @@ val downloadSingBox by tasks.registering {
 }
 
 // ---- Ядро Xray-core (второй движок, как на Android) ------------------------------
-// 26.10.10 (0.8.2-b) — пре-релиз по меткам апстрима (так помечены все выпуски с лета), коммит 701af60 — тот же, что в
-// libXray v26.10.10 на Android (scripts/fetch-libxray.sh), так что на всех платформах один и тот же Xray. Стабильный
+// 26.10.17 (0.8.2-rc1; 26.10.10 — 0.8.2-b) — пре-релиз по меткам апстрима (так помечены все выпуски с лета), коммит 92ccc93 — тот же, что в
+// libXray v26.10.17 на Android (scripts/fetch-libxray.sh), так что на всех платформах один и тот же Xray. Стабильный
 // 26.3.27 отстаёт на полгода, а панели (3x-ui 3.10 уже ставит на серверы 26.10.10, PasarGuard и др.) выдают настройки
-// под свежий Xray. SHA-256 — дайджесты ассетов релиза https://github.com/XTLS/Xray-core/releases/tag/v26.10.10 .
-val xrayVersion = "26.10.10"
+// под свежий Xray. SHA-256 — дайджесты ассетов релиза https://github.com/XTLS/Xray-core/releases/tag/v26.10.17 .
+val xrayVersion = "26.10.17"
 
 val xrayArchives = mapOf(
-    "windows-x64" to ("windows-64" to "bfefce8e9804e53b7d75b7c49d958b34e89890d9d5e672329089d1b3111647af"),
-    "windows-arm64" to ("windows-arm64-v8a" to "07d5ebf066e5a0bede9b4539269c8576105f3f5b27098f4e317f9bea1e8afc61"),
-    "linux-x64" to ("linux-64" to "72a5fde819713a103c6fc26a87aa025c1518c918a34eba4bc38d64dc0728e5d9"),
-    "linux-arm64" to ("linux-arm64-v8a" to "58e339e67827220175b3a1c6f66f48ccd086b79209f30ba1c0bcb47885d4c22a"),
-    "macos-x64" to ("macos-64" to "f99119d4aa662ae2e9a2adf57eccf3dad1b43035ae2e06ccc3949c8256e33fd0"),
-    "macos-arm64" to ("macos-arm64-v8a" to "7b1711eaeefd90f27082cf49c311aa57dad44ac13146faab3f0c1601158ea6c8"),
+    "windows-x64" to ("windows-64" to "c10a532a9271964f2aa2f4b4c0757605ff529222cb1d5d7ab88f8ecc52e67fb0"),
+    "windows-arm64" to ("windows-arm64-v8a" to "717ae1bfed2dfff1f5593a776321096c4cd7884ac5a030934903c1d8a1e364a9"),
+    "linux-x64" to ("linux-64" to "ecdd54eccd24c4c21a8f00968e7dbf7f5996da92383d2321170b560dc4a95158"),
+    "linux-arm64" to ("linux-arm64-v8a" to "4ebdad86048fa499e65334f88a120b1ed17e662f1c222afd3514afdf8820cdb1"),
+    "macos-x64" to ("macos-64" to "d39e0cb5d0991810f73deaa81ba1147812c77b69bb5ddb0576a6b0096f66eb1a"),
+    "macos-arm64" to ("macos-arm64-v8a" to "57531c66df375da671f66cad1443f63e90410b83d09baf226e2f26f2748aae0f"),
 )
 
 /** Xray-core своей платформы в тот же каталог ресурсов, что и sing-box. */
@@ -167,17 +167,17 @@ val syncGeoAssets by tasks.registering(Sync::class) {
 
 
 // ---- olcRTC и OpenFlux (0.7.4, BETA): клиенты-подпроцессы -------------------------
-// OpenFlux — готовые бинари из релиза апстрима (GPL-3.0), SHA-256 закреплены (SHA256SUMS.txt релиза v0.7.3, 0.8.2-b; коммит f12e981).
+// OpenFlux — готовые бинари из релиза апстрима (GPL-3.0), SHA-256 закреплены (SHA256SUMS.txt релиза v0.13.0, 0.8.2-rc1; коммит 4f9c786).
 // 04.10.2026 апстрим переставил метку v0.3.0 на новый коммит bb55dc3 («Boards, mailru and yandex: the new native transports»)
 // и перезалил все бинари — хеши обновлены; Android собирается из того же коммита (scripts/build-openflux.sh).
-val openFluxVersion = "0.7.3"
+val openFluxVersion = "0.13.0"
 val openFluxBinaries = mapOf(
-    "windows-x64" to ("openflux-windows-amd64.exe" to "dc2f51b17de47036b8d812ae21200898d883df16e4ee0922aae1955fbca422af"),
-    "windows-arm64" to ("openflux-windows-arm64.exe" to "38dd272b6b6bd7dc882eb31c07e8a6a4635cbde50f11d45570565a8e7063e332"),
-    "linux-x64" to ("openflux-linux-amd64" to "39fe61287bbeeee25f0f34c013564df7ee598d4839b9110b73e49cda31fb416e"),
-    "linux-arm64" to ("openflux-linux-arm64" to "5cac8f7eb15bfb590cc7148f6a350e9dc7b6b8d85a47cde7ea786958db9ae1ca"),
-    "macos-x64" to ("openflux-darwin-amd64" to "b57b5dbbd397c8ce2a1c95f99206bd37d03d6314c245b9424062753ad232b695"),
-    "macos-arm64" to ("openflux-darwin-arm64" to "759c2e9c84ddf06d3e00a13f780f0c498977aeb75b20be0e306833aa1fe311e3"),
+    "windows-x64" to ("openflux-windows-amd64.exe" to "77962ce3d97c45161ef3c7415a319867738f761470cff00ef43cddcdb4a8d2b1"),
+    "windows-arm64" to ("openflux-windows-arm64.exe" to "4e822d07917a9d73ae946ee9dce468b434c98072ecf8f752b1df3213680db334"),
+    "linux-x64" to ("openflux-linux-amd64" to "709236d17f3104cba07b156e183ebfaa0e708902e35d0c1678e72eac1a64b350"),
+    "linux-arm64" to ("openflux-linux-arm64" to "6e42b3d0a23dc74aac83e0bc4b08d97797f8b48937c842298b50bc72600f01b9"),
+    "macos-x64" to ("openflux-darwin-amd64" to "c62837622556b3c68a7c16999d53173fcf1566c0d240cfd4839e944bf576e51c"),
+    "macos-arm64" to ("openflux-darwin-arm64" to "3fdf935f38117fbfde7bedb186ce53049410378479dc49ea97d0fb005a4d5740"),
 )
 
 val downloadOpenFlux by tasks.registering {
@@ -599,27 +599,27 @@ val classicTargets = listOf(
     // не предлагает (Platform.goClientsSupported), на 32-битной Windows 10 — работают.
     Classic("windows-x86", "WindowsX86", "windows", "x86",
         "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "e4024508be5616015353c893b0d3f2dd3c080617a750ef6bd64f8183107611c8",
-        "Xray-win7-32.zip", "4464f2cdec1aef2f60132134059c82ea99002cf0d9d92ffbd0d801e5eeceb096",
+        "Xray-win7-32.zip", "fa0e82bf9aac180171152d298e0c00981482c9754972fdab35808c6137c30cdc",
         olcRtc = Triple("windows", "386", ""), openFluxSrc = Triple("windows", "386", ""),
         byeDpi = "byedpi-17.3-i686-w64.zip" to "3f3d0af999371cfa623bd641738a42785e107a9d829b38480ed3d942dafea28a",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.29%2B7/OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip",
             "OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip", "b747698a05a39391a58b9caac30310275e4e6bd9fef92d6c149cba310d91d2be")),
     Classic("windows-x64", "WindowsX64", "windows", "x64",
         "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "4f27f807f99198b2681a59c1f12564b3683331e68215344e75761ee9199a9b90",
-        "Xray-win7-64.zip", "712a9cededdfd715f5246020d60f57b531eb2c87ad00b21b39a47b1ced139b90",
+        "Xray-win7-64.zip", "38373b1ccc6dd36f1262cdccc98cb83e10c8dc62577b1d8d8fa8b595962de4c0",
         olcRtc = Triple("windows", "amd64", ""), openFluxSrc = Triple("windows", "amd64", ""),
         byeDpi = "byedpi-17.3-x86_64-w64.zip" to "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.32.1%2B1/OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip",
             "OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip", "f8c7da672f5dba36b6f870608820b6b598cfae91296929f1b8f21ef2f1e8a0dd")),
     Classic("linux-x86", "LinuxX86", "linux", "x86",
         "sing-box-$singBoxVersion-linux-386.tar.gz", "b2361b5eb0ef6da8f068d9bba762b9edbb3a8637515e30251ee8d5d78b30d846",
-        "Xray-linux-32.zip", "2f28fd52770ff8a68127c2694d009fe901c9ea995e38e5e8de779d1a41c52bf9",
+        "Xray-linux-32.zip", "b19b563d43f151f017e4a3227d2320c6ffb1c1a61f11b3c08b9e25bf940100af",
         olcRtc = Triple("linux", "386", ""), openFluxSrc = Triple("linux", "386", ""),
         byeDpi = "byedpi-17.3-i686.tar.gz" to "655452c2f8e1e3a99b021043b0a68f57927c97010efe19b06ac3b9949fd784ed"),
     Classic("linux-armv7", "LinuxArmv7", "linux", "armv7",
         "sing-box-$singBoxVersion-linux-armv7.tar.gz", "9eedd8eb2d3ea66a48794359d1cc1e32ce618b6e1b105c9cd314da6408c9fc87",
-        "Xray-linux-arm32-v7a.zip", "e01699721450b785813dbe0a86445ff1f4a5e91bb710f61d551fb649c236d38c",
-        openFlux = "openflux-linux-arm" to "91bfb09a0433697b5e4b544b6bf1b885283924a37dd205022df530edf4205fe1",
+        "Xray-linux-arm32-v7a.zip", "3c5339ba4a14ebad74df26e6ad935c215f5be615684f139a78d3dff8cbf6e7e4",
+        openFlux = "openflux-linux-arm" to "9f817502af34b7a67f30ef7a141622eeec0969922ac53728ff168757ebffd438",
         olcRtc = Triple("linux", "arm", "7"),
         byeDpi = "byedpi-17.3-armv7l.tar.gz" to "d231b95fc130a40994ef593ac87498ad8614e003b263e3a453bd62af096abb0c"),
 )
@@ -628,8 +628,8 @@ val classicTargets = listOf(
 fun buildOlcRtc(goos: String, goarch: String, goarm: String, dest: File) =
     buildGoClient("olcrtc-src", "https://github.com/openlibrecommunity/olcrtc.git", olcRtcCommit, "./cmd/olcrtc", goos, goarch, goarm, dest)
 
-/** Коммит OpenFlux — тот же, что у готовых бинарей (метка v0.7.3) и у Android-сборки. */
-val openFluxCommit = "f12e981629a18c8c01007d59ac002254c02972bb"
+/** Коммит OpenFlux — тот же, что у готовых бинарей (метка v0.13.0) и у Android-сборки. */
+val openFluxCommit = "4f9c786cdd1d9fcd0c133e2e0fec0c5a12522610"
 fun buildOpenFlux(goos: String, goarch: String, goarm: String, dest: File) =
     buildGoClient("openflux-src", "https://github.com/p1neappleXpress/OpenFlux.git", openFluxCommit, ".", goos, goarch, goarm, dest)
 

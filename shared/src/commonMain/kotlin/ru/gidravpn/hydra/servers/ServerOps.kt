@@ -7,6 +7,8 @@ data class AwgPeerStat(val publicKey: String, val endpoint: String, val latestHa
 
 /** Что есть на сервере сейчас (кнопка «Проверить», 0.8.0-rc4). */
 data class ServerStatus(
+    /** Вывод проверки дошёл до маркера `---END`. Оборванный (сеанс упал на полпути) не применяется: иначе запись о службах стёрлась бы. */
+    val complete: Boolean = true,
     val checkedAt: Long = System.currentTimeMillis(),
     val osName: String = "",
     val arch: String = "",
@@ -67,11 +69,15 @@ object ServerOps {
     val PANEL_DBS = mapOf("x-ui" to "/etc/x-ui/x-ui.db", "s-ui" to "/usr/local/s-ui/db/s-ui.db", "pasarguard" to "/var/lib/pasarguard/db.sqlite3")
 
     /** Скопировать базы стоящих панелей в [BACKUP_DIR] (если базы нет — ничего не делает). */
-    fun backupPanelsCommand(): String = "mkdir -p $BACKUP_DIR && chmod 700 $BACKUP_DIR; d=\$(date +%Y%m%d-%H%M%S); " +
-        PANEL_DBS.entries.joinToString(" ") { (n, f) -> "if [ -f $f ]; then cp -a $f $BACKUP_DIR/$n-\$d.db && chmod 600 $BACKUP_DIR/$n-\$d.db && echo \"копия базы $n: $BACKUP_DIR/$n-\$d.db\"; fi;" } +
-        " true"
+    fun backupPanelsCommand(): String = "mkdir -p $BACKUP_DIR && chmod 700 $BACKUP_DIR; d=\$(date +%Y%m%d-%H%M%S); ok=0; " +
+        PANEL_DBS.entries.joinToString(" ") { (n, f) ->
+            "if [ -f $f ]; then if cp -a $f $BACKUP_DIR/$n-\$d.db && [ -s $BACKUP_DIR/$n-\$d.db ] && chmod 600 $BACKUP_DIR/$n-\$d.db; " +
+                "then echo \"копия базы $n: $BACKUP_DIR/$n-\$d.db\"; else rm -f $BACKUP_DIR/$n-\$d.db; echo \"ОШИБКА: копия базы $n не создана\"; ok=1; fi; fi;"
+        } + " [ \$ok -eq 0 ]"
 
-    fun backupPanelsStep() = Step("panel-backup", "Сохранить копию базы панели (пользователи, настройки) в $BACKUP_DIR", backupPanelsCommand())
+    /** Шаг строгий: не удалась копия существующей базы — выполнение останавливается, база не удаляется (раньше шаг всегда «успешен»). */
+    fun backupPanelsStep() = Step("panel-backup", "Сохранить копию базы панели (пользователи, настройки) в $BACKUP_DIR", backupPanelsCommand(),
+        failHint = "Копия базы панели не создана (нет места на диске?) — удаление остановлено, чтобы не потерять пользователей")
 
     /** Метка «3x-ui поставила Hydra»: только такую панель снимает полная очистка. */
     const val XUI_MARK = "$STATE_DIR/xui.installed"
@@ -124,6 +130,7 @@ object ServerOps {
         }
         val ofx = kv["OFX"].orEmpty().split(' ').filter { ':' in it }.associate { it.substringBefore(':') to it.substringAfter(':') }
         return ServerStatus(
+            complete = out.lines().any { it.trim() == "---END" },
             osName = kv["OS"].orEmpty(), arch = arch, uptimeSec = kv["UPTIME"]?.toLongOrNull() ?: 0, load = kv["LOAD"].orEmpty(),
             mem = kv["MEM"].orEmpty(), disk = kv["DISK"].orEmpty(),
             awgInstalled = kv["AWG_UNIT"] == "1", awgState = kv["AWG_STATE"].orEmpty(), awgPeers = peers, ofxChannels = ofx,
@@ -230,7 +237,8 @@ object ServerOps {
             listOf(OtherPanels.SUI, OtherPanels.XUI).joinToString(" ") { s ->
                 "if [ -f ${s.mark} ]; then ${OtherPanels.uninstallCommand(s)}; echo '${s.kind.title}: удалена'; fi;"
             } + " if [ -f ${PasarGuardPanel.MARK} ]; then ${PasarGuardPanel.uninstallCommand()}; echo 'PasarGuard: удалена'; fi;" +
-                " if [ -f ${RemnawavePanel.MARK} ]; then ${RemnawavePanel.backupCommand()}; ${RemnawavePanel.uninstallCommand()}; echo 'Remnawave: удалена'; fi;" +
+                " if [ -f ${RemnawavePanel.MARK} ]; then if ( ${RemnawavePanel.backupCommand()} ); then ${RemnawavePanel.uninstallCommand()}; echo 'Remnawave: удалена'; " +
+                "else echo 'Remnawave: НЕ удалена — копия базы не создана'; fi; fi;" +
                 " if [ -f ${PanelNodes.PG_NODE_MARK} ]; then ${PanelNodes.pgNodeUninstallCommand()}; echo 'нода PasarGuard: удалена'; fi;" +
                 " if [ -f ${PanelNodes.RW_NODE_MARK} ]; then ${PanelNodes.rwNodeUninstallCommand()}; echo 'нода Remnawave: удалена'; fi;" +
                 " rm -f ${OtherPanels.PANEL_STATE}; true"),

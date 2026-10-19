@@ -30,10 +30,10 @@ object PasarGuardPanel {
         Step("pg-exists", "Проверить, что PasarGuard на сервере ещё нет", "test ! -e $DIR && test ! -e $NODE_DIR",
             failHint = "На сервере уже стоит PasarGuard — удалите её или подключитесь к ней на сайте"),
         Step("pg-docker", "Поставить Docker, если его нет (PasarGuard работает в контейнерах)",
-            "(command -v docker >/dev/null || (curl -fsSL https://get.docker.com | sh) >/tmp/.hydra-docker.log 2>&1) && systemctl enable --now docker >/dev/null 2>&1; docker --version",
+            "(command -v docker >/dev/null || (curl -fsSL -m 180 https://get.docker.com | sh) >/tmp/.hydra-docker.log 2>&1) && systemctl enable --now docker >/dev/null 2>&1; docker --version",
             failHint = "Docker поставить не удалось"),
         Step("pg-fetch", "Загрузить установщики PasarGuard (закреплённый выпуск $SCRIPTS_TAG)",
-            "curl -fsSL ${Installer.shq(scriptUrl("pasarguard.sh"))} -o $PANEL_SH && curl -fsSL ${Installer.shq(scriptUrl("pg-node.sh"))} -o $NODE_SH && " +
+            "curl -fsSL -m 180 ${Installer.shq(scriptUrl("pasarguard.sh"))} -o $PANEL_SH && curl -fsSL -m 180 ${Installer.shq(scriptUrl("pg-node.sh"))} -o $NODE_SH && " +
                 "chmod 700 $PANEL_SH $NODE_SH && sha256sum $PANEL_SH $NODE_SH", rollback = "rm -f $PANEL_SH $NODE_SH",
             failHint = "Не удалось скачать установщики с GitHub"),
         // установщик спрашивает «ставить ноду?» (нет — ставим отдельно) и в конце бесконечно показывает журнал: ждём, пока

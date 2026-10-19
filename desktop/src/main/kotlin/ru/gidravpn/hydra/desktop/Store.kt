@@ -76,6 +76,8 @@ data class DesktopSettings(
     val autoReconnect: Boolean = true,
     /** 0.8.0-rc3: SSH «Моих серверов», подписки и обновления идут через туннель, пока VPN включён. */
     val appThroughVpn: Boolean = true,
+    /** 0.8.2-rc1: управление с клавиатуры (Пробел/Enter на кнопке подключения, Tab). Выключено — кнопка реагирует только на мышь. */
+    val keyboardControl: Boolean = false,
     val autoConnect: Boolean = false,
     val launchAtLogin: Boolean = false,
     // Раздача VPN в локальную сеть (хотспот-прокси Android).
@@ -116,18 +118,39 @@ class Store(val file: File = File(Platform.dataDir, "hydra.json")) {
 
     private val lock = Any()
 
+    /** Файл не удалось ПРОЧИТАТЬ (блокировка антивирусом и т. п.): пустое состояние нельзя записывать поверх рабочего файла. */
+    @Volatile private var unreadable = false
+
     fun load(): HydraState = synchronized(lock) {
-        runCatching {
-            if (!file.isFile) return HydraState()
-            fromJson(JSONObject(file.readText()))
-        }.getOrElse {
-            // Битый файл не теряем молча — откладываем рядом и начинаем с пустого состояния.
-            runCatching { file.copyTo(File(file.parentFile, file.name + ".broken"), overwrite = true) }
+        if (!file.isFile) return HydraState()
+        val text = readWithRetry()
+        if (text == null) {
+            unreadable = true
+            return HydraState()
+        }
+        unreadable = false
+        runCatching { fromJson(JSONObject(text)) }.getOrElse {
+            // Битый файл не теряем молча — откладываем рядом (прежнюю копию не затираем) и начинаем с пустого состояния.
+            val keep = File(file.parentFile, file.name + ".broken").let { if (it.exists()) File(file.parentFile, it.name + "-" + System.currentTimeMillis()) else it }
+            runCatching { file.copyTo(keep, overwrite = true) }
             HydraState()
         }
     }
 
+    /** Чтение с повторами: на Windows файл ненадолго занимает антивирус; пока не прочитан — не считаем его пустым. */
+    private fun readWithRetry(): String? {
+        repeat(4) { attempt ->
+            try {
+                return file.readText()
+            } catch (_: java.io.IOException) {
+                if (attempt < 3) Thread.sleep(150L * (attempt + 1))
+            }
+        }
+        return null
+    }
+
     fun save(state: HydraState) = synchronized(lock) {
+        if (unreadable) throw java.io.IOException("Файл настроек Hydra не удалось прочитать при запуске — сохранение отключено, чтобы не затереть серверы и подписки. Перезапустите Hydra.")
         writePrivateAtomic(file, toJson(state).toString(2))
     }
 
@@ -143,7 +166,8 @@ class Store(val file: File = File(Platform.dataDir, "hydra.json")) {
                 // Права ставятся при создании — без окна, когда файл с паролями читаем всем.
                 Files.createFile(tmp.toPath(), PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))
             }
-            tmp.writeText(text)
+            // fsync до переименования: иначе после сбоя питания на месте файла может оказаться пустой.
+            java.io.FileOutputStream(tmp).use { out -> out.write(text.toByteArray(Charsets.UTF_8)); out.flush(); out.fd.sync() }
             try {
                 Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
             } catch (_: AtomicMoveNotSupportedException) {
@@ -269,6 +293,7 @@ class Store(val file: File = File(Platform.dataDir, "hydra.json")) {
             .put("singBoxEnabled", s.singBoxEnabled).put("xrayEnabled", s.xrayEnabled).put("preferXray", s.preferXray)
             .put("olcRtcEnabled", s.olcRtcEnabled).put("openFluxEnabled", s.openFluxEnabled)
             .put("killSwitch", s.killSwitch).put("autoReconnect", s.autoReconnect).put("appThroughVpn", s.appThroughVpn)
+            .put("keyboardControl", s.keyboardControl)
             .put("autoConnect", s.autoConnect).put("launchAtLogin", s.launchAtLogin)
             .put("lanShare", JSONObject().put("enabled", s.lanShare.enabled).put("port", s.lanShare.port)
                 .put("username", s.lanShare.username).put("password", s.lanShare.password))
@@ -294,6 +319,7 @@ class Store(val file: File = File(Platform.dataDir, "hydra.json")) {
                 killSwitch = o.optBoolean("killSwitch", false),
                 autoReconnect = o.optBoolean("autoReconnect", true),
                 appThroughVpn = o.optBoolean("appThroughVpn", true),
+                keyboardControl = o.optBoolean("keyboardControl", false),
                 autoConnect = o.optBoolean("autoConnect", false),
                 launchAtLogin = o.optBoolean("launchAtLogin", false),
                 lanShare = HotspotSettings(

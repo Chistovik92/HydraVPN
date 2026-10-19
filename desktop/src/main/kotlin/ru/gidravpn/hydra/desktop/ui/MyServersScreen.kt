@@ -259,6 +259,10 @@ private fun AddServerCard(m: MyServersManager, s: MyServersUi, onClose: () -> Un
                     Text("Шаг 2 из 2. Это «отпечаток» сервера — его уникальный признак. Если хостинг показывает отпечаток в панели, сверьте; " +
                         "дальше Hydra будет входить только на сервер с этим отпечатком.", fontSize = 13.sp)
                     SelectionContainer { Text(s.fingerprint, fontFamily = FontFamily.Monospace, fontSize = 13.sp) }
+                    if (s.previousFingerprint.isNotBlank()) {
+                        Text("⚠ Отпечаток этого сервера ИЗМЕНИЛСЯ. Раньше был: ${s.previousFingerprint}. Доверяйте, только если вы переустанавливали сервер " +
+                            "или меняли его SSH-ключи, — иначе соединение могут перехватывать.", color = Danger, fontSize = 13.sp)
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { m.confirmFingerprint() }, enabled = !s.busy) { Text("Доверять и войти") }
                         TextButton(onClick = onClose) { Text("Отмена") }
