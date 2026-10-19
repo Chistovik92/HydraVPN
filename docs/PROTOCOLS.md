@@ -123,7 +123,7 @@
   Апстрим архивирован 14.09.2026. См. docs/SERVICES.md и docs/ECOSYSTEM.md.
 
 ### OpenFlux — TCP-туннель с транспортами (Yandex/MAX/Mail.ru/Cups)
-- Исполняемый `libopenflux.so` (`--role client --inbound socks5`) → SOCKS5 → sing-box → tun. Ядро v0.4.2; ссылки — официальные
+- Исполняемый `libopenflux.so` (`--role client --inbound socks5`) → SOCKS5 → sing-box → tun. Ядро v0.7.3 (0.8.2-b; Telemost — только так, под `--inbound=tun` апстрим его не пускает); ссылки — официальные
   `openflux://v1/…` (с 0.7.11, старые читаются). См. docs/ECOSYSTEM.md.
 
 ## Помощники без сервера: обход DPI и Telegram

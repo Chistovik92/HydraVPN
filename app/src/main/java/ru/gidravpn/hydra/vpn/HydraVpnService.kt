@@ -456,7 +456,10 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
         // Должен совпадать с tun-инбаундом sing-box (тот же RoutingRepository.mtu).
         val mtu = (ru.gidravpn.hydra.data.repository.RoutingRepository(applicationContext).mtu.firstOrNull()
             ?: ru.gidravpn.hydra.data.model.MtuPreset.AUTO).value
-        val awg = profile.protocol == ru.gidravpn.hydra.data.model.Protocol.AMNEZIAWG
+        // 0.8.2-b: и обычный WireGuard, если его обслужит amneziawg-go (EngineToggles) — tun так же по конфигу
+        val awg = profile.protocol == ru.gidravpn.hydra.data.model.Protocol.AMNEZIAWG ||
+            (ru.gidravpn.hydra.data.repository.EngineRepository(applicationContext).toggles.firstOrNull() ?: ru.gidravpn.hydra.data.model.EngineToggles())
+                .engineFor(profile, ru.gidravpn.hydra.BuildConfig.XRAY_AVAILABLE) == ru.gidravpn.hydra.data.model.EngineToggles.Kind.AWG
         val builder = Builder().setSession("Hydra")
         if (awg) {
             // AmneziaWG: WireGuard не делает NAT — адрес tun обязан быть тем, что сервер знает как
@@ -488,7 +491,14 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             val routeCfg = ru.gidravpn.hydra.data.repository.RoutingRepository(applicationContext).routeConfig.firstOrNull()
                 ?: ru.gidravpn.hydra.data.routing.RouteConfig()
             val serverRepo = ru.gidravpn.hydra.data.repository.ServerRepository(applicationContext)
-            !ru.gidravpn.hydra.vpn.core.AppTunnelPolicy.needsAppBypass(profile, routeCfg) { id -> kotlinx.coroutines.runBlocking { serverRepo.byId(id) } }
+            val toggles = ru.gidravpn.hydra.data.repository.EngineRepository(applicationContext).toggles.firstOrNull()
+                ?: ru.gidravpn.hydra.data.model.EngineToggles()
+            val xrayServes = { p: ru.gidravpn.hydra.data.model.ServerProfile ->
+                toggles.engineFor(p, ru.gidravpn.hydra.BuildConfig.XRAY_AVAILABLE) in setOf(
+                    ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY, ru.gidravpn.hydra.data.model.EngineToggles.Kind.AWG)
+            }
+            !ru.gidravpn.hydra.vpn.core.AppTunnelPolicy.needsAppBypass(profile, routeCfg,
+                lookup = { id -> kotlinx.coroutines.runBlocking { serverRepo.byId(id) } }, servedByXray = xrayServes)
         }
         VpnState.log(if (appInTunnel) "Трафик самой Hydra (SSH, подписки) идёт через туннель"
             else "Трафик самой Hydra идёт мимо туннеля (настройка выключена или режим с подпроцессами)")

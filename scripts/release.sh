@@ -55,14 +55,33 @@ step "Предполётные проверки"
 [[ -f app/libs/libbox.aar ]] || err \
 "нет app/libs/libbox.aar — full-APK будет нерабочим.
        Соберите ядро по docs/BUILD.md (раздел 2.1) или положите готовый .aar."
-echo "    libbox.aar на месте"
+# 0.8.2-b: libbox — с правкой REALITY (SagerNet/sing-box#4520); метку пишет scripts/build-libbox.sh.
+LIBBOX_PATCH="$(tr -d '\r' < scripts/sing-box-reality-mlkem.patch | sha256sum | cut -d' ' -f1)"
+[[ "$(cat app/libs/libbox.aar.patch 2>/dev/null)" == "$LIBBOX_PATCH" ]] || err \
+"app/libs/libbox.aar собран без текущей scripts/sing-box-reality-mlkem.patch — sing-box не подключится по REALITY
+       к Xray-core >= 26.9.8. Пересоберите: scripts/build-libbox.sh"
+echo "    libbox.aar на месте (с правкой REALITY)"
 
 # Xray — штатное второе ядро: без libXray.aar переключатель «Xray Core» в настройках неактивен
 # (так вышли 0.6.x–0.7.2, пока ядро не было собрано).
 [[ -f app/libs/libXray.aar ]] || err \
 "нет app/libs/libXray.aar — в full-APK не будет ядра Xray.
        Соберите его по docs/BUILD.md (раздел 2.2) или положите готовый .aar."
-echo "    libXray.aar на месте"
+# Xray в AAR — тот же коммит, что закреплён в scripts/fetch-libxray.sh (и у ПК): иначе уедет старое ядро (как OpenFlux в 0.7.8).
+XRAY_COMMIT="$(sed -n 's/^LIBXRAY_XRAY_COMMIT="\([0-9a-f]*\)".*/\1/p' scripts/fetch-libxray.sh | head -1)"
+unzip -p app/libs/libXray.aar jni/arm64-v8a/libgojni.so | grep -ac "xtls/xray-core.*$XRAY_COMMIT" >/dev/null || err \
+"в app/libs/libXray.aar не Xray-core $XRAY_COMMIT — ядро устарело.
+       Обновите: scripts/fetch-libxray.sh"
+echo "    libXray.aar на месте (Xray-core $XRAY_COMMIT)"
+
+# AmneziaWG — версия ядра закреплена в scripts/build-awg.sh; до 0.8.2-a4 в выпуски уходил v3.1.20260814 вместо закреплённого.
+AWG_GO="$(sed -n 's/^AWG_GO_VERSION="${AWG_GO_VERSION:-\([^}]*\)}".*/\1/p' scripts/build-awg.sh | head -1)"
+for abi in arm64-v8a armeabi-v7a x86_64 x86; do
+  grep -ac "amneziawg-go/v3.$AWG_GO" "app/libs/awg/$abi/libwg-go.so" >/dev/null 2>&1 || err \
+"в app/libs/awg/$abi/libwg-go.so не amneziawg-go $AWG_GO — ядро AmneziaWG устарело.
+       Пересоберите: scripts/build-awg.sh"
+done
+echo "    AmneziaWG: amneziawg-go $AWG_GO"
 
 [[ -f keystore.properties ]] || err \
 "нет keystore.properties в корне проекта — без него release-сборка уйдёт

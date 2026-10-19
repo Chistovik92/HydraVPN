@@ -110,19 +110,19 @@ val downloadSingBox by tasks.registering {
 }
 
 // ---- Ядро Xray-core (второй движок, как на Android) ------------------------------
-// 26.9.30 — пре-релиз по меткам апстрима, но тот же коммит (b26a91d), что собран в libXray.aar на Android,
-// так что на всех платформах один и тот же Xray. Стабильный 26.9.30 отстаёт на полгода, а панели (3x-ui 3.9,
-// PasarGuard и др.) выдают настройки под свежий Xray. SHA-256 — дайджесты ассетов релиза
-// https://github.com/XTLS/Xray-core/releases/tag/v26.9.30 .
-val xrayVersion = "26.9.30"
+// 26.10.10 (0.8.2-b) — пре-релиз по меткам апстрима (так помечены все выпуски с лета), коммит 701af60 — тот же, что в
+// libXray v26.10.10 на Android (scripts/fetch-libxray.sh), так что на всех платформах один и тот же Xray. Стабильный
+// 26.3.27 отстаёт на полгода, а панели (3x-ui 3.10 уже ставит на серверы 26.10.10, PasarGuard и др.) выдают настройки
+// под свежий Xray. SHA-256 — дайджесты ассетов релиза https://github.com/XTLS/Xray-core/releases/tag/v26.10.10 .
+val xrayVersion = "26.10.10"
 
 val xrayArchives = mapOf(
-    "windows-x64" to ("windows-64" to "b17a619343c11b89d8faf36278298856749b15c52277d875d32051b33dcda617"),
-    "windows-arm64" to ("windows-arm64-v8a" to "5cf7ad4fd9aac5aa248ae7e598f3f0a0d0f79a6195089d611ddef9653830f1b0"),
-    "linux-x64" to ("linux-64" to "f851110beaff16e78d643f0ccfd9524b4a44dfd59bae3e34bb52bba378f7690e"),
-    "linux-arm64" to ("linux-arm64-v8a" to "9886f077f9fd8e6713b84c377c1c7db4e53b9bfa8c276a5bd12561139522b473"),
-    "macos-x64" to ("macos-64" to "1f366aaf21d3c3003d1556d066c4e08f9dd62d1f96555ecedde85b397df0f684"),
-    "macos-arm64" to ("macos-arm64-v8a" to "4b363bd924df5bf09f87bd445755ff8e5742b9a8a0480cda261061416c3c7dce"),
+    "windows-x64" to ("windows-64" to "bfefce8e9804e53b7d75b7c49d958b34e89890d9d5e672329089d1b3111647af"),
+    "windows-arm64" to ("windows-arm64-v8a" to "07d5ebf066e5a0bede9b4539269c8576105f3f5b27098f4e317f9bea1e8afc61"),
+    "linux-x64" to ("linux-64" to "72a5fde819713a103c6fc26a87aa025c1518c918a34eba4bc38d64dc0728e5d9"),
+    "linux-arm64" to ("linux-arm64-v8a" to "58e339e67827220175b3a1c6f66f48ccd086b79209f30ba1c0bcb47885d4c22a"),
+    "macos-x64" to ("macos-64" to "f99119d4aa662ae2e9a2adf57eccf3dad1b43035ae2e06ccc3949c8256e33fd0"),
+    "macos-arm64" to ("macos-arm64-v8a" to "7b1711eaeefd90f27082cf49c311aa57dad44ac13146faab3f0c1601158ea6c8"),
 )
 
 /** Xray-core своей платформы в тот же каталог ресурсов, что и sing-box. */
@@ -167,17 +167,17 @@ val syncGeoAssets by tasks.registering(Sync::class) {
 
 
 // ---- olcRTC и OpenFlux (0.7.4, BETA): клиенты-подпроцессы -------------------------
-// OpenFlux — готовые бинари из релиза апстрима (GPL-3.0), SHA-256 закреплены (SHA256SUMS.txt релиза v0.4.2).
+// OpenFlux — готовые бинари из релиза апстрима (GPL-3.0), SHA-256 закреплены (SHA256SUMS.txt релиза v0.7.3, 0.8.2-b; коммит f12e981).
 // 04.10.2026 апстрим переставил метку v0.3.0 на новый коммит bb55dc3 («Boards, mailru and yandex: the new native transports»)
 // и перезалил все бинари — хеши обновлены; Android собирается из того же коммита (scripts/build-openflux.sh).
-val openFluxVersion = "0.4.2"
+val openFluxVersion = "0.7.3"
 val openFluxBinaries = mapOf(
-    "windows-x64" to ("openflux-windows-amd64.exe" to "c6b4b2db082099aba88a1dbf28b93defd62e8759351f7204aaa0c6eb7340f520"),
-    "windows-arm64" to ("openflux-windows-arm64.exe" to "dbf1b33b6d38fbab59d12a1dd3ee9912620d44313c968aaa5aaaae8390a55a8f"),
-    "linux-x64" to ("openflux-linux-amd64" to "c51e82c1dc9c74b1fd6b264ee25533fb5d885e3e8bea451fb8920245ac1bf2c1"),
-    "linux-arm64" to ("openflux-linux-arm64" to "5e69a7ce3160684cf7e4c51592cb71084ef56819407b556478bb4abc75156427"),
-    "macos-x64" to ("openflux-darwin-amd64" to "f20268215c8952698b424824180f9f1bd24cc789163fb09a620d780b751367b7"),
-    "macos-arm64" to ("openflux-darwin-arm64" to "c2c41fadbfbb2eeba8bfa22e89787e0cb9b796045cf09a6ed2e401320ff778e0"),
+    "windows-x64" to ("openflux-windows-amd64.exe" to "dc2f51b17de47036b8d812ae21200898d883df16e4ee0922aae1955fbca422af"),
+    "windows-arm64" to ("openflux-windows-arm64.exe" to "38dd272b6b6bd7dc882eb31c07e8a6a4635cbde50f11d45570565a8e7063e332"),
+    "linux-x64" to ("openflux-linux-amd64" to "39fe61287bbeeee25f0f34c013564df7ee598d4839b9110b73e49cda31fb416e"),
+    "linux-arm64" to ("openflux-linux-arm64" to "5cac8f7eb15bfb590cc7148f6a350e9dc7b6b8d85a47cde7ea786958db9ae1ca"),
+    "macos-x64" to ("openflux-darwin-amd64" to "b57b5dbbd397c8ce2a1c95f99206bd37d03d6314c245b9424062753ad232b695"),
+    "macos-arm64" to ("openflux-darwin-arm64" to "759c2e9c84ddf06d3e00a13f780f0c498977aeb75b20be0e306833aa1fe311e3"),
 )
 
 val downloadOpenFlux by tasks.registering {
@@ -357,6 +357,19 @@ val generateIcons by tasks.registering {
     }
 }
 
+// ---- JavaFX (сайт панели внутри приложения, 0.8.2-a2) ------------------------------
+val javafxVersion = "21.0.5"
+// HYDRA_FX_PLATFORM — подменить платформу (проверка ветки linux-aarch64 на другой машине)
+val javafxPlatform: String = System.getenv("HYDRA_FX_PLATFORM") ?: run {
+    val os = System.getProperty("os.name").lowercase()
+    val arm = System.getProperty("os.arch").lowercase().let { it == "aarch64" || it == "arm64" }
+    when {
+        os.contains("win") -> "win"
+        os.contains("mac") -> if (arm) "mac-aarch64" else "mac"
+        else -> if (arm) "linux-aarch64" else "linux"
+    }
+}
+
 // ---- Зависимости ---------------------------------------------------------------
 dependencies {
     implementation(project(":shared"))
@@ -366,6 +379,14 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.json:json:20240303")
     implementation("net.java.dev.jna:jna-platform:5.14.0")
+    // Сайт панели внутри Hydra (0.8.2-a2): WebView из JavaFX — встроенного браузера в Compose Desktop нет. Нативная часть — под
+    // платформу сборки (как compose.desktop.currentOs: каждый пакет собирается на своей ОС); в Hydra Classic JavaFX не входит.
+    // У JavaFX 21 нет сборки под linux-aarch64 (CI 0.8.2-a2: «Could not find javafx-web-21.0.5-linux-aarch64.jar»): там классы — только
+    // для компиляции (они одинаковы на всех платформах), в пакет JavaFX не входит, и сайт панели открывается в браузере (PanelWebFx.available).
+    listOf("base", "graphics", "controls", "media", "web", "swing").forEach {
+        if (javafxPlatform == "linux-aarch64") { compileOnly("org.openjfx:javafx-$it:$javafxVersion:linux"); testImplementation("org.openjfx:javafx-$it:$javafxVersion:linux") }
+        else implementation("org.openjfx:javafx-$it:$javafxVersion:$javafxPlatform")
+    }
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
@@ -427,7 +448,9 @@ compose.desktop {
             // Модули JRE сверх java.base/java.desktop: OkHttp (logging, TLS с EC-шифрами),
             // JNA (jdk.unsupported), Compose (management/naming/accessibility). java.net.http не нужен: всё идёт через OkHttp и HttpURLConnection.
             modules("java.logging", "java.naming", "java.management",
-                "jdk.crypto.ec", "jdk.unsupported", "jdk.accessibility")
+                "jdk.crypto.ec", "jdk.unsupported", "jdk.accessibility",
+                // JavaFX WebView (0.8.2-a2): мост JavaScript ↔ Java и DOM
+                "jdk.jsobject", "jdk.xml.dom", "java.scripting")
 
             windows {
                 iconFile.set(iconsDir.map { it.file("hydra.ico") })
@@ -576,27 +599,27 @@ val classicTargets = listOf(
     // не предлагает (Platform.goClientsSupported), на 32-битной Windows 10 — работают.
     Classic("windows-x86", "WindowsX86", "windows", "x86",
         "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "e4024508be5616015353c893b0d3f2dd3c080617a750ef6bd64f8183107611c8",
-        "Xray-win7-32.zip", "3d73134f74e119589cc117c8f45b4564a14417f9b74508cc48599f142ac3aa81",
+        "Xray-win7-32.zip", "4464f2cdec1aef2f60132134059c82ea99002cf0d9d92ffbd0d801e5eeceb096",
         olcRtc = Triple("windows", "386", ""), openFluxSrc = Triple("windows", "386", ""),
         byeDpi = "byedpi-17.3-i686-w64.zip" to "3f3d0af999371cfa623bd641738a42785e107a9d829b38480ed3d942dafea28a",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.29%2B7/OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip",
             "OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip", "b747698a05a39391a58b9caac30310275e4e6bd9fef92d6c149cba310d91d2be")),
     Classic("windows-x64", "WindowsX64", "windows", "x64",
         "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "4f27f807f99198b2681a59c1f12564b3683331e68215344e75761ee9199a9b90",
-        "Xray-win7-64.zip", "75e67c738fdfafb9649f1a81a7ab6b3ba97a0f2e09a44254bff03c5b077547d3",
+        "Xray-win7-64.zip", "712a9cededdfd715f5246020d60f57b531eb2c87ad00b21b39a47b1ced139b90",
         olcRtc = Triple("windows", "amd64", ""), openFluxSrc = Triple("windows", "amd64", ""),
         byeDpi = "byedpi-17.3-x86_64-w64.zip" to "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.32.1%2B1/OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip",
             "OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip", "f8c7da672f5dba36b6f870608820b6b598cfae91296929f1b8f21ef2f1e8a0dd")),
     Classic("linux-x86", "LinuxX86", "linux", "x86",
         "sing-box-$singBoxVersion-linux-386.tar.gz", "b2361b5eb0ef6da8f068d9bba762b9edbb3a8637515e30251ee8d5d78b30d846",
-        "Xray-linux-32.zip", "277ffde84d86cb593ae9c3d144b11a5e4c80ba579fdfe6fe09830e04c85d04aa",
+        "Xray-linux-32.zip", "2f28fd52770ff8a68127c2694d009fe901c9ea995e38e5e8de779d1a41c52bf9",
         olcRtc = Triple("linux", "386", ""), openFluxSrc = Triple("linux", "386", ""),
         byeDpi = "byedpi-17.3-i686.tar.gz" to "655452c2f8e1e3a99b021043b0a68f57927c97010efe19b06ac3b9949fd784ed"),
     Classic("linux-armv7", "LinuxArmv7", "linux", "armv7",
         "sing-box-$singBoxVersion-linux-armv7.tar.gz", "9eedd8eb2d3ea66a48794359d1cc1e32ce618b6e1b105c9cd314da6408c9fc87",
-        "Xray-linux-arm32-v7a.zip", "0b9719471c7c69752857714e9711d4da57cf38a6beb75dcddfb21425f7919908",
-        openFlux = "openflux-linux-arm" to "489387fd9bd8eed248933b147ed8f9964d61188baae5f9d9f6a06b6b810214f7",
+        "Xray-linux-arm32-v7a.zip", "e01699721450b785813dbe0a86445ff1f4a5e91bb710f61d551fb649c236d38c",
+        openFlux = "openflux-linux-arm" to "91bfb09a0433697b5e4b544b6bf1b885283924a37dd205022df530edf4205fe1",
         olcRtc = Triple("linux", "arm", "7"),
         byeDpi = "byedpi-17.3-armv7l.tar.gz" to "d231b95fc130a40994ef593ac87498ad8614e003b263e3a453bd62af096abb0c"),
 )
@@ -605,8 +628,8 @@ val classicTargets = listOf(
 fun buildOlcRtc(goos: String, goarch: String, goarm: String, dest: File) =
     buildGoClient("olcrtc-src", "https://github.com/openlibrecommunity/olcrtc.git", olcRtcCommit, "./cmd/olcrtc", goos, goarch, goarm, dest)
 
-/** Коммит OpenFlux — тот же, что у готовых бинарей (метка v0.4.2) и у Android-сборки. */
-val openFluxCommit = "74cac6d47bf4c27947348ee957538a2c0728a485"
+/** Коммит OpenFlux — тот же, что у готовых бинарей (метка v0.7.3) и у Android-сборки. */
+val openFluxCommit = "f12e981629a18c8c01007d59ac002254c02972bb"
 fun buildOpenFlux(goos: String, goarch: String, goarm: String, dest: File) =
     buildGoClient("openflux-src", "https://github.com/p1neappleXpress/OpenFlux.git", openFluxCommit, ".", goos, goarch, goarm, dest)
 

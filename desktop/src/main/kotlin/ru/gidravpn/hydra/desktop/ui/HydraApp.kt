@@ -157,7 +157,7 @@ fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTa
                 Box(Modifier.fillMaxSize().padding(24.dp)) {
                     when (tab) {
                         Tab.HOME -> HomeScreen(c, ui, onRelaunchAdmin, openServers = { tab = Tab.SERVERS })
-                        Tab.SERVERS -> ServersScreen(c, ui)
+                        Tab.SERVERS -> ServersScreen(c, ui, openMyServers = { tab = Tab.MYSERVERS })
                         Tab.SUBS -> SubscriptionsScreen(c, ui)
                         Tab.ROUTING -> RoutingScreen(c, ui)
                         Tab.ROUTERS -> RoutersScreen(c, ui)
@@ -229,8 +229,9 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
                 else {
                     Text("${s.flag} ${s.name}", fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val engine = DesktopConfig.engineFor(s, settings, c.xrayAvailable)
-                    Text(s.summary + " · " + engineLabel(engine), fontSize = 12.sp,
+                    Text(s.summary + " · " + DesktopConfig.engineText(s, settings, c.xrayAvailable, ::engineLabel), fontSize = 12.sp,
                         color = if (engine == null) Danger else MaterialTheme.colorScheme.onSurfaceVariant)
+                    DesktopConfig.realityWarning(s, settings, c.xrayAvailable)?.let { Text(it, fontSize = 12.sp, color = Danger) }
                 }
             }
         }
@@ -293,7 +294,7 @@ private fun Stat(big: String, small: String) = Column(horizontalAlignment = Alig
 
 // ============================================================== Серверы
 @Composable
-private fun ServersScreen(c: AppController, ui: UiState) {
+private fun ServersScreen(c: AppController, ui: UiState, openMyServers: () -> Unit = {}) {
     var input by remember { mutableStateOf("") }
     var query by remember { mutableStateOf("") }
     var sortByPing by remember { mutableStateOf(false) }
@@ -305,6 +306,9 @@ private fun ServersScreen(c: AppController, ui: UiState) {
     }
     Column(Modifier.fillMaxSize()) {
         Header("Серверы") {
+            // 0.8.2-a2: владелец искал установку своего сервера и «Создать подключение» здесь, а они — во вкладке «Мои серверы»
+            // (на Android вход есть прямо на экране «Серверы»). Теперь и на ПК.
+            Button(onClick = openMyServers) { Text("Мой сервер и панели") }
             FilterChip(selected = sortByPing, onClick = { sortByPing = !sortByPing }, label = { Text("По пингу") })
             OutlinedButton(onClick = { c.import(clipboard()) }) { Text("Вставить из буфера") }
             OutlinedButton(onClick = { manual = true }) { Text("Добавить вручную") }
@@ -373,7 +377,7 @@ private fun ServerRow(c: AppController, ui: UiState, s: ServerProfile, onDelete:
                 (s.protocol?.displayName ?: s.protocolId) + " · " + s.address + ":" + s.port + " · " +
                     when {
                         !supported -> "на ПК недоступно"
-                        else -> engineLabel(engine)
+                        else -> DesktopConfig.engineText(s, ui.data.settings, c.xrayAvailable, ::engineLabel)
                     },
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )

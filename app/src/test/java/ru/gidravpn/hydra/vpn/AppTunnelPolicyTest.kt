@@ -41,11 +41,41 @@ class AppTunnelPolicyTest {
         assertTrue(AppTunnelPolicy.needsAppBypass(p(Protocol.VLESS, extra = "{\"via\":\"dpi\"}"), RouteConfig(), none))
     }
 
+    /**
+     * Б0 (0.8.2-b): VLESS по протоколу — sing-box, но REALITY (или «Xray вместо sing-box») обслуживает процесс `:xray`.
+     * Его системный DNS из туннеля попадал в тот же Xray — после смены сети подключение вставало. Такие профили — вне туннеля.
+     */
+    @Test fun xrayServedProfileKeepsAppOutside() {
+        val toggles = ru.gidravpn.hydra.data.model.EngineToggles()
+        val byXray = { s: ServerProfile -> toggles.engineFor(s, true) == ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY }
+        val reality = p(Protocol.VLESS).copy(security = "reality")
+        assertTrue(AppTunnelPolicy.needsAppBypass(reality, RouteConfig(), none, byXray))
+        assertFalse(AppTunnelPolicy.needsAppBypass(p(Protocol.VLESS).copy(security = "tls"), RouteConfig(), none, byXray))
+        // Xray выключен — REALITY идёт через sing-box (libbox с правкой, protect) — можно в туннель.
+        val sbOnly = ru.gidravpn.hydra.data.model.EngineToggles(xray = false)
+        assertFalse(AppTunnelPolicy.needsAppBypass(reality, RouteConfig(), none) { s -> sbOnly.engineFor(s, true) == ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY })
+        // «Использовать Xray вместо sing-box» — любой VLESS через Xray.
+        val prefer = ru.gidravpn.hydra.data.model.EngineToggles(preferXray = true)
+        assertTrue(AppTunnelPolicy.needsAppBypass(p(Protocol.VLESS), RouteConfig(), none) { s -> prefer.engineFor(s, true) == ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY })
+        // Узел правила маршрутизации, который обслужит Xray, — тоже.
+        val cfg = RouteConfig(rules = listOf(RouteRule(RouteKind.SUFFIX, "ru", RouteTarget.node(7))))
+        assertTrue(AppTunnelPolicy.needsAppBypass(p(Protocol.TROJAN), cfg, { id -> if (id == 7L) reality.copy(id = 7) else null }, byXray))
+    }
+
+    /** 0.8.2-b: обычный WireGuard через amneziawg-go — его сокеты не защищены (урок rc4) — приложение вне туннеля. */
+    @Test fun wireGuardViaAmneziaWgKeepsAppOutside() {
+        val t = ru.gidravpn.hydra.data.model.EngineToggles()
+        val unprotected = { s: ServerProfile -> t.engineFor(s, true) in setOf(ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY, ru.gidravpn.hydra.data.model.EngineToggles.Kind.AWG) }
+        assertTrue(AppTunnelPolicy.needsAppBypass(p(Protocol.WIREGUARD), RouteConfig(), none, unprotected))
+        val sb = ru.gidravpn.hydra.data.model.EngineToggles(amneziaWg = false)
+        assertFalse(AppTunnelPolicy.needsAppBypass(p(Protocol.WIREGUARD), RouteConfig(), none) { s -> sb.engineFor(s, true) in setOf(ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY, ru.gidravpn.hydra.data.model.EngineToggles.Kind.AWG) })
+    }
+
     @Test fun ruleToSubprocessNodeKeepsAppOutside() {
         val cfg = RouteConfig(rules = listOf(RouteRule(RouteKind.SUFFIX, "ru", RouteTarget.node(7))))
         val lookup = { id: Long -> if (id == 7L) p(Protocol.OPENFLUX, id = 7) else null }
         assertTrue(AppTunnelPolicy.needsAppBypass(p(Protocol.VLESS), cfg, lookup))
-        assertFalse(AppTunnelPolicy.needsAppBypass(p(Protocol.VLESS), cfg) { id -> if (id == 7L) p(Protocol.TROJAN, id = 7) else null })
+        assertFalse(AppTunnelPolicy.needsAppBypass(p(Protocol.VLESS), cfg, { id -> if (id == 7L) p(Protocol.TROJAN, id = 7) else null }))
         assertTrue("неизвестный узел — осторожно", AppTunnelPolicy.needsAppBypass(p(Protocol.VLESS), cfg, none))
     }
 }

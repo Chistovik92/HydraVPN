@@ -18,7 +18,7 @@ import ru.gidravpn.hydra.data.model.ServerProfile
 object OpenFluxArgs {
     private val URL_FLAGS = mapOf(
         "yandex" to "--yandex-url", "vyandex" to "--vyandex-url", "boards" to "--boards-url",
-        "mailru" to "--mailru-url", "cupsonline" to "--cupsonline-url",
+        "mailru" to "--mailru-url", "cupsonline" to "--cupsonline-url", "avito" to "--avito-url",
     )
 
     fun build(profile: ServerProfile, socksPort: Int, keyFile: String?): List<String> {

@@ -26,6 +26,10 @@ data class EngineToggles(
             Engine.SINGBOX -> {
                 val canXray = p in XRAY_CAPABLE && xray && xrayAvailable
                 when {
+                    // 0.8.2-b (Б1): обычный WireGuard на Android — ядром amneziawg-go (оно понимает и обычные конфиги); sing-box —
+                    // запасной, если тумблер AmneziaWG выключен. Через sing-box WG на Android качал ~5 КБ/с (эмулятор, x-ui и 3x-ui),
+                    // тот же сервер через amneziawg-go — 10 МБ за минуту.
+                    p == Protocol.WIREGUARD && amneziaWg -> Kind.AWG
                     canXray && (preferXray || !singBox) -> Kind.XRAY
                     singBox -> Kind.SINGBOX
                     else -> null
@@ -46,13 +50,30 @@ data class EngineToggles(
      * есть в сборке. Сервер Xray-core ≥ 26.9.8 (его ставит 3x-ui v3.10, проверено на стенде: Xray 26.10.10) требует в ClientHello
      * гибридный ключ X25519MLKEM768, а sing-box (все версии, в т. ч. 1.12.25 приложения) его не шлёт — сервер молча отдаёт сайт
      * маскировки, и подключение «подключено, 12 КБ и тишина» (sing-box: «reality verification failed»; SagerNet/sing-box#4520).
-     * Xray-core Hydra (26.9.30) этот ключ шлёт — на стенде через тот же инбаунд 1,9 МБ за 1,3 с.
+     * Xray-core Hydra (26.9.30, с 0.8.2-b — 26.10.10) этот ключ шлёт — на стенде через тот же инбаунд 1,9 МБ за 1,3 с.
      */
     fun engineFor(profile: ServerProfile, xrayAvailable: Boolean): Kind? {
         val k = engineFor(profile.protocol, xrayAvailable)
         val reality = profile.security.equals("reality", true) && profile.protocol in XRAY_CAPABLE
         return if (k == Kind.SINGBOX && reality && xray && xrayAvailable) Kind.XRAY else k
     }
+
+    /**
+     * A5 (0.8.2-a4): Xray выбран именно из-за REALITY (без REALITY профиль ушёл бы в sing-box) — на экране «Xray (REALITY)»,
+     * чтобы было видно, каким ядром и почему идёт подключение.
+     */
+    fun isRealityViaXray(profile: ServerProfile, xrayAvailable: Boolean): Boolean =
+        isReality(profile) && engineFor(profile.protocol, xrayAvailable) == Kind.SINGBOX && engineFor(profile, xrayAvailable) == Kind.XRAY
+
+    /**
+     * A5: профиль с REALITY пойдёт через sing-box (Xray выключен или его нет в сборке) — новые серверы Xray (3x-ui v3.10 и
+     * свежие панели) такое подключение молча не пустят (SagerNet/sing-box#4520). Показывается предупреждение.
+     */
+    fun realityWithoutXray(profile: ServerProfile, xrayAvailable: Boolean): Boolean =
+        isReality(profile) && engineFor(profile, xrayAvailable) == Kind.SINGBOX
+
+    private fun isReality(profile: ServerProfile) =
+        profile.security.equals("reality", true) && profile.protocol in XRAY_CAPABLE
 
     /** Протокол заблокирован именно выключенным тумблером (а не тем, что он в принципе недоступен). */
     fun isDisabled(protocol: Protocol?, xrayAvailable: Boolean): Boolean {

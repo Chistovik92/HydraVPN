@@ -60,6 +60,24 @@ class SingBoxConfigBuilderTest {
         assertEquals(GeoRoutingMode.OFF, GeoRoutingMode.fromId(null))
     }
 
+    /** 0.8.2-b: WireGuard — эндпоинтом sing-box 1.11+, а не устаревшим outbound (со старым на Android ~5 КБ/с). */
+    @Test fun wireGuardIsEndpoint() {
+        val conf = listOf("[Interface]", "PrivateKey = aOF+LkFG/xbhmh3/o3tcJKAykOxMOaiter3PfEZ7I3E=", "Address = 10.0.0.2/32", "MTU = 1420", "",
+            "[Peer]", "PublicKey = Xxflp8apO4k+UMJUn1v3rCESlAIO2NtI4OZDnFY4Sic=", "AllowedIPs = 0.0.0.0/0",
+            "Endpoint = 203.0.113.7:25000", "PersistentKeepalive = 25").joinToString("\n")
+        val p = WireGuardParser.toProfile(conf, "WireGuard", isAmnezia = false)!!
+        assertEquals("wireguard", p.protocolId)
+        val cfg = dump("wireguard_endpoint", SingBoxConfigBuilder.build(p))
+        assertTrue(cfg.getJSONArray("outbounds").objects().none { it.optString("type") == "wireguard" })
+        val ep = cfg.getJSONArray("endpoints").objects().single()
+        assertEquals("proxy", ep.getString("tag"))
+        assertEquals("10.0.0.2/32", ep.getJSONArray("address").getString(0))
+        assertEquals(1420, ep.getInt("mtu"))
+        val peer = ep.getJSONArray("peers").getJSONObject(0)
+        assertEquals("203.0.113.7", peer.getString("address")); assertEquals(25000, peer.getInt("port"))
+        assertEquals(25, peer.getInt("persistent_keepalive_interval"))
+    }
+
     private fun dump(name: String, cfg: JSONObject): JSONObject {
         File("build/singbox-configs").apply { mkdirs() }.resolve("$name.json").writeText(cfg.toString(2))
         return cfg

@@ -267,6 +267,8 @@ object RoutePlanApplier {
             }
             if (route.optString("final") == "direct") route.put("final", RouteTarget.DPI)
         }
+        // 0.8.2-b: узлы WireGuard — эндпоинтами, как и основной выход (SingBoxConfigBuilder.wireGuardToEndpoints).
+        ru.gidravpn.hydra.data.subscription.SingBoxConfigBuilder.wireGuardToEndpoints(root)
         return warn
     }
 

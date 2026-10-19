@@ -46,4 +46,33 @@ class EngineTogglesTest {
         assertNull(EngineToggles(singBox = false, xray = false).engineFor(r, true))
         assertEquals(Kind.XRAY, EngineToggles(preferXray = true).engineFor(tls, true))
     }
+
+    /** 0.8.2-a4 (A5): видно, почему Xray, и предупреждение, когда REALITY пойдёт через sing-box. */
+    @Test fun realityReasonAndWarning() {
+        val r = ServerProfile(name = "r", protocolId = Protocol.VLESS.id, address = "203.0.113.5", port = 443, security = "reality", transport = "grpc")
+        val tls = r.copy(security = "tls")
+        val hy = r.copy(protocolId = Protocol.HYSTERIA2.id)
+        assertTrue(EngineToggles().isRealityViaXray(r, true))
+        assertFalse(EngineToggles().realityWithoutXray(r, true))
+        assertFalse(EngineToggles(preferXray = true).isRealityViaXray(r, true))   // Xray выбран и без REALITY — причина не REALITY
+        assertFalse(EngineToggles(singBox = false).isRealityViaXray(r, true))     // sing-box выключен — Xray и так единственный
+        assertFalse(EngineToggles().isRealityViaXray(tls, true))
+        assertTrue(EngineToggles(xray = false).realityWithoutXray(r, true))       // Xray выключен — предупреждение
+        assertTrue(EngineToggles().realityWithoutXray(r, false))                  // Xray нет в сборке
+        assertFalse(EngineToggles(xray = false).realityWithoutXray(tls, true))
+        assertFalse(EngineToggles(xray = false, singBox = false).realityWithoutXray(r, true)) // ядро выключено — об этом своё сообщение
+        assertFalse(EngineToggles().realityWithoutXray(hy, false))                // не Xray-протокол
+    }
+
+    /** 0.8.2-b (Б1): обычный WireGuard на Android — ядром amneziawg-go, sing-box — запасной. */
+    @Test fun wireGuardViaAmneziaWg() {
+        assertEquals(EngineToggles.Kind.AWG, EngineToggles().engineFor(Protocol.WIREGUARD, true))
+        assertEquals(EngineToggles.Kind.SINGBOX, EngineToggles(amneziaWg = false).engineFor(Protocol.WIREGUARD, true))
+        assertEquals(EngineToggles.Kind.AWG, EngineToggles(singBox = false).engineFor(Protocol.WIREGUARD, true))
+        assertEquals(null, EngineToggles(singBox = false, amneziaWg = false).engineFor(Protocol.WIREGUARD, true))
+        assertFalse(EngineToggles(singBox = false).isDisabled(Protocol.WIREGUARD, true))
+        // остальное — как было
+        assertEquals(EngineToggles.Kind.SINGBOX, EngineToggles().engineFor(Protocol.HYSTERIA2, true))
+        assertEquals(EngineToggles.Kind.AWG, EngineToggles().engineFor(Protocol.AMNEZIAWG, true))
+    }
 }

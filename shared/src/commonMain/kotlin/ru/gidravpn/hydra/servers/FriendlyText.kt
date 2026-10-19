@@ -157,6 +157,19 @@ object FriendlyText {
             t(en, "Проверим, что панель открывается", "Check that the panel opens"),
             t(en, "Пользователей и подключения вы заведёте на сайте панели — кнопка «Открыть панель»", "You create users and connections on the panel website — the “Open panel” button"),
         )
+        ServerKind.PANEL_REMNAWAVE -> listOf(
+            fmt(t(en, "Поставим Docker, если его нет, и панель %s закреплённой версии (база и кэш — в контейнерах)", "Install Docker if missing and the %s panel of a pinned version (database and cache in containers)"), kind.panel!!.title),
+            t(en, "Добавим небольшой прокси, чтобы сайт панели открывался через защищённый туннель Hydra — снаружи её не найти", "Add a small proxy so the panel website opens through Hydra's secure tunnel — invisible from outside"),
+            t(en, "Создадим владельца с надёжным логином и паролем, установим ноду (ядро Xray) и подключим её", "Create the owner with a strong login and password, install a node (Xray core) and connect it"),
+            t(en, "Подключения создаются кнопкой «Создать подключение» или на сайте панели", "Create connections with the “Create connection” button or on the panel website"),
+        )
+        ServerKind.PANEL_PASARGUARD -> listOf(
+            fmt(t(en, "Поставим Docker, если его нет, и официальные установщики %s закреплённой версии", "Install Docker if missing and the official %s installers of a pinned version"), kind.panel!!.title),
+            t(en, "Установим панель и ноду (ядро Xray) на этом сервере", "Install the panel and a node (Xray core) on this server"),
+            t(en, "Создадим владельца панели с надёжным логином и паролем и подключим ноду", "Create the panel owner with a strong login and password and connect the node"),
+            t(en, "Панель будет видна только через защищённый туннель Hydra — снаружи её не найти", "The panel is reachable only through Hydra's secure tunnel — invisible from outside"),
+            t(en, "Подключения создаются кнопкой «Создать подключение» или на сайте панели", "Create connections with the “Create connection” button or on the panel website"),
+        )
     }
 
     /** Рекомендация по умолчанию: что поставить, если человек не знает. */
@@ -167,5 +180,7 @@ object FriendlyText {
         ServerKind.OPENFLUX -> t(en, "Для опытных: обходит блокировки через сервисы вроде Яндекс Документов.", "For experienced users: bypasses blocking through services like Yandex Docs.")
         ServerKind.PANEL_3XUI -> t(en, "Для тех, кто хочет сам управлять пользователями на сайте-панели.", "For those who want to manage users on a panel website.")
         ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> t(en, "Если вы привыкли к этой панели: всё управление — на её сайте.", "If you are used to this panel: everything is managed on its website.")
+        ServerKind.PANEL_REMNAWAVE -> t(en, "Современная панель: пользователи, отряды, лимиты, подписки — на её сайте. Ставится в Docker.", "A modern panel: users, squads, limits, subscriptions on its website. Runs in Docker.")
+        ServerKind.PANEL_PASARGUARD -> t(en, "Наследник Marzban: пользователи, группы, лимиты — на сайте панели. Ставится в Docker.", "Marzban's successor: users, groups, limits on the panel website. Runs in Docker.")
     }
 }

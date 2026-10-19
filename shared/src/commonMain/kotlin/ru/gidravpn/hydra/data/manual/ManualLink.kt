@@ -117,8 +117,8 @@ object ManualLink {
                 "AmneziaWG parameters (Jc, Jmin, Jmax, S1–S4, H1–H4, I1–I5 — one «key = value» per line)", Kind.MULTILINE, showIf = "conf" to setOf("")),
         ) else emptyList())
         "openflux" -> listOf(
-            Field("transport", "Транспорт", "Transport", Kind.CHOICE, default = "direct", choices = listOf("direct", "vyandex", "yandex", "mailru", "cupsonline", "oneme")),
-            Field("url", "Адрес узла host:порт / ссылка на документ", "Node host:port / document link", required = true, showIf = "transport" to setOf("direct", "vyandex", "yandex", "mailru", "cupsonline"),
+            Field("transport", "Транспорт", "Transport", Kind.CHOICE, default = "direct", choices = listOf("direct", "vyandex", "yandex", "mailru", "cupsonline", "avito", "telemost", "oneme")),
+            Field("url", "Адрес узла host:порт / ссылка на документ", "Node host:port / document link", required = true, showIf = "transport" to setOf("direct", "vyandex", "yandex", "mailru", "cupsonline", "avito", "telemost"),
                 hintRu = "direct — 203.0.113.5:24680; Яндекс — https://docs.yandex.ru/edit/d/…", hintEn = "direct — 203.0.113.5:24680; Yandex — https://docs.yandex.ru/edit/d/…"),
             Field("maxToken", "Токен MAX", "MAX token", Kind.SECRET, required = true, showIf = "transport" to setOf("oneme")),
             Field("maxUid", "ID пользователя MAX", "MAX user ID", required = true, showIf = "transport" to setOf("oneme")),

@@ -198,7 +198,7 @@ object XrayConfigBuilder {
 
     /**
      * Транспорт в терминах Xray — как на ПК (shared XrayConfigBuilder). «http»/«h2» в Xray-core 24+ удалён (в приложении —
-     * 26.9.30): ближайшая замена с тем же поведением — xhttp.
+     * 26.10.10): ближайшая замена с тем же поведением — xhttp.
      */
     private fun transportName(t: String): String = when (t.lowercase()) {
         "ws", "grpc", "httpupgrade", "xhttp" -> t.lowercase()

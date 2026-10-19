@@ -36,6 +36,8 @@ object LinkParser {
             "tuic"      -> parseTuic(link)
             "wireguard", "wg" -> WireGuardParser.toProfile(link, "WireGuard", isAmnezia = false)
             "awg", "amnezia" -> WireGuardParser.toProfile(link, "AmneziaWG", isAmnezia = true)
+            // 3x-ui (0.8.2-a2) отдаёт AmneziaWG как `vpn://` + base64 готового .conf; формат AmneziaVPN (сжатый JSON) сюда не подходит — null
+            "vpn" -> WireGuardParser.toProfile(link, "AmneziaWG", isAmnezia = false)
             "sstp"      -> parseUserPass(link, Protocol.SSTP, 443)
             "l2tp"      -> parseUserPass(link, Protocol.L2TP, 1701)
             "pptp"      -> parseUserPass(link, Protocol.PPTP, 1723)
@@ -120,8 +122,12 @@ object LinkParser {
             alpn = q["alpn"].orEmpty(),
             extra = JSONObject().apply {
                 q["host"]?.takeIf { it.isNotBlank() }?.let { put("ws_host", it) }
+                // Trojan + REALITY (0.8.2-a2, 3x-ui): без ключа REALITY Xray не собирал конфиг («empty password»)
+                q["pbk"]?.let { put("reality_pbk", it) }
+                q["sid"]?.let { put("reality_sid", it) }
                 if (insecureFlag(q)) put("insecure", true)
             }.toString(),
+            fingerprint = q["fp"] ?: "chrome",
         )
     }
 
@@ -233,12 +239,16 @@ object LinkParser {
     private operator fun Ss.component3() = host
     private operator fun Ss.component4() = port
 
-    private fun decodeSs(core: String): Ss {
+    private fun decodeSs(core0: String): Ss {
+        // параметры после порта (`?type=tcp` у 3x-ui) — не часть порта: раньше порт терялся и подставлялся 8388
+        val core = core0.substringBefore("?").removeSuffix("/")
         return if ("@" in core) {
-            val creds = String(b64(core.substringBefore("@")))
+            val user = core.substringBeforeLast("@")
+            // SIP002 позволяет `метод:пароль` открытым текстом (URL-кодированным) — так их отдаёт 3x-ui для Shadowsocks 2022 (0.8.2-a2)
+            val creds = if (':' in user || user.contains("%3A", true)) java.net.URLDecoder.decode(user.replace("+", "%2B"), "UTF-8") else String(b64(user))
             val method = creds.substringBefore(":")
             val password = creds.substringAfter(":")
-            val hostPort = core.substringAfter("@")
+            val hostPort = core.substringAfterLast("@")
             Ss(method, password, hostPort.substringBeforeLast(":"),
                 hostPort.substringAfterLast(":").toIntOrNull() ?: 8388)
         } else {

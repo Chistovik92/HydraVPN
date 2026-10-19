@@ -15,6 +15,13 @@ enum class PanelKind(val title: String, val repo: String) {
     SUI("s-ui", "alireza0/s-ui"),
     /** x-ui (alireza0) — 0.8.1: так же, как s-ui. */
     XUI("x-ui", "alireza0/x-ui"),
+    /** PasarGuard (наследник Marzban, Docker) — 0.8.2-a3: установка, вход на сайт, подключения ([PasarGuardPanel]). */
+    PASARGUARD("PasarGuard", "PasarGuard/panel"),
+    /** Remnawave (Docker, за прокси Caddy на 127.0.0.1) — 0.8.2-a3 ([RemnawavePanel]). */
+    REMNAWAVE("Remnawave", "remnawave/panel");
+
+    /** Панель в Docker, видна только с самого сервера: сайт — через туннель Hydra, без сертификата на IP и «открыть извне». */
+    val tunnelOnly: Boolean get() = this == PASARGUARD || this == REMNAWAVE
 }
 
 /**
@@ -37,15 +44,19 @@ data class PanelInstance(
      * приложения, API 3x-ui — `curl` на сервере по SSH. [baseUrl] остаётся внешним адресом (на него выписан сертификат).
      */
     val local: Boolean = false,
+    /** Ноды панели на других серверах (0.8.2-a4). */
+    val nodes: List<PanelNode> = emptyList(),
 ) {
     fun toJson(): JSONObject = JSONObject().put("kind", kind.name).put("baseUrl", baseUrl).put("user", username).put("password", password)
         .put("token", token).put("version", version).put("inboundId", inboundId).put("client", clientEmail).put("local", local)
+        .also { if (nodes.isNotEmpty()) it.put("nodes", PanelNode.listToJson(nodes)) }
 
     companion object {
         fun fromJson(o: JSONObject) = PanelInstance(
             runCatching { PanelKind.valueOf(o.optString("kind", "XUI3")) }.getOrDefault(PanelKind.XUI3),
             o.getString("baseUrl"), o.optString("user"), o.optString("password"), o.getString("token"),
             o.optString("version"), o.optInt("inboundId"), o.optString("client"), o.optBoolean("local"),
+            PanelNode.listFromJson(o.optJSONArray("nodes")),
         )
     }
 }
@@ -134,6 +145,14 @@ class XuiApi(private val t: XuiTransport) {
      * null — подписка в панели выключена или у клиента нет `subId`.
      */
     fun subscriptionUrl(host: String, subId: String): String? = XuiPanel.subscriptionUrl(settings(), host, subId)
+
+    /**
+     * Подключить уже существующего пользователя к другому инбаунду (0.8.2-a2, `POST /panel/api/clients/{email}/attach`): его
+     * подписка сама получает новое подключение, учётные данные под протокол панель заполняет сама.
+     */
+    fun attachClient(email: String, inboundIds: List<Int>) {
+        obj(t.call("POST", "/panel/api/clients/${java.net.URLEncoder.encode(email, "UTF-8")}/attach", JSONObject().put("inboundIds", JSONArray(inboundIds)).toString()))
+    }
 
     fun delClient(email: String) { obj(t.call("POST", "/panel/api/clients/del/${java.net.URLEncoder.encode(email, "UTF-8")}")) }
 
@@ -348,6 +367,7 @@ object XuiPanel {
             PanelKind.XUI -> "/usr/local/x-ui/x-ui cert -webCert $crt -webCertKey $key >/dev/null && " +
                 OtherPanels.settingsCommand(kind, mapOf("subCertFile" to crt, "subKeyFile" to key))
             PanelKind.SUI -> OtherPanels.settingsCommand(kind, mapOf("webCertFile" to crt, "webKeyFile" to key, "subCertFile" to crt, "subKeyFile" to key))
+            PanelKind.PASARGUARD, PanelKind.REMNAWAVE -> error("${kind.title} в Hydra — только через туннель, без сертификата на IP")
         }
         add(Step("cert-panel", "Включить HTTPS у панели и подписки",
             "$cmd && systemctl restart $svc && sleep 2 && systemctl is-active $svc",

@@ -34,6 +34,12 @@ data class ServerStatus(
     val suiInstalled: Boolean = false,
     val suiByHydra: Boolean = false,
     val xuiAlirezaByHydra: Boolean = false,
+    /** PasarGuard на сервере и метка «поставила Hydra» (0.8.2-a3). */
+    val pgInstalled: Boolean = false,
+    val pgByHydra: Boolean = false,
+    /** Remnawave на сервере и метка «поставила Hydra» (0.8.2-a3). */
+    val rwInstalled: Boolean = false,
+    val rwByHydra: Boolean = false,
     /** Копия записи панели `/etc/hydra/panel.json`. */
     val panelStateJson: String = "",
     /** Ошибка проверки (сервер недоступен и т. п.); null — проверка прошла. */
@@ -58,7 +64,7 @@ object ServerOps {
     const val BACKUP_DIR = "/root/hydra-backups"
 
     /** Где панели хранят базу (SQLite). */
-    val PANEL_DBS = mapOf("x-ui" to "/etc/x-ui/x-ui.db", "s-ui" to "/usr/local/s-ui/db/s-ui.db")
+    val PANEL_DBS = mapOf("x-ui" to "/etc/x-ui/x-ui.db", "s-ui" to "/usr/local/s-ui/db/s-ui.db", "pasarguard" to "/var/lib/pasarguard/db.sqlite3")
 
     /** Скопировать базы стоящих панелей в [BACKUP_DIR] (если базы нет — ничего не делает). */
     fun backupPanelsCommand(): String = "mkdir -p $BACKUP_DIR && chmod 700 $BACKUP_DIR; d=\$(date +%Y%m%d-%H%M%S); " +
@@ -89,6 +95,10 @@ object ServerOps {
         append("echo SUI=\$([ -e /usr/local/s-ui ] && echo 1 || echo 0); ")
         append("echo SUI_MARK=\$([ -f ${OtherPanels.SUI.mark} ] && echo 1 || echo 0); ")
         append("echo XUIA_MARK=\$([ -f ${OtherPanels.XUI.mark} ] && echo 1 || echo 0); ")
+        append("echo PG=\$([ -e ${PasarGuardPanel.DIR}/docker-compose.yml ] && echo 1 || echo 0); ")
+        append("echo PG_MARK=\$([ -f ${PasarGuardPanel.MARK} ] && echo 1 || echo 0); ")
+        append("echo RW=\$([ -e ${RemnawavePanel.DIR}/docker-compose.yml ] && echo 1 || echo 0); ")
+        append("echo RW_MARK=\$([ -f ${RemnawavePanel.MARK} ] && echo 1 || echo 0); ")
         append("echo '---AWGDUMP'; $AWG_ENV ${AwgInstallPlan.BIN_DIR}/awg show $iface dump 2>/dev/null; ")
         append("echo '---AWGSTATE'; cat $AWG_STATE 2>/dev/null; echo; ")
         append("echo '---AWGCONF'; cat ${AwgInstallPlan.CONF_DIR}/$iface.conf 2>/dev/null; ")
@@ -123,6 +133,7 @@ object ServerOps {
             xuiInstalled = kv["XUI"] == "1", xuiByHydra = kv["XUI_MARK"] == "1", xuiState = kv["XUI_STATE"].orEmpty(),
             xuiResult = sections["XUIRESULT"].orEmpty().joinToString("\n").trim(),
             suiInstalled = kv["SUI"] == "1", suiByHydra = kv["SUI_MARK"] == "1", xuiAlirezaByHydra = kv["XUIA_MARK"] == "1",
+            pgInstalled = kv["PG"] == "1", pgByHydra = kv["PG_MARK"] == "1", rwInstalled = kv["RW"] == "1", rwByHydra = kv["RW_MARK"] == "1",
             panelStateJson = sections["PANELSTATE"].orEmpty().joinToString("\n").trim(),
         )
     }
@@ -156,6 +167,36 @@ object ServerOps {
         else -> null
     }
 
+    /**
+     * Открыть порт только для одного адреса (0.8.2-a4: порт ноды — только главному серверу) и запомнить это в [FW_LIST]
+     * строкой `ufw-from <ip> <порт/протокол>` — её закрывают [closePortFromCommand] и очистка сервера.
+     */
+    fun openPortFromStep(firewall: String, port: String, fromIp: String): Step? {
+        require(Regex("""^\d{1,3}(\.\d{1,3}){3}$""").matches(fromIp)) { "Неверный адрес $fromIp" }
+        require(Regex("""^\d{1,5}/(tcp|udp)$""").matches(port)) { "Неверный порт $port" }
+        val (n, proto) = port.split('/')
+        return when (firewall) {
+            "ufw" -> Step("fw-from", "Открыть $port в ufw только для $fromIp",
+                "ufw allow from $fromIp to any port $n proto $proto && $MKDIR && echo 'ufw-from $fromIp $port' >> $FW_LIST",
+                rollback = "ufw delete allow from $fromIp to any port $n proto $proto")
+            "firewalld" -> {
+                val rule = "rule family=ipv4 source address=$fromIp port port=$n protocol=$proto accept"
+                Step("fw-from", "Открыть $port в firewalld только для $fromIp",
+                    "firewall-cmd --permanent --add-rich-rule='$rule' && firewall-cmd --reload && $MKDIR && echo 'firewalld-from $fromIp $port' >> $FW_LIST",
+                    rollback = "firewall-cmd --permanent --remove-rich-rule='$rule' && firewall-cmd --reload")
+            }
+            else -> null
+        }
+    }
+
+    /** Закрыть порт, открытый [openPortFromStep]. */
+    fun closePortFromCommand(port: String, fromIp: String): String {
+        val (n, proto) = port.split('/')
+        return "if grep -qx 'ufw-from $fromIp $port' $FW_LIST 2>/dev/null; then ufw delete allow from $fromIp to any port $n proto $proto >/dev/null 2>&1; fi; " +
+            "if grep -qx 'firewalld-from $fromIp $port' $FW_LIST 2>/dev/null; then firewall-cmd --permanent --remove-rich-rule='rule family=ipv4 source address=$fromIp port port=$n protocol=$proto accept' >/dev/null 2>&1 && firewall-cmd --reload >/dev/null 2>&1; fi; " +
+            "[ -f $FW_LIST ] && sed -i '\\|-from $fromIp $port\$|d' $FW_LIST; true"
+    }
+
     /** Закрыть порт, если его открывала Hydra (есть в [FW_LIST]). */
     fun closePortCommand(port: String) =
         "if grep -qx 'ufw $port' $FW_LIST 2>/dev/null; then ufw delete allow $port >/dev/null 2>&1; fi; " +
@@ -185,13 +226,19 @@ object ServerOps {
         Step("wipe-xui", "Удалить панель 3x-ui, если её ставила Hydra",
             "if [ -f $XUI_MARK ] && [ -x /usr/bin/x-ui ]; then printf 'y\\n' | /usr/bin/x-ui uninstall >/dev/null 2>&1; echo '3x-ui: удалена'; " +
                 "else echo '3x-ui: не ставилась Hydra'; fi; true"),
-        Step("wipe-panels", "Удалить панели s-ui и x-ui, если их ставила Hydra",
+        Step("wipe-panels", "Удалить панели s-ui, x-ui, PasarGuard и Remnawave, если их ставила Hydra",
             listOf(OtherPanels.SUI, OtherPanels.XUI).joinToString(" ") { s ->
                 "if [ -f ${s.mark} ]; then ${OtherPanels.uninstallCommand(s)}; echo '${s.kind.title}: удалена'; fi;"
-            } + " rm -f ${OtherPanels.PANEL_STATE}; true"),
+            } + " if [ -f ${PasarGuardPanel.MARK} ]; then ${PasarGuardPanel.uninstallCommand()}; echo 'PasarGuard: удалена'; fi;" +
+                " if [ -f ${RemnawavePanel.MARK} ]; then ${RemnawavePanel.backupCommand()}; ${RemnawavePanel.uninstallCommand()}; echo 'Remnawave: удалена'; fi;" +
+                " if [ -f ${PanelNodes.PG_NODE_MARK} ]; then ${PanelNodes.pgNodeUninstallCommand()}; echo 'нода PasarGuard: удалена'; fi;" +
+                " if [ -f ${PanelNodes.RW_NODE_MARK} ]; then ${PanelNodes.rwNodeUninstallCommand()}; echo 'нода Remnawave: удалена'; fi;" +
+                " rm -f ${OtherPanels.PANEL_STATE}; true"),
         Step("wipe-fw", "Закрыть порты, которые открывала Hydra",
-            "if [ -f $FW_LIST ]; then while read -r fw p; do case \"\$fw\" in " +
+            "if [ -f $FW_LIST ]; then while read -r fw p q; do case \"\$fw\" in " +
                 "ufw) ufw delete allow \"\$p\" >/dev/null 2>&1 && echo \"закрыт \$p (ufw)\";; " +
+                "ufw-from) ufw delete allow from \"\$p\" to any port \"\${q%/*}\" proto \"\${q#*/}\" >/dev/null 2>&1 && echo \"закрыт \$q для \$p (ufw)\";; " +
+                "firewalld-from) firewall-cmd --permanent --remove-rich-rule=\"rule family=ipv4 source address=\$p port port=\${q%/*} protocol=\${q#*/} accept\" >/dev/null 2>&1 && echo \"закрыт \$q для \$p (firewalld)\";; " +
                 "firewalld) firewall-cmd --permanent --remove-port=\"\$p\" >/dev/null 2>&1 && echo \"закрыт \$p (firewalld)\";; esac; done < $FW_LIST; " +
                 "command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --reload >/dev/null 2>&1; fi; true"),
         Step("wipe-state", "Удалить копии настроек и временные файлы Hydra",

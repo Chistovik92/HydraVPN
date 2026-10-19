@@ -42,6 +42,38 @@ class UpdateAndRouterTest {
         assertNull(Updates.pick(info, Os.MACOS, "x64", Updates.InstallKind.INSTALLED))
     }
 
+    /** A7 (0.8.2-a4): установщик Windows ждёт выхода Hydra и её ядер; путь с пробелами и апострофом не ломает команду. */
+    @Test fun windowsInstallerStartsAfterHydraExits() {
+        val s = Updates.afterExitScript(4242, "C:\\Users\\O'Neil\\AppData\\Local\\Hydra",
+            listOf("msiexec", "/i", "C:\\Users\\O'Neil\\AppData\\Roaming\\Hydra VPN\\updates\\Hydra-desktop-0.8.2-windows-x64.msi"))
+        assertTrue(s, s.startsWith("Wait-Process -Id 4242 -Timeout 90"))
+        assertTrue(s, "\$d = 'C:\\Users\\O''Neil\\AppData\\Local\\Hydra\\'" in s)
+        assertTrue(s, s.indexOf("Wait-Process -Timeout 30") < s.indexOf("Start-Process"))
+        assertTrue(s, s.endsWith("Start-Process -FilePath 'msiexec' -ArgumentList '/i \"C:\\Users\\O''Neil\\AppData\\Roaming\\Hydra VPN\\updates\\Hydra-desktop-0.8.2-windows-x64.msi\"'"))
+        val exe = Updates.afterExitScript(1, null, listOf("C:\\u\\Hydra.exe"))
+        assertFalse(exe, "\$d" in exe)
+        assertTrue(exe, exe.endsWith("Start-Process -FilePath 'C:\\u\\Hydra.exe'"))
+    }
+
+    /** То же вживую в PowerShell (только Windows): процесс уже вышел → команда запускается, путь и аргумент с пробелами целы. */
+    @Test fun windowsAfterExitScriptRunsForReal() {
+        org.junit.Assume.assumeTrue(System.getProperty("os.name").lowercase().startsWith("windows"))
+        val dir = java.nio.file.Files.createTempDirectory("hydra upd'").toFile()
+        val out = java.io.File(dir, "o k.txt")
+        // как msiexec /i "<путь с пробелами>": программа, которая сама разбирает свою командную строку
+        val ps1 = java.io.File(dir, "w r.ps1").apply { writeText("Set-Content -LiteralPath (Join-Path \$PSScriptRoot 'o k.txt') -Value \$args[0]\r\n") }
+        val gone = ProcessBuilder("cmd.exe", "/c", "exit").start().apply { waitFor() }.pid()
+        val s = Updates.afterExitScript(gone, dir.absolutePath, listOf("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1.absolutePath, "a b"))
+        val p = ProcessBuilder(Updates.powershellFile(Updates.writeScript(java.io.File(dir, "Обновление.ps1"), s))).redirectErrorStream(true).start()
+        val log = p.inputStream.bufferedReader().readText()
+        p.waitFor()
+        val end = System.currentTimeMillis() + 15_000
+        while (!out.exists() && System.currentTimeMillis() < end) Thread.sleep(200)
+        Thread.sleep(300)
+        assertEquals("$s\n$log", "a b", out.takeIf { it.exists() }?.readText()?.trim())
+        dir.deleteRecursively()
+    }
+
     @Test fun versionsAndTrustedHosts() {
         assertTrue(UpdateFeed.isNewer("0.7.1", "0.7.0"))
         assertTrue(UpdateFeed.isNewer("0.7.0.1", "0.7.0"))

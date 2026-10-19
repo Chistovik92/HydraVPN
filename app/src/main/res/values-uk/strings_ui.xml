@@ -350,4 +350,16 @@
     <string name="split_preset_done">Додано до винятків: %1$d. Режим: усе, крім вибраних.</string>
     <string name="split_preset_none">Відповідних російських застосунків не знайдено</string>
     <string name="manual_bad">Із цих полів не виходить робочий сервер — перевірте адресу, ключі й порт.</string>
+    <string name="main_engine">Ядро: %1$s</string>
+    <string name="ms_nodes">Ноди</string>
+    <string name="ms_nodes_none">Нод поки немає. Нода — другий сервер, на якому працюють підключення цієї панелі.</string>
+    <string name="ms_node_add">Додати ноду</string>
+    <string name="ms_node_remove">Прибрати</string>
+    <string name="ms_node_remove_q">Прибрати ноду «%1$s»?</string>
+    <string name="ms_node_remove_msg">Ноду буде прибрано з панелі, а з сервера %1$s — усе, що Hydra ставила для неї. Підключення через цей сервер перестануть працювати.</string>
+    <string name="ms_node_pick_title">Нода для панелі %1$s</string>
+    <string name="ms_node_pick_none">Немає вільного сервера: додайте другий сервер у «Мої сервери» — на ньому не має бути служб Hydra.</string>
+    <string name="ms_node_pick_hint">Hydra поставить на вибраний сервер усе потрібне для ноди й підключить її до панелі. Порти ноди відкриються лише для цього сервера. 2–5 хвилин.</string>
+    <string name="ms_node_of">Нода панелі %1$s сервера «%2$s»</string>
+    <string name="ms_node_of_hint">Підключення панелі працюють і через цей сервер. Прибрати ноду — на картці «%1$s».</string>
 </resources>

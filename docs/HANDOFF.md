@@ -11,7 +11,7 @@
 - Стек: Kotlin + Jetpack Compose, minSdk 26, compileSdk 35
 - Лицензия: **GPL-3.0** (`LICENSE`), сторонние компоненты — `THIRD_PARTY_NOTICES.md`
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Текущая версия: **0.8.1** (выпуск 15.10.2026, versionCode 72; `master`). Следующая — 0.8.2-a в ветке `claude/0-8-2-alpha` (versionCode 73+), план — `docs/versions/0.8.2.md`.
+- Текущая версия: **0.8.1** (выпуск 15.10.2026, versionCode 72; `master`). Ветка `claude/0-8-2-alpha`: пре-релиз **0.8.2-b** (16.10.2026, versionCode 77), план — `docs/versions/0.8.2.md`.
 - Флейворы сборки: `stub` (симуляция, без нативных `.aar`, собирается и в CI) и
   `native` (реальные ядра, требует `.aar`/`.so`).
 
@@ -58,7 +58,7 @@
 | PPTP | userspace PPP + GRE | **0.7.19:** Android через root-помощника (raw GRE), Windows через RAS; не проверено на сервере |
 | **WDTT** (beta) | нативный `libclient.so` | WG через TURN ВК; нужен нативный клиент + VK-auth |
 | **olcRTC** (beta) | подпроцесс `libolcrtc.so` + SOCKS5 → sing-box | TCP-over-WebRTC; Android, ПК, iOS (0.7.10); апстрим заархивирован |
-| **OpenFlux** (beta) | подпроцесс `libopenflux.so` + SOCKS5 → sing-box | клиент v0.4.2, `openflux://v1/`; Android, ПК, iOS |
+| **OpenFlux** (beta) | подпроцесс `libopenflux.so` + SOCKS5 → sing-box | клиент v0.7.3 (0.8.2-b), `openflux://v1/`; Android, ПК, iOS |
 | **Обход DPI** (0.7.13) | ByeDPI (`ciadpi` v0.17.3), локальный SOCKS5 :10880 | профиль «Обход DPI», трафик «напрямую», выход `dpi`; мастер подбора; настройки подбора — 0.7.15; все платформы (iOS — внутри расширения) |
 | **Telegram по WebSocket** (0.7.14) | собственный Kotlin-порт tg-ws-proxy, SOCKS5 :10881 | Android и ПК; iOS — в очереди; подробно — `docs/ROUTING.md` |
 | **Geo-базы** (0.7.13) | `.srs` sing-box, загрузка в приложении | источники, зеркала, откат; все платформы |
@@ -73,7 +73,7 @@
 ## Открытые задачи (TODO)
 
 1. ✅ **Нативные ядра** (`docs/BUILD.md`) — все собраны и входят в full-APK (состояние на 0.7.15): `libbox.aar` (sing-box 1.12.25),
-   `libXray.aar` (Xray 26.9.30), AmneziaWG (`libwg-go.so`, v3.1.20260828), `libolcrtc.so`, `libopenflux.so` (v0.4.2), `libciadpi.so` (ByeDPI 0.17.3).
+   `libXray.aar` (Xray 26.10.10, `scripts/fetch-libxray.sh`), AmneziaWG (`libwg-go.so`, v3.1.20260828), `libolcrtc.so`, `libopenflux.so` (v0.7.3), `libciadpi.so` (ByeDPI 0.17.3).
    Сборка — `scripts/build-*.sh` (результаты в `app/libs/`, в git не входят); сверка версий — `scripts/check-updates.sh` перед каждым релизом;
    WDTT не берём. Перед `release.sh` пересобирать OpenFlux и olcRTC (устаревший клиент уже уходил в релиз).
 2. **On-device проверка SSTP/L2TP**: согласование PPP, MS-CHAPv2, IPCP, SNAT/чек-суммы

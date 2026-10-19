@@ -292,13 +292,13 @@
     <string name="profile_hwid_hint">Sent to subscription panels as x-hwid. Panels with a device limit use it to count this phone.</string>
     <string name="eng_intro">Every core is on by default. A turned-off core does not start the tunnel; its servers are marked in the Servers list.</string>
     <string name="eng_singbox">sing-box</string>
-    <string name="eng_singbox_desc">VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5, WireGuard. Stays running inside as the TUN bridge for Xray, olcRTC and OpenFlux even when off.</string>
+    <string name="eng_singbox_desc">VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC v5; WireGuard when AmneziaWG is off. Stays running inside as the TUN bridge for Xray, olcRTC and OpenFlux even when off.</string>
     <string name="eng_xray">Xray Core</string>
     <string name="eng_xray_desc">VLESS, VMess, Trojan, Shadowsocks with XTLS Vision / REALITY, in a separate process. Used for these protocols when preferred below or when sing-box is off.</string>
     <string name="eng_prefer_xray">Use Xray instead of sing-box</string>
     <string name="eng_prefer_xray_desc">For VLESS / VMess / Trojan / SS.</string>
     <string name="eng_awg">AmneziaWG 1.0 – 3.1</string>
-    <string name="eng_awg_desc">Obfuscated WireGuard, all protocol generations: 1.0 (Jc/Jmin/Jmax, S1/S2, H1–H4), 1.5 (I1–I5), 2.0 (S3/S4, header ranges) and 3.x (header protection key, content padding, random trailers, timers). Core: amneziawg-go 3.1.</string>
+    <string name="eng_awg_desc">Obfuscated WireGuard, all protocol generations: 1.0 (Jc/Jmin/Jmax, S1/S2, H1–H4), 1.5 (I1–I5), 2.0 (S3/S4, header ranges) and 3.x (header protection key, content padding, random trailers, timers). Core: amneziawg-go 3.1. Also serves plain WireGuard.</string>
     <string name="eng_ppp">SSTP / L2TP</string>
     <string name="eng_ppp_desc">Our own PPP stack in Kotlin (LCP, MS-CHAPv2, IPCP): SSTP over TLS with crypto-binding, L2TP over UDP without IPsec.</string>
     <string name="eng_olcrtc">olcRTC</string>
@@ -359,4 +359,16 @@
     <string name="split_preset_ru">Russian apps go direct</string>
     <string name="split_preset_done">Added to exceptions: %1$d. Mode: everything except selected.</string>
     <string name="split_preset_none">No matching Russian apps installed</string>
+    <string name="main_engine">Core: %1$s</string>
+    <string name="ms_nodes">Nodes</string>
+    <string name="ms_nodes_none">No nodes yet. A node is a second server that runs the connections of this panel.</string>
+    <string name="ms_node_add">Add node</string>
+    <string name="ms_node_remove">Remove</string>
+    <string name="ms_node_remove_q">Remove node “%1$s”?</string>
+    <string name="ms_node_remove_msg">The node will be removed from the panel, and everything Hydra installed for it will be removed from %1$s. Connections through this server will stop working.</string>
+    <string name="ms_node_pick_title">Node for %1$s</string>
+    <string name="ms_node_pick_none">No free server: add a second server to “My servers” — it must have no Hydra services.</string>
+    <string name="ms_node_pick_hint">Hydra will install everything the node needs on the chosen server and connect it to the panel. Node ports open only for this server. 2–5 minutes.</string>
+    <string name="ms_node_of">Node of %1$s panel on “%2$s”</string>
+    <string name="ms_node_of_hint">Connections of the panel also run through this server. Remove the node on the “%1$s” card.</string>
 </resources>

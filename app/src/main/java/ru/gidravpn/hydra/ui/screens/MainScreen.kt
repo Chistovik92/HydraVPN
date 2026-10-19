@@ -48,6 +48,7 @@ import ru.gidravpn.hydra.vpn.core.ConnectionState
 fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
     val state by vm.state.collectAsState()
     val server by vm.selectedServer.collectAsState()
+    val toggles by vm.engineToggles.collectAsState()
     val stats by vm.stats.collectAsState()
     val speed by vm.speed.collectAsState()
     val since by vm.connectedSince.collectAsState()
@@ -111,6 +112,19 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
                     BetaBadge()
                 }
             }
+            // A5 (0.8.2-a4): каким ядром пойдёт подключение и почему («Xray (REALITY)»); REALITY без Xray — предупреждение.
+            server?.let { s ->
+                val xa = ru.gidravpn.hydra.BuildConfig.XRAY_AVAILABLE
+                val kind = toggles.engineFor(s, xa)
+                if (kind != null) {
+                    val name = engineName(kind) + if (toggles.isRealityViaXray(s, xa)) " (REALITY)" else ""
+                    Spacer(Modifier.height(6.dp))
+                    Text(stringResource(R.string.main_engine, name), color = TextMuted, fontSize = 12.sp)
+                }
+                // Предупреждение «REALITY без Xray» (main_reality_no_xray) на Android с 0.8.2-b не показывается: libbox собран
+                // с scripts/sing-box-reality-mlkem.patch и проходит к Xray ≥ 26.9.8 сам (эмулятор: 50 МБ к Xray 26.10.10).
+                // На ПК sing-box — готовый бинарь апстрима, там предупреждение остаётся (DesktopConfig.REALITY_WARNING).
+            }
         }
         Spacer(Modifier.height(32.dp))
 
@@ -154,6 +168,16 @@ fun MainScreen(vm: MainViewModel, onGoServers: () -> Unit) {
                     .clip(RoundedCornerShape(8.dp)).background(InputBg).padding(10.dp))
         }
     }
+}
+
+private fun engineName(k: ru.gidravpn.hydra.data.model.EngineToggles.Kind) = when (k) {
+    ru.gidravpn.hydra.data.model.EngineToggles.Kind.SINGBOX -> "sing-box"
+    ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY -> "Xray"
+    ru.gidravpn.hydra.data.model.EngineToggles.Kind.AWG -> "AmneziaWG"
+    ru.gidravpn.hydra.data.model.EngineToggles.Kind.PPP -> "PPP"
+    ru.gidravpn.hydra.data.model.EngineToggles.Kind.OLCRTC -> "olcRTC"
+    ru.gidravpn.hydra.data.model.EngineToggles.Kind.OPENFLUX -> "OpenFlux"
+    ru.gidravpn.hydra.data.model.EngineToggles.Kind.BYEDPI -> "ByeDPI"
 }
 
 @Composable
