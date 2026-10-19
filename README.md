@@ -5,7 +5,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус ветки `claude/0-8-2-alpha`: **0.8.2-b** (бета, пре-релиз) — свежие ядра, интернет не пропадает при смене сети, ноды панелей, PasarGuard, Remnawave · последний выпуск: **0.8.1** · [Пре-релизы](https://github.com/Chistovik92/HydraVPN/releases) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md) · [Документация](docs/README.md)
+- Статус ветки `claude/0-8-2-alpha`: **0.8.2-rc1** (кандидат в выпуск, пре-релиз) — аудит устойчивости, свежие ядра, интернет не пропадает при смене сети, ноды панелей, PasarGuard, Remnawave · последний выпуск: **0.8.1** · [Пре-релизы](https://github.com/Chistovik92/HydraVPN/releases) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md) · [Документация](docs/README.md)
 
 > **⚠️ Windows: с версии 0.7.20 антивирус может ругаться.** Kaspersky блокирует установку и `Hydra.exe`, ссылаясь на поведенческий анализ
 > (`PDM:Trojan.Win32.Generic`); другие антивирусы могут вести себя так же. Мы считаем это ложным срабатыванием: код открыт (GPL-3.0), SHA-256 файлов указан в релизе.
@@ -135,11 +135,14 @@ Hydra Classic (Windows 7 / 32-бит) — тот же набор экранов 
 
 Подробности и ограничения — [docs/PROTOCOLS.md](docs/PROTOCOLS.md), сервисы — [docs/SERVICES.md](docs/SERVICES.md).
 
-## Что нового в этой ветке (0.8.2-a … 0.8.2-b)
+## Что нового в этой ветке (0.8.2-a … 0.8.2-rc1)
 
 Альфа-сборки ветки `claude/0-8-2-alpha` выходят пре-релизами и приходят только уровню «Разработчик»; владельцем на VPS и телефоне
 ещё не проверены. Сверх выпуска 0.8.1:
 
+- **Кандидат 0.8.2-rc1:** Xray-core 26.10.17, OpenFlux 0.13.0; аудит устойчивости (параллельные подключения на Android, потеря
+  настроек и входа при сбоях чтения, остановка ядер и системный прокси на ПК, обязательная копия базы панели перед удалением);
+  на ПК — «Настройки → Управление с клавиатуры» (Пробел больше не переключает VPN сам).
 - **Бета 0.8.2-b:** Xray-core 26.10.10, OpenFlux 0.7.3 (Telemost, Avito), AmneziaWG 3.1.20260828; sing-box снова подключается по REALITY
   к новым серверам Xray (Android, iOS); **интернет больше не пропадает при смене сети** на подключениях через Xray; обычный WireGuard на
   Android — быстрым ядром AmneziaWG.
@@ -203,7 +206,7 @@ HydraVPN/
 - [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md) — olcRTC / OpenFlux / snolc / AmneziaWG: апстримы, статус, клиенты
 - [docs/HANDOFF_ROUTERS.md](docs/HANDOFF_ROUTERS.md) — управление роутером: контракт API и что проверено
 - [desktop/README.md](desktop/README.md) · [ios/README.md](ios/README.md) — клиенты для ПК и iOS
-- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.8.2-b
+- [CHANGELOG.md](CHANGELOG.md) — детальный лог 0.1.0 → 0.8.2-rc1
 - [docs/HISTORY.md](docs/HISTORY.md) — хронология версий с датами и коммитами, журнал идей
 - [docs/LEGACY.md](docs/LEGACY.md) — 32-битные и старые системы: Android x86/TV, Hydra Classic (Windows 7, 32-бит), Windows XP
 
