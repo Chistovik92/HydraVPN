@@ -146,11 +146,20 @@ private fun RouterChips(links: List<RouterLink>, selected: String?, m: RouterMan
 
 @Composable
 private fun RouterDetails(c: AppController, ui: UiState, link: RouterLink, r: RouterUi, m: RouterManager, ask: (Pending) -> Unit) {
+    val confirm: (String, String, () -> Unit) -> Unit = { t, x, a -> ask(Pending(t, x, a)) }
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { StatusCard(link, r) }
+        // Роутер 1.3.0+: остальное — по его возможностям (capabilities); у старых роутеров карточек нет.
+        if (r.caps.has("update")) item { RouterUpdateCard(r, m, confirm) }
         item { NodesCard(r, m) }
-        item { EditableSectionsCard(r, m) { t, x, a -> ask(Pending(t, x, a)) } }
+        item { EditableSectionsCard(r, m, confirm) }
+        if (r.caps.has("rules")) item { RouterRulesCard(r, m, confirm) }
+        if (r.caps.has("lists")) item { RouterListsCard(r, m, confirm) }
         item { SubscriptionsCard(c, ui, r, m, ask) }
+        if (r.caps.has("servers.edit")) item { RouterServersCard(r, m, confirm) }
+        if (r.caps.has("cores")) item { RouterCoresCard(r, m, confirm) }
+        if (r.caps.has("settings")) item { RouterSettingsCard(r, m) }
+        if (r.caps.has("sms")) item { RouterSmsCard(r, m) }
         item { RouterRadarCard(r, m, r.sections.map { it.name }) }
         item { RouterChecksCard(r, m) }
         item { RouterLog(r) }

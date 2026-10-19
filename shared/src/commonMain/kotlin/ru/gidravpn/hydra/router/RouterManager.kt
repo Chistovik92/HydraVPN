@@ -35,6 +35,19 @@ data class RouterUi(
     val radar: RouterRadar? = null,
     /** Результаты диагностики: имя проверки → ответ роутера. */
     val checks: Map<String, String> = emptyMap(),
+    // 1.3.0+: всё ниже пусто у роутеров, которые этого не умеют (capabilities).
+    val caps: RouterCapabilities = RouterCapabilities(),
+    /** Самообновление роутера (current, latest, update_available, state, error); null — не поддерживается. */
+    val update: JSONObject? = null,
+    val cores: List<RouterCore> = emptyList(),
+    /** Версии ядра для выбора: имя ядра → релизы (с бетами). */
+    val coreVersions: Map<String, List<RouterRelease>> = emptyMap(),
+    val rules: List<RouterRule> = emptyList(),
+    val lists: List<RouterList> = emptyList(),
+    val servers: List<JSONObject> = emptyList(),
+    val settings: JSONObject? = null,
+    val smsModems: List<String> = emptyList(),
+    val sms: List<RouterSms> = emptyList(),
 )
 
 /**
@@ -85,7 +98,8 @@ class RouterManager(
     fun refresh() = call(quiet = true) { c ->
         val (ver, _) = c.version()
         val st = c.status()
-        val sections = c.sections()
+        val caps = c.capabilities()
+        val sections = c.sections().map { it.copy(serverUnmasks = caps.has("sections.unmask")) }
         val subs = c.subscriptions()
         val nodes = runCatching { c.nodes() }
         val logs = runCatching { c.logs(150) }.getOrDefault(emptyList())
@@ -96,8 +110,95 @@ class RouterManager(
                 sections = sections, subscriptions = subs,
                 nodes = nodes.getOrDefault(emptyList()),
                 nodesError = nodes.exceptionOrNull()?.message,
-                logs = logs.takeLast(150), statusDetails = summarize(st), radar = radar ?: it.radar)
+                logs = logs.takeLast(150), statusDetails = summarize(st), radar = radar ?: it.radar, caps = caps)
         }
+        loadManagement(c, caps)
+    }
+
+    /** Новое в 1.3.0: обновление, ядра, правила, списки, серверы, настройки, SMS — только то, что роутер умеет. */
+    private fun loadManagement(c: RouterClient, caps: RouterCapabilities) {
+        val update = if (caps.has("update")) runCatching { c.updateStatus() }.getOrNull() else null
+        val cores = if (caps.has("cores")) runCatching { c.cores() }.getOrDefault(emptyList()) else emptyList()
+        val rules = if (caps.has("rules")) runCatching { c.rules() }.getOrDefault(emptyList()) else emptyList()
+        val lists = if (caps.has("lists")) runCatching { c.lists() }.getOrDefault(emptyList()) else emptyList()
+        val servers = if (caps.has("servers")) runCatching { c.servers() }.getOrDefault(emptyList()) else emptyList()
+        val settings = if (caps.has("settings")) runCatching { c.settings() }.getOrNull() else null
+        val sms = if (caps.has("sms")) runCatching { c.sms() }.getOrNull() else null
+        _ui.update {
+            it.copy(update = update, cores = cores, rules = rules, lists = lists, servers = servers, settings = settings,
+                smsModems = sms?.first.orEmpty(), sms = sms?.second.orEmpty())
+        }
+    }
+
+    // ------------------------------------------------------------ обновление роутера и ядра
+
+    fun checkUpdate() = call(null) { c ->
+        val st = c.updateCheck()
+        _ui.update { it.copy(update = st) }
+        toast(if (st.optBoolean("update_available")) "Есть обновление роутера: ${st.optString("latest")}" else "Роутер обновлён до последней версии")
+    }
+
+    /** [version] — конкретная (в том числе старая: откат); null — последняя. Роутер перезапустится сам. */
+    fun installUpdate(version: String?) = call("Роутер обновляется и перезапустится сам — это займёт минуту") { c ->
+        c.updateInstall(version)
+        _ui.update { st -> st.copy(update = runCatching { c.updateStatus() }.getOrNull() ?: st.update) }
+    }
+
+    fun loadCoreVersions(name: String) = call(quiet = true) { c ->
+        val rels = c.coreVersions(name)
+        _ui.update { it.copy(coreVersions = it.coreVersions + (name to rels)) }
+    }
+
+    /** [version]: x.y.z, latest или beta. Установка идёт на роутере в фоне — статус обновится при опросе. */
+    fun installCore(name: String, version: String) = call("Роутер устанавливает $name $version") { c ->
+        c.installCore(name, version)
+        _ui.update { it.copy(cores = runCatching { c.cores() }.getOrDefault(it.cores)) }
+    }
+
+    // ------------------------------------------------------------ маршрутизация: правила и списки
+
+    fun saveRule(index: Int?, rule: JSONObject) = call(if (index == null) "Правило добавлено" else "Правило сохранено") { c ->
+        if (index == null) c.addRule(rule) else c.replaceRule(index, rule)
+        _ui.update { it.copy(rules = c.rules()) }
+    }
+
+    fun deleteRule(index: Int) = call("Правило удалено") { c -> c.deleteRule(index); _ui.update { it.copy(rules = c.rules()) } }
+
+    fun saveList(existing: String?, list: JSONObject) = call("Список «${list.optString("name")}» сохранён") { c ->
+        if (existing == null) c.addList(list) else c.replaceList(existing, list)
+        _ui.update { it.copy(lists = c.lists()) }
+    }
+
+    fun deleteList(name: String) = call("Список «$name» удалён") { c -> c.deleteList(name); _ui.update { it.copy(lists = c.lists()) } }
+
+    // ------------------------------------------------------------ серверы, подписки, настройки, SMS
+
+    fun saveServer(existing: String?, server: JSONObject) = call("Сервер «${server.optString("name")}» сохранён") { c ->
+        if (existing == null) c.addServer(server) else c.replaceServer(existing, server)
+        _ui.update { it.copy(servers = c.servers()) }
+    }
+
+    fun deleteServer(name: String) = call("Сервер «$name» удалён") { c -> c.deleteServer(name); _ui.update { it.copy(servers = c.servers()) } }
+
+    /** Правка подписки: раздел и интервал; замаскированный адрес роутер оставит прежним. */
+    fun editSubscription(s: RouterSubscription, section: String, updateHours: Int) = call("Подписка сохранена") { c ->
+        c.replaceSubscription(s.index, JSONObject().put("section", section).put("url", s.url)
+            .put("subscription_update_enabled", updateHours > 0)
+            .put("subscription_update_interval", updateHours.coerceAtLeast(1) * 3_600_000_000_000L))
+        reload(c)
+    }
+
+    /** Меняет одну настройку; значение — Boolean, число, строка ("6h") или список. */
+    fun setSetting(key: String, value: Any) = call("Настройка $key сохранена") { c ->
+        c.patchSettings(JSONObject().put(key, if (value is List<*>) JSONArray(value) else value))
+        _ui.update { it.copy(settings = c.settings()) }
+    }
+
+    fun sendSms(to: String, text: String) = call("SMS отправлено на $to") { c -> c.sendSms(to, text) }
+
+    fun refreshSms() = call(quiet = true) { c ->
+        val (modems, msgs) = c.sms()
+        _ui.update { it.copy(smsModems = modems, sms = msgs) }
     }
 
     fun selectNode(group: String, node: String) = call("Узел «$node» выбран") { c -> c.selectNode(group, node); reload(c) }
