@@ -115,7 +115,10 @@ class XuiPanelTest {
                 "XUI_USERNAME=u\nXUI_PASSWORD=p\nXUI_PANEL_PORT=24680\nXUI_WEB_BASE_PATH=hp\nXUI_API_TOKEN=TOKEN-from-installer-123\n")
             if (command.startsWith("curl -ksS")) {
                 val path = Regex("'http://127.0.0.1:24680/hp([^']*)'").find(command)?.groupValues?.get(1).orEmpty()
-                if ("Bearer TOKEN-from-installer-123" !in command) return ExecResult(0, """{"success":false,"msg":"unauthorized"}""")
+                // 0.8.2-rc2 (R3): токен — в файле `curl -K`, а не в командной строке (она видна в `ps`)
+                check("TOKEN-from-installer-123" !in command) { "токен в аргументах curl: $command" }
+                val cfg = Regex("-K (\\S+)").find(command)?.groupValues?.get(1)
+                if (cfg == null || "Bearer TOKEN-from-installer-123" !in files[cfg].orEmpty()) return ExecResult(0, """{"success":false,"msg":"unauthorized"}""")
                 return ExecResult(0, when (path) {
                     "/panel/api/setting/all" -> """{"success":true,"obj":{}}"""
                     "/panel/api/server/getNewX25519Cert" -> """{"success":true,"obj":{"privateKey":"PRIV","publicKey":"PUB"}}"""
@@ -129,7 +132,8 @@ class XuiPanelTest {
             return ExecResult(0, "")
         }
         val bodies = mutableListOf<String>()
-        override fun upload(data: ByteArray, remotePath: String, mode: Int) { bodies += String(data) }
+        val files = mutableMapOf<String, String>()
+        override fun upload(data: ByteArray, remotePath: String, mode: Int) { bodies += String(data); files[remotePath] = String(data) }
         override fun close() {}
     }
 
