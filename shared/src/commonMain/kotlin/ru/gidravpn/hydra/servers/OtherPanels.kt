@@ -30,12 +30,9 @@ object OtherPanels {
 
     fun spec(kind: PanelKind): Spec? = when (kind) { PanelKind.SUI -> SUI; PanelKind.XUI -> XUI; PanelKind.XUI3, PanelKind.PASARGUARD, PanelKind.REMNAWAVE -> null }
 
-    fun latestTag(s: Spec, timeoutMs: Int = 15_000): String {
-        val c = URL("https://api.github.com/repos/${s.repo}/releases/latest").openConnection() as HttpURLConnection
-        c.connectTimeout = timeoutMs; c.readTimeout = timeoutMs; c.setRequestProperty("Accept", "application/vnd.github+json")
-        val text = c.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
-        return JSONObject(text).getString("tag_name").also { require(XuiPanel.validTag(it)) { "Неожиданный тег $it" } }
-    }
+    /** Тег, который ставит Hydra (0.8.2-rc2): проверенный выпуск из [ScriptPins] (скрипт сверяется по SHA-256), а не «последний» у апстрима. */
+    @Suppress("UNUSED_PARAMETER")
+    fun latestTag(s: Spec, timeoutMs: Int = 15_000): String = if (s.kind == PanelKind.SUI) ScriptPins.SUI_TAG else ScriptPins.XUI_TAG
 
     fun scriptUrl(s: Spec, tag: String) = "https://raw.githubusercontent.com/${s.repo}/$tag/install.sh"
 
@@ -69,8 +66,9 @@ object OtherPanels {
         add(Step("panel-exists", "Проверить, что ${s.kind.title} и другой панели в ${s.home} ещё нет", "test ! -e ${s.home}",
             failHint = "На сервере уже стоит панель в ${s.home} — удалите её или подключите существующую"))
         add(Step("panel-fetch", "Загрузить установщик ${s.kind.title} ${p.tag} (закреплённый тег)",
-            "(curl -fsSL -m 180 ${Installer.shq(scriptUrl(s, p.tag))} -o $sc || wget -q -O $sc ${Installer.shq(scriptUrl(s, p.tag))}) && chmod 700 $sc && sha256sum $sc",
-            rollback = "rm -f $sc", failHint = "Не удалось скачать установщик с GitHub"))
+            "(curl -fsSL -m 180 ${Installer.shq(scriptUrl(s, p.tag))} -o $sc || wget -q -O $sc ${Installer.shq(scriptUrl(s, p.tag))}) && chmod 700 $sc && sha256sum $sc" +
+                ScriptPins.verify(s.repo, p.tag, "install.sh", sc).let { if (it.isEmpty()) "" else " && $it" },
+            rollback = "rm -f $sc", failHint = "Не удалось скачать установщик с GitHub или его SHA-256 не совпал с проверенным"))
         val run = when (s.kind) {
             // s-ui спрашивает «изменить настройки?» — отвечаем «нет»: логин и порт задаём сами следующим шагом
             PanelKind.SUI -> "printf 'n\\n' | SUI_LANG=en bash $sc ${p.tag}"

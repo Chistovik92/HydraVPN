@@ -34,8 +34,10 @@ object PasarGuardPanel {
             failHint = "Docker поставить не удалось"),
         Step("pg-fetch", "Загрузить установщики PasarGuard (закреплённый выпуск $SCRIPTS_TAG)",
             "curl -fsSL -m 180 ${Installer.shq(scriptUrl("pasarguard.sh"))} -o $PANEL_SH && curl -fsSL -m 180 ${Installer.shq(scriptUrl("pg-node.sh"))} -o $NODE_SH && " +
-                "chmod 700 $PANEL_SH $NODE_SH && sha256sum $PANEL_SH $NODE_SH", rollback = "rm -f $PANEL_SH $NODE_SH",
-            failHint = "Не удалось скачать установщики с GitHub"),
+                "chmod 700 $PANEL_SH $NODE_SH && sha256sum $PANEL_SH $NODE_SH" +
+                listOf(ScriptPins.verify("PasarGuard/scripts", SCRIPTS_TAG, "pasarguard.sh", PANEL_SH), ScriptPins.verify("PasarGuard/scripts", SCRIPTS_TAG, "pg-node.sh", NODE_SH))
+                    .filter { it.isNotEmpty() }.joinToString("") { " && $it" },
+            rollback = "rm -f $PANEL_SH $NODE_SH", failHint = "Не удалось скачать установщики с GitHub или их SHA-256 не совпал с проверенным"),
         // установщик спрашивает «ставить ноду?» (нет — ставим отдельно) и в конце бесконечно показывает журнал: ждём, пока
         // панель ответит, и останавливаем его
         Step("pg-install", "Установить панель PasarGuard (Docker; без сертификата — только для самого сервера)",
@@ -67,7 +69,14 @@ object PasarGuardPanel {
     fun closePortsCommand(file: String = PORTS): String = "if [ -f $file ]; then while read -r p; do ${ServerOps.closePortCommand("\$p").replace("'", "\"")}; done < $file; rm -f $file; fi; true"
 
     /** Удаление панели и ноды (копия базы — до этого, шагом [ServerOps.backupPanelsStep]); Docker остаётся. */
-    fun uninstallCommand(): String =
+    /**
+     * Скрипт ноды v0.1.10 ставит её нативной службой systemd `pg-node-service` (бинарь node-serviced), а не контейнером: после
+     * «удаления» она оставалась работать на порту 3000 и мешала установке других панелей (0.8.2-rc2).
+     */
+    const val NODE_SERVICE_REMOVE = "systemctl disable --now pg-node-service >/dev/null 2>&1; " +
+        "rm -f /etc/systemd/system/pg-node-service.service /usr/local/bin/pg-node-service; systemctl daemon-reload >/dev/null 2>&1; "
+
+    fun uninstallCommand(): String = NODE_SERVICE_REMOVE +
         "(cd $DIR 2>/dev/null && docker compose -p pasarguard down -v >/dev/null 2>&1); (cd $NODE_DIR 2>/dev/null && docker compose down -v >/dev/null 2>&1); " +
             "rm -rf $DIR $NODE_DIR $DATA $NODE_DATA /usr/local/bin/pasarguard /usr/local/bin/pg-node; rm -f $MARK ${OtherPanels.PANEL_STATE}; true"
 

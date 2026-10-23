@@ -65,7 +65,10 @@ object RemnawavePanel {
             failHint = "Docker поставить не удалось"),
         Step("rw-fetch", "Загрузить файлы Remnawave $TAG (закреплённый выпуск)",
             "mkdir -p $DIR && chmod 700 $DIR && curl -fsSL -m 180 ${Installer.shq(composeUrl())} -o $DIR/docker-compose.yml && curl -fsSL -m 180 ${Installer.shq(envUrl())} -o $DIR/.env && " +
-                "chmod 600 $DIR/.env && sha256sum $DIR/docker-compose.yml", rollback = "rm -rf $DIR", failHint = "Не удалось скачать файлы с GitHub"),
+                "chmod 600 $DIR/.env && sha256sum $DIR/docker-compose.yml" +
+                listOf(ScriptPins.verify("remnawave/backend", TAG, "docker-compose-prod.yml", "$DIR/docker-compose.yml"), ScriptPins.verify("remnawave/backend", TAG, ".env.sample", "$DIR/.env"))
+                    .filter { it.isNotEmpty() }.joinToString("") { " && $it" },
+            rollback = "rm -rf $DIR", failHint = "Не удалось скачать файлы с GitHub или их SHA-256 не совпал с проверенным"),
         Step("rw-env", "Задать секреты панели (придумывает Hydra)", upload = Step.Upload(ENV_SH, envScript(host).toByteArray(), 384)),
         Step("rw-env-apply", "Записать настройки панели", "sh $ENV_SH; rc=\$?; rm -f $ENV_SH; exit \$rc", failHint = "Не удалось записать настройки"),
         Step("rw-caddy", "Прокси для сайта панели (только 127.0.0.1)", upload = Step.Upload("$DIR/Caddyfile", CADDYFILE.toByteArray(), 420)),

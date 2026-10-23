@@ -79,6 +79,8 @@ class PasarGuardLiveTest {
             SshConnector.connect(login, saved.single().fingerprint).use { ssh ->
                 assertEquals("", ssh.exec("ls -d ${if (rw) RemnawavePanel.DIR + " " + RemnawavePanel.NODE_DIR else PasarGuardPanel.DIR + " " + PasarGuardPanel.NODE_DIR} 2>/dev/null").out.trim())
                 assertTrue(ssh.exec("ls /root/hydra-backups/ 2>/dev/null").out.contains(if (rw) "remnawave-" else "pasarguard-"), "нет копии базы")
+                // 0.8.2-rc2: нода PasarGuard v0.1.10 — нативная служба; после удаления она не должна работать и занимать порт 3000
+                if (!rw) assertEquals("", ssh.exec("ls /usr/local/bin/pg-node-service /etc/systemd/system/pg-node-service.service 2>/dev/null").out.trim(), "служба ноды осталась")
             }
         }
         val bad = results.filter { ": ok" !in it.second }

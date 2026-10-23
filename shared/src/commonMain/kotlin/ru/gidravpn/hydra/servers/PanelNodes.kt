@@ -94,7 +94,7 @@ object PanelNodes {
         Step("pgn-mark", "Отметить, что ноду поставила Hydra", "mkdir -p ${ServerOps.STATE_DIR} && chmod 700 ${ServerOps.STATE_DIR} && touch $PG_NODE_MARK"),
     )
 
-    fun pgNodeUninstallCommand() = "(cd ${PasarGuardPanel.NODE_DIR} 2>/dev/null && docker compose down -v >/dev/null 2>&1); " +
+    fun pgNodeUninstallCommand() = PasarGuardPanel.NODE_SERVICE_REMOVE + "(cd ${PasarGuardPanel.NODE_DIR} 2>/dev/null && docker compose down -v >/dev/null 2>&1); " +
         "rm -rf ${PasarGuardPanel.NODE_DIR} ${PasarGuardPanel.NODE_DATA} /usr/local/bin/pg-node; rm -f $PG_NODE_MARK; true"
 
     // ------------------------------------------------------------------------------------------------ Remnawave

@@ -175,13 +175,13 @@ object XuiPanel {
 
     fun scriptUrl(tag: String) = "https://raw.githubusercontent.com/MHSanaei/3x-ui/$tag/install.sh"
 
-    /** Последний выпуск (тег) — показывается до запуска; сам скрипт ставит указанный тег, а не «последний». */
-    fun latestTag(timeoutMs: Int = 15_000): String {
-        val c = URL("https://api.github.com/repos/MHSanaei/3x-ui/releases/latest").openConnection() as HttpURLConnection
-        c.connectTimeout = timeoutMs; c.readTimeout = timeoutMs; c.setRequestProperty("Accept", "application/vnd.github+json")
-        val text = c.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
-        return JSONObject(text).getString("tag_name").also { require(Regex("^v\\d+\\.\\d+\\.\\d+$").matches(it)) { "Неожиданный тег $it" } }
-    }
+    /**
+     * Тег, который ставит Hydra (0.8.2-rc2): проверенный выпуск из [ScriptPins], а не «последний» у апстрима — скрипт этого тега
+     * сверяется по SHA-256, а выпуск прошёл живой прогон на стенде. Новые выпуски 3x-ui Hydra ставит после проверки (в новой версии Hydra).
+     * Имя прежнее, параметр [timeoutMs] оставлен для совместимости: запроса к GitHub больше нет.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun latestTag(timeoutMs: Int = 15_000): String = ScriptPins.XUI3_TAG
 
     /**
      * Адрес панели из того, что вставил пользователь: без схемы — `http://`, без завершающего слеша, без пробелов.
@@ -221,8 +221,9 @@ object XuiPanel {
         add(Step("xui-exists", "Проверить, что 3x-ui на сервере ещё нет", "test ! -e /usr/local/x-ui/x-ui",
             failHint = "На сервере уже стоит 3x-ui — подключите существующую панель по адресу и токену"))
         add(Step("xui-fetch", "Загрузить установщик 3x-ui ${p.tag} (закреплённый тег)",
-            "(curl -fsSL -m 180 ${Installer.shq(scriptUrl(p.tag))} -o $SCRIPT || wget -q -O $SCRIPT ${Installer.shq(scriptUrl(p.tag))}) && chmod 700 $SCRIPT && sha256sum $SCRIPT",
-            rollback = "rm -f $SCRIPT", failHint = "Не удалось скачать установщик с GitHub"))
+            "(curl -fsSL -m 180 ${Installer.shq(scriptUrl(p.tag))} -o $SCRIPT || wget -q -O $SCRIPT ${Installer.shq(scriptUrl(p.tag))}) && chmod 700 $SCRIPT && sha256sum $SCRIPT" +
+                ScriptPins.verify("MHSanaei/3x-ui", p.tag, "install.sh", SCRIPT).let { if (it.isEmpty()) "" else " && $it" },
+            rollback = "rm -f $SCRIPT", failHint = "Не удалось скачать установщик с GitHub или его SHA-256 не совпал с проверенным"))
         add(Step("xui-env", "Записать параметры установки (файл 0600; логин и пароль не показываются)",
             upload = Step.Upload(ENV_FILE, ("XUI_NONINTERACTIVE=1\nXUI_USERNAME=${p.username}\nXUI_PASSWORD=${p.password}\nXUI_PANEL_PORT=${p.port}\n" +
                 "XUI_WEB_BASE_PATH=${p.webPath}\nXUI_SSL_MODE=${when { !p.sslIp -> "none"; p.domain.isNotBlank() -> "domain\nXUI_DOMAIN=${p.domain}"; else -> "ip" }}\nXUI_ENABLE_FAIL2BAN=false\n").toByteArray(), 384)))
