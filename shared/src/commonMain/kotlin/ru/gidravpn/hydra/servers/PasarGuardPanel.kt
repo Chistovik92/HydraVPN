@@ -12,7 +12,7 @@ import org.json.JSONObject
  * (`pasarguard-cli generate-temp-key` → `POST /api/setup/owner`) → вход (`POST /api/admin/token`, JWT) → нода (`POST /api/node`).
  */
 object PasarGuardPanel {
-    const val SCRIPTS_TAG = "v0.1.9"
+    const val SCRIPTS_TAG = "v0.1.10"
     const val DIR = "/opt/pasarguard"
     const val NODE_DIR = "/opt/pg-node"
     const val DATA = "/var/lib/pasarguard"
