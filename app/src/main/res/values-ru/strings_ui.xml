@@ -368,6 +368,10 @@
     <string name="ms_node_pick_title">Нода для панели %1$s</string>
     <string name="ms_node_pick_none">Нет свободного сервера: добавьте второй сервер в «Мои серверы» — на нём не должно быть служб Hydra.</string>
     <string name="ms_node_pick_hint">Hydra поставит на выбранный сервер всё нужное для ноды и подключит её к панели. Порты ноды откроются только для этого сервера. 2–5 минут.</string>
+    <string name="ms_node_install">Установить ноду</string>
+    <string name="ms_node_install_title">Нода на сервере «%1$s»</string>
+    <string name="ms_node_install_none">Сначала поставьте панель 3x-ui, PasarGuard или Remnawave на другом сервере из «Мои серверы» — нода подключается к ней.</string>
+    <string name="ms_node_install_hint">Выберите панель, к которой подключить этот сервер. Hydra поставит на него всё нужное; порты ноды откроются только для сервера панели. Займёт 2–5 минут.</string>
     <string name="ms_node_of">Нода панели %1$s сервера «%2$s»</string>
     <string name="ms_node_of_hint">Подключения панели работают и через этот сервер. Убрать ноду — на карточке «%1$s».</string>
 </resources>

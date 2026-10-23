@@ -360,6 +360,10 @@
     <string name="ms_node_pick_title">%1$s 面板的节点</string>
     <string name="ms_node_pick_none">没有空闲服务器：请在“我的服务器”中添加第二台服务器（上面不能有 Hydra 服务）。</string>
     <string name="ms_node_pick_hint">Hydra 会在所选服务器上安装节点所需的一切并连接到面板。节点端口只对本服务器开放。需要 2–5 分钟。</string>
+    <string name="ms_node_install">安装节点</string>
+    <string name="ms_node_install_title">服务器“%1$s”上的节点</string>
+    <string name="ms_node_install_none">请先在“我的服务器”中的另一台服务器上安装 3x-ui、PasarGuard 或 Remnawave——节点会连接到它。</string>
+    <string name="ms_node_install_hint">选择要连接此服务器的面板。Hydra 会安装节点所需的一切；节点端口只对面板服务器开放。需要 2–5 分钟。</string>
     <string name="ms_node_of">服务器“%2$s”上 %1$s 面板的节点</string>
     <string name="ms_node_of_hint">面板的连接也通过此服务器工作。移除节点请到“%1$s”卡片。</string>
 </resources>

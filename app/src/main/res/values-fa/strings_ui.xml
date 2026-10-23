@@ -360,6 +360,10 @@
     <string name="ms_node_pick_title">نود برای پنل %1$s</string>
     <string name="ms_node_pick_none">سرور آزادی نیست: سرور دومی به «سرورهای من» اضافه کنید — نباید سرویس Hydra داشته باشد.</string>
     <string name="ms_node_pick_hint">Hydra همه چیز لازم را روی سرور انتخاب‌شده نصب و آن را به پنل وصل می‌کند. پورت‌های نود فقط برای این سرور باز می‌شوند. ۲ تا ۵ دقیقه.</string>
+    <string name="ms_node_install">نصب نود</string>
+    <string name="ms_node_install_title">نود روی سرور «%1$s»</string>
+    <string name="ms_node_install_none">ابتدا پنل 3x-ui، PasarGuard یا Remnawave را روی سرور دیگری از «سرورهای من» نصب کنید — نود به آن وصل می‌شود.</string>
+    <string name="ms_node_install_hint">پنلی را که می‌خواهید این سرور به آن وصل شود انتخاب کنید. Hydra همه چیز لازم را نصب می‌کند؛ پورت‌های نود فقط برای سرور پنل باز می‌شوند. ۲ تا ۵ دقیقه.</string>
     <string name="ms_node_of">نود پنل %1$s سرور «%2$s»</string>
     <string name="ms_node_of_hint">اتصال‌های پنل از این سرور هم کار می‌کنند. حذف نود — در کارت «%1$s».</string>
 </resources>

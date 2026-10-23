@@ -425,6 +425,7 @@ private fun OfxSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, bu
 private fun PanelSection(c: AppController, srv: MyServer, st: ServerStatus?, m: MyServersManager, s: MyServersUi, onAddUser: () -> Unit, onConfirm: (Confirm) -> Unit, onInstall: (ServerKind) -> Unit) {
     val p = srv.panel
     val busy = s.busy
+    var pickPanel by remember { mutableStateOf(false) }
     Text(p?.let { "Панель ${it.kind.title}" } ?: "Панель управления", fontWeight = FontWeight.SemiBold)
     if (p == null) {
         Text("Не установлена. Сайт-панель, где вы сами заводите пользователей и выдаёте им ссылки — удобно, если VPN нужен нескольким людям. " +
@@ -439,6 +440,24 @@ private fun PanelSection(c: AppController, srv: MyServer, st: ServerStatus?, m: 
             if (st?.xuiInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_XUI) }, enabled = !busy) { Text("Установить x-ui") }
             if (st?.pgInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_PASARGUARD) }, enabled = !busy) { Text("Установить PasarGuard") }
             if (st?.rwInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_REMNAWAVE) }, enabled = !busy) { Text("Установить Remnawave") }
+            if (!srv.hasServices) OutlinedButton(onClick = { pickPanel = true }, enabled = !busy) { Text("Установить ноду") }
+        }
+        if (pickPanel) {
+            val panels = m.nodePanels(srv.id)
+            AlertDialog(onDismissRequest = { pickPanel = false },
+                title = { Text("Нода на сервере «${srv.name}»") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (panels.isEmpty()) Text("Сначала поставьте панель 3x-ui, PasarGuard или Remnawave на другом сервере из «Мои серверы» — нода подключается к ней.", fontSize = 13.sp)
+                        else {
+                            Text("Выберите панель, к которой подключить этот сервер. Hydra поставит на него всё нужное; порты ноды откроются только для сервера панели. Займёт 2–5 минут.", fontSize = 13.sp)
+                            panels.forEach { main ->
+                                OutlinedButton(onClick = { pickPanel = false; m.installNode(srv.id, main.id) }) { Text("${main.panel?.kind?.title} · ${main.name} (${main.host})") }
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { pickPanel = false }) { Text("Отмена") } })
         }
         return
     }

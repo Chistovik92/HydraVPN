@@ -464,6 +464,7 @@ private fun PanelSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, 
     val ctx = LocalContext.current
     val p = srv.panel
     val busy = s.busy
+    var pickPanel by remember { mutableStateOf(false) }
     Text(p?.let { stringResource(R.string.ms_panel_kind, it.kind.title) } ?: stringResource(R.string.ms_panel_title), color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
     if (p == null) {
         Text(stringResource(R.string.ms_panel_none), color = TextMuted, fontSize = 12.sp)
@@ -476,6 +477,24 @@ private fun PanelSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, 
             if (st?.xuiInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "x-ui"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_XUI) }
             if (st?.pgInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "PasarGuard"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_PASARGUARD) }
             if (st?.rwInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "Remnawave"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_REMNAWAVE) }
+            if (!srv.hasServices) MsChip(stringResource(R.string.ms_node_install), AccentCyan) { if (!busy) pickPanel = true }
+        }
+        if (pickPanel) {
+            val panels = m.nodePanels(srv.id)
+            AlertDialog(onDismissRequest = { pickPanel = false },
+                title = { Text(stringResource(R.string.ms_node_install_title, srv.name)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (panels.isEmpty()) Text(stringResource(R.string.ms_node_install_none), fontSize = 13.sp)
+                        else {
+                            Text(stringResource(R.string.ms_node_install_hint), fontSize = 13.sp)
+                            panels.forEach { main ->
+                                OutlinedButton(onClick = { pickPanel = false; m.installNode(srv.id, main.id) }) { Text("${main.panel?.kind?.title} · ${main.name} (${main.host})") }
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { pickPanel = false }) { Text(stringResource(android.R.string.cancel)) } })
         }
         return
     }

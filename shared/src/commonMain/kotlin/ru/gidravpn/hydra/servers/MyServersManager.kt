@@ -803,6 +803,20 @@ class MyServersManager(
     fun nodeCandidates(mainId: String): List<MyServer> = servers().filter { it.id != mainId && it.fingerprint.isNotBlank() && !it.hasServices }
 
     /**
+     * Панели, к которым сервер [nodeServerId] можно подключить нодой (0.8.2-rc2, кнопка «Установить ноду» на карточке свободного
+     * сервера): панели 3x-ui, PasarGuard и Remnawave, которыми Hydra управляет по SSH. Тот же путь, что «Добавить ноду» в карточке
+     * панели, — вход «от ноды».
+     */
+    fun nodePanels(nodeServerId: String): List<MyServer> {
+        val node = find(nodeServerId) ?: return emptyList()
+        if (node.hasServices || node.fingerprint.isBlank()) return emptyList()
+        return servers().filter { it.id != nodeServerId && it.fingerprint.isNotBlank() && it.panel?.kind?.let(PanelNodes::supports) == true }
+    }
+
+    /** Установить ноду на [nodeServerId] для панели сервера [mainId] (то же, что [addPanelNode], вход «от ноды»). */
+    fun installNode(nodeServerId: String, mainId: String) = addPanelNode(mainId, nodeServerId)
+
+    /**
      * Добавить ноду (0.8.2-a4): сервер [nodeServerId] из «Моих серверов» становится нодой панели сервера [mainId] —
      * 3x-ui (сама панель-нода, токен `node-sync`), PasarGuard (`pg-node`) или Remnawave (`remnanode`). Порты ноды открываются
      * только для главного сервера. Ссылки подключений на ноде сразу попадают в «Серверы».
