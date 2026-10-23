@@ -129,19 +129,19 @@ val downloadSingBox by tasks.registering {
 }
 
 // ---- Ядро Xray-core (второй движок, как на Android) ------------------------------
-// 26.10.17 (0.8.2-rc1; 26.10.10 — 0.8.2-b) — пре-релиз по меткам апстрима (так помечены все выпуски с лета), коммит 92ccc93 — тот же, что в
-// libXray v26.10.17 на Android (scripts/fetch-libxray.sh), так что на всех платформах один и тот же Xray. Стабильный
+// 26.10.21 (0.8.2-rc2; 26.10.17 — rc1, 26.10.10 — 0.8.2-b), коммит 1b1647c — тот же, что в
+// libXray v26.10.21 на Android (scripts/fetch-libxray.sh), так что на всех платформах один и тот же Xray. Стабильный
 // 26.3.27 отстаёт на полгода, а панели (3x-ui 3.10 уже ставит на серверы 26.10.10, PasarGuard и др.) выдают настройки
-// под свежий Xray. SHA-256 — дайджесты ассетов релиза https://github.com/XTLS/Xray-core/releases/tag/v26.10.17 .
-val xrayVersion = "26.10.17"
+// под свежий Xray. SHA-256 — дайджесты ассетов релиза https://github.com/XTLS/Xray-core/releases/tag/v26.10.21 .
+val xrayVersion = "26.10.21"
 
 val xrayArchives = mapOf(
-    "windows-x64" to ("windows-64" to "c10a532a9271964f2aa2f4b4c0757605ff529222cb1d5d7ab88f8ecc52e67fb0"),
-    "windows-arm64" to ("windows-arm64-v8a" to "717ae1bfed2dfff1f5593a776321096c4cd7884ac5a030934903c1d8a1e364a9"),
-    "linux-x64" to ("linux-64" to "ecdd54eccd24c4c21a8f00968e7dbf7f5996da92383d2321170b560dc4a95158"),
-    "linux-arm64" to ("linux-arm64-v8a" to "4ebdad86048fa499e65334f88a120b1ed17e662f1c222afd3514afdf8820cdb1"),
-    "macos-x64" to ("macos-64" to "d39e0cb5d0991810f73deaa81ba1147812c77b69bb5ddb0576a6b0096f66eb1a"),
-    "macos-arm64" to ("macos-arm64-v8a" to "57531c66df375da671f66cad1443f63e90410b83d09baf226e2f26f2748aae0f"),
+    "windows-x64" to ("windows-64" to "fc58c39ee2f2717b4c54d28d374362389e5319b20ae44aea76ea45a5243ec827"),
+    "windows-arm64" to ("windows-arm64-v8a" to "bb44af3380c9975f951ce7645c04d56ab600040e68f23974a2806e08e0a3f872"),
+    "linux-x64" to ("linux-64" to "0eec3ed4163c273d8c8bf821f7d219e257921cf584aa3fb970715e458e631978"),
+    "linux-arm64" to ("linux-arm64-v8a" to "d1304946c486d98e6b886e9b931eaaaebb23835b30e217638037b7f2721d4e9c"),
+    "macos-x64" to ("macos-64" to "8e5169b429e76ce5f550c8294db465bc259f30c158ba900aa40802b76ad2f66e"),
+    "macos-arm64" to ("macos-arm64-v8a" to "926cc55fda2a8757dabe4f22dc98772f218ace025f101bd0b68aee232e59d5dc"),
 )
 
 /** Xray-core своей платформы в тот же каталог ресурсов, что и sing-box. */

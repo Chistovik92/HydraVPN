@@ -232,7 +232,7 @@ internal fun SettingsScreen(c: AppController, ui: UiState) {
 
         item {
             Section("О программе") {
-                Text("Hydra ${Platform.version} · sing-box 1.12.25 · Xray-core 26.10.17 · ${System.getProperty("os.name")} ${System.getProperty("os.arch")}", fontSize = 13.sp)
+                Text("Hydra ${Platform.version} · sing-box 1.12.25 · Xray-core 26.10.21 · ${System.getProperty("os.name")} ${System.getProperty("os.arch")}", fontSize = 13.sp)
                 Text("Данные: ${Platform.dataDir.absolutePath}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("На ПК поддерживаются: VLESS (в т.ч. REALITY), VMess, Trojan, Shadowsocks (sing-box или Xray), Hysteria2, TUIC, WireGuard (sing-box), " +
                     "olcRTC и OpenFlux (бета). AmneziaWG, SSTP и L2TP пока только в Android.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
