@@ -27,7 +27,8 @@ class XuiConnectionsLiveTest {
      */
     @Test fun everyConnectionTypeCarriesTraffic() {
         assumeTrue(System.getenv("HYDRA_XUI_CONN_LIVE") != null)
-        val v = System.getenv("HYDRA_SSH_TEST")
+        // 0.8.2-rc2: без пароля стенда — HYDRA_WSL_STAND=<distro> (WslSession): 3x-ui уже стоит на основном стенде WSL
+        val v = System.getenv("HYDRA_SSH_TEST") ?: if (WslSession.install()) "${System.getenv("HYDRA_WSL_HOST") ?: "172.29.99.246"}:22:root:-" else null
         val direct = System.getenv("HYDRA_XUI_RESULT_FILE")?.let { java.io.File(it) }
         assumeTrue(v != null || (direct != null && System.getenv("HYDRA_XUI_HOST") != null))
         if (v == null) {

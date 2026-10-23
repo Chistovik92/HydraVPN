@@ -134,7 +134,8 @@ class PasarGuardApi(private val ssh: SshSession, private val user: String, priva
     /** Запрос API; ответ — JSON (объект или массив) либо пустая строка. */
     fun call(method: String, path: String, body: Any? = null): Any? {
         if (token.isBlank()) login()
-        val (c, out) = exec("-X $method -H ${Installer.shq("Authorization: Bearer $token")} -H 'Content-Type: application/json' ${Installer.shq(base + path)}", body?.toString())
+        // токен — файлом `curl -K`, а не в аргументах (видны в `ps`)
+        val (c, out) = CurlAuth.withConfig(ssh, token) { cfg -> exec("-X $method -K $cfg -H 'Content-Type: application/json' ${Installer.shq(base + path)}", body?.toString()) }
         if (c !in 200..299) throw XuiApiException("PasarGuard: HTTP $c ${out.take(200)}")
         val t = out.trim()
         return when { t.startsWith("{") -> JSONObject(t); t.startsWith("[") -> JSONArray(t); else -> t }

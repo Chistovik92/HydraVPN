@@ -146,7 +146,8 @@ class RemnawaveApi(private val ssh: SshSession, private val user: String, privat
     /** Запрос API; результат — содержимое `response`. */
     fun call(method: String, path: String, body: Any? = null): Any? {
         if (token.isBlank()) login()
-        val (c, out) = exec("-X $method -H ${Installer.shq("Authorization: Bearer $token")} -H 'Content-Type: application/json' ${Installer.shq(base + path)}", body?.toString())
+        // токен — файлом `curl -K`, а не в аргументах (видны в `ps`)
+        val (c, out) = CurlAuth.withConfig(ssh, token) { cfg -> exec("-X $method -K $cfg -H 'Content-Type: application/json' ${Installer.shq(base + path)}", body?.toString()) }
         if (c !in 200..299) throw XuiApiException("Remnawave: HTTP $c ${out.take(240)}")
         return runCatching { JSONObject(out).opt("response") }.getOrNull()
     }

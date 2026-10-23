@@ -88,13 +88,16 @@ class DirectXuiTransport(private val baseUrl: String, private val token: String,
  */
 class SshXuiTransport(private val ssh: SshSession, private val localBase: String, private val token: String, private val hostHeader: String) : XuiTransport {
     override fun call(method: String, path: String, body: String?): String {
-        val bodyFile = "/tmp/.hydra-xui-body.json"
-        val hdr = "-H ${Installer.shq("Authorization: Bearer $token")} -H ${Installer.shq("Host: $hostHeader")}"
-        val cmd = if (body != null) {
-            ssh.upload(body.toByteArray(), bodyFile, 384)
-            "curl -ksS -m 25 -X $method $hdr -H 'Content-Type: application/json' --data @$bodyFile ${Installer.shq(localBase.trimEnd('/') + path)}; rm -f $bodyFile"
-        } else "curl -ksS -m 25 -X $method $hdr ${Installer.shq(localBase.trimEnd('/') + path)}"
-        val r = ssh.exec(cmd)
+        // токен — файлом `curl -K` (0600, удаляется после вызова), а не в аргументах: они видны в `ps` (0.8.2-rc2, R3)
+        val r = CurlAuth.withConfig(ssh, token) { cfg ->
+            val bodyFile = "/tmp/.hydra-xui-body-${XuiPanel.random(6).lowercase()}.json"
+            val hdr = "-K $cfg -H ${Installer.shq("Host: $hostHeader")}"
+            val cmd = if (body != null) {
+                ssh.upload(body.toByteArray(), bodyFile, 384)
+                "curl -ksS -m 25 -X $method $hdr -H 'Content-Type: application/json' --data @$bodyFile ${Installer.shq(localBase.trimEnd('/') + path)}; rm -f $bodyFile"
+            } else "curl -ksS -m 25 -X $method $hdr ${Installer.shq(localBase.trimEnd('/') + path)}"
+            ssh.exec(cmd)
+        }
         if (r.out.isBlank()) throw XuiApiException("Панель не ответила (curl код ${r.exit})")
         return r.out
     }

@@ -239,7 +239,14 @@ class MyServersManager(
 
     private fun run(id: String, title: String, t: SshTarget, quiet: Boolean, work: (MyServer, SshSession, Installer) -> Unit) {
         val srv = find(id) ?: return
-        _ui.update { it.copy(busy = true, opServer = id, error = null, progress = title, log = if (quiet) it.log else emptyList()) }
+        // «занято» занимается атомарно (0.8.2-rc2, R5): проверка в op() и эта установка раньше шли раздельно — два действия подряд
+        // (нажатие и ответ фоновой задачи) могли пройти оба и пойти по серверу параллельно
+        var taken = false
+        _ui.update { u ->
+            taken = !u.busy
+            if (u.busy) u else u.copy(busy = true, opServer = id, error = null, progress = title, log = if (quiet) u.log else emptyList())
+        }
+        if (!taken) return
         scope.launch(Dispatchers.IO) {
             try {
                 SshConnector.connect(t, srv.fingerprint).use { ssh ->
