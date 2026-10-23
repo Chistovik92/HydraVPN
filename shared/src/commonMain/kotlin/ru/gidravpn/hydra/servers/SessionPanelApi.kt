@@ -57,6 +57,16 @@ class SessionPanelApi(private val ssh: SshSession, private val panel: PanelInsta
         return (obj(post("xui/API/inbounds/add", body.toString(), "application/json")) as? JSONObject)?.optInt("id") ?: 0
     }
 
+    /** Добавить клиента в инбаунд x-ui (0.8.2-rc2): `POST xui/API/inbounds/addClient`, поля `id` и `settings`. */
+    fun xuiAddClient(inboundId: Int, client: JSONObject) {
+        obj(post("xui/API/inbounds/addClient", OtherPanelUsers.xuiAddClientForm(inboundId, client), "application/x-www-form-urlencoded"))
+    }
+
+    /** Убрать клиента из инбаунда x-ui: `POST xui/API/inbounds/{инбаунд}/delClient/{id или пароль клиента}`. */
+    fun xuiDelClient(inboundId: Int, clientKey: String) {
+        obj(post("xui/API/inbounds/$inboundId/delClient/${enc(clientKey)}", "", "application/x-www-form-urlencoded"))
+    }
+
     fun xuiDelInbound(id: Int) { obj(post("xui/API/inbounds/del/$id", "", "application/x-www-form-urlencoded")) }
 
     // ------------------------------------------------------------------------------------------ s-ui

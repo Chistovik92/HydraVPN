@@ -372,6 +372,14 @@
     <string name="ms_node_install_title">Нода на сервере «%1$s»</string>
     <string name="ms_node_install_none">Сначала поставьте панель 3x-ui, PasarGuard или Remnawave на другом сервере из «Мои серверы» — нода подключается к ней.</string>
     <string name="ms_node_install_hint">Выберите панель, к которой подключить этот сервер. Hydra поставит на него всё нужное; порты ноды откроются только для сервера панели. Займёт 2–5 минут.</string>
+    <string name="ms_backup_btn">Восстановить из копии</string>
+    <string name="ms_backup_title">Копии базы панели %1$s</string>
+    <string name="ms_backup_loading">Ищу копии на сервере…</string>
+    <string name="ms_backup_none">Копий нет. Их делает Hydra перед удалением панели и очисткой сервера — они лежат в /root/hydra-backups.</string>
+    <string name="ms_backup_hint">Пользователи и настройки панели станут такими, какими были в копии. Текущая база сохранится рядом и вернётся, если панель не запустится.</string>
+    <string name="ms_backup_confirm_title">Восстановить базу из копии от %1$s?</string>
+    <string name="ms_backup_confirm_msg">Панель ненадолго остановится. Всё, что добавлено в неё после этой копии (пользователи, подключения), пропадёт.</string>
+    <string name="ms_backup_restore">Восстановить</string>
     <string name="ms_node_of">Нода панели %1$s сервера «%2$s»</string>
     <string name="ms_node_of_hint">Подключения панели работают и через этот сервер. Убрать ноду — на карточке «%1$s».</string>
 </resources>

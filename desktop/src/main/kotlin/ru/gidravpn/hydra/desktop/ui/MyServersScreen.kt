@@ -466,6 +466,7 @@ private fun PanelSection(c: AppController, srv: MyServer, st: ServerStatus?, m: 
     Text("Версия ${p.version.ifBlank { "—" }}" + (state?.let { " · служба: $it" } ?: ""), fontSize = 12.sp,
         color = if (state == "active") Ok else MaterialTheme.colorScheme.onSurfaceVariant)
     PanelBody(c, srv, m, s, onAddUser)
+    PanelBackupsSection(srv, m, s)
     ChipRow {
         OutlinedButton(onClick = { m.restartService(srv.id, kind) }, enabled = !busy) { Text("Перезапустить") }
         TextButton(onClick = {
@@ -535,14 +536,14 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
         if (p.password.isNotBlank()) OutlinedButton(onClick = { copySecret(p.password); c.toast("Пароль скопирован на 30 секунд") }) { Text("Скопировать пароль") }
         if (tunnel != null) OutlinedButton(onClick = { m.closePanelTunnel(srv.id) }) { Text("Закрыть туннель") }
         if (ssh && !p.kind.tunnelOnly) OutlinedButton(onClick = { askLocal = !p.local }, enabled = !busy) { Text(if (p.local) "Открыть панель извне" else "Закрыть панель извне") }
-        // пользователи через API — только у 3x-ui (токен); у s-ui и x-ui — на сайте панели
-        if (p.token.isNotBlank()) {
+        // пользователи через API: 3x-ui (токен), с rc2 — s-ui и x-ui (по SSH); у остальных — на сайте панели
+        if (ru.gidravpn.hydra.servers.OtherPanelUsers.supported(srv)) {
             OutlinedButton(onClick = { m.loadPanelClients(srv.id) }, enabled = !busy) { Text("Пользователи") }
             OutlinedButton(onClick = onAddUser, enabled = !busy) { Text("Добавить пользователя") }
         }
         if (ru.gidravpn.hydra.servers.OtherPanelConnections.canCreate(srv)) OutlinedButton(onClick = { createConn = true }, enabled = !busy) { Text("Создать подключение") }
     }
-    if (p.token.isBlank()) Text("Пользователей и подключения заводите на сайте панели; ссылку подключения из панели можно вставить в «Серверы».",
+    if (!ru.gidravpn.hydra.servers.OtherPanelUsers.supported(srv)) Text("Пользователей и подключения заводите на сайте панели; ссылку подключения из панели можно вставить в «Серверы».",
         fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     inApp?.let { url ->
         PanelWebWindow(p, srv.name, url, onFailed = { if (p.password.isNotBlank()) copySecret(p.password) }) {
@@ -637,6 +638,44 @@ private fun PanelNodesSection(srv: MyServer, m: MyServersManager, s: MyServersUi
             text = { Text("Нода будет убрана из панели, а с сервера ${n.host} — всё, что Hydra ставила для неё. Подключения через этот сервер перестанут работать.") },
             confirmButton = { TextButton(onClick = { remove = null; m.removePanelNode(srv.id, n.serverId) }) { Text("Убрать", color = Danger) } },
             dismissButton = { TextButton(onClick = { remove = null }) { Text("Отмена") } })
+    }
+}
+
+/**
+ * Восстановление базы панели из копии (0.8.2-rc2, A3): копии лежат в `/root/hydra-backups` (Hydra делает их перед удалением и
+ * очисткой сервера). Выбор копии → подтверждение → Hydra проверяет копию, сохраняет текущую базу и подменяет её.
+ */
+@Composable
+private fun PanelBackupsSection(srv: MyServer, m: MyServersManager, s: MyServersUi) {
+    val p = srv.panel ?: return
+    if (srv.fingerprint.isBlank() || !ru.gidravpn.hydra.servers.PanelBackups.supports(p.kind)) return
+    var open by remember { mutableStateOf(false) }
+    var pick by remember { mutableStateOf<ru.gidravpn.hydra.servers.PanelBackups.Backup?>(null) }
+    OutlinedButton(onClick = { open = true; m.loadBackups(srv.id) }, enabled = !s.busy) { Text("Восстановить из копии") }
+    if (open) {
+        val list = s.backups[srv.id]
+        AlertDialog(onDismissRequest = { open = false },
+            title = { Text("Копии базы панели ${p.kind.title}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    when {
+                        list == null -> Text("Ищу копии на сервере…", fontSize = 13.sp)
+                        list.isEmpty() -> Text("Копий нет. Их делает Hydra перед удалением панели и очисткой сервера — они лежат в /root/hydra-backups.", fontSize = 13.sp)
+                        else -> {
+                            Text("Пользователи и настройки панели станут такими, какими были в копии. Текущая база сохранится рядом и вернётся, если панель не запустится.", fontSize = 13.sp)
+                            list.forEach { b -> OutlinedButton(onClick = { open = false; pick = b }) { Text(b.title) } }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { open = false }) { Text("Закрыть") } })
+    }
+    pick?.let { b ->
+        AlertDialog(onDismissRequest = { pick = null },
+            title = { Text("Восстановить базу из копии от ${b.title}?") },
+            text = { Text("Панель ненадолго остановится. Всё, что добавлено в неё после этой копии (пользователи, подключения), пропадёт.") },
+            confirmButton = { TextButton(onClick = { pick = null; m.restoreBackup(srv.id, b.file) }) { Text("Восстановить", color = Danger) } },
+            dismissButton = { TextButton(onClick = { pick = null }) { Text("Отмена") } })
     }
 }
 

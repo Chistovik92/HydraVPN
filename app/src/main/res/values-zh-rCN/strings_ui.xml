@@ -364,6 +364,14 @@
     <string name="ms_node_install_title">服务器“%1$s”上的节点</string>
     <string name="ms_node_install_none">请先在“我的服务器”中的另一台服务器上安装 3x-ui、PasarGuard 或 Remnawave——节点会连接到它。</string>
     <string name="ms_node_install_hint">选择要连接此服务器的面板。Hydra 会安装节点所需的一切；节点端口只对面板服务器开放。需要 2–5 分钟。</string>
+    <string name="ms_backup_btn">从备份恢复</string>
+    <string name="ms_backup_title">面板 %1$s 的备份</string>
+    <string name="ms_backup_loading">正在服务器上查找备份…</string>
+    <string name="ms_backup_none">没有备份。Hydra 会在删除面板或清理服务器之前创建备份，位于 /root/hydra-backups。</string>
+    <string name="ms_backup_hint">面板的用户和设置将恢复为备份时的状态。当前数据库会保存在旁边，面板无法启动时会自动还原。</string>
+    <string name="ms_backup_confirm_title">从 %1$s 的备份恢复数据库？</string>
+    <string name="ms_backup_confirm_msg">面板会短暂停止。此备份之后添加的所有内容（用户、连接）都将丢失。</string>
+    <string name="ms_backup_restore">恢复</string>
     <string name="ms_node_of">服务器“%2$s”上 %1$s 面板的节点</string>
     <string name="ms_node_of_hint">面板的连接也通过此服务器工作。移除节点请到“%1$s”卡片。</string>
 </resources>

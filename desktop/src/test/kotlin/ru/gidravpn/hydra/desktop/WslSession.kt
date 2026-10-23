@@ -19,7 +19,15 @@ class WslSession(private val distro: String, private val container: String?) : S
         listOf("wsl", "-d", distro, "-u", "root", "-e") + (if (container != null) listOf("docker", "exec", "-i", container) else emptyList()) + inner
 
     override fun exec(command: String, onLine: (String) -> Unit): ExecResult {
-        val p = ProcessBuilder(cmd(listOf("bash", "-c", command))).redirectErrorStream(true).start()
+        // Команда — файлом внутрь стенда, а не аргументом: Java и wsl.exe разбирают кавычки по-разному, и `sqlite3 … "select …"` приходил
+        // обрезанным (0.8.2-rc2: в путь сертификата s-ui попадал текст ошибки sqlite). Скрипт запускается без stdin.
+        val script = "/tmp/.hydra-wsl-" + System.nanoTime().toString(36)
+        upload(command.toByteArray(Charsets.UTF_8), script, 384)
+        try { return run(listOf("bash", script), onLine) } finally { runCatching { run(listOf("rm", "-f", script)) {} } }
+    }
+
+    private fun run(inner: List<String>, onLine: (String) -> Unit): ExecResult {
+        val p = ProcessBuilder(cmd(inner)).redirectErrorStream(true).start()
         p.outputStream.close()
         val out = StringBuilder()
         p.inputStream.bufferedReader(Charsets.UTF_8).forEachLine { raw ->

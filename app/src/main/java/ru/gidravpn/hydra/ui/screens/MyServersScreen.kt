@@ -502,6 +502,7 @@ private fun PanelSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, 
     val state = st?.takeIf { it.error == null }?.xuiState?.takeIf { it.isNotBlank() }
     Text(stringResource(R.string.ms_panel_line, p.version.ifBlank { "—" }, state ?: "—"), color = if (state == "active") Success else TextMuted, fontSize = 12.sp)
     PanelBody(srv, m, s, onAddUser)
+    PanelBackupsSection(srv, m, s)
     Spacer(Modifier.height(6.dp))
     MsRow {
         MsChip(stringResource(R.string.ms_restart), TextSecondary) { if (!busy) m.restartService(srv.id, kind) }
@@ -556,7 +557,7 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
         if (p.password.isNotBlank()) MsChip(stringResource(R.string.ms_copy_password), TextSecondary) { copySecret(clip, p.password); Toast.makeText(ctx, pwMsg, Toast.LENGTH_SHORT).show() }
         if (tunnel != null) MsChip(stringResource(R.string.ms_tunnel_close), TextSecondary) { m.closePanelTunnel(srv.id) }
         // пользователи через API — только у 3x-ui (токен); у s-ui и x-ui — на сайте панели
-        if (p.token.isNotBlank()) {
+        if (ru.gidravpn.hydra.servers.OtherPanelUsers.supported(srv)) {
             MsChip(stringResource(R.string.ms_panel_users), AccentViolet) { if (!busy) m.loadPanelClients(srv.id) }
             MsChip(stringResource(R.string.ms_panel_add_user), AccentCyan) { if (!busy) onAddUser() }
         }
@@ -568,7 +569,7 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
     if (createConn) CreateConnectionDialog(ru.gidravpn.hydra.servers.OtherPanelConnections.typesFor(p.kind), https = XuiPanel.isHttps(p.baseUrl), onClose = { createConn = false }) { type, port, mask ->
         createConn = false; m.createPanelConnection(srv.id, type, port, mask)
     }
-    if (p.token.isBlank()) Text(stringResource(R.string.ms_panel_site_only), color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+    if (!ru.gidravpn.hydra.servers.OtherPanelUsers.supported(srv)) Text(stringResource(R.string.ms_panel_site_only), color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
     // «ничего наружу без согласия» (0.8.1-rc2): панель слушает только сам сервер, сайт — через защищённый туннель
     if (ssh && !p.kind.tunnelOnly) {
         val onConfirm = LocalConfirm.current
@@ -639,6 +640,44 @@ private fun BrokenCard(srv: MyServer, onForget: () -> Unit) = Card {
     Text(stringResource(R.string.ms_broken), color = TextMuted, fontSize = 12.sp)
     Spacer(Modifier.height(8.dp))
     MsChip(stringResource(R.string.ms_forget), TextSecondary) { onForget() }
+}
+
+/**
+ * Восстановление базы панели из копии (0.8.2-rc2, A3): копии лежат в `/root/hydra-backups` (Hydra делает их перед удалением и
+ * очисткой сервера). Выбор копии → подтверждение → Hydra проверяет копию, сохраняет текущую базу и подменяет её.
+ */
+@Composable
+private fun PanelBackupsSection(srv: MyServer, m: MyServersManager, s: MyServersUi) {
+    val p = srv.panel ?: return
+    if (srv.fingerprint.isBlank() || !ru.gidravpn.hydra.servers.PanelBackups.supports(p.kind)) return
+    var open by remember { mutableStateOf(false) }
+    var pick by remember { mutableStateOf<ru.gidravpn.hydra.servers.PanelBackups.Backup?>(null) }
+    MsRow { MsChip(stringResource(R.string.ms_backup_btn), TextSecondary) { if (!s.busy) { open = true; m.loadBackups(srv.id) } } }
+    if (open) {
+        val list = s.backups[srv.id]
+        AlertDialog(onDismissRequest = { open = false },
+            title = { Text(stringResource(R.string.ms_backup_title, p.kind.title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    when {
+                        list == null -> Text(stringResource(R.string.ms_backup_loading), fontSize = 13.sp)
+                        list.isEmpty() -> Text(stringResource(R.string.ms_backup_none), fontSize = 13.sp)
+                        else -> {
+                            Text(stringResource(R.string.ms_backup_hint), fontSize = 13.sp)
+                            list.forEach { b -> OutlinedButton(onClick = { open = false; pick = b }) { Text(b.title) } }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(android.R.string.cancel)) } })
+    }
+    pick?.let { b ->
+        AlertDialog(onDismissRequest = { pick = null },
+            title = { Text(stringResource(R.string.ms_backup_confirm_title, b.title)) },
+            text = { Text(stringResource(R.string.ms_backup_confirm_msg)) },
+            confirmButton = { TextButton(onClick = { pick = null; m.restoreBackup(srv.id, b.file) }) { Text(stringResource(R.string.ms_backup_restore), color = Danger) } },
+            dismissButton = { TextButton(onClick = { pick = null }) { Text(stringResource(android.R.string.cancel)) } })
+    }
 }
 
 /** Готовая панель, подключённая по адресу и токену (без SSH): только API панели. */

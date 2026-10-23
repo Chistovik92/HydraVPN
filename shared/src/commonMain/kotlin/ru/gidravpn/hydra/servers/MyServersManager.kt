@@ -90,6 +90,8 @@ data class MyServersUi(
     val saved: Set<String> = emptySet(),
     /** Панели 3x-ui: id сервера → email пользователей (после «Пользователи»). */
     val panelClients: Map<String, List<String>> = emptyMap(),
+    /** Копии баз панелей на серверах (0.8.2-rc2, A3): сервер → копии, новые первыми. */
+    val backups: Map<String, List<PanelBackups.Backup>> = emptyMap(),
     /** Что показываем в окне: имя → конфиг клиента или ссылка. */
     val shown: Pair<String, String>? = null,
     /** Открытые туннели к закрытым извне панелям (0.8.1-rc2): id сервера → адрес панели на этом устройстве. */
@@ -577,13 +579,21 @@ class MyServersManager(
     }
 
     /** Пользователи панели (email) — для списка в карточке. */
-    fun loadPanelClients(id: String) = withPanel(id) { s, api ->
-        val emails = api.clientEmails()
-        _ui.update { it.copy(panelClients = it.panelClients + (s.id to emails)) }
+    fun loadPanelClients(id: String) {
+        if (sessionUsers(id) != null) return loadSessionUsers(id)
+        withPanel(id) { s, api ->
+            val emails = api.clientEmails()
+            _ui.update { it.copy(panelClients = it.panelClients + (s.id to emails)) }
+        }
     }
 
     /** Новый пользователь панели: ссылки показываются в окне, их можно добавить в «Серверы». */
-    fun addPanelClient(id: String, email: String) = withPanel(id) { s, api ->
+    fun addPanelClient(id: String, email: String) {
+        if (sessionUsers(id) != null) return addSessionUser(id, email)
+        addXuiPanelClient(id, email)
+    }
+
+    private fun addXuiPanelClient(id: String, email: String) = withPanel(id) { s, api ->
         // инбаунд Hydra; у панели, взятой под управление с другого устройства, его номер неизвестен — первый VLESS
         val inbound = s.panel!!.inboundId.takeIf { it > 0 } ?: api.inbounds().let { a ->
             (0 until a.length()).mapNotNull { a.optJSONObject(it) }.let { l -> l.firstOrNull { it.optString("protocol") == "vless" } ?: l.firstOrNull() }?.optInt("id")
@@ -1007,8 +1017,11 @@ class MyServersManager(
     }
 
     /** Ссылки уже созданного пользователя панели. */
-    fun showPanelLinks(id: String, email: String) = withPanel(id) { s, api ->
-        _ui.update { it.copy(shown = email to accessText(s, api, email, api.subIdOf(email))) }
+    fun showPanelLinks(id: String, email: String) {
+        if (sessionUsers(id) != null) return showSessionUser(id, email)
+        withPanel(id) { s, api ->
+            _ui.update { it.copy(shown = email to accessText(s, api, email, api.subIdOf(email))) }
+        }
     }
 
     /** Что выдать пользователю: адрес подписки (обновляется сам, 0.8.1-rc1), а если подписка в панели выключена — ссылки. */
@@ -1020,9 +1033,138 @@ class MyServersManager(
         return links.joinToString("\n")
     }
 
-    fun removePanelClient(id: String, email: String) = withPanel(id) { s, api ->
-        api.delClient(email)
-        _ui.update { it.copy(panelClients = it.panelClients + (s.id to api.clientEmails())) }
+    fun removePanelClient(id: String, email: String) {
+        if (sessionUsers(id) != null) return removeSessionUser(id, email)
+        withPanel(id) { s, api ->
+            api.delClient(email)
+            _ui.update { it.copy(panelClients = it.panelClients + (s.id to api.clientEmails())) }
+        }
+    }
+
+    // ================================================================================================ Пользователи s-ui и x-ui (0.8.2-rc2, A1–A3)
+
+    /** s-ui и x-ui со входом по SSH: пользователи — через их API по cookie ([OtherPanelUsers]). */
+    private fun sessionUsers(id: String): MyServer? =
+        find(id)?.takeIf { (it.panel?.kind == PanelKind.SUI || it.panel?.kind == PanelKind.XUI) && it.fingerprint.isNotBlank() }
+
+    private fun sessionOp(id: String, title: String, work: (MyServer, SessionPanelApi, SshSession, Installer) -> Unit) =
+        op(id, title) { s, ssh, inst ->
+            val p = s.panel ?: throw OpFailed("Панели нет")
+            inst.addSecret(p.password)
+            SessionPanelApi(ssh, p).use { api ->
+                try { api.login(); work(s, api, ssh, inst) }
+                catch (e: XuiApiException) { throw OpFailed("Панель: ${e.message}") }
+                catch (e: org.json.JSONException) { throw OpFailed("Панель ответила не так, как ожидалось: ${e.message}") }
+            }
+        }
+
+    private fun usersOf(s: MyServer, api: SessionPanelApi): List<OtherPanelUsers.User> {
+        val p = s.panel!!
+        return if (p.kind == PanelKind.XUI) OtherPanelUsers.xuiUsers(api.xuiInbounds(), OtherPanelConnections.subId(p)) else OtherPanelUsers.suiUsers(api.suiLoad())
+    }
+
+    private fun loadSessionUsers(id: String) = sessionOp(id, "Читаю пользователей панели…") { s, api, _, _ ->
+        _ui.update { it.copy(panelClients = it.panelClients + (s.id to usersOf(s, api).map { u -> u.name })) }
+    }
+
+    /** Подписка пользователя: у x-ui — `/sub/<subId>` на порту подписки (включается, если выключена), у s-ui — `/sub/<имя>`. */
+    private fun sessionAccess(s: MyServer, api: SessionPanelApi, ssh: SshSession, inst: Installer, user: OtherPanelUsers.User): String {
+        val p = s.panel!!
+        val host = runCatching { java.net.URL(p.baseUrl).host }.getOrNull()?.removePrefix("[")?.removeSuffix("]")?.ifBlank { null } ?: s.host
+        val db = OtherPanels.dbPath(p.kind)
+        fun setting(k: String) = ssh.exec("sqlite3 $db \"select value from settings where key='$k'\" 2>/dev/null").out.trim()
+        if (p.kind == PanelKind.XUI && setting("subEnable") != "true") {
+            inst.run(listOf(Step("xui-sub", "Включить подписку x-ui (порт 2096): по ней Hydra забирает подключения",
+                OtherPanels.settingsCommand(PanelKind.XUI, mapOf("subEnable" to "true")) + " && systemctl restart x-ui && sleep 3 && systemctl is-active x-ui",
+                accept = { r -> r.out.lineSequence().any { it.trim() == "active" } }, failHint = "x-ui не запустилась")))
+        }
+        val port = setting("subPort").toIntOrNull() ?: 2096
+        val https = setting("subCertFile").isNotBlank()
+        service.preflight(ssh, 0).let { pre -> ServerOps.openPortStep(pre.firewall, "$port/tcp")?.let { inst.run(listOf(it)) } }
+        val url = "${if (https) "https" else "http"}://${if (':' in host) "[$host]" else host}:$port/sub/${user.subId}"
+        Thread.sleep(1500)
+        val links = runCatching { api.subscription(port, "/sub/", user.subId, https) }.getOrDefault(emptyList())
+        if (links.isNotEmpty()) return url
+        // подписка недоступна (выключена, закрыта) — ссылки самой панели, если s-ui их отдаёт
+        if (p.kind == PanelKind.SUI) {
+            val cid = suiId(api, "clients", user.name)
+            val client = runCatching { org.json.JSONObject(api.suiRaw("api/clients?id=$cid")).optJSONObject("obj")?.optJSONArray("clients")?.optJSONObject(0) }.getOrNull()
+            client?.let(OtherPanelConnections::suiLinks)?.takeIf { it.isNotEmpty() }?.let { return it.joinToString("\n") }
+        }
+        throw XuiApiException("Подписка пользователя пуста: в панели нет подключений для него или подписка выключена")
+    }
+
+    private fun addSessionUser(id: String, name: String) = sessionOp(id, "Добавляю пользователя «$name»…") { s, api, ssh, inst ->
+        if (!OtherPanelUsers.validName(name)) throw OpFailed("Имя — латинские буквы, цифры, «-» и «_», до 32 знаков")
+        if (usersOf(s, api).any { it.name == name }) throw OpFailed("Пользователь «$name» уже есть")
+        val user = if (s.panel!!.kind == PanelKind.XUI) {
+            val inbounds = api.xuiInbounds()
+            val targets = OtherPanelUsers.xuiTargets(inbounds)
+            if (targets.isEmpty()) throw OpFailed("В x-ui нет подключений для пользователей — сначала «Создать подключение»")
+            val c = OtherPanelConnections.newCreds(XuiConnection.VLESS_TCP_REALITY, XuiPanel.random(16).lowercase())
+            inst.addSecret(c.uuid); inst.addSecret(c.password); inst.addSecret(c.ssKey)
+            for (t in targets) {
+                val ibId = t.optInt("id")
+                OtherPanelUsers.xuiClient(t.optString("protocol"), OtherPanelUsers.xuiEmail(name, ibId), c.subId, c.uuid, c.password, c.ssKey)?.let { api.xuiAddClient(ibId, it) }
+            }
+            Thread.sleep(2000)   // x-ui применяет клиентов перезапуском Xray
+            OtherPanelUsers.User(name, c.subId)
+        } else {
+            val ids = OtherPanelUsers.suiInboundIds(api.suiLoad())
+            if (ids.isEmpty()) throw OpFailed("В s-ui нет подключений для пользователей — сначала «Создать подключение»")
+            val client = OtherPanelUsers.suiClient(name, ids)
+            api.suiSave("clients", "new", client)
+            suiId(api, "clients", name)   // убедиться, что сохранилось
+            // s-ui применяет нового клиента к ядру не сразу (на стенде — 3–8 с): ссылка, выданная раньше, первые секунды не подключается
+            _ui.update { it.copy(progress = "Жду, пока панель применит пользователя…") }
+            Thread.sleep(10_000)
+            OtherPanelUsers.User(name, name)
+        }
+        val access = sessionAccess(s, api, ssh, inst, user)
+        _ui.update { it.copy(shown = name to access, panelClients = it.panelClients + (s.id to usersOf(s, api).map { u -> u.name }),
+            log = it.log + "Пользователь «$name» добавлен") }
+    }
+
+    private fun showSessionUser(id: String, name: String) = sessionOp(id, "Получаю подписку пользователя…") { s, api, ssh, inst ->
+        val user = usersOf(s, api).firstOrNull { it.name == name } ?: throw OpFailed("Пользователя «$name» в панели нет")
+        _ui.update { it.copy(shown = name to sessionAccess(s, api, ssh, inst, user)) }
+    }
+
+    // ------------------------------------------------------------------------------------------ Копии баз панелей (A3)
+
+    /** Копии базы этой панели в `/root/hydra-backups` — для окна «Восстановить из копии». */
+    fun loadBackups(id: String) {
+        val kind = find(id)?.panel?.kind?.takeIf { PanelBackups.supports(it) } ?: return
+        op(id, "Ищу копии базы панели…", quiet = true) { s, ssh, _ ->
+            val list = PanelBackups.parse(ssh.exec(PanelBackups.listCommand()).out, kind)
+            _ui.update { it.copy(backups = it.backups + (s.id to list)) }
+        }
+    }
+
+    /**
+     * Восстановить базу панели из копии [file] (0.8.2-rc2, A3): копия проверяется, текущая база сохраняется, панель останавливается,
+     * база подменяется, панель запускается; не запустилась — прежняя база возвращается. Пользователи и настройки — как в копии.
+     */
+    fun restoreBackup(id: String, file: String) {
+        val srv0 = find(id) ?: return
+        val kind = srv0.panel?.kind?.takeIf { PanelBackups.supports(it) } ?: return _ui.update { it.copy(error = "Для этой панели восстановление из копии пока недоступно", opServer = id) }
+        if (!PanelBackups.validFile(file)) return _ui.update { it.copy(error = "Недопустимое имя копии", opServer = id) }
+        op(id, "Восстанавливаю базу панели из копии…") { s, ssh, inst ->
+            val steps = PanelBackups.restoreSteps(kind, file)
+            if (!inst.run(steps)) throw OpFailed(_ui.value.error ?: "Восстановить базу не удалось")
+            closePanelTunnel(id)
+            log("Готово: панель запущена с базой из копии $file. Предыдущая база сохранена как ${ServerOps.BACKUP_DIR}/${if (kind == PanelKind.SUI) "s-ui" else "x-ui"}-before-restore.db")
+            _ui.update { it.copy(panelClients = it.panelClients - s.id) }
+        }
+    }
+
+    private fun removeSessionUser(id: String, name: String) = sessionOp(id, "Удаляю пользователя «$name»…") { s, api, _, _ ->
+        val user = usersOf(s, api).firstOrNull { it.name == name } ?: throw OpFailed("Пользователя «$name» в панели нет")
+        if (s.panel!!.kind == PanelKind.XUI) {
+            if (user.subId == OtherPanelConnections.subId(s.panel)) throw OpFailed("«hydra» — общая группа подключений Hydra; убирайте подключения на сайте панели")
+            OtherPanelUsers.xuiClientsOf(api.xuiInbounds(), user.subId).forEach { (ib, key) -> api.xuiDelClient(ib, key) }
+        } else api.suiSave("clients", "del", suiId(api, "clients", name))
+        _ui.update { it.copy(panelClients = it.panelClients + (s.id to usersOf(s, api).map { u -> u.name }), log = it.log + "Пользователь «$name» удалён") }
     }
 
     fun clientConf(id: String, clientName: String): String? {
