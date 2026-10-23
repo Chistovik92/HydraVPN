@@ -19,7 +19,7 @@ import kotlin.test.fail
  */
 class PasarGuardLiveTest {
     @Test fun pasarGuardInstallConnectionsTraffic() {
-        val v = System.getenv("HYDRA_SSH_TEST")
+        val v = System.getenv("HYDRA_SSH_TEST") ?: if (WslSession.install()) "${System.getenv("HYDRA_WSL_TARGET") ?: "172.29.99.250"}:22:root:-" else null
         assumeTrue(v != null && System.getenv("HYDRA_PG_LIVE") != null)
         val p = v!!.split(":", limit = 4)
         val login = SshTarget(p[0], p[1].toInt(), p[2], password = p[3])

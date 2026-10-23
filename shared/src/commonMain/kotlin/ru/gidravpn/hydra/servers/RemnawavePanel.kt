@@ -10,8 +10,8 @@ import org.json.JSONObject
  * добавляет эти заголовки: сайт панели открывается через SSH-туннель Hydra, наружу панель не видна; API — `curl` на сервере.
  */
 object RemnawavePanel {
-    const val TAG = "3.4.5"
-    const val NODE_TAG = "3.4.2"
+    const val TAG = "3.4.7"
+    const val NODE_TAG = "3.4.3"
     const val CADDY = "caddy:2.10.0-alpine"
     const val DIR = "/opt/remnawave"
     const val NODE_DIR = "/opt/remnanode"
@@ -213,6 +213,14 @@ class RemnawaveApi(private val ssh: SshSession, private val user: String, privat
             u
         }
         val short = user.optString("shortUuid").ifBlank { throw XuiApiException("Remnawave не выдала подписку пользователя") }
+        // 0.8.2-rc2: нода иногда не подхватывает новый инбаунд сама («handler not found», порт не слушается, пока ноду не перезапустят) —
+        // чаще у первого подключения после установки. Порт не слушается — перезапуск ноды через API панели (до двух раз).
+        for (attempt in 0 until 3) {
+            if (ssh.exec("ss -ltnuH 2>/dev/null | grep -q ':$port '").ok) break
+            if (attempt == 2) break
+            runCatching { call("POST", "/api/nodes/${node.getString("uuid")}/actions/restart", JSONObject().put("forceRestart", true)) }
+            Thread.sleep(8000)
+        }
         var links = emptyList<String>()
         repeat(6) { links = subscriptionLinks(short).filter { l -> OtherPanelConnections.linkHasPort(l, port) }
             if (links.isNotEmpty()) return links; Thread.sleep(2500) }
