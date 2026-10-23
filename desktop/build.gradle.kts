@@ -33,6 +33,25 @@ val pkgVersion: String = appVersion.substringBefore('-').split('.').take(3)
     .let { it + List(3 - it.size) { "0" } }
     .joinToString(".")
 
+// Windows (MSI/EXE): ProductVersion из трёх чисел, а Windows Installer при той же версии и том же UpgradeCode отвечает
+// ошибкой 1638 («Уже установлена другая версия этого продукта») — поэтому 0.8.2-b → 0.8.2-rc1 не ставился поверх.
+// Пре-релиз кодируем в третье число: PATCH*100 + ступень (a = 10+n-1, b = 30+n-1, rcN = 60+N, выпуск = 99):
+// 0.8.2-b = 0.8.230 < 0.8.2-rc1 = 0.8.261 < 0.8.2 = 0.8.299 < 0.8.3-a = 0.8.310. Ранее выпущенные 0.8.x (PATCH < 100) меньше.
+val winPkgVersion: String = run {
+    val (major, minor, patch) = pkgVersion.split('.').map(String::toInt)
+    val suffix = appVersion.substringAfter('-', "")
+    val n = suffix.dropWhile(Char::isLetter).toIntOrNull() ?: 1
+    val stage = when {
+        suffix.isEmpty() -> 99
+        suffix.startsWith("rc") -> 60 + n
+        suffix.startsWith("b") -> 30 + n - 1
+        suffix.startsWith("a") -> 10 + n - 1
+        else -> error("Неизвестный суффикс версии: $appVersion")
+    }
+    require(patch * 100 + stage <= 65535) { "PATCH слишком велик для MSI: $appVersion" }
+    "$major.$minor.${patch * 100 + stage}"
+}
+
 // macOS (DMG/CFBundleVersion) требует MAJOR > 0: 0.X.Y → 1.X.Y. Порядок версий
 // сохраняется; настоящая версия видна в самом приложении (hydra.version).
 val macPkgVersion: String = pkgVersion.split('.').let { (a, b, c) -> "${a.toInt() + 1}.$b.$c" }
@@ -458,6 +477,8 @@ compose.desktop {
                 shortcut = true
                 dirChooser = true
                 perUserInstall = true
+                msiPackageVersion = winPkgVersion
+                exePackageVersion = winPkgVersion
                 // Постоянный UUID: без него MSI новой версии не заменяет старую.
                 upgradeUuid = "6f1d0c0e-5c7b-4b8e-9a44-2d6f0b9e1a37"
             }
