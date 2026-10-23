@@ -135,6 +135,9 @@ val downloadSingBox by tasks.registering {
 // под свежий Xray. SHA-256 — дайджесты ассетов релиза https://github.com/XTLS/Xray-core/releases/tag/v26.10.21 .
 val xrayVersion = "26.10.21"
 
+/** Зеркало сторонних сборок: релиз `deps` в нашем репозитории (scripts/mirror-deps.sh); имена — `Xray-<версия>-<архив>.zip`. */
+val depsMirror = "https://github.com/Chistovik92/HydraVPN/releases/download/deps"
+
 val xrayArchives = mapOf(
     "windows-x64" to ("windows-64" to "fc58c39ee2f2717b4c54d28d374362389e5319b20ae44aea76ea45a5243ec827"),
     "windows-arm64" to ("windows-arm64-v8a" to "bb44af3380c9975f951ce7645c04d56ab600040e68f23974a2806e08e0a3f872"),
@@ -159,9 +162,18 @@ val downloadXray by tasks.registering {
         fun sha(f: File) = MessageDigest.getInstance("SHA-256").digest(f.readBytes())
             .joinToString("") { "%02x".format(it) }
         if (!file.exists() || sha(file) != sha256) {
-            val url = "https://github.com/XTLS/Xray-core/releases/download/v$xrayVersion/Xray-$suffix.zip"
-            logger.lifecycle("Скачиваю $url")
-            URI(url).toURL().openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+            // апстрим удаляет релизы (v26.10.10 и v26.10.17 пропали, 0.8.2-rc2): после апстрима — наше зеркало с тем же SHA-256
+            val urls = listOf("https://github.com/XTLS/Xray-core/releases/download/v$xrayVersion/Xray-$suffix.zip",
+                "$depsMirror/Xray-$xrayVersion-$suffix.zip")
+            var lastError: Exception? = null
+            val got = urls.any { url ->
+                try {
+                    logger.lifecycle("Скачиваю $url")
+                    URI(url).toURL().openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+                    sha(file) == sha256
+                } catch (e: Exception) { lastError = e; logger.lifecycle("  не вышло: ${e.message}"); false }
+            }
+            if (!got) throw GradleException("Xray $xrayVersion ($suffix) не скачан ни с апстрима, ни с зеркала $depsMirror", lastError)
         }
         val actual = sha(file)
         check(actual == sha256) { "SHA-256 ${file.name} не совпал: $actual (ожидался $sha256)" }

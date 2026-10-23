@@ -52,3 +52,6 @@ keystore.properties
 /desktop/build
 /ios/build
 /.kotlin/
+
+# Зеркало сторонних сборок (scripts/mirror-deps.sh)
+/mirror/

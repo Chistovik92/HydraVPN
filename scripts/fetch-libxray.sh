@@ -20,12 +20,17 @@ LIBXRAY_XRAY_COMMIT="1b1647cd9ddf"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 ZIP="$WORK/libxray-android.zip"
-URL="https://github.com/XTLS/libXray/releases/download/v$LIBXRAY_VERSION/libxray-android.zip"
-echo "==> $URL"
-curl -fL --retry 4 --retry-delay 3 -o "$ZIP" "$URL"
-
-actual="$(sha256sum "$ZIP" | cut -d' ' -f1)"
-[[ "$actual" == "$LIBXRAY_SHA256" ]] || { echo "ОШИБКА: SHA-256 libxray-android.zip $actual, ожидался $LIBXRAY_SHA256" >&2; exit 1; }
+# Апстрим удаляет релизы (v26.10.10 и v26.10.17 пропали): после апстрима — наше зеркало (релиз `deps`, scripts/mirror-deps.sh)
+# с тем же SHA-256.
+URLS=("https://github.com/XTLS/libXray/releases/download/v$LIBXRAY_VERSION/libxray-android.zip"
+      "https://github.com/Chistovik92/HydraVPN/releases/download/deps/libxray-android-$LIBXRAY_VERSION.zip")
+ok=0
+for URL in "${URLS[@]}"; do
+  echo "==> $URL"
+  if curl -fL --retry 4 --retry-delay 3 -o "$ZIP" "$URL" && [[ "$(sha256sum "$ZIP" | cut -d' ' -f1)" == "$LIBXRAY_SHA256" ]]; then ok=1; break; fi
+  echo "    не вышло (нет файла или другой SHA-256)" >&2
+done
+[[ $ok == 1 ]] || { echo "ОШИБКА: libxray-android.zip v$LIBXRAY_VERSION с SHA-256 $LIBXRAY_SHA256 не найден ни у апстрима, ни в зеркале" >&2; exit 1; }
 
 unzip -q -o "$ZIP" -d "$WORK"
 AAR="$WORK/libxray-android/libXray.aar"
