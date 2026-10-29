@@ -111,6 +111,9 @@ case "$TARGET" in
 
     arch="x86_64"; [[ "$TARGET" == "linux-arm64" ]] && arch="aarch64"
     appdir="$(mktemp -d)/Hydra.AppDir"
+    # Маркер самообновления от дымового запуска (0600, приватный) — appimagetool требует
+    # «readable for all users» и падает; в дистрибутив артефакт теста не входит.
+    rm -f "$APP_DIR/.update-started"
     mkdir -p "$appdir"
     cp -a "$APP_DIR" "$appdir/Hydra"
     cp desktop/build/icons/hydra.png "$appdir/hydra.png"

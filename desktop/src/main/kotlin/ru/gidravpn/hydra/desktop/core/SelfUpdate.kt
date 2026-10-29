@@ -111,8 +111,9 @@ object SelfUpdate {
             """
             |@echo off
             |chcp 65001 >nul
+            |rem ping вместо timeout /t: у timeout нет stdin (CI/сервисы) и он падает «Input redirection is not supported».
             |:wait
-            |tasklist /FI "PID eq $pid" 2>nul | find "$pid" >nul && (timeout /t 1 /nobreak >nul & goto wait)
+            |tasklist /FI "PID eq $pid" 2>nul | find "$pid" >nul && (ping -n 2 127.0.0.1 >nul & goto wait)
             |set "ROOT=${root.absolutePath}"
             |set "NEW=${payload.absolutePath}"
             |set "OLD=%ROOT%.old"
@@ -124,12 +125,12 @@ object SelfUpdate {
             |move "%ROOT%" "%OLD%" >nul 2>&1 && goto moved
             |set /a N+=1
             |if %N% geq 30 goto launch
-            |timeout /t 1 /nobreak >nul
+            |ping -n 2 127.0.0.1 >nul
             |goto retry
             |:moved
             |move "%NEW%" "%ROOT%" >nul 2>&1 || goto rollback
-            |start "" "%ROOT%\$start"
-            |timeout /t 10 /nobreak >nul
+            |start "" "%ROOT%\\$start"
+            |ping -n 11 127.0.0.1 >nul
             |rem Hydra создаёт этот маркер только после успешного запуска.
             |if exist "%ROOT%\\.update-started" goto success
             |move "%ROOT%" "%FAILED%" >nul 2>&1
