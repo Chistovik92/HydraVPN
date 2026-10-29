@@ -80,6 +80,9 @@ case "$TARGET" in
   windows-*) taskkill //F //IM Hydra.exe >/dev/null 2>&1 || true ;;
   *) pkill -f "$LAUNCHER" 2>/dev/null || kill "$pid" 2>/dev/null || true ;;
 esac
+# Маркер самообновления от дымового запуска (0600) не должен попадать в пакеты:
+# appimagetool требует «readable for all users», codesign на macOS — «unsealed contents».
+rm -f "$APP_DIR/.update-started"
 grep -iE 'exception|error' "$smoke_log" | head -5 || true
 echo "    запуск OK"
 
@@ -111,9 +114,6 @@ case "$TARGET" in
 
     arch="x86_64"; [[ "$TARGET" == "linux-arm64" ]] && arch="aarch64"
     appdir="$(mktemp -d)/Hydra.AppDir"
-    # Маркер самообновления от дымового запуска (0600, приватный) — appimagetool требует
-    # «readable for all users» и падает; в дистрибутив артефакт теста не входит.
-    rm -f "$APP_DIR/.update-started"
     mkdir -p "$appdir"
     cp -a "$APP_DIR" "$appdir/Hydra"
     cp desktop/build/icons/hydra.png "$appdir/hydra.png"
