@@ -9,6 +9,7 @@
 | Метки, коммиты и журнал решений владельца | [HISTORY.md](HISTORY.md) |
 | Что впереди, правила выпуска и схема версий | [ROADMAP.md](ROADMAP.md) |
 | Состояние проекта для разработчика, карта кода, честные оговорки | [HANDOFF.md](HANDOFF.md) |
+| Инструкция пользователя: установка, подключение, серверы, обновления | [USER-GUIDE.md](USER-GUIDE.md) |
 | Свой сервер — инструкция для пользователя | [SERVERS.md](SERVERS.md) |
 | Протоколы и их возможности на платформах | [PROTOCOLS.md](PROTOCOLS.md), [SERVICES.md](SERVICES.md) |
 | Маршрутизация, обход DPI, Telegram по WebSocket | [ROUTING.md](ROUTING.md) |

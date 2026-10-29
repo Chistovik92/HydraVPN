@@ -196,6 +196,7 @@ HydraVPN/
 
 ## Документация
 
+- [docs/USER-GUIDE.md](docs/USER-GUIDE.md) — **инструкция пользователя**: установка, подключение, серверы, панели, маршрутизация
 - [docs/PROTOCOLS.md](docs/PROTOCOLS.md) — протоколы, форматы ссылок, ограничения
 - [docs/ROUTING.md](docs/ROUTING.md) — маршрутизация, обход DPI (ByeDPI), подбор стратегий, Telegram по WebSocket, geo-базы
 - [docs/SERVICES.md](docs/SERVICES.md) — сервисы и интеграции (SoftEther, WDTT, olcRTC)

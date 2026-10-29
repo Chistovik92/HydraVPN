@@ -9,6 +9,8 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 GH="$(command -v gh || true)"
+# Windows: gh.exe из WSL command -v не видит (расширение .exe)
+[[ -n "$GH" || -x "/mnt/c/Program Files/GitHub CLI/gh.exe" ]] && GH="${GH:-/mnt/c/Program Files/GitHub CLI/gh.exe}"
 [[ -n "$GH" ]] || { echo "ОШИБКА: не найден gh (GitHub CLI)" >&2; exit 2; }
 
 # --- что закреплено у нас --------------------------------------------------------------------------------------
@@ -45,7 +47,7 @@ SB_BRANCH_LATEST="$(latest_in_branch SagerNet/sing-box "$SB_BRANCH")"
 row "sing-box (ветка $SB_BRANCH)" "$SINGBOX" "$SB_BRANCH_LATEST"
 row "sing-box (последняя)" "$SINGBOX" "$SB_LATEST_STABLE" "← смена ветки = перенос libbox, см. ROADMAP 0.8.4"
 [[ "$CI_SINGBOX" == "$SINGBOX" ]] || echo "  !! CI (android.yml) закрепил sing-box $CI_SINGBOX, а ПК — $SINGBOX"
-XRAY_ANY="$("$GH" release list -R XTLS/Xray-core --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null | tr -d '' | sed 's/^v//')"
+XRAY_ANY="$("$GH" release list -R XTLS/Xray-core --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null | tr -d '' | sed 's/^v//')"
 XRAY_STABLE="$(latest_release XTLS/Xray-core | sed 's/^v//')"
 # Метка «pre-release» у Xray-core стоит на всех релизах с июня; берём последний, стабильный — для справки.
 row "Xray-core" "$XRAY" "$XRAY_ANY" "(стабильная метка: $XRAY_STABLE)"
