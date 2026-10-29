@@ -39,7 +39,10 @@ if [[ ! -d third_party/olcrtc/.git ]]; then
 fi
 git -C third_party/olcrtc fetch -q --depth 1 origin "$OLCRTC_REF"
 git -C third_party/olcrtc checkout -q --force FETCH_HEAD
-find third_party/olcrtc/internal/protect -name '*.go' -exec sed -i 's|github.com/pion/transport/v4|github.com/pion/transport/v5|g' {} +
+# BSD sed (macOS) требует пустой суффикс у -i, GNU sed — нет; пишем во временный файл.
+find third_party/olcrtc/internal/protect -name '*.go' | while read -r f; do
+  sed 's|github.com/pion/transport/v4|github.com/pion/transport/v5|g' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+done
 echo "    olcRTC: $OLCRTC_REF + transport/v5 compatibility"
 
 # sing-box — тоже клоном (go.mod: replace → third_party/sing-box) с правкой REALITY (0.8.2-b, SagerNet/sing-box#4520):

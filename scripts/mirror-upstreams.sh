@@ -22,6 +22,11 @@ repos=(
   remnawave/backend remnawave/node Nexora-VPN/panel
 )
 for upstream in "${repos[@]}"; do basenames[${upstream#*/}]=$(( ${basenames[${upstream#*/}]:-0} + 1 )); done
+# GitHub не принимает refs/pull/*, а git push по HTTPS из WSL без credential-хелпера
+# виснет в ожидании пароля на закрытом пайпе. Решение: пушить с токеном gh в URL.
+TOKEN="$("$GH" auth token 2>/dev/null || true)"
+[[ -n "$TOKEN" ]] || { echo "Не удалось получить токен gh (gh auth login). Пуш в GitHub невозможен." >&2; exit 2; }
+PUSH_URL="https://x-access-token:${TOKEN}@github.com"
 for upstream in "${repos[@]}"; do
   name="$PREFIX-${upstream#*/}"
   [[ ${basenames[${upstream#*/}]} -gt 1 ]] && name="$PREFIX-${upstream//\//-}"
@@ -38,7 +43,7 @@ for upstream in "${repos[@]}"; do
     "$GH" repo view "$OWNER/$name" >/dev/null 2>&1 || "$GH" repo create "$OWNER/$name" "$([[ $PRIVATE == 1 ]] && echo --private || echo --public)" --description "Hydra dependency mirror of $upstream (all branches, tags and history)"
     # GitHub запрещает записывать служебные refs/pull/*, но они не относятся к
     # веткам/тегам. Отправляем полную историю веток и тегов, а не --mirror всего refs.
-    git -C "$dir" push --force "https://github.com/$OWNER/$name.git" '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+    git -C "$dir" push --force "$PUSH_URL/$OWNER/$name.git" '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
   fi
 done
 printf '%s\n' "${repos[@]}" > "$OUT/UPSTREAMS.txt"
