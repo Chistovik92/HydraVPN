@@ -100,8 +100,8 @@ jobs:
           git clone --depth 1 --branch "v${SING_BOX_VERSION}" https://github.com/SagerNet/sing-box /tmp/sing-box
           # REALITY к Xray-core >= 26.9.8 (0.8.2-b, SagerNet/sing-box#4520).
           git -C /tmp/sing-box apply "$GITHUB_WORKSPACE/scripts/sing-box-reality-mlkem.patch"
-          go install github.com/sagernet/gomobile/cmd/gomobile@latest
-          go install github.com/sagernet/gomobile/cmd/gobind@latest
+          go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.8
+          go install github.com/sagernet/gomobile/cmd/gobind@v0.1.8
           export PATH="$PATH:$(go env GOPATH)/bin"
           export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME"
           gomobile init

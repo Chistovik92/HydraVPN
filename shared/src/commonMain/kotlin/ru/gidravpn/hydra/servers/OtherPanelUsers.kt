@@ -23,7 +23,7 @@ object OtherPanelUsers {
     fun supported(s: MyServer): Boolean {
         val p = s.panel ?: return false
         return when (p.kind) {
-            PanelKind.XUI3 -> p.token.isNotBlank()
+            PanelKind.XUI3, PanelKind.NEXORA -> p.token.isNotBlank()
             PanelKind.SUI, PanelKind.XUI -> s.fingerprint.isNotBlank()
             else -> false
         }

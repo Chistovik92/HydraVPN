@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.first
 import ru.gidravpn.hydra.BuildConfig
 import ru.gidravpn.hydra.data.db.AppDatabase
 import ru.gidravpn.hydra.data.repository.allStores
+import ru.gidravpn.hydra.data.db.toEntity
+import ru.gidravpn.hydra.data.db.toModel
 
 /**
  * Резервная копия всей конфигурации (Фаза 6d): все DataStore-настройки +
@@ -36,8 +38,8 @@ object BackupManager {
                 appVersion = BuildConfig.VERSION_NAME,
                 createdAt = System.currentTimeMillis(),
                 prefs = prefs,
-                servers = db.serverDao().getAll(),
-                subscriptions = db.subscriptionDao().getAll(),
+                servers = db.serverDao().getAll().map { it.toModel() },
+                subscriptions = db.subscriptionDao().getAll().map { it.toModel() },
             )
         )
     }
@@ -55,8 +57,8 @@ object BackupManager {
         db.withTransaction {
             db.serverDao().deleteAll()
             db.subscriptionDao().deleteAll()
-            db.subscriptionDao().upsertAll(backup.subscriptions)
-            db.serverDao().upsertAll(backup.servers)
+            db.subscriptionDao().upsertAll(backup.subscriptions.map { it.toEntity() })
+            db.serverDao().upsertAll(backup.servers.map { it.toEntity() })
         }
         val stores = context.allStores()
         var settings = 0

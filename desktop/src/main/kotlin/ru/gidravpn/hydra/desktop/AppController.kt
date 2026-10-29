@@ -58,6 +58,7 @@ import ru.gidravpn.hydra.desktop.core.Autostart
 import ru.gidravpn.hydra.desktop.core.ClashApi
 import ru.gidravpn.hydra.desktop.core.CoreRunner
 import ru.gidravpn.hydra.desktop.core.Sidecar
+import ru.gidravpn.hydra.desktop.core.SelfUpdate
 import ru.gidravpn.hydra.desktop.core.hasValidEndpoint
 import ru.gidravpn.hydra.desktop.core.DesktopConfig
 import ru.gidravpn.hydra.desktop.core.NeedsElevation
@@ -204,6 +205,7 @@ class AppController(
 
     /** Вызывается из main после построения окна: автоподключение при запуске (как на Android). */
     fun onStartup(reconnect: Boolean = false) {
+        SelfUpdate.markStarted()
         // reconnect — запуск после «Перезапустить от администратора» (0.7.16): соединение, которое было, поднимается снова.
         if ((reconnect || _ui.value.data.settings.autoConnect) && _ui.value.selected != null) connect()
     }

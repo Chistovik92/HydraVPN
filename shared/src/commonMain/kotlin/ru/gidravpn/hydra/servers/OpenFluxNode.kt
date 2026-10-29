@@ -61,10 +61,10 @@ data class OfxNodeSpec(
 
 object OpenFluxNode {
     /** Тот же коммит апстрима, что и у встроенного клиента (scripts/build-openflux.sh). */
-    const val SCRIPT_REF = "f12e981629a18c8c01007d59ac002254c02972bb"
+    const val SCRIPT_REF = "f492a1a33b7581ad8f88118f97e0b866adda3cdc"
     const val SCRIPT_URL = "https://raw.githubusercontent.com/p1neappleXpress/OpenFlux/$SCRIPT_REF/deploy/node-install.sh"
     /** SHA-256 файла по [SCRIPT_URL]; при смене коммита пересчитать (`curl -sL URL | sha256sum`). */
-    const val SCRIPT_SHA256 = "2bb7bbbd5249e1890c6fcbcc1d1d7def725f2a65c72dae138e43b2f53208cccb"
+    const val SCRIPT_SHA256 = "5795c109bc37837238b8487df9977702eb5549167e47e7f08a07af7d9abeca83"
     const val SCRIPT = "/root/.hydra-openflux-node-install.sh"
 
     private val okJson = { r: ExecResult -> r.out.lineSequence().any { it.trim().startsWith("{") && it.contains("\"ok\":true") } }

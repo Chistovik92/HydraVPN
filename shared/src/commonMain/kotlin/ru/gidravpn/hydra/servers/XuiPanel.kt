@@ -18,10 +18,12 @@ enum class PanelKind(val title: String, val repo: String) {
     /** PasarGuard (наследник Marzban, Docker) — 0.8.2-a3: установка, вход на сайт, подключения ([PasarGuardPanel]). */
     PASARGUARD("PasarGuard", "PasarGuard/panel"),
     /** Remnawave (Docker, за прокси Caddy на 127.0.0.1) — 0.8.2-a3 ([RemnawavePanel]). */
-    REMNAWAVE("Remnawave", "remnawave/panel");
+    REMNAWAVE("Remnawave", "remnawave/panel"),
+    /** Nexora: стабильный Bearer API v1, ноды ставятся заданиями панели по SSH ([NexoraPanel]). */
+    NEXORA("Nexora", "Nexora-VPN/panel");
 
-    /** Панель в Docker, видна только с самого сервера: сайт — через туннель Hydra, без сертификата на IP и «открыть извне». */
-    val tunnelOnly: Boolean get() = this == PASARGUARD || this == REMNAWAVE
+    /** Панель видна только с самого сервера: сайт — через туннель Hydra, без сертификата на IP и «открыть извне». */
+    val tunnelOnly: Boolean get() = this == PASARGUARD || this == REMNAWAVE || this == NEXORA
 }
 
 /**
@@ -283,6 +285,26 @@ object XuiPanel {
         YANDEX("ya.ru:443", "ya.ru"),
         /** Зарубежный сайт без своих узлов в РФ — SNI не спорит с зарубежным IP сервера. */
         GITHUB("github.com:443", "github.com"),
+        /** Собственный сайт владельца; домен передаётся отдельно и не хранится в изменяемом состоянии enum. */
+        CUSTOM("", ""),
+    }
+
+    /** Безопасное имя REALITY target: ASCII/IDN-домен без схемы, порта, пути, пробелов и IP-адреса. */
+    fun normalizeRealityDomain(value: String): String? {
+        val input = value.trim().removeSuffix(".")
+        if (input.isEmpty() || input.length > 253 || input.any { it.isWhitespace() } || ':' in input || '/' in input || '\\' in input || '@' in input) return null
+        val domain = runCatching { java.net.IDN.toASCII(input, java.net.IDN.USE_STD3_ASCII_RULES).lowercase() }.getOrNull() ?: return null
+        if (domain.length > 253 || '.' !in domain) return null
+        val labels = domain.split('.')
+        if (labels.any { it.isEmpty() || it.length > 63 || it.startsWith('-') || it.endsWith('-') || it.any { c -> !c.isLetterOrDigit() && c != '-' } }) return null
+        if (labels.all { label -> label.all(Char::isDigit) }) return null // IPv4 и числовые псевдодомены не являются SNI
+        return domain
+    }
+
+    /** SNI выбранной маски; для [RealityMask.CUSTOM] проверяет и нормализует [customDomain]. */
+    fun realitySni(mask: RealityMask, customDomain: String = ""): String {
+        if (mask != RealityMask.CUSTOM) return mask.sni
+        return normalizeRealityDomain(customDomain) ?: throw IllegalArgumentException("Укажите корректный домен маскировки без https://, порта и пути")
     }
 
     /** Транспорт инбаунда Hydra (0.8.1-rc1). */
@@ -299,10 +321,11 @@ object XuiPanel {
      * Ключи — от панели ([XuiApi.newRealityKeys]).
      */
     fun defaultInbound(port: Int, priv: String, pub: String, mask: RealityMask = RealityMask.VK, remark: String = "Hydra",
-                       rnd: SecureRandom = SecureRandom(), transport: Transport = Transport.GRPC): JSONObject {
+                       rnd: SecureRandom = SecureRandom(), transport: Transport = Transport.GRPC, customDomain: String = ""): JSONObject {
         val shortId = ByteArray(8).also { rnd.nextBytes(it) }.joinToString("") { "%02x".format(it) }
+        val sni = realitySni(mask, customDomain)
         val settings = JSONObject().put("clients", JSONArray()).put("decryption", "none").put("encryption", "none").put("fallbacks", JSONArray())
-        val reality = JSONObject().put("show", false).put("xver", 0).put("target", mask.target).put("serverNames", JSONArray(listOf(mask.sni)))
+        val reality = JSONObject().put("show", false).put("xver", 0).put("target", if (mask == RealityMask.CUSTOM) "$sni:443" else mask.target).put("serverNames", JSONArray(listOf(sni)))
             .put("privateKey", priv).put("minClientVer", "").put("maxClientVer", "").put("maxTimediff", 0).put("shortIds", JSONArray(listOf(shortId)))
             .put("mldsa65Seed", "")
             .put("settings", JSONObject().put("publicKey", pub).put("fingerprint", "chrome").put("serverName", "").put("spiderX", "/").put("mldsa65Verify", ""))
@@ -361,6 +384,12 @@ object XuiPanel {
     }
 
     /**
+     * SHA-256 именно leaf-сертификата в base64 (`tlsVerifyMode=pin` 3x-ui). Берётся по доверенному SSH из установленного
+     * файла, а не сетевым TLS-рукопожатием: иначе подменённый сертификат можно было бы «закрепить» как свой.
+     */
+    fun certFingerprintCommand() = "openssl x509 -in $CERT_DIR/fullchain.pem -outform DER | openssl dgst -sha256 -binary | openssl base64 -A"
+
+    /**
      * Отдать панели сертификат из [CERT_DIR]: 3x-ui и x-ui — своей командой `x-ui cert` (у 3x-ui она ставит его и подписке),
      * у x-ui подписке и у s-ui (своей команды нет) — записью путей в таблицу настроек панели ([OtherPanels.settingsCommand]).
      */
@@ -372,7 +401,7 @@ object XuiPanel {
             PanelKind.XUI -> "/usr/local/x-ui/x-ui cert -webCert $crt -webCertKey $key >/dev/null && " +
                 OtherPanels.settingsCommand(kind, mapOf("subCertFile" to crt, "subKeyFile" to key))
             PanelKind.SUI -> OtherPanels.settingsCommand(kind, mapOf("webCertFile" to crt, "webKeyFile" to key, "subCertFile" to crt, "subKeyFile" to key))
-            PanelKind.PASARGUARD, PanelKind.REMNAWAVE -> error("${kind.title} в Hydra — только через туннель, без сертификата на IP")
+            PanelKind.PASARGUARD, PanelKind.REMNAWAVE, PanelKind.NEXORA -> error("${kind.title} в Hydra — только через туннель, без сертификата на IP")
         }
         add(Step("cert-panel", "Включить HTTPS у панели и подписки",
             "$cmd && systemctl restart $svc && sleep 2 && systemctl is-active $svc",

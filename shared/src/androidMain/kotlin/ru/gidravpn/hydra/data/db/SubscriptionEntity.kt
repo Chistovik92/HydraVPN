@@ -34,6 +34,7 @@ data class SubscriptionEntity(
     @ColumnInfo(defaultValue = "0") val collapsed: Boolean = false,
     /** Текст последней ошибки обновления; пусто — последнее обновление прошло. */
     @ColumnInfo(defaultValue = "") val lastError: String = "",
+    @ColumnInfo(defaultValue = "") val botPanel: String = "",
 ) {
     fun toDomain(): Subscription = Subscription(
         id = id,
@@ -51,6 +52,7 @@ data class SubscriptionEntity(
         autoUpdate = autoUpdate,
         collapsed = collapsed,
         lastError = lastError,
+        botPanel = botPanel,
     )
 
     companion object {
@@ -70,6 +72,7 @@ data class SubscriptionEntity(
             autoUpdate = subscription.autoUpdate,
             collapsed = subscription.collapsed,
             lastError = subscription.lastError,
+            botPanel = subscription.botPanel,
         )
     }
 }

@@ -31,6 +31,7 @@ object OtherPanelConnections {
         PanelKind.SUI -> SUI
         PanelKind.PASARGUARD -> PasarGuardPanel.TYPES
         PanelKind.REMNAWAVE -> RemnawavePanel.TYPES
+        PanelKind.NEXORA -> emptyList() // стабильный API v1: пользователи и ноды, конструктор инбаундов не используется
     }
 
     // ------------------------------------------------------------------------------------------ s-ui (sing-box)
@@ -129,9 +130,9 @@ object OtherPanelConnections {
 
     /** Инбаунд x-ui сразу с клиентом [c] (у WireGuard — пир с ключами Hydra). */
     fun xuiInbound(type: XuiConnection, port: Int, c: Creds, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK,
-                   priv: String = "", pub: String = "", cert: XuiConnection.Companion.Cert? = null): JSONObject {
+                   priv: String = "", pub: String = "", cert: XuiConnection.Companion.Cert? = null, customDomain: String = ""): JSONObject {
         require(type in XUI) { "${type.title} в x-ui нет" }
-        val ib = XuiConnection.inbound(type, port, "Hydra ${type.title}", mask, priv, pub, cert)
+        val ib = XuiConnection.inbound(type, port, "Hydra ${type.title}", mask, priv, pub, cert, customDomain = customDomain)
         val st = ib.getJSONObject("settings")
         if (type == XuiConnection.WIREGUARD) {
             st.remove("clients"); st.remove("subnetIp"); st.remove("subnetCidr")

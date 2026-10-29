@@ -13,6 +13,7 @@ class ScriptPinsTest {
         assertNotNull(ScriptPins.sha256("MHSanaei/3x-ui", XuiPanel.latestTag(), "install.sh"), "3x-ui ${XuiPanel.latestTag()}")
         assertNotNull(ScriptPins.sha256("alireza0/s-ui", OtherPanels.latestTag(OtherPanels.SUI), "install.sh"), "s-ui")
         assertNotNull(ScriptPins.sha256("alireza0/x-ui", OtherPanels.latestTag(OtherPanels.XUI), "install.sh"), "x-ui")
+        assertNotNull(ScriptPins.sha256(NexoraPanel.REPO, NexoraPanel.TAG, "install.sh"), "Nexora")
         for (f in listOf("pasarguard.sh", "pg-node.sh")) assertNotNull(ScriptPins.sha256("PasarGuard/scripts", PasarGuardPanel.SCRIPTS_TAG, f), f)
         for (f in listOf("docker-compose-prod.yml", ".env.sample")) assertNotNull(ScriptPins.sha256("remnawave/backend", RemnawavePanel.TAG, f), f)
     }
@@ -24,7 +25,11 @@ class ScriptPinsTest {
         val s = OtherPanels.installSteps(OtherPanels.SUI, OtherPanels.Params(OtherPanels.latestTag(OtherPanels.SUI)), false, "none")
         assertTrue("sha256sum -c" in s.first { it.id == "panel-fetch" }.command!!)
         assertEquals(3, PasarGuardPanel.installSteps("key").first { it.id == "pg-fetch" }.command!!.split("sha256sum -c").size)
+        val remoteNode = PanelNodes.pgNodeSteps("key", "203.0.113.5").first { it.id == "pgn-fetch" }.command!!
+        assertTrue("sha256sum -c" in remoteNode && ScriptPins.sha256("PasarGuard/scripts", PasarGuardPanel.SCRIPTS_TAG, "pg-node.sh")!! in remoteNode)
         assertEquals(3, RemnawavePanel.installSteps("203.0.113.5").first { it.id == "rw-fetch" }.command!!.split("sha256sum -c").size)
+        val nexora = NexoraPanel.installSteps().first { it.id == "nexora-fetch" }.command!!
+        assertTrue("sha256sum -c" in nexora && ScriptPins.sha256(NexoraPanel.REPO, NexoraPanel.TAG, "install.sh")!! in nexora)
     }
 
     @Test fun unknownTagHasNoPinAndNoCheck() {

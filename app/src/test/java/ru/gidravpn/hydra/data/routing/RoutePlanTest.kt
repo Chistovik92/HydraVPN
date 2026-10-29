@@ -110,9 +110,27 @@ class RoutePlanTest {
     @Test fun udpProtocolIsNotChained() {
         val hy2 = ServerProfile(name = "h", protocolId = "hysteria2", address = "203.0.113.30", port = 443, uuidOrPassword = "p", sni = "x.com")
         val cfg = SingBoxConfigBuilder.build(hy2)
-        val warn = RoutePlanApplier.apply(cfg, RoutePlan(dpi = DpiSettings(enabled = true), proxyVia = RouteTarget.DPI))
-        assertEquals(1, warn.size)
+        val error = runCatching {
+            RoutePlanApplier.apply(cfg, RoutePlan(dpi = DpiSettings(enabled = true), proxyVia = RouteTarget.DPI))
+        }.exceptionOrNull()
+        assertTrue(error is IllegalStateException)
         assertFalse(cfg.outs().first { it.getString("tag") == "proxy" }.has("detour"))
+    }
+
+    @Test fun missingExplicitChainFailsClosed() {
+        val cfg = base()
+        val error = runCatching {
+            RoutePlanApplier.apply(cfg, RoutePlan(proxyVia = RouteTarget.node(404)))
+        }.exceptionOrNull()
+        assertTrue(error is IllegalStateException)
+        assertFalse(cfg.outs().first { it.getString("tag") == "proxy" }.has("detour"))
+    }
+
+    @Test fun dpiSidecarFailureCannotRemoveExplicitChain() {
+        val error = runCatching {
+            RoutePlan(proxyVia = RouteTarget.DPI, dpi = DpiSettings(enabled = false)).withoutDpi()
+        }.exceptionOrNull()
+        assertTrue(error is IllegalArgumentException)
     }
 
     @Test fun directTrafficGoesThroughDpiButPrivateStaysDirect() {

@@ -41,6 +41,7 @@ object PanelWeb {
                 Login(o + "api/admin/token", "username=${enc(p.username)}&password=${enc(p.password)}", o + "dashboard/", p.username, p.password) }
             // Remnawave: форма входа React; запасной путь — запрос входа (JWT страница кладёт сама — главное форма)
             PanelKind.REMNAWAVE -> Login(b + "api/auth/login", "username=${enc(p.username)}&password=${enc(p.password)}", b, p.username, p.password)
+            PanelKind.NEXORA -> Login(b + "api/login", "username=${enc(p.username)}&password=${enc(p.password)}", b, p.username, p.password)
         }
     }
 

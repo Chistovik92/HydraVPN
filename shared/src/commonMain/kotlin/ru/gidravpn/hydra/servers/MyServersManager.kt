@@ -18,13 +18,13 @@ class ServerForm(
 
 /** Служба, которую можно поставить на свой сервер. */
 enum class ServerKind {
-    AMNEZIAWG, OPENFLUX, PANEL_3XUI, PANEL_SUI, PANEL_XUI, PANEL_PASARGUARD, PANEL_REMNAWAVE;
+    AMNEZIAWG, OPENFLUX, PANEL_3XUI, PANEL_SUI, PANEL_XUI, PANEL_PASARGUARD, PANEL_REMNAWAVE, PANEL_NEXORA;
 
     /** Вид панели для служб-панелей; null — не панель. */
-    val panel: PanelKind? get() = when (this) { PANEL_3XUI -> PanelKind.XUI3; PANEL_SUI -> PanelKind.SUI; PANEL_XUI -> PanelKind.XUI; PANEL_PASARGUARD -> PanelKind.PASARGUARD; PANEL_REMNAWAVE -> PanelKind.REMNAWAVE; else -> null }
+    val panel: PanelKind? get() = when (this) { PANEL_3XUI -> PanelKind.XUI3; PANEL_SUI -> PanelKind.SUI; PANEL_XUI -> PanelKind.XUI; PANEL_PASARGUARD -> PanelKind.PASARGUARD; PANEL_REMNAWAVE -> PanelKind.REMNAWAVE; PANEL_NEXORA -> PanelKind.NEXORA; else -> null }
 
     companion object {
-        fun ofPanel(k: PanelKind) = when (k) { PanelKind.XUI3 -> PANEL_3XUI; PanelKind.SUI -> PANEL_SUI; PanelKind.XUI -> PANEL_XUI; PanelKind.PASARGUARD -> PANEL_PASARGUARD; PanelKind.REMNAWAVE -> PANEL_REMNAWAVE }
+        fun ofPanel(k: PanelKind) = when (k) { PanelKind.XUI3 -> PANEL_3XUI; PanelKind.SUI -> PANEL_SUI; PanelKind.XUI -> PANEL_XUI; PanelKind.PASARGUARD -> PANEL_PASARGUARD; PanelKind.REMNAWAVE -> PANEL_REMNAWAVE; PanelKind.NEXORA -> PANEL_NEXORA }
     }
 }
 
@@ -48,6 +48,8 @@ class ServiceForm(
     val mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK,
     /** Панель 3x-ui: транспорт инбаунда (0.8.1-rc1), по умолчанию gRPC. */
     val transport: XuiPanel.Transport = XuiPanel.Transport.GRPC,
+    /** Домен маскировки REALITY, когда [mask] = CUSTOM. */
+    val customDomain: String = "",
 )
 
 /** Мастер добавления сервера. */
@@ -328,7 +330,7 @@ class MyServersManager(
                 ServerKind.PANEL_3XUI -> {
                     _ui.update { it.copy(progress = "Узнаю последнюю версию 3x-ui…") }
                     xuiTag = XuiPanel.latestTag()
-                    service.planPreviewXui(xuiTag, f.openFirewall, pre, f.sslIp, f.mask, f.transport)
+                    service.planPreviewXui(xuiTag, f.openFirewall, pre, f.sslIp, f.mask, f.transport, f.customDomain)
                 }
                 ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> {
                     val spec = OtherPanels.spec(f.kind.panel!!)!!
@@ -338,6 +340,7 @@ class MyServersManager(
                 }
                 ServerKind.PANEL_PASARGUARD -> service.planPreviewPasarGuard()
                 ServerKind.PANEL_REMNAWAVE -> service.planPreviewRemnawave(srv.host)
+                ServerKind.PANEL_NEXORA -> service.planPreviewNexora()
             }
             update(srv.copy(osName = pre.osName.ifBlank { srv.osName }, arch = pre.arch))
             _ui.update { it.copy(install = InstallUi(id, f, InstallStage.READY, pre, plan)) }
@@ -359,11 +362,12 @@ class MyServersManager(
             val res = when (f.kind) {
                 ServerKind.AMNEZIAWG -> service.deployAwg(srv, f.generation, f.awgPort, f.openFirewall, pre, inst, ::log)
                 ServerKind.OPENFLUX -> service.deployOfx(ssh, srv, f.channel, f.vyandex, f.mailru, f.cupsonline, f.autoupdate, inst, ::log)
-                ServerKind.PANEL_3XUI -> service.deployXui(ssh, srv, xuiTag.ifBlank { XuiPanel.latestTag() }, f.accessPort, f.openFirewall, pre, inst, f.sslIp, f.mask, f.transport, ::log)
+                ServerKind.PANEL_3XUI -> service.deployXui(ssh, srv, xuiTag.ifBlank { XuiPanel.latestTag() }, f.accessPort, f.openFirewall, pre, inst, f.sslIp, f.mask, f.transport, f.customDomain, ::log)
                 ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> service.deployPanel(srv, f.kind.panel!!,
                     panelTag.ifBlank { OtherPanels.latestTag(OtherPanels.spec(f.kind.panel!!)!!) }, f.openFirewall, pre, inst, f.sslIp, ::log)
                 ServerKind.PANEL_PASARGUARD -> service.deployPasarGuard(ssh, srv, inst, ::log)
                 ServerKind.PANEL_REMNAWAVE -> service.deployRemnawave(ssh, srv, inst, ::log)
+                ServerKind.PANEL_NEXORA -> service.deployNexora(ssh, srv, inst, ::log)
             }
             when (res) {
                 is DeployResult.Ok -> {
@@ -388,14 +392,14 @@ class MyServersManager(
 
     // ================================================================================================ Управление
 
-    fun addClient(id: String, name: String) = op(id, "Добавляю устройство «$name»…") { srv, _, inst ->
-        val (upd, c) = service.addClient(srv, name, inst) ?: throw OpFailed(_ui.value.error ?: "Не удалось добавить устройство")
+    fun addClient(id: String, name: String) = op(id, "Добавляю устройство «$name»…") { srv, ssh, inst ->
+        val (upd, c) = service.addClient(ssh, srv, name, inst) ?: throw OpFailed(_ui.value.error ?: "Не удалось добавить устройство")
         update(upd)
         _ui.update { it.copy(shown = name to upd.awg!!.clientConf(c)) }
     }
 
-    fun removeClient(id: String, name: String) = op(id, "Удаляю устройство «$name»…") { srv, _, inst ->
-        update(service.removeClient(srv, name, inst) ?: throw OpFailed(_ui.value.error ?: "Не удалось удалить устройство"))
+    fun removeClient(id: String, name: String) = op(id, "Удаляю устройство «$name»…") { srv, ssh, inst ->
+        update(service.removeClient(ssh, srv, name, inst) ?: throw OpFailed(_ui.value.error ?: "Не удалось удалить устройство"))
     }
 
     fun restartService(id: String, kind: ServerKind) = op(id, "Перезапускаю службу…") { srv, _, inst ->
@@ -403,7 +407,7 @@ class MyServersManager(
             ServerKind.AMNEZIAWG -> service.restartAwg(inst)
             ServerKind.OPENFLUX -> service.restartOfx(srv, inst)
             ServerKind.PANEL_3XUI -> service.restartXui(inst)
-            ServerKind.PANEL_SUI, ServerKind.PANEL_XUI, ServerKind.PANEL_PASARGUARD, ServerKind.PANEL_REMNAWAVE -> service.restartPanel(kind.panel!!, inst)
+            ServerKind.PANEL_SUI, ServerKind.PANEL_XUI, ServerKind.PANEL_PASARGUARD, ServerKind.PANEL_REMNAWAVE, ServerKind.PANEL_NEXORA -> service.restartPanel(kind.panel!!, inst)
         }
         if (!ok) throw OpFailed(_ui.value.error ?: "Служба не перезапустилась")
         log("Служба перезапущена")
@@ -532,6 +536,18 @@ class MyServersManager(
 
     // ================================================================================================ Панель 3x-ui: по токену API
 
+    /** Nexora: тот же SSH Bearer transport, что у 3x-ui, но только стабильный API v1. */
+    private fun withNexora(id: String, title: String, work: (MyServer, NexoraApi) -> Unit) {
+        op(id, title) { s, ssh, inst ->
+            val p = s.panel ?: throw OpFailed("Панели нет")
+            inst.addSecret(p.token)
+            val u = java.net.URL(p.baseUrl)
+            try { work(s, NexoraApi(SshXuiTransport(ssh, "${u.protocol}://127.0.0.1:${u.port}${u.path}", p.token, u.host.removePrefix("[").removeSuffix("]")))) }
+            catch (e: XuiApiException) { throw OpFailed("Nexora: ${e.message}") }
+            catch (e: org.json.JSONException) { throw OpFailed("Nexora ответила не так, как ожидалось: ${e.message}") }
+        }
+    }
+
     private fun withPanel(id: String, work: (MyServer, XuiApi) -> Unit) {
         val srv = find(id)?.takeIf { it.panel != null } ?: return
         if (_ui.value.busy) return
@@ -587,6 +603,9 @@ class MyServersManager(
 
     /** Пользователи панели (email) — для списка в карточке. */
     fun loadPanelClients(id: String) {
+        if (find(id)?.panel?.kind == PanelKind.NEXORA) return withNexora(id, "Читаю пользователей Nexora…") { s, api ->
+            _ui.update { it.copy(panelClients = it.panelClients + (s.id to api.users().map { u -> u.name })) }
+        }
         if (sessionUsers(id) != null) return loadSessionUsers(id)
         withPanel(id) { s, api ->
             val emails = api.clientEmails()
@@ -596,6 +615,11 @@ class MyServersManager(
 
     /** Новый пользователь панели: ссылки показываются в окне, их можно добавить в «Серверы». */
     fun addPanelClient(id: String, email: String) {
+        if (find(id)?.panel?.kind == PanelKind.NEXORA) return withNexora(id, "Добавляю пользователя Nexora…") { s, api ->
+            if (api.users().any { it.name == email }) throw XuiApiException("Пользователь «$email» уже есть")
+            val user = api.addUser(email)
+            _ui.update { it.copy(shown = user.name to user.subUrl, panelClients = it.panelClients + (s.id to api.users().map { u -> u.name })) }
+        }
         if (sessionUsers(id) != null) return addSessionUser(id, email)
         addXuiPanelClient(id, email)
     }
@@ -619,12 +643,24 @@ class MyServersManager(
      * отдельно). Hysteria 2 и TUIC — с сертификатом панели (`webCertFile`; «Включить HTTPS»). Есть вход по SSH — порт открывается
      * в файрволе (UDP для WireGuard, AmneziaWG, Hysteria 2, TUIC) и API идёт по SSH; иначе — напрямую по токену.
      */
-    fun createPanelConnection(id: String, type: XuiConnection, port: Int, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK) {
-        if (find(id)?.panel?.kind == PanelKind.XUI) return createXuiAlirezaConnection(id, type, port, mask)
-        if (find(id)?.panel?.kind == PanelKind.SUI) return createSuiConnection(id, type, port, mask)
-        if (find(id)?.panel?.kind?.tunnelOnly == true) return createPasarGuardConnection(id, type, port, mask)
+    fun createPanelConnection(id: String, type: XuiConnection, port: Int, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK, nodeServerId: String? = null,
+                              customDomain: String = "") {
+        if (type.reality && mask == XuiPanel.RealityMask.CUSTOM && XuiPanel.normalizeRealityDomain(customDomain) == null)
+            return _ui.update { it.copy(error = "Укажите корректный домен маскировки без https://, порта и пути", opServer = id) }
+        if (find(id)?.panel?.kind == PanelKind.XUI) return createXuiAlirezaConnection(id, type, port, mask, customDomain)
+        if (find(id)?.panel?.kind == PanelKind.SUI) return createSuiConnection(id, type, port, mask, customDomain)
+        if (find(id)?.panel?.kind?.tunnelOnly == true) {
+            if (mask == XuiPanel.RealityMask.CUSTOM) return _ui.update { it.copy(error = "Свой домен маскировки в этой панели пока не поддерживается", opServer = id) }
+            return createPasarGuardConnection(id, type, port, mask)
+        }
         val srv = find(id)?.takeIf { it.panel?.kind == PanelKind.XUI3 && it.panel.token.isNotBlank() } ?: return
         if (port !in 1..65535) return _ui.update { it.copy(error = "Порт — число от 1 до 65535", opServer = id) }
+        val node = nodeServerId?.let { nodeId -> srv.panel!!.nodes.firstOrNull { it.serverId == nodeId } }
+        if (nodeServerId != null && node == null) return _ui.update { it.copy(error = "Выбранная нода не подключена к панели", opServer = id) }
+        val nodeSrv = node?.let { n -> find(n.serverId) }
+        val nodeRemoteId = node?.remoteId?.toIntOrNull()?.takeIf { it > 0 }
+        if (node != null && (nodeRemoteId == null || nodeSrv == null || nodeSrv.fingerprint.isBlank()))
+            return _ui.update { it.copy(error = "Не удалось определить сервер выбранной ноды", opServer = id) }
         fun create(s: MyServer, api: XuiApi): Pair<String, List<String>> {
             val host = runCatching { java.net.URL(s.panel!!.baseUrl).host }.getOrNull()?.removePrefix("[")?.removeSuffix("]")?.ifBlank { null } ?: s.host
             val settings = api.settings()
@@ -636,7 +672,8 @@ class MyServersManager(
             val keys = if (type.reality) api.newRealityKeys() else ("" to "")
             if (api.inbounds().let { a -> (0 until a.length()).any { a.getJSONObject(it).optInt("port") == port } })
                 throw XuiApiException("Порт $port уже занят другим подключением панели — выберите другой")
-            val inboundId = api.addInbound(XuiConnection.inbound(type, port, "Hydra ${type.title}", mask, keys.first, keys.second, cert))
+            val inboundId = api.addInbound(XuiConnection.inbound(type, port, "Hydra ${type.title}" + (node?.let { " · ${it.name}" }.orEmpty()),
+                mask, keys.first, keys.second, cert, nodeId = nodeRemoteId ?: 0, customDomain = customDomain))
             // основной пользователь: созданный мастером, иначе первый в панели, иначе новый
             val email = s.panel!!.clientEmail.takeIf { e -> e.isNotBlank() && e in api.clientEmails() } ?: api.clientEmails().firstOrNull()
                 ?: "hydra-1".also { api.addClient(it, XuiPanel.random(16).lowercase(), listOf(inboundId), flow = "") }
@@ -646,7 +683,12 @@ class MyServersManager(
         }
         fun show(email: String, links: List<String>, fw: String) = _ui.update {
             it.copy(shown = "${type.title} · $email" to (links.joinToString("\n").ifBlank { "Подключение создано; ссылку панель выдаст в подписке пользователя $email." }),
-                progress = "", panelClients = it.panelClients - id, log = it.log + listOfNotNull("Создано подключение ${type.title} на порту $port — подписка пользователя $email обновится сама", fw.ifBlank { null }))
+                progress = "", panelClients = it.panelClients - id, log = it.log + listOfNotNull("Создано подключение ${type.title} на порту $port${node?.let { n -> " на ноде ${n.name}" }.orEmpty()} — подписка пользователя $email обновится сама", fw.ifBlank { null }))
+        }
+        val nodeLogin = node?.let { store.load(it.serverId)?.target(nodeSrv!!) ?: memLogins[it.serverId] }
+        if (node != null && nodeLogin == null) {
+            askLogin(node.serverId, "Вход на сервер ноды «${node.name}»…", null) { createPanelConnection(id, type, port, mask, nodeServerId, customDomain) }
+            return
         }
         if (srv.fingerprint.isNotBlank()) return op(id, "Создаю подключение ${type.title}…") { s, ssh, inst ->
             val p = s.panel!!
@@ -654,10 +696,22 @@ class MyServersManager(
             val u = java.net.URL(p.baseUrl)
             val api = XuiApi(SshXuiTransport(ssh, "${u.protocol}://127.0.0.1:${u.port}${u.path}", p.token, u.host.removePrefix("[").removeSuffix("]")))
             val (email, links) = try { create(s, api) } catch (e: XuiApiException) { throw OpFailed("Панель: ${e.message}") }
-            val pre = service.preflight(ssh, 0)
-            val fwStep = ServerOps.openPortStep(pre.firewall, "$port/${if (type.udp) "udp" else "tcp"}")
-            if (fwStep != null) inst.run(listOf(fwStep))
-            show(email, links, if (fwStep != null) "Порт $port/${if (type.udp) "udp" else "tcp"} открыт в файрволе" else "")
+            val proto = if (type.udp) "udp" else "tcp"
+            if (node == null) {
+                val pre = service.preflight(ssh, 0)
+                val fwStep = ServerOps.openPortStep(pre.firewall, "$port/$proto")
+                if (fwStep != null) inst.run(listOf(fwStep))
+                show(email, links, if (fwStep != null) "Порт $port/$proto открыт в файрволе" else "")
+            } else {
+                val ns = nodeSrv!!
+                val login = nodeLogin!!
+                SshConnector.connect(login, ns.fingerprint).use { nodeSsh ->
+                    val nodeInst = Installer(nodeSsh, listOfNotNull(login.password, login.privateKey, login.keyPassphrase), ::onEvent)
+                    val fwStep = ServerOps.openPortStep(service.preflight(nodeSsh, 0).firewall, "$port/$proto")
+                    if (fwStep != null) nodeInst.run(listOf(fwStep))
+                    show(email, links, if (fwStep != null) "Порт $port/$proto открыт в файрволе ноды ${node.name}" else "")
+                }
+            }
         }
         withPanel(id) { s, api -> val (email, links) = create(s, api); show(email, links, "Откройте порт $port/${if (type.udp) "udp" else "tcp"} в файрволе хостинга, если он закрыт") }
     }
@@ -667,7 +721,7 @@ class MyServersManager(
      * Hydra; все подключения Hydra в этой панели — у одного пользователя-подписки ([OtherPanelConnections.subId]), подписку панели
      * Hydra включает сама (порт 2096). Ссылка — из этой подписки; WireGuard x-ui в подписку не кладёт — конфиг собирает Hydra.
      */
-    private fun createXuiAlirezaConnection(id: String, type: XuiConnection, port: Int, mask: XuiPanel.RealityMask) {
+    private fun createXuiAlirezaConnection(id: String, type: XuiConnection, port: Int, mask: XuiPanel.RealityMask, customDomain: String) {
         val srv0 = find(id)?.takeIf { it.fingerprint.isNotBlank() } ?: return
         if (type !in OtherPanelConnections.XUI) return _ui.update { it.copy(error = "${type.title} в x-ui нет — выберите другой тип", opServer = id) }
         if (port !in 1..65535) return _ui.update { it.copy(error = "Порт — число от 1 до 65535", opServer = id) }
@@ -704,7 +758,7 @@ class MyServersManager(
                     } else ("" to "")
                     val creds = OtherPanelConnections.newCreds(type, OtherPanelConnections.subId(p))
                     inst.addSecret(creds.uuid); inst.addSecret(creds.password); inst.addSecret(creds.ssKey); inst.addSecret(creds.wgPriv)
-                    val ib = OtherPanelConnections.xuiInbound(type, port, creds, mask, keys.first, keys.second, cert)
+                    val ib = OtherPanelConnections.xuiInbound(type, port, creds, mask, keys.first, keys.second, cert, customDomain)
                     api.xuiAddInbound(ib)
                     val pre = service.preflight(ssh, 0)
                     val proto = if (type.udp) "udp" else "tcp"
@@ -727,7 +781,7 @@ class MyServersManager(
      * или сертификат панели для Hysteria 2 / TUIC) → инбаунд sing-box → пользователь с учётными данными Hydra; ссылку s-ui
      * считает сама (`links` пользователя).
      */
-    private fun createSuiConnection(id: String, type: XuiConnection, port: Int, mask: XuiPanel.RealityMask) {
+    private fun createSuiConnection(id: String, type: XuiConnection, port: Int, mask: XuiPanel.RealityMask, customDomain: String) {
         if (find(id)?.fingerprint.isNullOrBlank()) return
         if (type !in OtherPanelConnections.SUI) return _ui.update { it.copy(error = "${type.title} в s-ui нет — выберите другой тип", opServer = id) }
         if (port !in 1..65535) return _ui.update { it.copy(error = "Порт — число от 1 до 65535", opServer = id) }
@@ -753,7 +807,7 @@ class MyServersManager(
                             val pub = (0 until kp.length()).map { kp.getString(it) }.firstOrNull { it.startsWith("PublicKey") }?.substringAfter(":")?.trim()
                             if (priv == null || pub == null) throw XuiApiException("s-ui не выдала ключи REALITY")
                             val sid = XuiPanel.random(8).lowercase().map { "%02x".format(it.code % 256) }.joinToString("").take(16)
-                            api.suiSave("tls", "new", OtherPanelConnections.suiRealityTls(tag, mask.sni, priv, pub, sid))
+                            api.suiSave("tls", "new", OtherPanelConnections.suiRealityTls(tag, XuiPanel.realitySni(mask, customDomain), priv, pub, sid))
                             suiId(api, "tls", tag)
                         }
                         type.needsCert -> {
@@ -877,6 +931,24 @@ class MyServersManager(
                             ports.forEach { openAll(it) }
                             PanelNode(nodeSrv.id, nodeSrv.name, nodeSrv.host, id.toString(), ports) to retryLinks { linksToHost(api.userLinks(), nodeSrv.host) }
                         }
+                        PanelKind.NEXORA -> {
+                            val u = java.net.URL(p.baseUrl)
+                            val api = NexoraApi(SshXuiTransport(sshA, "${u.protocol}://127.0.0.1:${u.port}${u.path}", p.token, u.host.removePrefix("[").removeSuffix("]")))
+                            val id = api.addNode(name, tB)
+                            try {
+                                val probe = api.probe(id, tB)
+                                log("Нода проверена панелью: ${probe.optString("osName", "Linux")}, ${probe.optString("arch", "архитектура неизвестна")}")
+                                api.awaitInstall(id, tB) { lines -> lines.filter { it.isNotBlank() }.forEach(::log) }
+                                openFrom("${NexoraPanel.NODE_PORT}/tcp")
+                                api.waitConnected(id)?.let { err -> throw XuiApiException(err) }
+                                log("Нода Nexora подключена по mTLS")
+                            } catch (e: Exception) {
+                                runCatching { api.awaitInstall(id, tB, uninstall = true) }
+                                runCatching { api.deleteNode(id) }
+                                throw e
+                            }
+                            PanelNode(nodeSrv.id, nodeSrv.name, nodeSrv.host, id.toString(), listOf("${NexoraPanel.NODE_PORT}/tcp")) to emptyList()
+                        }
                         PanelKind.REMNAWAVE -> {
                             val api = RemnawaveApi(sshA, p.username, p.password)
                             val key = api.secretKey(); instB.addSecret(key)
@@ -927,16 +999,21 @@ class MyServersManager(
         val res = XuiPanel.parseResult(sshB.exec("cat ${XuiPanel.RESULT}").out)
         val port = res["XUI_PANEL_PORT"]?.toIntOrNull() ?: throw OpFailed("Нет порта панели ноды (${XuiPanel.RESULT})")
         val path = res["XUI_WEB_BASE_PATH"].orEmpty().trim('/')
+        // R2: у новой ноды токен идёт только по HTTPS с leaf-сертификатом, закреплённым по доверенному SSH. HTTP/skip не используем
+        // даже при сбое ACME: пользователь должен исправить доступ к 80/tcp или выбрать ноду с доменом, а не потерять защиту молча.
+        if (!instB.run(XuiPanel.httpsSteps(PanelKind.XUI3, nodeSrv.host, true, preB.firewall, port, path)))
+            throw OpFailed(_ui.value.error ?: "Не удалось включить HTTPS у ноды. Для IP нужен публичный адрес и входящий 80/tcp для Let's Encrypt")
+        val pin = sshB.exec(XuiPanel.certFingerprintCommand()).out.trim()
+        if (!PanelNodes.validXuiCertPin(pin)) throw OpFailed("Не удалось прочитать SHA-256 сертификата ноды")
         val token = sshB.exec(PanelNodes.xuiNodeTokenCommand()).out.trim().lines().lastOrNull().orEmpty()
         if (token.length < 16) throw OpFailed("Панель ноды не выдала токен синхронизации")
         instB.addSecret(token)
-        val scheme = if (sshB.exec("curl -sk -o /dev/null -w '%{http_code}' --max-time 5 https://127.0.0.1:$port/$path/").out.trim().startsWith("2")) "https" else "http"
         openFrom("$port/tcp")
         val u = java.net.URL(p.baseUrl)
         val apiA = XuiApi(SshXuiTransport(sshA, "${u.protocol}://127.0.0.1:${u.port}${u.path}", p.token, u.host.removePrefix("[").removeSuffix("]")))
         val nodes = XuiNodesApi(SshXuiTransport(sshA, "${u.protocol}://127.0.0.1:${u.port}${u.path}", p.token, u.host.removePrefix("[").removeSuffix("]")))
         nodes.list().firstOrNull { it.optString("name") == name }?.let { nodes.delete(it.optInt("id")) }   // осталась от прошлой попытки
-        val id = nodes.add(PanelNodes.xuiNodeBody(name, scheme, nodeSrv.host, port, path, token))
+        val id = nodes.add(PanelNodes.xuiNodeBody(name, nodeSrv.host, port, path, token, pin))
         nodes.waitOnline(id)?.let { runCatching { nodes.delete(id) }; throw OpFailed("Главная панель не достучалась до ноды ($it). Порт $port/tcp ноды должен быть доступен с главного сервера") }
         log("Нода подключена к панели")
         // подключение на ноде: порт 443, если свободен у главной панели, иначе следующий свободный
@@ -981,6 +1058,15 @@ class MyServersManager(
                     }
                     PanelKind.PASARGUARD -> PasarGuardApi(sshA, p.username, p.password).removeNode(node.remoteId.toIntOrNull() ?: 0, node.host)
                     PanelKind.REMNAWAVE -> RemnawaveApi(sshA, p.username, p.password).removeNode(node.remoteId, node.host)
+                    PanelKind.NEXORA -> {
+                        val u = java.net.URL(p.baseUrl)
+                        val api = NexoraApi(SshXuiTransport(sshA, "${u.protocol}://127.0.0.1:${u.port}${u.path}", p.token, u.host.removePrefix("[").removeSuffix("]")))
+                        val id = node.remoteId.toIntOrNull() ?: 0
+                        if (id > 0) {
+                            if (tB != null) runCatching { api.awaitInstall(id, tB, uninstall = true) { lines -> lines.filter { it.isNotBlank() }.forEach(::log) } }
+                            api.deleteNode(id)
+                        }
+                    }
                     else -> Unit
                 }
             } catch (e: XuiApiException) { log("Панель: ${e.message} — нода убрана из Hydra, проверьте её на сайте панели") }
@@ -998,7 +1084,9 @@ class MyServersManager(
                             "if [ -e /usr/local/x-ui ]; then systemctl disable --now x-ui >/dev/null 2>&1; rm -rf /usr/local/x-ui /etc/x-ui /usr/bin/x-ui /etc/systemd/system/x-ui.service; systemctl daemon-reload; fi; " +
                             "rm -f ${ServerOps.XUI_MARK}; fi; test ! -e /usr/local/x-ui", failHint = "3x-ui ноды удалить не удалось")
                         PanelKind.PASARGUARD -> Step("node-rm", "Удалить ноду PasarGuard с сервера", PanelNodes.pgNodeUninstallCommand())
-                        else -> Step("node-rm", "Удалить ноду Remnawave с сервера", PanelNodes.rwNodeUninstallCommand())
+                        PanelKind.REMNAWAVE -> Step("node-rm", "Удалить ноду Remnawave с сервера", PanelNodes.rwNodeUninstallCommand())
+                        PanelKind.NEXORA -> Step("node-rm", "Проверить удаление Nexora Node; убрать аварийные остатки", NexoraPanel.nodeUninstallCommand())
+                        else -> Step("node-rm", "Удалить ноду с сервера", "true")
                     }, Step("node-fw-close", "Закрыть порты ноды, если их открывала Hydra", "$close; true")))
                 }
             }.onFailure { log("Сервер ноды недоступен (${it.message}) — служба ноды на нём осталась, её снимет «Очистить сервер»") }
@@ -1025,6 +1113,11 @@ class MyServersManager(
 
     /** Ссылки уже созданного пользователя панели. */
     fun showPanelLinks(id: String, email: String) {
+        if (find(id)?.panel?.kind == PanelKind.NEXORA) return withNexora(id, "Получаю подписку Nexora…") { _, api ->
+            val user = api.user(email)
+            if (user.subUrl.isBlank()) throw XuiApiException("Nexora не вернула подписку пользователя")
+            _ui.update { it.copy(shown = user.name to user.subUrl) }
+        }
         if (sessionUsers(id) != null) return showSessionUser(id, email)
         withPanel(id) { s, api ->
             _ui.update { it.copy(shown = email to accessText(s, api, email, api.subIdOf(email))) }
@@ -1041,6 +1134,10 @@ class MyServersManager(
     }
 
     fun removePanelClient(id: String, email: String) {
+        if (find(id)?.panel?.kind == PanelKind.NEXORA) return withNexora(id, "Удаляю пользователя Nexora…") { s, api ->
+            api.deleteUser(api.user(email).id)
+            _ui.update { it.copy(panelClients = it.panelClients + (s.id to api.users().map { u -> u.name })) }
+        }
         if (sessionUsers(id) != null) return removeSessionUser(id, email)
         withPanel(id) { s, api ->
             api.delClient(email)
@@ -1160,7 +1257,7 @@ class MyServersManager(
             val steps = PanelBackups.restoreSteps(kind, file)
             if (!inst.run(steps)) throw OpFailed(_ui.value.error ?: "Восстановить базу не удалось")
             closePanelTunnel(id)
-            log("Готово: панель запущена с базой из копии $file. Предыдущая база сохранена как ${ServerOps.BACKUP_DIR}/${if (kind == PanelKind.SUI) "s-ui" else "x-ui"}-before-restore.db")
+            log("Готово: панель запущена с базой из копии $file. Предыдущая база сохранена как ${ServerOps.BACKUP_DIR}/${PanelBackups.key(kind)}-before-restore.${if (kind == PanelKind.REMNAWAVE) "sql" else "db"}")
             _ui.update { it.copy(panelClients = it.panelClients - s.id) }
         }
     }

@@ -12,7 +12,7 @@ import org.json.JSONObject
 object RemnawavePanel {
     const val TAG = "3.4.7"
     const val NODE_TAG = "3.4.3"
-    const val CADDY = "caddy:2.10.0-alpine"
+    const val CADDY = "caddy:2.11.7-alpine"
     const val DIR = "/opt/remnawave"
     const val NODE_DIR = "/opt/remnanode"
     const val API_PORT = 3000

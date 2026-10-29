@@ -1,12 +1,11 @@
 package ru.gidravpn.hydra.data.subscription
 
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.OptIn
-import org.json.JSONObject
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
+import org.json.JSONObject
 import java.net.URLDecoder
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Парсер стандартных ссылок-конфигов, которые выдают панели x-ui / 3x-ui /
@@ -16,14 +15,27 @@ import java.net.URLDecoder
 object LinkParser {
 
     /** Разбирает содержимое подписки: plain-список ссылок ИЛИ base64-блоб. */
-    fun parseSubscription(raw: String, subscriptionId: Long? = null): List<ServerProfile> {
+    fun parseSubscription(raw: String, subscriptionId: Long? = null): List<ServerProfile> =
+        parseSubscriptionDetailed(raw, subscriptionId).profiles
+
+    fun parseSubscriptionDetailed(raw: String, subscriptionId: Long? = null): SubscriptionParseResult {
         val text = maybeBase64Decode(raw.trim())
-        return text.lineSequence()
+        var failed = 0
+        val profiles = text.lineSequence()
             .map { it.trim() }
             .filter { it.isNotEmpty() && "://" in it }
-            .mapNotNull { runCatching { parseLine(it) }.getOrNull() }
+            .mapNotNull {
+                val parsed = runCatching { parseLine(it) }.getOrNull()
+                if (parsed == null) failed++
+                parsed
+            }
             .map { it.copy(subscriptionId = subscriptionId) }
             .toList()
+        return SubscriptionParseResult(profiles, failed)
+    }
+
+    data class SubscriptionParseResult(val profiles: List<ServerProfile>, val failedLines: Int) {
+        val complete get() = failedLines == 0
     }
 
     fun parseLine(link: String): ServerProfile? {
@@ -61,7 +73,7 @@ object LinkParser {
         val uri = UriParser.parse(link)
         val q = uri.queryMap()
         val userInfo = uri.userInfo.orEmpty()
-        val user = userInfo.substringBefore(":")   // userInfo уже декодирован UriParser
+        val user = urlDecode(userInfo.substringBefore(":"))
         val pass = userInfo.substringAfter(":", "")
         return ServerProfile(
             name = tag(uri) ?: "${protocol.displayName} ${uri.host}",
@@ -154,7 +166,7 @@ object LinkParser {
     // ss://base64(method:password)@host:port#name   ИЛИ   ss://base64(method:password@host:port)#name
     private fun parseShadowsocks(link: String): ServerProfile {
         val body = link.removePrefix("ss://")
-        val name = body.substringAfter("#", "").let { if (it.isEmpty()) "" else decode(it) }
+        val name = body.substringAfter("#", "").let { if (it.isEmpty()) "" else urlDecode(it) }
         val core = body.substringBefore("#")
         val (method, password, host, port) = decodeSs(core)
         return ServerProfile(
@@ -214,14 +226,13 @@ object LinkParser {
     private fun insecureFlag(q: Map<String, String>) =
         listOf("insecure", "allowInsecure", "allow_insecure").any { q[it] == "1" || q[it].equals("true", true) }
 
-    private fun tag(uri: UriParser): String? = uri.fragment?.let { decode(it) }?.ifBlank { null }
+    private fun tag(uri: UriParser): String? = urlDecode(uri.fragment).ifBlank { null }
+
+    private fun urlDecode(s: String) = runCatching { URLDecoder.decode(s, "UTF-8") }.getOrDefault(s)
 
     @OptIn(ExperimentalEncodingApi::class)
     private fun b64(s: String): ByteArray =
-        // Android Base64.DEFAULT пропускает переводы строк/пробелы, kotlin.io.encoding — нет:
-        // подписки часто отдают base64, порезанный по 76 символов.
-        Base64.decode(s.filterNot { it.isWhitespace() }.trimEnd('=')
-            .replace('-', '+').replace('_', '/').padBase64())
+        Base64.decode(s.filterNot { it.isWhitespace() }.replace('-', '+').replace('_', '/').padBase64())
 
     private fun String.padBase64(): String {
         val m = length % 4

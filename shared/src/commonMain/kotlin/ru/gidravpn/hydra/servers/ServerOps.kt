@@ -42,6 +42,10 @@ data class ServerStatus(
     /** Remnawave на сервере и метка «поставила Hydra» (0.8.2-a3). */
     val rwInstalled: Boolean = false,
     val rwByHydra: Boolean = false,
+    /** Nexora на сервере и метка «поставила Hydra» (0.8.2). */
+    val nexoraInstalled: Boolean = false,
+    val nexoraByHydra: Boolean = false,
+    val nexoraState: String = "",
     /** Копия записи панели `/etc/hydra/panel.json`. */
     val panelStateJson: String = "",
     /** Ошибка проверки (сервер недоступен и т. п.); null — проверка прошла. */
@@ -105,6 +109,9 @@ object ServerOps {
         append("echo PG_MARK=\$([ -f ${PasarGuardPanel.MARK} ] && echo 1 || echo 0); ")
         append("echo RW=\$([ -e ${RemnawavePanel.DIR}/docker-compose.yml ] && echo 1 || echo 0); ")
         append("echo RW_MARK=\$([ -f ${RemnawavePanel.MARK} ] && echo 1 || echo 0); ")
+        append("echo NEXORA=\$([ -x ${NexoraPanel.HOME}/nexora-panel ] && echo 1 || echo 0); ")
+        append("echo NEXORA_MARK=\$([ -f ${NexoraPanel.MARK} ] && echo 1 || echo 0); ")
+        append("echo NEXORA_STATE=\$(systemctl is-active ${NexoraPanel.SERVICE} 2>/dev/null); ")
         append("echo '---AWGDUMP'; $AWG_ENV ${AwgInstallPlan.BIN_DIR}/awg show $iface dump 2>/dev/null; ")
         append("echo '---AWGSTATE'; cat $AWG_STATE 2>/dev/null; echo; ")
         append("echo '---AWGCONF'; cat ${AwgInstallPlan.CONF_DIR}/$iface.conf 2>/dev/null; ")
@@ -141,6 +148,7 @@ object ServerOps {
             xuiResult = sections["XUIRESULT"].orEmpty().joinToString("\n").trim(),
             suiInstalled = kv["SUI"] == "1", suiByHydra = kv["SUI_MARK"] == "1", xuiAlirezaByHydra = kv["XUIA_MARK"] == "1",
             pgInstalled = kv["PG"] == "1", pgByHydra = kv["PG_MARK"] == "1", rwInstalled = kv["RW"] == "1", rwByHydra = kv["RW_MARK"] == "1",
+            nexoraInstalled = kv["NEXORA"] == "1", nexoraByHydra = kv["NEXORA_MARK"] == "1", nexoraState = kv["NEXORA_STATE"].orEmpty(),
             panelStateJson = sections["PANELSTATE"].orEmpty().joinToString("\n").trim(),
         )
     }
@@ -233,6 +241,10 @@ object ServerOps {
         Step("wipe-xui", "Удалить панель 3x-ui, если её ставила Hydra",
             "if [ -f $XUI_MARK ] && [ -x /usr/bin/x-ui ]; then printf 'y\\n' | /usr/bin/x-ui uninstall >/dev/null 2>&1; echo '3x-ui: удалена'; " +
                 "else echo '3x-ui: не ставилась Hydra'; fi; true"),
+        Step("wipe-nexora", "Удалить Nexora, если её ставила Hydra (база сначала копируется в ${ServerOps.BACKUP_DIR})",
+            "if [ -f ${NexoraPanel.MARK} ]; then mkdir -p ${ServerOps.BACKUP_DIR} && chmod 700 ${ServerOps.BACKUP_DIR} && " +
+                "{ [ ! -d ${NexoraPanel.DATA} ] || cp -a ${NexoraPanel.DATA} ${ServerOps.BACKUP_DIR}/nexora-\$(date +%Y%m%d-%H%M%S); } && " +
+                "{ ${NexoraPanel.uninstallCommand()}; }; else echo 'Nexora: не ставилась Hydra'; fi; true"),
         Step("wipe-panels", "Удалить панели s-ui, x-ui, PasarGuard и Remnawave, если их ставила Hydra",
             listOf(OtherPanels.SUI, OtherPanels.XUI).joinToString(" ") { s ->
                 "if [ -f ${s.mark} ]; then ${OtherPanels.uninstallCommand(s)}; echo '${s.kind.title}: удалена'; fi;"

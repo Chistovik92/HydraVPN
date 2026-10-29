@@ -1,67 +1,35 @@
 package ru.gidravpn.hydra.data.db
 
-import androidx.room.*
-import ru.gidravpn.hydra.data.model.ServerProfile
-import ru.gidravpn.hydra.data.model.Subscription
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ServerDao {
     @Query("SELECT * FROM servers ORDER BY sortIndex, id")
-    fun observeAll(): Flow<List<ServerProfile>>
-
+    fun observeAll(): Flow<List<ServerEntity>>
     @Query("SELECT * FROM servers WHERE id = :id")
-    suspend fun byId(id: Long): ServerProfile?
-
+    suspend fun byId(id: Long): ServerEntity?
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(server: ServerProfile): Long
-
+    suspend fun upsert(server: ServerEntity): Long
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertAll(servers: List<ServerProfile>)
-
+    suspend fun upsertAll(servers: List<ServerEntity>)
     @Delete
-    suspend fun delete(server: ServerProfile)
-
+    suspend fun delete(server: ServerEntity)
     @Query("DELETE FROM servers WHERE subscriptionId = :subId")
     suspend fun deleteBySubscription(subId: Long)
-
-    /**
-     * Замена содержимого подписки одним куском (Фаза 7e). Раньше репозиторий
-     * звал `deleteBySubscription()` и `upsertAll()` подряд, вне транзакции:
-     * падение или снятие процесса между ними оставляло подписку пустой —
-     * серверы стёрты, новые не записаны.
-     */
-    @Transaction
-    suspend fun replaceSubscriptionServers(subId: Long, servers: List<ServerProfile>) {
-        deleteBySubscription(subId)
-        upsertAll(servers)
-    }
-
     @Query("SELECT * FROM servers WHERE subscriptionId = :subId ORDER BY sortIndex, id")
-    suspend fun bySubscription(subId: Long): List<ServerProfile>
-
+    suspend fun bySubscription(subId: Long): List<ServerEntity>
     @Delete
-    suspend fun deleteAll(servers: List<ServerProfile>)
-
+    suspend fun deleteAll(servers: List<ServerEntity>)
     @Update
-    suspend fun updateAll(servers: List<ServerProfile>)
-
-    /**
-     * Синхронизация подписки (0.6.21) одной транзакцией: пропавшие серверы удаляются, новые
-     * добавляются, оставшиеся обновляются с сохранением id. См. SubscriptionSync.
-     */
-    @Transaction
-    suspend fun syncSubscription(subId: Long, incoming: List<ServerProfile>): ru.gidravpn.hydra.data.subscription.SubscriptionSync.Plan {
-        val plan = ru.gidravpn.hydra.data.subscription.SubscriptionSync.plan(subId, bySubscription(subId), incoming)
-        if (plan.toDelete.isNotEmpty()) deleteAll(plan.toDelete)
-        if (plan.toUpdate.isNotEmpty()) updateAll(plan.toUpdate)
-        if (plan.toInsert.isNotEmpty()) upsertAll(plan.toInsert)
-        return plan
-    }
-
+    suspend fun updateAll(servers: List<ServerEntity>)
     @Query("SELECT * FROM servers ORDER BY sortIndex, id")
-    suspend fun getAll(): List<ServerProfile>
-
+    suspend fun getAll(): List<ServerEntity>
     @Query("DELETE FROM servers")
     suspend fun deleteAll()
 }
@@ -69,26 +37,19 @@ interface ServerDao {
 @Dao
 interface SubscriptionDao {
     @Query("SELECT * FROM subscriptions ORDER BY id")
-    fun observeAll(): Flow<List<Subscription>>
-
+    fun observeAll(): Flow<List<SubscriptionEntity>>
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(sub: Subscription): Long
-
+    suspend fun upsert(sub: SubscriptionEntity): Long
     @Delete
-    suspend fun delete(sub: Subscription)
-
+    suspend fun delete(sub: SubscriptionEntity)
     @Query("SELECT * FROM subscriptions WHERE id = :id")
-    suspend fun byId(id: Long): Subscription?
-
+    suspend fun byId(id: Long): SubscriptionEntity?
     @Update
-    suspend fun update(sub: Subscription)
-
+    suspend fun update(sub: SubscriptionEntity)
     @Query("SELECT * FROM subscriptions ORDER BY id")
-    suspend fun getAll(): List<Subscription>
-
+    suspend fun getAll(): List<SubscriptionEntity>
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertAll(subs: List<Subscription>)
-
+    suspend fun upsertAll(subs: List<SubscriptionEntity>)
     @Query("DELETE FROM subscriptions")
     suspend fun deleteAll()
 }

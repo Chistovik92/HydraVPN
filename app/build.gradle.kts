@@ -103,54 +103,15 @@ android {
         }
     }
 
+    // Общие исходники подключены через :shared, без Sync-копий.
     // XrayCore.kt существует в двух вариантах (см. docs/BUILD.md, раздел 2.2):
     // заглушка (nativeXrayStub) и рабочая реализация на libXray.aar (nativeXrayReal).
     // Какая из них попадает в сборку flavor `native` — решает наличие .aar —
     // так `assembleNativeDebug` не ломается, если libXray.aar ещё не собран.
     // .so и classes.dex для процесса :xray подключаются НЕ как Gradle-зависимость
     // (см. extractLibXrayNativeLibs/libXrayToDex ниже и комментарий там же).
-    // Клиент роутера (пакет ru.gidravpn.hydra.router) общий с ПК-версией и лежит в :shared, но
-    // :shared в app не подключается целиком (см. комментарий у dependencies: в app свои копии
-    // тех же классов, дубли ломали слияние dex). Поэтому в сборку берётся только этот пакет —
-    // копией в build/generated, без дублирования исходников в репозитории.
-    val syncSharedRouter = tasks.register<Sync>("syncSharedRouter") {
-        from(rootProject.file("shared/src/commonMain/kotlin/ru/gidravpn/hydra/router"))
-        into(layout.buildDirectory.dir("generated/sharedRouter/ru/gidravpn/hydra/router"))
-    }
-    // Поиск и загрузка обновлений (пакет ru.gidravpn.hydra.update) тоже общие с ПК — тем же способом (0.7.1).
-    val syncSharedUpdate = tasks.register<Sync>("syncSharedUpdate") {
-        from(rootProject.file("shared/src/commonMain/kotlin/ru/gidravpn/hydra/update"))
-        into(layout.buildDirectory.dir("generated/sharedRouter/ru/gidravpn/hydra/update"))
-    }
-    // TG WS (пакет ru.gidravpn.hydra.data.tgws, 0.7.14) — один и тот же движок на Android и на ПК.
-    val syncSharedTgWs = tasks.register<Sync>("syncSharedTgWs") {
-        from(rootProject.file("shared/src/commonMain/kotlin/ru/gidravpn/hydra/data/tgws"))
-        into(layout.buildDirectory.dir("generated/sharedRouter/ru/gidravpn/hydra/data/tgws"))
-    }
-    // PPTP (пакет ru.gidravpn.hydra.vpn.pptp, 0.7.19): кодеки, MPPE и клиент - общие с ПК.
-    val syncSharedPptp = tasks.register<Sync>("syncSharedPptp") {
-        from(rootProject.file("shared/src/commonMain/kotlin/ru/gidravpn/hydra/vpn/pptp"))
-        into(layout.buildDirectory.dir("generated/sharedRouter/ru/gidravpn/hydra/vpn/pptp"))
-    }
-    // «Мои серверы» (пакет ru.gidravpn.hydra.servers, 0.8.0): SSH, установщик AmneziaWG — общие с ПК.
-    val syncSharedServers = tasks.register<Sync>("syncSharedServers") {
-        from(rootProject.file("shared/src/commonMain/kotlin/ru/gidravpn/hydra/servers"))
-        into(layout.buildDirectory.dir("generated/sharedRouter/ru/gidravpn/hydra/servers"))
-    }
-    // Ручной ввод серверов (0.8.0-rc4): поля форм и сборка ссылок — общие с ПК.
-    val syncSharedManual = tasks.register<Sync>("syncSharedManual") {
-        from(rootProject.file("shared/src/commonMain/kotlin/ru/gidravpn/hydra/data/manual"))
-        into(layout.buildDirectory.dir("generated/sharedRouter/ru/gidravpn/hydra/data/manual"))
-    }
-    // Копии должны появиться до любой задачи, читающей исходники (Kotlin, KSP/KAPT, lint).
-    tasks.configureEach {
-        if (!name.startsWith("syncShared") && (name.startsWith("compile") || name.startsWith("ksp") ||
-                name.startsWith("kapt") || name.startsWith("lint"))) dependsOn(syncSharedRouter, syncSharedUpdate, syncSharedTgWs, syncSharedPptp, syncSharedServers, syncSharedManual)
-    }
+    // Платформонезависимые пакеты подключаются через :shared.
     sourceSets {
-        getByName("main") {
-            kotlin.srcDir(layout.buildDirectory.dir("generated/sharedRouter"))
-        }
         getByName("native") {
             val hasLibXray = file("libs/libXray.aar").exists()
             java.srcDir(if (hasLibXray) "src/nativeXrayReal/java" else "src/nativeXrayStub/java")
@@ -341,11 +302,8 @@ dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.09.02")
     implementation(composeBom)
 
-    // :shared (KMP) сюда пока НЕ подключается: в app лежат свои копии тех же классов
-    // (ru.gidravpn.hydra.data.model.*, data.subscription.*, vpn.ppp.*) с теми же FQN, но
-    // другой реализацией. С зависимостью в APK попадала только одна копия из двух —
-    // какая, решал порядок слияния dex. Перевод Android на :shared — отдельный шаг
-    // (удалить дубли из app), см. docs/MULTIPLATFORM.md.
+    // Общие модели, парсеры, конфиги и PPP. Android-only адаптеры находятся в androidMain.
+    implementation(project(":shared"))
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.2")

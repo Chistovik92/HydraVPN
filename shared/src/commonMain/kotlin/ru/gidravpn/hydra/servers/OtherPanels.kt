@@ -28,7 +28,7 @@ object OtherPanels {
     val SUI = Spec(PanelKind.SUI, "alireza0/s-ui", "/usr/local/s-ui", "s-ui", "${ServerOps.STATE_DIR}/sui.installed")
     val XUI = Spec(PanelKind.XUI, "alireza0/x-ui", "/usr/local/x-ui", "x-ui", "${ServerOps.STATE_DIR}/xui-alireza.installed")
 
-    fun spec(kind: PanelKind): Spec? = when (kind) { PanelKind.SUI -> SUI; PanelKind.XUI -> XUI; PanelKind.XUI3, PanelKind.PASARGUARD, PanelKind.REMNAWAVE -> null }
+    fun spec(kind: PanelKind): Spec? = when (kind) { PanelKind.SUI -> SUI; PanelKind.XUI -> XUI; PanelKind.XUI3, PanelKind.PASARGUARD, PanelKind.REMNAWAVE, PanelKind.NEXORA -> null }
 
     /** Тег, который ставит Hydra (0.8.2-rc2): проверенный выпуск из [ScriptPins] (скрипт сверяется по SHA-256), а не «последний» у апстрима. */
     @Suppress("UNUSED_PARAMETER")
@@ -56,7 +56,7 @@ object OtherPanels {
         PanelKind.XUI -> "set -e\n/usr/local/x-ui/x-ui setting -username '${p.username}' -password '${p.password}' -port ${p.port} -webBasePath '/${p.path}/'\n" +
             "systemctl restart x-ui\n"
         PanelKind.XUI3 -> error("3x-ui ставится через XuiPanel")
-        PanelKind.PASARGUARD, PanelKind.REMNAWAVE -> error("${s.kind.title} ставится в Docker своим классом")
+        PanelKind.PASARGUARD, PanelKind.REMNAWAVE, PanelKind.NEXORA -> error("${s.kind.title} ставится своим классом")
     }
 
     fun installSteps(s: Spec, p: Params, openFirewall: Boolean, firewall: String): List<Step> = buildList {

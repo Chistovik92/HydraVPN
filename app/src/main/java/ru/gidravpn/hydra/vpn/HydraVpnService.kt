@@ -276,11 +276,9 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             // fd) номер — fdsan валит процесс SIGABRT
             // ("failed to exchange ownership... was expected to be unowned").
             if (t is CancellationException) {
-                if (newTun?.fileDescriptor?.valid() == true) {
-                    runCatching { newTun.close() }
-                } else if (newTunFd >= 0) {
-                    runCatching { ParcelFileDescriptor.adoptFd(newTunFd).close() }
-                }
+                // newCore.stop() owns a detached fd and may already have closed it.
+                // Re-adopting the saved number here could close an unrelated fd.
+                closeOwnedTun(newTun)
                 throw t
             }
 
@@ -317,11 +315,7 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             if (killSwitch) {
                 enterKillSwitch(newTun, newTunFd, "тоннель не поднялся")
             } else {
-                if (newTun?.fileDescriptor?.valid() == true) {
-                    runCatching { newTun.close() }
-                } else if (newTunFd >= 0) {
-                    runCatching { ParcelFileDescriptor.adoptFd(newTunFd).close() }
-                }
+                closeOwnedTun(newTun)
                 VpnState.state.value = ConnectionState.ERROR
                 stopTunnel()
             }
@@ -329,7 +323,16 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
         return false
     }
 
-    /** Закрывает tun так же, как везде выше: сначала PFD, если он ещё владеет fd, иначе сырой fd. */
+    /** Закрывает только дескриптор, которым ещё владеет PFD. */
+    private fun closeOwnedTun(t: ParcelFileDescriptor?) {
+        if (t?.fileDescriptor?.valid() == true) runCatching { t.close() }
+    }
+
+    /**
+     * Закрывает tun одним владельцем: PFD, пока он владеет fd, иначе сырой fd,
+     * отданный ядру через detachFd(). Никогда не делает adoptFd() после close()
+     * того же PFD — номер уже мог быть переиспользован другим подключением.
+     */
     private fun closeTun(t: ParcelFileDescriptor?, fd: Int) {
         if (t?.fileDescriptor?.valid() == true) {
             runCatching { t.close() }
@@ -672,7 +675,9 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
         val best = PhysicalNetwork.pick(cm, exclude)
         runCatching { setUnderlyingNetworks(best?.let { arrayOf(it) }) }
         if (best != lastUnderlying) {
+            val changed = lastUnderlying != null
             lastUnderlying = best
+            if (changed && best != null) runCatching { core?.onNetworkChanged() }
             val kind = best?.let { cm.getNetworkCapabilities(it) }?.let { c ->
                 when {
                     c.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"

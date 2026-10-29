@@ -477,6 +477,7 @@ private fun PanelSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, 
             if (st?.xuiInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "x-ui"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_XUI) }
             if (st?.pgInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "PasarGuard"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_PASARGUARD) }
             if (st?.rwInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "Remnawave"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_REMNAWAVE) }
+            if (st?.nexoraInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "Nexora"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_NEXORA) }
             if (!srv.hasServices) MsChip(stringResource(R.string.ms_node_install), AccentCyan) { if (!busy) pickPanel = true }
         }
         if (pickPanel) {
@@ -566,8 +567,8 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
     var createConn by remember { mutableStateOf(false) }
     if (ru.gidravpn.hydra.servers.OtherPanelConnections.canCreate(srv))
         MsRow { MsChip(stringResource(R.string.ms_conn_create), AccentCyan) { if (!busy) createConn = true } }
-    if (createConn) CreateConnectionDialog(ru.gidravpn.hydra.servers.OtherPanelConnections.typesFor(p.kind), https = XuiPanel.isHttps(p.baseUrl), onClose = { createConn = false }) { type, port, mask ->
-        createConn = false; m.createPanelConnection(srv.id, type, port, mask)
+    if (createConn) CreateConnectionDialog(ru.gidravpn.hydra.servers.OtherPanelConnections.typesFor(p.kind), p.nodes, https = XuiPanel.isHttps(p.baseUrl), onClose = { createConn = false }) { type, port, mask, node, customDomain ->
+        createConn = false; m.createPanelConnection(srv.id, type, port, mask, node, customDomain)
     }
     if (!ru.gidravpn.hydra.servers.OtherPanelUsers.supported(srv)) Text(stringResource(R.string.ms_panel_site_only), color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
     // «ничего наружу без согласия» (0.8.1-rc2): панель слушает только сам сервер, сайт — через защищённый туннель
@@ -732,10 +733,12 @@ private fun ConnectPanelDialog(onClose: () -> Unit, onOk: (name: String, address
 
 /** Создать подключение в 3x-ui (0.8.2-a2): тип, порт, маскировка для REALITY. */
 @Composable
-private fun CreateConnectionDialog(types: List<ru.gidravpn.hydra.servers.XuiConnection>, https: Boolean, onClose: () -> Unit, onOk: (ru.gidravpn.hydra.servers.XuiConnection, Int, XuiPanel.RealityMask) -> Unit) {
+private fun CreateConnectionDialog(types: List<ru.gidravpn.hydra.servers.XuiConnection>, nodes: List<ru.gidravpn.hydra.servers.PanelNode>, https: Boolean, onClose: () -> Unit, onOk: (ru.gidravpn.hydra.servers.XuiConnection, Int, XuiPanel.RealityMask, String?, String) -> Unit) {
     var type by remember { mutableStateOf(ru.gidravpn.hydra.servers.XuiConnection.VLESS_GRPC_REALITY) }
     var port by remember { mutableStateOf((20000 + java.security.SecureRandom().nextInt(40000)).toString()) }
     var mask by remember { mutableStateOf(XuiPanel.RealityMask.VK) }
+    var customDomain by remember { mutableStateOf("") }
+    var node by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onClose, containerColor = Surface,
         title = { Text(stringResource(R.string.ms_conn_title), color = TextPrimary) },
@@ -743,9 +746,20 @@ private fun CreateConnectionDialog(types: List<ru.gidravpn.hydra.servers.XuiConn
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(stringResource(R.string.ms_conn_text), color = TextSecondary, fontSize = 13.sp)
                 MsRow { types.forEach { t -> MsChip(t.title, TextSecondary, selected = type == t) { type = t } } }
+                if (nodes.isNotEmpty()) {
+                    Text("Сервер", color = TextSecondary, fontSize = 13.sp)
+                    MsRow {
+                        MsChip("Главный", TextSecondary, selected = node == null) { node = null }
+                        nodes.forEach { n -> MsChip(n.name, TextSecondary, selected = node == n.serverId) { node = n.serverId } }
+                    }
+                }
                 if (type.reality) {
                     Text(stringResource(R.string.ms_xui_mask), color = TextSecondary, fontSize = 13.sp)
-                    MsRow { XuiPanel.RealityMask.entries.forEach { r -> MsChip(r.sni, TextSecondary, selected = mask == r) { mask = r } } }
+                    MsRow { XuiPanel.RealityMask.entries.forEach { r -> MsChip(if (r == XuiPanel.RealityMask.CUSTOM) "Свой домен" else r.sni, TextSecondary, selected = mask == r) { mask = r } } }
+                    if (mask == XuiPanel.RealityMask.CUSTOM) {
+                        MsField("Свой домен", customDomain, hint = "example.com") { customDomain = it.trim() }
+                        Text("HTTPS-сайт на порту 443; без https://, порта и пути", color = TextMuted, fontSize = 12.sp)
+                    }
                 }
                 MsField(stringResource(R.string.ms_conn_port), port) { port = it.filter(Char::isDigit).take(5) }
                 if (type.udp) Text(stringResource(R.string.ms_conn_udp), color = TextMuted, fontSize = 12.sp)
@@ -753,7 +767,8 @@ private fun CreateConnectionDialog(types: List<ru.gidravpn.hydra.servers.XuiConn
             }
         },
         confirmButton = {
-            TextButton(enabled = (port.toIntOrNull() ?: 0) in 1..65535 && (!type.needsCert || https), onClick = { onOk(type, port.toInt(), mask) }) {
+            TextButton(enabled = (port.toIntOrNull() ?: 0) in 1..65535 && (!type.needsCert || https) &&
+                (mask != XuiPanel.RealityMask.CUSTOM || XuiPanel.normalizeRealityDomain(customDomain) != null), onClick = { onOk(type, port.toInt(), mask, node, customDomain) }) {
                 Text(stringResource(R.string.ms_create), color = AccentCyan)
             }
         },
@@ -780,6 +795,7 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
     var accessPort by remember { mutableStateOf("443") }
     var sslIp by remember { mutableStateOf(true) }
     var mask by remember { mutableStateOf(XuiPanel.RealityMask.VK) }
+    var customDomain by remember { mutableStateOf("") }
     var transport by remember { mutableStateOf(XuiPanel.Transport.GRPC) }
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, Border, RoundedCornerShape(14.dp)).padding(12.dp)) {
         Text(when (kind) {
@@ -803,10 +819,14 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
             Text(stringResource(R.string.ms_xui_transport), color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
             MsRow { XuiPanel.Transport.entries.forEach { t -> MsChip(t.title, TextSecondary, selected = transport == t) { transport = t } } }
             Text(stringResource(R.string.ms_xui_mask), color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
-            MsRow { XuiPanel.RealityMask.entries.forEach { r -> MsChip(r.sni, TextSecondary, selected = mask == r) { mask = r } } }
-            Text(stringResource(when (mask) {
+            MsRow { XuiPanel.RealityMask.entries.forEach { r -> MsChip(if (r == XuiPanel.RealityMask.CUSTOM) "Свой домен" else r.sni, TextSecondary, selected = mask == r) { mask = r } } }
+            if (mask == XuiPanel.RealityMask.CUSTOM) {
+                MsField("Свой домен", customDomain, hint = "example.com") { customDomain = it.trim() }
+                Text("HTTPS-сайт на порту 443; без https://, порта и пути", color = TextMuted, fontSize = 12.sp)
+            } else Text(stringResource(when (mask) {
                 XuiPanel.RealityMask.VK, XuiPanel.RealityMask.YANDEX -> R.string.ms_xui_mask_ru
                 XuiPanel.RealityMask.GITHUB -> R.string.ms_xui_mask_foreign
+                XuiPanel.RealityMask.CUSTOM -> R.string.ms_xui_mask_foreign
             }), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 4.dp))
             Row(Modifier.clickableNoRipple { sslIp = !sslIp }.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.material3.Checkbox(sslIp, { sslIp = it })
@@ -842,12 +862,12 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
         val ok = when (kind) {
             ServerKind.AMNEZIAWG -> aport in 1024..65535
             ServerKind.OPENFLUX -> OfxNodeSpec.validChannel(channel)
-            ServerKind.PANEL_3XUI -> (accessPort.toIntOrNull() ?: 0) in 1..65535
-            ServerKind.PANEL_SUI, ServerKind.PANEL_XUI, ServerKind.PANEL_PASARGUARD, ServerKind.PANEL_REMNAWAVE -> true
+            ServerKind.PANEL_3XUI -> (accessPort.toIntOrNull() ?: 0) in 1..65535 && (mask != XuiPanel.RealityMask.CUSTOM || XuiPanel.normalizeRealityDomain(customDomain) != null)
+            ServerKind.PANEL_SUI, ServerKind.PANEL_XUI, ServerKind.PANEL_PASARGUARD, ServerKind.PANEL_REMNAWAVE, ServerKind.PANEL_NEXORA -> true
         }
         Spacer(Modifier.height(8.dp))
         MsRow {
-            if (ok && !busy) MsChip(stringResource(R.string.ms_check_plan), AccentCyan) { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443, sslIp = sslIp, mask = mask, transport = transport)) }
+            if (ok && !busy) MsChip(stringResource(R.string.ms_check_plan), AccentCyan) { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443, sslIp = sslIp, mask = mask, transport = transport, customDomain = customDomain)) }
             MsChip(stringResource(R.string.ms_cancel), TextSecondary) { onCancel() }
         }
     }

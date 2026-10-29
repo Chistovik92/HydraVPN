@@ -1,5 +1,8 @@
 package ru.gidravpn.hydra.ui.screens
 
+import ru.gidravpn.hydra.data.model.descriptionRes
+import ru.gidravpn.hydra.data.model.labelRes
+
 import ru.gidravpn.hydra.ui.launchSafe
 import ru.gidravpn.hydra.ui.launchScan
 import android.content.Intent

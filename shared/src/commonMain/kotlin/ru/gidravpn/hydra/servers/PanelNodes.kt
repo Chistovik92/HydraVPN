@@ -37,7 +37,7 @@ data class NodeRole(val kind: PanelKind, val mainId: String, val mainName: Strin
 
 object PanelNodes {
     /** Панели, у которых Hydra умеет ставить ноды. s-ui и x-ui (alireza0) нод не имеют. */
-    fun supports(kind: PanelKind) = kind == PanelKind.XUI3 || kind == PanelKind.PASARGUARD || kind == PanelKind.REMNAWAVE
+    fun supports(kind: PanelKind) = kind == PanelKind.XUI3 || kind == PanelKind.PASARGUARD || kind == PanelKind.REMNAWAVE || kind == PanelKind.NEXORA
 
     val PG_NODE_MARK = "${ServerOps.STATE_DIR}/pg-node.installed"
     val RW_NODE_MARK = "${ServerOps.STATE_DIR}/remnanode.installed"
@@ -64,12 +64,17 @@ object PanelNodes {
     /** Токен 3x-ui для главной панели: область `node-sync` (только синхронизация, не администратор). */
     fun xuiNodeTokenCommand() = "/usr/local/x-ui/x-ui setting -getApiToken -tokenScope node-sync -tokenName hydra-main 2>/dev/null | sed -n 's/^apiToken: *//p' | tail -1"
 
-    /** Тело `POST /panel/api/nodes/add` (контракт NodeMutationRequest 3x-ui v3.10). */
-    fun xuiNodeBody(name: String, scheme: String, host: String, port: Int, basePath: String, token: String): JSONObject =
-        JSONObject().put("id", 0).put("name", name).put("remark", "Hydra").put("scheme", scheme).put("address", host.removePrefix("[").removeSuffix("]"))
+    /** SHA-256 leaf-сертификата в base64 — именно такой формат ждёт `tlsVerifyMode=pin` у 3x-ui v3.10. */
+    fun validXuiCertPin(pin: String) = Regex("^[A-Za-z0-9+/]{43}=$").matches(pin)
+
+    /** Тело `POST /panel/api/nodes/add`: новые ноды — только HTTPS и закреплённый сертификат, без skip/HTTP. */
+    fun xuiNodeBody(name: String, host: String, port: Int, basePath: String, token: String, pinnedCertSha256: String): JSONObject {
+        require(validXuiCertPin(pinnedCertSha256)) { "Некорректный SHA-256 сертификата ноды" }
+        return JSONObject().put("id", 0).put("name", name).put("remark", "Hydra").put("scheme", "https").put("address", host.removePrefix("[").removeSuffix("]"))
             .put("port", port).put("basePath", "/" + basePath.trim('/') + "/").put("apiToken", token).put("enable", true)
-            .put("allowPrivateAddress", isPrivate(host)).put("tlsVerifyMode", if (scheme == "https") "skip" else "verify")
-            .put("inboundSyncMode", "all").put("inboundTags", JSONArray()).put("outboundTag", "").put("pinnedCertSha256", "")
+            .put("allowPrivateAddress", isPrivate(host)).put("tlsVerifyMode", "pin")
+            .put("inboundSyncMode", "all").put("inboundTags", JSONArray()).put("outboundTag", "").put("pinnedCertSha256", pinnedCertSha256)
+    }
 
     // ------------------------------------------------------------------------------------------------ PasarGuard
 
@@ -81,8 +86,9 @@ object PanelNodes {
             "(command -v docker >/dev/null || (curl -fsSL -m 180 https://get.docker.com | sh) >/tmp/.hydra-docker.log 2>&1) && systemctl enable --now docker >/dev/null 2>&1; docker --version",
             failHint = "Docker поставить не удалось"),
         Step("pgn-fetch", "Загрузить установщик ноды PasarGuard (закреплённый выпуск ${PasarGuardPanel.SCRIPTS_TAG})",
-            "curl -fsSL -m 180 ${Installer.shq(PasarGuardPanel.scriptUrl("pg-node.sh"))} -o $PG_NODE_SH && chmod 700 $PG_NODE_SH && sha256sum $PG_NODE_SH",
-            rollback = "rm -f $PG_NODE_SH", failHint = "Не удалось скачать установщик с GitHub"),
+            "curl -fsSL -m 180 ${Installer.shq(PasarGuardPanel.scriptUrl("pg-node.sh"))} -o $PG_NODE_SH && chmod 700 $PG_NODE_SH && sha256sum $PG_NODE_SH" +
+                ScriptPins.verify("PasarGuard/scripts", PasarGuardPanel.SCRIPTS_TAG, "pg-node.sh", PG_NODE_SH).let { if (it.isEmpty()) "" else " && $it" },
+            rollback = "rm -f $PG_NODE_SH", failHint = "Не удалось скачать установщик с GitHub или его SHA-256 не совпал с проверенным"),
         Step("pgn-install", "Установить ноду PasarGuard (ядро Xray)",
             // сертификат ноды — и на её адрес: главная панель сверяет его при подключении (без этого «IP address mismatch»)
             "bash $PG_NODE_SH install --api-key ${Installer.shq(apiKey)} --san-entries ${Installer.shq(host.removePrefix("[").removeSuffix("]"))} -y < /dev/null > /tmp/.hydra-pgn.log 2>&1; rc=\$?; " +
@@ -122,6 +128,7 @@ object PanelNodes {
     fun planPreview(kind: PanelKind, mainName: String): List<Step> = when (kind) {
         PanelKind.XUI3 -> listOf(
             Step("node-xui", "Поставить на этот сервер 3x-ui (если её нет) и выдать главной панели токен с правом только синхронизации"),
+            Step("node-cert", "Включить HTTPS и закрепить SHA-256 сертификата (для IP нужен публичный адрес и входящий 80/tcp)"),
             Step("node-fw", "Открыть порт панели ноды только для главного сервера"),
             Step("node-add", "Подключить ноду к панели «$mainName»"),
             Step("node-conn", "Создать на ноде подключение VLESS + gRPC + REALITY и добавить его в «Серверы»"))
@@ -135,6 +142,11 @@ object PanelNodes {
             Step("node-fw", "Открыть порт ноды ${RemnawavePanel.NODE_PORT} только для главного сервера"),
             Step("node-add", "Подключить ноду к панели «$mainName» со всеми подключениями профиля"),
             Step("node-hosts", "Добавить адрес ноды к подключениям и ссылки — в «Серверы»"))
+        PanelKind.NEXORA -> listOf(
+            Step("node-nexora-probe", "Панель «$mainName» проверит сервер ноды по SSH"),
+            Step("node-nexora", "Панель установит Nexora Node ${NexoraPanel.TAG} штатным заданием (mTLS, управление ${NexoraPanel.NODE_PORT}/tcp)"),
+            Step("node-fw", "Открыть порт управления нодой только для главного сервера"),
+            Step("node-conn", "Дождаться подключения ноды; существующие пользователи получат её через свои подписки"))
         else -> emptyList()
     }
 }

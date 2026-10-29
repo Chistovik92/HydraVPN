@@ -22,9 +22,9 @@ class NodePanelsTest {
     @Test fun offersOnlyPanelsThatHaveNodes() {
         val m = manager(listOf(
             srv("free"), srv("x3", panel(PanelKind.XUI3)), srv("pg", panel(PanelKind.PASARGUARD)), srv("rw", panel(PanelKind.REMNAWAVE)),
-            srv("sui", panel(PanelKind.SUI)), srv("xui", panel(PanelKind.XUI)),
+            srv("nexora", panel(PanelKind.NEXORA)), srv("sui", panel(PanelKind.SUI)), srv("xui", panel(PanelKind.XUI)),
         ))
-        assertEquals(listOf("x3", "pg", "rw"), m.nodePanels("free").map { it.id })
+        assertEquals(listOf("x3", "pg", "rw", "nexora"), m.nodePanels("free").map { it.id })
     }
 
     @Test fun panelOnlyServerWithoutSshIsNotOffered() {

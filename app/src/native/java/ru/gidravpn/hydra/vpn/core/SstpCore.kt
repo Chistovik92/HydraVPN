@@ -109,8 +109,10 @@ class SstpCore : VpnCore {
         raw.tcpNoDelay = true
 
         val ssl = createTlsSocket(raw, profile, allowInsecure, extra.optString("sni"))
-        ssl.startHandshake()
         socket = ssl
+        // TCP connect timeout does not bound the TLS handshake or HTTP upgrade.
+        ssl.soTimeout = CONNECT_TIMEOUT_MS.toInt()
+        ssl.startHandshake()
         val input = BufferedInputStream(ssl.inputStream)
         val output = BufferedOutputStream(ssl.outputStream)
 

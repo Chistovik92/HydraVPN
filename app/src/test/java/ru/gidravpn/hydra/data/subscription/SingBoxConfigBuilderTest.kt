@@ -263,6 +263,15 @@ class SingBoxConfigBuilderTest {
         assertEquals("sniff", cfg.rules().getJSONObject(0).getString("action"))
     }
 
+    @Test fun xrayBridgePreservesSocksAuthentication() {
+        val cfg = SingBoxConfigBuilder.buildXrayBridge(
+            10808, socksAuth = XrayConfigBuilder.SocksAuth("hydra", "secret"),
+        )
+        val proxy = proxyOut(cfg)
+        assertEquals("hydra", proxy.getString("username"))
+        assertEquals("secret", proxy.getString("password"))
+    }
+
     @Test fun hotspotAddsAuthenticatedMixedInbound() {
         val hs = ru.gidravpn.hydra.data.model.HotspotSettings(enabled = true, port = 2080, username = "hydra", password = "s3cretPw")
         val cfg = dump("hotspot", SingBoxConfigBuilder.build(profile, hotspot = hs))

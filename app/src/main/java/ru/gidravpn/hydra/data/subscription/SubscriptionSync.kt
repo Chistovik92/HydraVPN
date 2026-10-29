@@ -25,7 +25,12 @@ object SubscriptionSync {
 
     fun key(p: ServerProfile) = listOf(p.protocolId, p.address.lowercase(), p.port, p.uuidOrPassword).joinToString("|")
 
-    fun plan(subId: Long, existing: List<ServerProfile>, incoming: List<ServerProfile>): Plan {
+    fun plan(
+        subId: Long,
+        existing: List<ServerProfile>,
+        incoming: List<ServerProfile>,
+        preserveMissing: Boolean = false,
+    ): Plan {
         val pool = existing.groupBy(::key).mapValues { ArrayDeque(it.value) }
         val insert = mutableListOf<ServerProfile>()
         val update = mutableListOf<ServerProfile>()
@@ -41,7 +46,7 @@ object SubscriptionSync {
                 if (next != old) update += next
             }
         }
-        val delete = pool.values.flatten()
+        val delete = if (preserveMissing) emptyList() else pool.values.flatten()
         return Plan(insert, update, delete)
     }
 }

@@ -7,7 +7,11 @@ import ru.gidravpn.hydra.data.db.AppDatabase
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.Subscription
 import ru.gidravpn.hydra.data.subscription.LinkParser
+import ru.gidravpn.hydra.data.subscription.SubscriptionSync
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import ru.gidravpn.hydra.data.db.toEntity
+import ru.gidravpn.hydra.data.db.toModel
 
 /** Единая точка доступа к серверам и подпискам. */
 class ServerRepository(context: Context) {
@@ -17,38 +21,38 @@ class ServerRepository(context: Context) {
     private val subs = db.subscriptionDao()
     private val fetcher = SubscriptionFetcher()
 
-    val allServers: Flow<List<ServerProfile>> = servers.observeAll()
-    val allSubscriptions: Flow<List<Subscription>> = subs.observeAll()
+    val allServers: Flow<List<ServerProfile>> = servers.observeAll().map { list -> list.map { it.toModel() } }
+    val allSubscriptions: Flow<List<Subscription>> = subs.observeAll().map { list -> list.map { it.toModel() } }
 
-    suspend fun save(server: ServerProfile): Long = servers.upsert(server)
-    suspend fun delete(server: ServerProfile) = servers.delete(server)
-    suspend fun byId(id: Long) = servers.byId(id)
+    suspend fun save(server: ServerProfile): Long = servers.upsert(server.toEntity())
+    suspend fun delete(server: ServerProfile) = servers.delete(server.toEntity())
+    suspend fun byId(id: Long) = servers.byId(id)?.toModel()
 
     /**
      * 0.8.0-rc4: профили AmneziaWG, сохранённые до исправления как «WireGuard» (вставленный .conf, сервер из «Моих серверов»):
      * параметры обфускации в них есть, но тип был неверный, и sing-box не мог сделать рукопожатие. Тип исправляется на месте.
      * @return сколько профилей исправлено.
      */
-    suspend fun fixMislabeledAmnezia(): Int = servers.getAll()
+    suspend fun fixMislabeledAmnezia(): Int = servers.getAll().map { it.toModel() }
         .filter { it.protocolId == ru.gidravpn.hydra.data.model.Protocol.WIREGUARD.id &&
             runCatching { ru.gidravpn.hydra.data.subscription.WireGuardParser.hasAwgParams(org.json.JSONObject(it.extra)) }.getOrDefault(false) }
-        .count { runCatching { servers.upsert(it.copy(protocolId = ru.gidravpn.hydra.data.model.Protocol.AMNEZIAWG.id)) }.isSuccess }
+        .count { runCatching { servers.upsert(it.copy(protocolId = ru.gidravpn.hydra.data.model.Protocol.AMNEZIAWG.id).toEntity()) }.isSuccess }
 
     /** Импорт одиночной ссылки (vless:// … ) из буфера обмена или deep-link. */
     suspend fun importLink(link: String): ServerProfile? =
-        LinkParser.parseLine(link.trim())?.also { servers.upsert(it) }
+        LinkParser.parseLine(link.trim())?.also { servers.upsert(it.toEntity()) }
 
     /** Пачка серверов из умного импорта (0.6.18): сколько реально сохранено. */
     suspend fun importProfiles(profiles: List<ServerProfile>): Int =
-        profiles.count { runCatching { servers.upsert(it) }.isSuccess }
+        profiles.count { runCatching { servers.upsert(it.toEntity()) }.isSuccess }
 
     /**
      * Добавить подписку и подтянуть её содержимое. Повторное добавление того же URL не плодит
      * дубликат — обновляется существующая подписка.
      */
     suspend fun addSubscription(name: String, url: String): Int {
-        val existing = subs.getAll().firstOrNull { it.url.trim() == url.trim() }
-        val subId = existing?.id ?: subs.upsert(Subscription(name = name, url = url))
+        val existing = subs.getAll().map { it.toModel() }.firstOrNull { it.url.trim() == url.trim() }
+        val subId = existing?.id ?: subs.upsert(Subscription(name = name, url = url).toEntity())
         return refreshSubscription(subId)
     }
 
@@ -66,12 +70,12 @@ class ServerRepository(context: Context) {
         var subscriptions = 0
         var servers = 0
         var failed = 0
-        for (step in BotSyncPlanner.plan(subs.getAll(), items)) {
+        for (step in BotSyncPlanner.plan(subs.getAll().map { it.toModel() }, items)) {
             when (step) {
                 is BotSyncPlanner.Step.Disable ->
-                    subs.update(step.sub.copy(autoUpdate = false, lastError = BotSyncPlanner.DISABLED_MARK))
+                    subs.update(step.sub.copy(autoUpdate = false, lastError = BotSyncPlanner.DISABLED_MARK).toEntity())
                 is BotSyncPlanner.Step.Add -> runCatching {
-                    val id = subs.upsert(Subscription(name = step.item.title, url = step.item.url, botPanel = step.item.panel))
+                    val id = subs.upsert(Subscription(name = step.item.title, url = step.item.url, botPanel = step.item.panel).toEntity())
                     refreshSubscription(id).also { applyBotQuota(id, step.item) }
                 }.fold(onSuccess = { subscriptions++; servers += it }, onFailure = { failed++ })
                 is BotSyncPlanner.Step.Update -> runCatching {
@@ -81,7 +85,7 @@ class ServerRepository(context: Context) {
                             url = step.item.url,
                             botPanel = step.item.panel,
                             autoUpdate = sub.autoUpdate || sub.lastError == BotSyncPlanner.DISABLED_MARK,
-                        )
+                        ).toEntity()
                     )
                     refreshSubscription(sub.id).also { applyBotQuota(sub.id, step.item) }
                 }.fold(onSuccess = { subscriptions++; servers += it }, onFailure = { failed++ })
@@ -93,9 +97,9 @@ class ServerRepository(context: Context) {
 
     /** Срок и трафик из ответа бота — запасной источник: заголовки панели при обновлении подписки главнее. */
     private suspend fun applyBotQuota(subId: Long, item: BotSubscription) {
-        val s = subs.byId(subId) ?: return
+        val s = subs.byId(subId)?.toModel() ?: return
         if (s.expireAt != 0L || s.totalBytes != 0L) return
-        subs.update(s.copy(expireAt = item.expire, totalBytes = item.trafficLimit, downloadBytes = item.trafficUsed, uploadBytes = 0))
+        subs.update(s.copy(expireAt = item.expire, totalBytes = item.trafficLimit, downloadBytes = item.trafficUsed, uploadBytes = 0).toEntity())
     }
     data class RefreshResult(val total: Int, val added: Int, val removed: Int)
 
@@ -111,19 +115,22 @@ class ServerRepository(context: Context) {
     suspend fun refreshSubscription(subId: Long): Int = refreshDetailed(subId).total
 
     suspend fun refreshDetailed(subId: Long): RefreshResult {
-        val sub = subs.byId(subId) ?: throw IllegalStateException("подписка #$subId не найдена")
+        val sub = subs.byId(subId)?.toModel() ?: throw IllegalStateException("подписка #$subId не найдена")
         val result = try {
             fetcher.fetch(sub.url, HydraDevice.headers(appContext), subId)
         } catch (e: Exception) {
-            subs.update(sub.copy(lastError = e.message ?: e.javaClass.simpleName))
+            subs.update(sub.copy(lastError = e.message ?: e.javaClass.simpleName).toEntity())
             throw e
         }
         if (result.profiles.isEmpty()) {
             val msg = "подписка не вернула ни одного сервера — прежний список сохранён"
-            subs.update(sub.copy(lastError = msg))
+            subs.update(sub.copy(lastError = msg).toEntity())
             throw IllegalStateException(msg)
         }
-        val plan = servers.syncSubscription(subId, result.profiles)
+        val plan = SubscriptionSync.plan(subId, servers.bySubscription(subId).map { it.toModel() }, result.profiles, preserveMissing = result.partial)
+        if (plan.toDelete.isNotEmpty()) servers.deleteAll(plan.toDelete.map { it.toEntity() })
+        plan.toUpdate.forEach { servers.upsert(it.toEntity()) }
+        plan.toInsert.forEach { servers.upsert(it.toEntity()) }
         val i = result.info
         subs.update(
             sub.copy(
@@ -132,18 +139,18 @@ class ServerRepository(context: Context) {
                 supportUrl = i.supportUrl,
                 autoUpdateHours = i.updateHours ?: sub.autoUpdateHours,
                 lastUpdated = System.currentTimeMillis(),
-                lastError = "",
-            )
+                lastError = if (result.partial) "часть строк не разобрана — отсутствующие серверы сохранены" else "",
+            ).toEntity()
         )
         return RefreshResult(result.profiles.size, plan.toInsert.size, plan.toDelete.size)
     }
 
-    suspend fun allSubscriptionsNow(): List<Subscription> = subs.getAll()
-    suspend fun updateSubscription(sub: Subscription) = subs.update(sub)
+    suspend fun allSubscriptionsNow(): List<Subscription> = subs.getAll().map { it.toModel() }
+    suspend fun updateSubscription(sub: Subscription) = subs.update(sub.toEntity())
 
     /** Удалить подписку вместе со всеми её серверами. */
     suspend fun deleteSubscription(sub: Subscription) {
         servers.deleteBySubscription(sub.id)
-        subs.delete(sub)
+        subs.delete(sub.toEntity())
     }
 }

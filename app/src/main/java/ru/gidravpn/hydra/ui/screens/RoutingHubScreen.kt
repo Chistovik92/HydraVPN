@@ -1,5 +1,9 @@
 package ru.gidravpn.hydra.ui.screens
 
+import ru.gidravpn.hydra.data.model.labelRes
+import ru.gidravpn.hydra.data.model.netSummary
+import ru.gidravpn.hydra.data.model.summary
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn

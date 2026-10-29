@@ -1,0 +1,55 @@
+name: AWG ARM QEMU
+
+on:
+  push: { branches: [ master, main ] }
+  pull_request: { branches: [ master, main ] }
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, armv7]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+      - name: Install cross toolchains and QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
+            qemu-user-static file zip
+      - name: Build pinned AWG server package
+        run: scripts/build-awg-server.sh "${{ matrix.arch }}"
+      - name: Check binary architectures
+        run: |
+          file "dist/awg-server/${{ matrix.arch }}/amneziawg-go" "dist/awg-server/${{ matrix.arch }}/awg"
+          if [[ "${{ matrix.arch }}" == arm64 ]]; then
+            file "dist/awg-server/${{ matrix.arch }}/amneziawg-go" | grep -q 'ARM aarch64'
+            file "dist/awg-server/${{ matrix.arch }}/awg" | grep -q 'ARM aarch64'
+          else
+            file "dist/awg-server/${{ matrix.arch }}/amneziawg-go" | grep -q 'ARM, EABI5'
+            file "dist/awg-server/${{ matrix.arch }}/awg" | grep -q 'ARM, EABI5'
+          fi
+      - name: Run ARM binaries under QEMU
+        run: |
+          if [[ "${{ matrix.arch }}" == arm64 ]]; then qemu=qemu-aarch64-static; else qemu=qemu-arm-static; fi
+          "$qemu" "dist/awg-server/${{ matrix.arch }}/amneziawg-go" --version
+          "$qemu" "dist/awg-server/${{ matrix.arch }}/awg" --version
+          bash "dist/awg-server/${{ matrix.arch }}/awg-quick" --version
+      - name: Upload tested package
+        uses: actions/upload-artifact@v4
+        with:
+          name: hydra-awg-server-${{ matrix.arch }}
+          path: |
+            dist/awg-release/Hydra-awg-server-*-${{ matrix.arch }}.zip
+            dist/awg-release/Hydra-awg-server-*-${{ matrix.arch }}.zip.sha256
+          if-no-files-found: error

@@ -325,6 +325,26 @@ object FriendlyI18n {
             "Сучасна панель: користувачі, загони, ліміти, підписки — на її сайті. Працює в Docker.",
             "یک پنل مدرن: کاربران، گروه‌ها، محدودیت‌ها و اشتراک‌ها در وب‌سایت آن. در Docker اجرا می‌شود.",
             "现代面板：用户、小队、限额、订阅都在其网站上。运行在 Docker 中。"),
+        "Download the pinned official %s installer and verify its SHA-256" to arrayOf(
+            "Завантажимо офіційний інсталятор Nexora закріпленої версії та перевіримо його SHA-256",
+            "نصب‌کنندهٔ رسمی Nexora با نسخهٔ ثابت را دانلود و SHA-256 آن را بررسی می‌کنیم",
+            "下载固定版本的 Nexora 官方安装程序并验证其 SHA-256"),
+        "Install the panel, create its owner and a long-lived API token" to arrayOf(
+            "Встановимо панель, створимо її власника та довготривалий API-токен",
+            "پنل را نصب می‌کنیم، مالک آن و یک توکن API بلندمدت می‌سازیم",
+            "安装面板，创建所有者和长期有效的 API 令牌"),
+        "The panel will only be available through Hydra's secure SSH tunnel" to arrayOf(
+            "Панель буде доступна лише через захищений SSH-тунель Hydra",
+            "پنل فقط از طریق تونل امن SSH در Hydra در دسترس خواهد بود",
+            "面板只能通过 Hydra 的安全 SSH 隧道访问"),
+        "Users, subscriptions and nodes can be added from the server card" to arrayOf(
+            "Користувачів, підписки та ноди можна додати з картки сервера",
+            "کاربران، اشتراک‌ها و نودها را می‌توان از کارت سرور افزود",
+            "可以从服务器卡片添加用户、订阅和节点"),
+        "A modern panel with a stable API: users, subscriptions and node installation." to arrayOf(
+            "Сучасна панель зі стабільним API: користувачі, підписки та встановлення нод.",
+            "پنلی مدرن با API پایدار: کاربران، اشتراک‌ها و نصب نود.",
+            "拥有稳定 API 的现代面板：用户、订阅和节点安装。"),
     )
 
     /** Все ключи — для проверки полноты в тестах. */

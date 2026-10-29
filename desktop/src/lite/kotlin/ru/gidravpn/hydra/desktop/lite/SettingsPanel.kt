@@ -136,7 +136,7 @@ internal class SettingsPanel(private val c: AppController) : Renderable {
         section("Оформление", row(JLabel("Тема:"), themeBox), row(JLabel("Иконка окна и трея:"), iconBox),
             note("Иконка меняется сразу; цвет акцента темы в Classic — после перезапуска. Classic светлая: тёмный фон тем есть в обычной Hydra.")),
         section("О программе",
-            JLabel("Hydra ${Platform.version} (Classic) · sing-box 1.12.25 · Xray-core 26.10.21 · ${System.getProperty("os.name")} ${System.getProperty("os.arch")}"),
+            JLabel("Hydra ${Platform.version} (Classic) · sing-box 1.12.25 · Xray-core 26.10.29 · ${System.getProperty("os.name")} ${System.getProperty("os.arch")}"),
             note("Данные: ${Platform.dataDir.absolutePath}"),
             note("Classic — упрощённая оболочка для 32-битных систем и Windows 7: те же ядра и настройки, что у обычной Hydra. " +
                 "Нет управления роутерами HydraVPN for Router (оно есть в обычной Hydra и на Android). " +

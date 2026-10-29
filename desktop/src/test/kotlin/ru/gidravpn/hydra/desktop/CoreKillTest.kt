@@ -32,6 +32,15 @@ class CoreKillTest {
         } finally { p.destroyForcibly() }
     }
 
+    @Test fun processIdentityUsesFullExecutablePath() {
+        val p = longRunning()
+        try {
+            val exe = File(p.toHandle().info().command().get())
+            assertTrue(CoreRunner.isOwnedProcess(p.toHandle(), listOf(exe)))
+            assertFalse(CoreRunner.isOwnedProcess(p.toHandle(), listOf(File(exe.parentFile, "different-name-${exe.name}"))))
+        } finally { p.destroyForcibly() }
+    }
+
     @Test fun killTreeEndsProcess() {
         val p = longRunning()
         CoreRunner.killTree(p)

@@ -163,6 +163,12 @@ object FriendlyText {
             t(en, "Создадим владельца с надёжным логином и паролем, установим ноду (ядро Xray) и подключим её", "Create the owner with a strong login and password, install a node (Xray core) and connect it"),
             t(en, "Подключения создаются кнопкой «Создать подключение» или на сайте панели", "Create connections with the “Create connection” button or on the panel website"),
         )
+        ServerKind.PANEL_NEXORA -> listOf(
+            fmt(t(en, "Скачаем официальный установщик %s закреплённой версии и проверим его SHA-256", "Download the pinned official %s installer and verify its SHA-256"), kind.panel!!.title),
+            t(en, "Установим панель, создадим владельца и долговременный API-токен", "Install the panel, create its owner and a long-lived API token"),
+            t(en, "Панель будет доступна только через защищённый SSH-туннель Hydra", "The panel will only be available through Hydra's secure SSH tunnel"),
+            t(en, "Пользователей, подписки и ноды можно добавить на карточке сервера", "Users, subscriptions and nodes can be added from the server card"),
+        )
         ServerKind.PANEL_PASARGUARD -> listOf(
             fmt(t(en, "Поставим Docker, если его нет, и официальные установщики %s закреплённой версии", "Install Docker if missing and the official %s installers of a pinned version"), kind.panel!!.title),
             t(en, "Установим панель и ноду (ядро Xray) на этом сервере", "Install the panel and a node (Xray core) on this server"),
@@ -182,5 +188,6 @@ object FriendlyText {
         ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> t(en, "Если вы привыкли к этой панели: всё управление — на её сайте.", "If you are used to this panel: everything is managed on its website.")
         ServerKind.PANEL_REMNAWAVE -> t(en, "Современная панель: пользователи, отряды, лимиты, подписки — на её сайте. Ставится в Docker.", "A modern panel: users, squads, limits, subscriptions on its website. Runs in Docker.")
         ServerKind.PANEL_PASARGUARD -> t(en, "Наследник Marzban: пользователи, группы, лимиты — на сайте панели. Ставится в Docker.", "Marzban's successor: users, groups, limits on the panel website. Runs in Docker.")
+        ServerKind.PANEL_NEXORA -> t(en, "Современная панель со стабильным API: пользователи, подписки и установка нод.", "A modern panel with a stable API: users, subscriptions and node installation.")
     }
 }

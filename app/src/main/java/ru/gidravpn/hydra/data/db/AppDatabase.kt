@@ -4,11 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import ru.gidravpn.hydra.data.model.ServerProfile
-import ru.gidravpn.hydra.data.model.Subscription
-
 @Database(
-    entities = [ServerProfile::class, Subscription::class],
+    entities = [ServerEntity::class, SubscriptionEntity::class],
     version = 4,
     exportSchema = true
 )

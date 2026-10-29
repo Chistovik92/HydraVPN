@@ -55,12 +55,25 @@ object Platform {
     /** Конфиги с паролями, pid-файлы, лог ядра — каталог только для владельца. */
     val runDir: File get() = File(dataDir, "run").apply { mkdirs(); privateDir(this) }
 
-    /** chmod 700 (Linux/macOS); на Windows %APPDATA% и так закрыт для других пользователей. */
+    /** chmod 700 (Linux/macOS); на Windows %APPDATA% наследует ACL учётной записи. */
     fun privateDir(dir: File) {
         if (os == Os.WINDOWS) return
         runCatching {
             java.nio.file.Files.setPosixFilePermissions(dir.toPath(), java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"))
         }
+    }
+
+    /** Runtime-файлы (PID и журналы) не должны быть доступны другим пользователям ОС. */
+    fun privateFile(file: File) {
+        if (os == Os.WINDOWS) return
+        runCatching {
+            java.nio.file.Files.setPosixFilePermissions(file.toPath(), java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"))
+        }
+    }
+
+    private fun privateBinDir(): File = File(dataDir, "bin").apply {
+        mkdirs()
+        privateDir(this)
     }
 
     /**
@@ -107,7 +120,7 @@ object Platform {
         val core = resourcesDir?.let { File(it, file) }?.takeIf { it.isFile } ?: return null
         if (os == Os.WINDOWS || core.canExecute() || core.setExecutable(true)) return core
         // Пакет без бита исполнения на read-only носителе (AppImage/DMG): копия в каталог данных.
-        val bin = File(dataDir, "bin").apply { mkdirs() }
+        val bin = privateBinDir()
         val copy = File(bin, file)
         if (!copy.isFile || copy.length() != core.length()) core.copyTo(copy, overwrite = true)
         copy.setExecutable(true, true)

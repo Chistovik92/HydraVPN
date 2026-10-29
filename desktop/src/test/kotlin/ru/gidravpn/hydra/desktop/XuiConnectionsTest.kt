@@ -9,6 +9,7 @@ import ru.gidravpn.hydra.servers.XuiPanel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** 0.8.2-a2: все типы подключений 3x-ui и ссылки, которые на них выдаёт панель (образцы — со стенда 3x-ui v3.10.2). */
@@ -21,6 +22,7 @@ class XuiConnectionsTest {
             assertEquals(t.protocol, ib.getString("protocol"), t.name)
             assertEquals(31000, ib.getInt("port"))
             assertTrue(ib.getBoolean("enable"))
+            assertFalse(ib.has("nodeId"))
             // клиентов в инбаунде нет: пользователь подключается потом, ключи выдаёт панель
             if (t != XuiConnection.AMNEZIAWG) assertEquals(0, ib.getJSONObject("settings").optJSONArray("clients")?.length() ?: 0, t.name)
         }
@@ -36,6 +38,7 @@ class XuiConnectionsTest {
         // без ключей REALITY или сертификата — понятный отказ
         assertFailsWith<IllegalArgumentException> { XuiConnection.inbound(XuiConnection.TROJAN_REALITY, 1, "t") }
         assertFailsWith<IllegalArgumentException> { XuiConnection.inbound(XuiConnection.HYSTERIA2, 1, "t") }
+        assertEquals(17, XuiConnection.inbound(XuiConnection.VLESS_GRPC_REALITY, 1, "t", priv = "a", pub = "b", nodeId = 17).getInt("nodeId"))
         // прежний инбаунд по умолчанию (rc1) не изменился
         assertEquals(XuiPanel.defaultInbound(1, "a", "b", rnd = java.security.SecureRandom()).getJSONObject("streamSettings").getString("network"), "grpc")
     }

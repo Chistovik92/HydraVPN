@@ -43,17 +43,18 @@ enum class XuiConnection(val protocol: String, val title: String, val needsCert:
          * Клиентов в инбаунде нет: пользователь подключается потом ([XuiApi.attachClient]), панель сама выдаёт ему ключи.
          */
         fun inbound(type: XuiConnection, port: Int, remark: String, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK,
-                    priv: String = "", pub: String = "", cert: Cert? = null, r: SecureRandom = SecureRandom()): JSONObject {
+                    priv: String = "", pub: String = "", cert: Cert? = null, r: SecureRandom = SecureRandom(), nodeId: Int = 0,
+                    customDomain: String = ""): JSONObject {
             require(!type.reality || (priv.isNotBlank() && pub.isNotBlank())) { "Для ${type.title} нужны ключи REALITY" }
             require(!type.needsCert || cert != null) { "Для ${type.title} нужен сертификат сервера" }
             val base = when (type) {
-                VLESS_GRPC_REALITY -> return XuiPanel.defaultInbound(port, priv, pub, mask, remark, r, XuiPanel.Transport.GRPC)
-                VLESS_XHTTP_REALITY -> return XuiPanel.defaultInbound(port, priv, pub, mask, remark, r, XuiPanel.Transport.XHTTP)
-                VLESS_TCP_REALITY -> XuiPanel.defaultInbound(port, priv, pub, mask, remark, r, XuiPanel.Transport.GRPC).also { ib ->
+                VLESS_GRPC_REALITY -> XuiPanel.defaultInbound(port, priv, pub, mask, remark, r, XuiPanel.Transport.GRPC, customDomain)
+                VLESS_XHTTP_REALITY -> XuiPanel.defaultInbound(port, priv, pub, mask, remark, r, XuiPanel.Transport.XHTTP, customDomain)
+                VLESS_TCP_REALITY -> XuiPanel.defaultInbound(port, priv, pub, mask, remark, r, XuiPanel.Transport.GRPC, customDomain).also { ib ->
                     ib.getJSONObject("streamSettings").apply { remove("grpcSettings"); put("network", "tcp")
                         put("tcpSettings", JSONObject().put("acceptProxyProtocol", false).put("header", JSONObject().put("type", "none"))) }
                 }
-                TROJAN_REALITY -> XuiPanel.defaultInbound(port, priv, pub, mask, remark, r, XuiPanel.Transport.GRPC).also { ib ->
+                TROJAN_REALITY -> XuiPanel.defaultInbound(port, priv, pub, mask, remark, r, XuiPanel.Transport.GRPC, customDomain).also { ib ->
                     ib.put("protocol", "trojan").put("settings", JSONObject().put("clients", JSONArray()).put("fallbacks", JSONArray()))
                     ib.getJSONObject("streamSettings").apply { remove("grpcSettings"); put("network", "tcp")
                         put("tcpSettings", JSONObject().put("acceptProxyProtocol", false).put("header", JSONObject().put("type", "none"))) }
@@ -81,7 +82,7 @@ enum class XuiConnection(val protocol: String, val title: String, val needsCert:
             }
             val sniffing = JSONObject().put("enabled", true).put("destOverride", JSONArray(listOf("http", "tls", "quic"))).put("metadataOnly", false).put("routeOnly", false)
             return base.put("enable", true).put("remark", remark).put("listen", "").put("port", port).put("expiryTime", 0).put("total", 0)
-                .apply { if (!has("sniffing")) put("sniffing", sniffing) }
+                .apply { if (nodeId > 0) put("nodeId", nodeId); if (!has("sniffing")) put("sniffing", sniffing) }
         }
 
         private fun tls(c: Cert, alpn: List<String>) = JSONObject().put("serverName", c.serverName).put("minVersion", "1.2").put("maxVersion", "1.3")

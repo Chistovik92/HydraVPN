@@ -17,6 +17,8 @@ object Ppp {
     const val PROTO_CHAP = 0xC223
     const val PROTO_IPCP = 0x8021
     const val PROTO_CCP = 0x80FD
+    /** Сжатие/шифрование (MPPE): внутри - зашифрованный кадр PPP. */
+    const val PROTO_COMP = 0x00FD
 
     // Коды LCP/IPCP (RFC 1661)
     const val CODE_CONF_REQ = 1
@@ -153,6 +155,9 @@ object Ppp {
         ((value ushr 24) and 0xFF).toByte(), ((value ushr 16) and 0xFF).toByte(),
         ((value ushr 8) and 0xFF).toByte(), (value and 0xFF).toByte(),
     ))
+
+    /** 2-байтовое значение (MRU). */
+    fun optShort(type: Int, value: Int): Option = Option(type, byteArrayOf(((value ushr 8) and 0xFF).toByte(), (value and 0xFF).toByte()))
 
     fun optBytes(type: Int, value: ByteArray): Option = Option(type, value)
 

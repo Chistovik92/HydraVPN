@@ -440,6 +440,7 @@ private fun PanelSection(c: AppController, srv: MyServer, st: ServerStatus?, m: 
             if (st?.xuiInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_XUI) }, enabled = !busy) { Text("Установить x-ui") }
             if (st?.pgInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_PASARGUARD) }, enabled = !busy) { Text("Установить PasarGuard") }
             if (st?.rwInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_REMNAWAVE) }, enabled = !busy) { Text("Установить Remnawave") }
+            if (st?.nexoraInstalled != true) OutlinedButton(onClick = { onInstall(ServerKind.PANEL_NEXORA) }, enabled = !busy) { Text("Установить Nexora") }
             if (!srv.hasServices) OutlinedButton(onClick = { pickPanel = true }, enabled = !busy) { Text("Установить ноду") }
         }
         if (pickPanel) {
@@ -555,6 +556,8 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
         var type by remember { mutableStateOf(ru.gidravpn.hydra.servers.XuiConnection.VLESS_GRPC_REALITY) }
         var port by remember { mutableStateOf((20000 + java.security.SecureRandom().nextInt(40000)).toString()) }
         var mask by remember { mutableStateOf(XuiPanel.RealityMask.VK) }
+        var customDomain by remember { mutableStateOf("") }
+        var node by remember { mutableStateOf<String?>(null) }
         val https = XuiPanel.isHttps(p.baseUrl)
         AlertDialog(onDismissRequest = { createConn = false },
             title = { Text("Новое подключение в панели") },
@@ -562,9 +565,19 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Hydra создаст его в панели и подключит к основному пользователю панели — его подписка в «Серверах» получит подключение сама.", fontSize = 13.sp)
                     ChipRow { ru.gidravpn.hydra.servers.OtherPanelConnections.typesFor(p.kind).forEach { t -> FilterChip(selected = type == t, onClick = { type = t }, label = { Text(t.title) }) } }
-                    if (type.reality) ChipRow {
-                        Text("Маскировка:", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
-                        XuiPanel.RealityMask.entries.forEach { r -> FilterChip(selected = mask == r, onClick = { mask = r }, label = { Text(r.sni) }) }
+                    if (p.kind == PanelKind.XUI3 && p.nodes.isNotEmpty()) ChipRow {
+                        Text("Сервер:", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                        FilterChip(selected = node == null, onClick = { node = null }, label = { Text("Главный") })
+                        p.nodes.forEach { n -> FilterChip(selected = node == n.serverId, onClick = { node = n.serverId }, label = { Text(n.name) }) }
+                    }
+                    if (type.reality) {
+                        ChipRow {
+                            Text("Маскировка:", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                            XuiPanel.RealityMask.entries.forEach { r -> FilterChip(selected = mask == r, onClick = { mask = r }, label = { Text(if (r == XuiPanel.RealityMask.CUSTOM) "Свой домен" else r.sni) }) }
+                        }
+                        if (mask == XuiPanel.RealityMask.CUSTOM) OutlinedTextField(customDomain, { customDomain = it.trim() }, singleLine = true,
+                            label = { Text("Свой домен") }, placeholder = { Text("example.com") },
+                            supportingText = { Text("Домен, который отвечает по HTTPS на порту 443. Без https://, порта и пути.") })
                     }
                     OutlinedTextField(port, { port = it.filter(Char::isDigit).take(5) }, singleLine = true, label = { Text("Порт") })
                     if (type.udp) Text("Работает по UDP — порт откроется как UDP. Часть мобильных сетей в РФ режет UDP: тогда выберите VLESS/Trojan + REALITY.",
@@ -572,8 +585,9 @@ private fun PanelBody(c: AppController, srv: MyServer, m: MyServersManager, s: M
                     if (type.needsCert && !https) Text("Нужен сертификат сервера: сначала нажмите «Включить HTTPS» у панели.", fontSize = 12.sp, color = Danger)
                 }
             },
-            confirmButton = { TextButton(enabled = (port.toIntOrNull() ?: 0) in 1..65535 && (!type.needsCert || https),
-                onClick = { createConn = false; m.createPanelConnection(srv.id, type, port.toInt(), mask) }) { Text("Создать") } },
+            confirmButton = { TextButton(enabled = (port.toIntOrNull() ?: 0) in 1..65535 && (!type.needsCert || https) &&
+                (mask != XuiPanel.RealityMask.CUSTOM || XuiPanel.normalizeRealityDomain(customDomain) != null),
+                onClick = { createConn = false; m.createPanelConnection(srv.id, type, port.toInt(), mask, node, customDomain) }) { Text("Создать") } },
             dismissButton = { TextButton(onClick = { createConn = false }) { Text("Отмена") } })
     }
     askLocal?.let { close ->
@@ -755,6 +769,7 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
     var accessPort by remember { mutableStateOf("443") }
     var sslIp by remember { mutableStateOf(true) }
     var mask by remember { mutableStateOf(XuiPanel.RealityMask.VK) }
+    var customDomain by remember { mutableStateOf("") }
     var transport by remember { mutableStateOf(XuiPanel.Transport.GRPC) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -787,9 +802,11 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
                 }
                 ChipRow {
                     Text("Маскировка:", fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
-                    XuiPanel.RealityMask.entries.forEach { r -> FilterChip(selected = mask == r, onClick = { mask = r }, label = { Text(r.sni) }) }
+                    XuiPanel.RealityMask.entries.forEach { r -> FilterChip(selected = mask == r, onClick = { mask = r }, label = { Text(if (r == XuiPanel.RealityMask.CUSTOM) "Свой домен" else r.sni) }) }
                 }
-                Text(if (mask == XuiPanel.RealityMask.GITHUB) MASK_FOREIGN else MASK_RU, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (mask == XuiPanel.RealityMask.CUSTOM) OutlinedTextField(customDomain, { customDomain = it.trim() }, Modifier.fillMaxWidth(), singleLine = true,
+                    label = { Text("Свой домен") }, placeholder = { Text("example.com") }, supportingText = { Text("HTTPS-сайт на порту 443; без https://, порта и пути") })
+                else Text(if (mask == XuiPanel.RealityMask.GITHUB) MASK_FOREIGN else MASK_RU, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(sslIp, { sslIp = it }); Text("HTTPS для панели и подписки: бесплатный сертификат Let's Encrypt на IP (нужен открытый 80/tcp)", fontSize = 13.sp)
                 }
@@ -814,11 +831,11 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
             val ok = when (kind) {
                 ServerKind.AMNEZIAWG -> aport in 1024..65535
                 ServerKind.OPENFLUX -> OfxNodeSpec.validChannel(channel)
-                ServerKind.PANEL_3XUI -> (accessPort.toIntOrNull() ?: 0) in 1..65535
-                ServerKind.PANEL_SUI, ServerKind.PANEL_XUI, ServerKind.PANEL_PASARGUARD, ServerKind.PANEL_REMNAWAVE -> true
+                ServerKind.PANEL_3XUI -> (accessPort.toIntOrNull() ?: 0) in 1..65535 && (mask != XuiPanel.RealityMask.CUSTOM || XuiPanel.normalizeRealityDomain(customDomain) != null)
+                ServerKind.PANEL_SUI, ServerKind.PANEL_XUI, ServerKind.PANEL_PASARGUARD, ServerKind.PANEL_REMNAWAVE, ServerKind.PANEL_NEXORA -> true
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(enabled = ok && !busy, onClick = { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443, sslIp = sslIp, mask = mask, transport = transport)) }) { Text("Проверить сервер и показать план") }
+                Button(enabled = ok && !busy, onClick = { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443, sslIp = sslIp, mask = mask, transport = transport, customDomain = customDomain)) }) { Text("Проверить сервер и показать план") }
                 TextButton(onClick = onCancel) { Text("Отмена") }
             }
         }
