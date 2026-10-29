@@ -76,3 +76,8 @@ data class SubscriptionEntity(
         )
     }
 }
+
+/** Прежнее имя маппинга из app — теперь берётся из shared. */
+fun SubscriptionEntity.toModel(): Subscription = toDomain()
+
+fun Subscription.toEntity(): SubscriptionEntity = SubscriptionEntity.fromDomain(this)
