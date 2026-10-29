@@ -27,6 +27,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
             build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
+            libc6-dev-arm64-cross libc6-dev-armhf-cross \
             qemu-user-static file zip
       - name: Build pinned AWG server package
         run: scripts/build-awg-server.sh "${{ matrix.arch }}"
