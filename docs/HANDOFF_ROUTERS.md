@@ -23,7 +23,15 @@
 конфиг», «Перезапустить службу» (с подтверждением). Опрос раз в 10 с, пока вкладка открыта. На ПК дополнительно: разделы (включить,
 править, добавить, удалить), подключение роутера к боту «Радар» (код → подписки), диагностика `check/{name}`. Раздел с личными
 ссылками роутер отдаёт замаскированными (`********`), поэтому приложение его не правит (запись затёрла бы ключи) — такой раздел
-правят в веб-интерфейсе роутера.
+правят в веб-интерфейсе роутера (до 1.3.0; с 1.3.0 роутер сам возвращает скрытые ключи — см. ниже).
+
+### Полное управление (роутер 1.3.0, ветка `claude/router-full-control`)
+
+`RouterClient`: `capabilities`, `update*`, `servers` (+PUT), `replaceSubscription`, `rules`, `lists`, `settings`/`patchSettings`
+(POST — у HttpURLConnection нет PATCH), `cores`/`coreVersions`/`installCore`, `sms`/`sendSms`. `RouterManager` грузит всё это по
+`caps` и даёт действия; ПК — `desktop/.../ui/RouterControl.kt`, Android — карточки в `RoutersScreen.kt` (строки на 5 языках).
+Проверено: `RouterLiveTest.fullManagement` против роутера 1.3.0 на Windows (sing-box 1.12.25) — 5 из 5. iOS не обновлён (сборка
+только в macOS-CI).
 
 ## Совместимость с версиями роутера
 
@@ -35,6 +43,7 @@
 | 1.2.3 | **аккаунт «Радар» на роутере**: `GET/POST/DELETE /api/v1/radar…` (бот 5.9.1) — клиент использует |
 | 1.2.4 | **самообновление из веб-интерфейса**: `GET /api/v1/update`, `POST /api/v1/update/check`, `POST /api/v1/update` — клиент Hydra пока не вызывает |
 | 1.2.5 | типы доменных правил (`namespace:`, `full:`/`exact:`, `wildcard:`, `regexp:`, `keyword:`) в разделах и `rules[]`; `domainmap`, `genconfig`, Keenetic через `ndmc` (`POST /api/v1/domainmap`, `POST /api/v1/genconfig`, `GET /api/v1/keenetic`, `POST /api/v1/keenetic/proxy`); файлы релиза по именам ОС: `hydravpn-router-<версия>-<openwrt|keeneticos|routeros>-<arch>` (до 1.2.5 — `-linux-<arch>`); `.ipk` для Entware KeeneticOS; `install.rsc` для RouterOS; в `status` появился блок `update` |
+| 1.3.0 | **полное управление**: `/api/v1/capabilities` (api 3), `rules`, `lists`, `settings` (GET, PATCH/POST; `api_*` и пути — только чтение), PUT `servers/{name}` и `subscriptions/{index}`, запись раздела/сервера из замаскированной копии сохраняет ключи (`sections.unmask`), `cores` (+`versions`, `install`), `sms`, Telegram-бот на роутере; узлы Xray (xhttp), OpenFlux, olcRTC, AmneziaWG — на роутере |
 
 Эндпоинты `/api/v1/*`, **которые использует клиент:** `version`, `status`, `sections` (GET/POST, PUT/DELETE `{name}`), `subscriptions`
 (GET/POST, `{index}/refresh`, DELETE), `nodes` (+`select`, `test`), `logs`, `reload`, `restart`, `check/{name}`, `radar`

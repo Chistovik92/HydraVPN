@@ -78,7 +78,8 @@ class InstallerTest {
         val ok = Installer(FakeSsh(corrupt = true)) { events += it }
             .run(AwgInstallPlan.steps(spec, emptyList(), bundle(), false, "none"))
         assertFalse(ok)
-        assertTrue((events.last() as InstallEvent.StepFailed).reason.contains("Контрольная сумма"))
+        // После ошибки контрольной суммы происходит откат, поэтому ищем StepFailed среди событий
+        assertTrue(events.filterIsInstance<InstallEvent.StepFailed>().any { it.reason.contains("Контрольная сумма") })
     }
 
     @Test fun redactorHidesKeys() {
@@ -91,5 +92,29 @@ class InstallerTest {
         val inst = Installer(FakeSsh()) { }
         inst.cancelled = true
         assertFalse(inst.run(AwgInstallPlan.steps(spec, emptyList(), bundle(), false, "none")))
+    }
+
+    @Test fun rollbackOnFailure() {
+        val ssh = FakeSsh(failOn = "systemctl daemon-reload")
+        val events = mutableListOf<InstallEvent>()
+        val ok = Installer(ssh) { events += it }
+            .run(AwgInstallPlan.steps(spec, emptyList(), bundle(), false, "none"))
+        assertFalse(ok)
+        // После ошибки на шаге "start" (systemctl daemon-reload) должны быть выполнены откаты предыдущих шагов
+        assertTrue(events.any { it is InstallEvent.Output && it.line.contains("Откат выполненных шагов") })
+        // Откат службы: disable --now
+        assertTrue(ssh.cmds.any { it.contains("systemctl disable --now hydra-awg") })
+    }
+
+    @Test fun rollbackOnCancel() {
+        val ssh = FakeSsh()
+        val events = mutableListOf<InstallEvent>()
+        val inst = Installer(ssh) { events += it }
+        // Отменяем после первого шага
+        inst.cancelled = true
+        val plan = AwgInstallPlan.steps(spec, emptyList(), bundle(), false, "none")
+        val ok = inst.run(plan)
+        assertFalse(ok)
+        assertTrue(events.filterIsInstance<InstallEvent.StepFailed>().any { it.reason.contains("Остановлено") })
     }
 }

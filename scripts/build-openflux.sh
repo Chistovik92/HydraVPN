@@ -26,8 +26,8 @@ BIN="$NDK/toolchains/llvm/prebuilt/$HOST/bin"
 EXT=""; [[ "$HOST" == windows* ]] && EXT=".cmd"
 
 # Коммит закреплён (а не HEAD и не метка): 04.10.2026 апстрим переставил метку v0.3.0, а HEAD ушёл дальше.
-# Это тот же коммит, что и у готовых бинарей на ПК (desktop/build.gradle.kts). Сменить: OPENFLUX_REF=<sha> scripts/build-openflux.sh
-OPENFLUX_REF="${OPENFLUX_REF:-74cac6d47bf4c27947348ee957538a2c0728a485}"
+# Это тот же коммит (v0.17.1, 0.8.2-rc3), что и у готовых бинарей на ПК и у iOS Bridge. Сменить: OPENFLUX_REF=<sha> scripts/build-openflux.sh
+OPENFLUX_REF="${OPENFLUX_REF:-f492a1a33b7581ad8f88118f97e0b866adda3cdc}"
 if [[ ! -d "$WORK/.git" ]]; then
   git init -q "$WORK"
   git -C "$WORK" remote add origin https://github.com/p1neappleXpress/OpenFlux.git

@@ -22,10 +22,16 @@ gradle wrapper --gradle-version 8.9   # один раз, если нет gradlew
 
 ### 2.1 sing-box → `libbox.aar`
 
+**С 0.8.2-b — `scripts/build-libbox.sh`:** клон закреплённой версии + `scripts/sing-box-reality-mlkem.patch` (REALITY к Xray-core
+≥ 26.9.8, SagerNet/sing-box#4520), Go 1.25.5, рядом — метка `app/libs/libbox.aar.patch`; `release.sh` без неё не выпустит APK.
+Ручной рецепт ниже — то же самое по шагам.
+
 ```bash
 git clone https://github.com/SagerNet/sing-box
 cd sing-box
 git checkout v1.12.25          # версия, против которой собран/проверен Hydra
+# 0.8.2-b: правка REALITY — без неё нет подключения к Xray-core >= 26.9.8 (SagerNet/sing-box#4520)
+git apply /path/to/Hydra/scripts/sing-box-reality-mlkem.patch
 # инструмент gomobile от SagerNet
 go install github.com/sagernet/gomobile/cmd/gomobile@latest
 go install github.com/sagernet/gomobile/cmd/gobind@latest
@@ -54,13 +60,18 @@ cp libbox.aar /path/to/Hydra/app/libs/
 
 ### 2.2 Xray-core → `libXray.aar`
 
+**С 0.8.2-b — готовый AAR апстрима:** `scripts/fetch-libxray.sh` скачивает `libxray-android.zip` релиза XTLS/libXray
+(SHA-256 закреплён), проверяет коммит Xray-core во всех четырёх ABI и кладёт `app/libs/libXray.aar`. Классы побайтно те же,
+что у своей сборки, сегменты выровнены по 16 КБ, символы отладки вырезаны (58 МБ вместо 99). `scripts/release.sh` не выпустит
+APK, если в `app/libs/libXray.aar` другой коммит Xray. Своя сборка ниже — запасной путь (например, нужен патч).
+
 Официальный (единственный поддерживаемый апстримом) способ сборки — не голый
 `gomobile bind`, а Python-скрипт репозитория:
 
 ```bash
 git clone https://github.com/XTLS/libXray
 cd libXray
-git checkout v26.9.30   # метка = версия Xray-core внутри; на ПК закреплена та же (desktop/build.gradle.kts)
+git checkout v26.10.10  # метка = версия Xray-core внутри; на ПК закреплена та же (desktop/build.gradle.kts)
 export ANDROID_HOME=<путь к Android SDK>
 export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/<версия>"   # см. `ls "$ANDROID_HOME/ndk"`
 python3 build/main.py android

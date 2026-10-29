@@ -6,18 +6,18 @@
 | Платформа | Клиент | Ядро | Сборка / проверка |
 |---|---|---|---|
 | Android | `app/` (Jetpack Compose) | libbox (sing-box 1.12.25), Xray, AWG, olcRTC, OpenFlux, SSTP/L2TP | локально `scripts/release.sh` (подпись) + `android.yml` |
-| Windows 10/11 x64 | `desktop/` (Compose Desktop) | sing-box 1.12.25 + Xray-core 26.9.30 процессами | `desktop.yml` на `windows-latest`: MSI, EXE, portable ZIP |
-| Linux x64 / arm64 | `desktop/` | sing-box 1.12.25 + Xray-core 26.9.30 процессами | `ubuntu-24.04`, `ubuntu-24.04-arm`: DEB, RPM, AppImage, tar.gz |
-| macOS 12+ arm64 / x64 | `desktop/` | sing-box 1.12.25 + Xray-core 26.9.30 процессами | `macos-15`, `macos-15-intel`: DMG (ad-hoc подпись) |
+| Windows 10/11 x64 | `desktop/` (Compose Desktop) | sing-box 1.12.25 + Xray-core 26.10.10 процессами | `desktop.yml` на `windows-latest`: MSI, EXE, portable ZIP |
+| Linux x64 / arm64 | `desktop/` | sing-box 1.12.25 + Xray-core 26.10.10 процессами | `ubuntu-24.04`, `ubuntu-24.04-arm`: DEB, RPM, AppImage, tar.gz |
+| macOS 12+ arm64 / x64 | `desktop/` | sing-box 1.12.25 + Xray-core 26.10.10 процессами | `macos-15`, `macos-15-intel`: DMG (ad-hoc подпись) |
 | iOS | `ios/` (SwiftUI + Network Extension) | Libbox.xcframework, WireGuardKit (AWG) | `ios.yml`: неподписанный `.ipa` |
 
 ## Архитектура
 
 ```
 HydraVPN/
-├── app/        Android. Свои копии data-классов (см. ниже «Android и :shared»)
-├── shared/     KMP: commonMain — модели, LinkParser/UriParser, SingBoxConfigBuilder,
-│               PPP-протокол; androidMain — Room-сущности (пока не используются)
+├── app/        Android: UI, хранилище, сервисы и реализации нативных ядер
+├── shared/     KMP: commonMain — модели, парсеры, маршрутизация, PPP-протокол;
+│               androidMain — Room-сущности и интерфейс Android VpnCore
 ├── desktop/    Compose Desktop: src/main/kotlin (UI, AppController, core/*),
 │               src/test/kotlin (конфиги, парсеры, хранилище, рендер экранов)
 └── ios/        SwiftUI-приложение, HydraTunnel (Libbox), HydraAWG, виджеты
@@ -69,13 +69,11 @@ HydraVPN/
 
 ## Android и `:shared`
 
-В `app/` лежат свои копии классов с теми же именами, что в `:shared`
-(`ru.gidravpn.hydra.data.model.*`, `data.subscription.*`, `vpn.ppp.*`), но с другой
-реализацией (android.net.Uri, Room-аннотации, IPv6-поддержка в SingBoxConfigBuilder).
-В 1936f1d `app` подключал `:shared` — в APK попадала одна копия из двух, какая —
-решал порядок слияния dex. В 0.6.25 зависимость снята. Перевод Android на `:shared` —
-отдельная задача: удалить дубли из `app`, догнать `:shared` до версий `app`
-(ipv6 в SingBoxConfigBuilder и т.п.), прогнать `app`-тесты.
+С 0.8.2 Android подключает `:shared` напрямую: `implementation(project(":shared"))`.
+Общие модели, парсеры, DPI/geo/routing, PPP и серверные инструменты существуют в одном
+экземпляре в `:shared`; прежние копии из `app` и Gradle Sync-задачи удалены.
+Android-специфичные Room-сущности и `VpnCore` находятся в `androidMain`, а привязка
+строковых ресурсов — в `app/data/model/UiText.kt` и Android UI.
 
 ## Ограничения (честно)
 

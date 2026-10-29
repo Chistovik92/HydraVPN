@@ -15,6 +15,15 @@ enum class PanelKind(val title: String, val repo: String) {
     SUI("s-ui", "alireza0/s-ui"),
     /** x-ui (alireza0) — 0.8.1: так же, как s-ui. */
     XUI("x-ui", "alireza0/x-ui"),
+    /** PasarGuard (наследник Marzban, Docker) — 0.8.2-a3: установка, вход на сайт, подключения ([PasarGuardPanel]). */
+    PASARGUARD("PasarGuard", "PasarGuard/panel"),
+    /** Remnawave (Docker, за прокси Caddy на 127.0.0.1) — 0.8.2-a3 ([RemnawavePanel]). */
+    REMNAWAVE("Remnawave", "remnawave/panel"),
+    /** Nexora: стабильный Bearer API v1, ноды ставятся заданиями панели по SSH ([NexoraPanel]). */
+    NEXORA("Nexora", "Nexora-VPN/panel");
+
+    /** Панель видна только с самого сервера: сайт — через туннель Hydra, без сертификата на IP и «открыть извне». */
+    val tunnelOnly: Boolean get() = this == PASARGUARD || this == REMNAWAVE || this == NEXORA
 }
 
 /**
@@ -37,15 +46,19 @@ data class PanelInstance(
      * приложения, API 3x-ui — `curl` на сервере по SSH. [baseUrl] остаётся внешним адресом (на него выписан сертификат).
      */
     val local: Boolean = false,
+    /** Ноды панели на других серверах (0.8.2-a4). */
+    val nodes: List<PanelNode> = emptyList(),
 ) {
     fun toJson(): JSONObject = JSONObject().put("kind", kind.name).put("baseUrl", baseUrl).put("user", username).put("password", password)
         .put("token", token).put("version", version).put("inboundId", inboundId).put("client", clientEmail).put("local", local)
+        .also { if (nodes.isNotEmpty()) it.put("nodes", PanelNode.listToJson(nodes)) }
 
     companion object {
         fun fromJson(o: JSONObject) = PanelInstance(
             runCatching { PanelKind.valueOf(o.optString("kind", "XUI3")) }.getOrDefault(PanelKind.XUI3),
             o.getString("baseUrl"), o.optString("user"), o.optString("password"), o.getString("token"),
             o.optString("version"), o.optInt("inboundId"), o.optString("client"), o.optBoolean("local"),
+            PanelNode.listFromJson(o.optJSONArray("nodes")),
         )
     }
 }
@@ -61,6 +74,7 @@ class DirectXuiTransport(private val baseUrl: String, private val token: String,
     override fun call(method: String, path: String, body: String?): String {
         val c = URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection
         c.requestMethod = method; c.connectTimeout = timeoutMs; c.readTimeout = timeoutMs
+        c.instanceFollowRedirects = false   // токен администратора не должен уходить на другой адрес по редиректу
         c.setRequestProperty("Authorization", "Bearer $token")
         if (body != null) { c.doOutput = true; c.setRequestProperty("Content-Type", "application/json"); c.outputStream.use { it.write(body.toByteArray()) } }
         val code = c.responseCode
@@ -76,13 +90,16 @@ class DirectXuiTransport(private val baseUrl: String, private val token: String,
  */
 class SshXuiTransport(private val ssh: SshSession, private val localBase: String, private val token: String, private val hostHeader: String) : XuiTransport {
     override fun call(method: String, path: String, body: String?): String {
-        val bodyFile = "/tmp/.hydra-xui-body.json"
-        val hdr = "-H ${Installer.shq("Authorization: Bearer $token")} -H ${Installer.shq("Host: $hostHeader")}"
-        val cmd = if (body != null) {
-            ssh.upload(body.toByteArray(), bodyFile, 384)
-            "curl -ksS -m 25 -X $method $hdr -H 'Content-Type: application/json' --data @$bodyFile ${Installer.shq(localBase.trimEnd('/') + path)}; rm -f $bodyFile"
-        } else "curl -ksS -m 25 -X $method $hdr ${Installer.shq(localBase.trimEnd('/') + path)}"
-        val r = ssh.exec(cmd)
+        // токен — файлом `curl -K` (0600, удаляется после вызова), а не в аргументах: они видны в `ps` (0.8.2-rc2, R3)
+        val r = CurlAuth.withConfig(ssh, token) { cfg ->
+            val bodyFile = "/tmp/.hydra-xui-body-${XuiPanel.random(6).lowercase()}.json"
+            val hdr = "-K $cfg -H ${Installer.shq("Host: $hostHeader")}"
+            val cmd = if (body != null) {
+                ssh.upload(body.toByteArray(), bodyFile, 384)
+                "curl -ksS -m 25 -X $method $hdr -H 'Content-Type: application/json' --data @$bodyFile ${Installer.shq(localBase.trimEnd('/') + path)}; rm -f $bodyFile"
+            } else "curl -ksS -m 25 -X $method $hdr ${Installer.shq(localBase.trimEnd('/') + path)}"
+            ssh.exec(cmd)
+        }
         if (r.out.isBlank()) throw XuiApiException("Панель не ответила (curl код ${r.exit})")
         return r.out
     }
@@ -135,6 +152,14 @@ class XuiApi(private val t: XuiTransport) {
      */
     fun subscriptionUrl(host: String, subId: String): String? = XuiPanel.subscriptionUrl(settings(), host, subId)
 
+    /**
+     * Подключить уже существующего пользователя к другому инбаунду (0.8.2-a2, `POST /panel/api/clients/{email}/attach`): его
+     * подписка сама получает новое подключение, учётные данные под протокол панель заполняет сама.
+     */
+    fun attachClient(email: String, inboundIds: List<Int>) {
+        obj(t.call("POST", "/panel/api/clients/${java.net.URLEncoder.encode(email, "UTF-8")}/attach", JSONObject().put("inboundIds", JSONArray(inboundIds)).toString()))
+    }
+
     fun delClient(email: String) { obj(t.call("POST", "/panel/api/clients/del/${java.net.URLEncoder.encode(email, "UTF-8")}")) }
 
     /** Готовые ссылки (`vless://…`) клиента по всем его инбаундам. */
@@ -155,13 +180,13 @@ object XuiPanel {
 
     fun scriptUrl(tag: String) = "https://raw.githubusercontent.com/MHSanaei/3x-ui/$tag/install.sh"
 
-    /** Последний выпуск (тег) — показывается до запуска; сам скрипт ставит указанный тег, а не «последний». */
-    fun latestTag(timeoutMs: Int = 15_000): String {
-        val c = URL("https://api.github.com/repos/MHSanaei/3x-ui/releases/latest").openConnection() as HttpURLConnection
-        c.connectTimeout = timeoutMs; c.readTimeout = timeoutMs; c.setRequestProperty("Accept", "application/vnd.github+json")
-        val text = c.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
-        return JSONObject(text).getString("tag_name").also { require(Regex("^v\\d+\\.\\d+\\.\\d+$").matches(it)) { "Неожиданный тег $it" } }
-    }
+    /**
+     * Тег, который ставит Hydra (0.8.2-rc2): проверенный выпуск из [ScriptPins], а не «последний» у апстрима — скрипт этого тега
+     * сверяется по SHA-256, а выпуск прошёл живой прогон на стенде. Новые выпуски 3x-ui Hydra ставит после проверки (в новой версии Hydra).
+     * Имя прежнее, параметр [timeoutMs] оставлен для совместимости: запроса к GitHub больше нет.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun latestTag(timeoutMs: Int = 15_000): String = ScriptPins.XUI3_TAG
 
     /**
      * Адрес панели из того, что вставил пользователь: без схемы — `http://`, без завершающего слеша, без пробелов.
@@ -201,8 +226,9 @@ object XuiPanel {
         add(Step("xui-exists", "Проверить, что 3x-ui на сервере ещё нет", "test ! -e /usr/local/x-ui/x-ui",
             failHint = "На сервере уже стоит 3x-ui — подключите существующую панель по адресу и токену"))
         add(Step("xui-fetch", "Загрузить установщик 3x-ui ${p.tag} (закреплённый тег)",
-            "(curl -fsSL ${Installer.shq(scriptUrl(p.tag))} -o $SCRIPT || wget -q -O $SCRIPT ${Installer.shq(scriptUrl(p.tag))}) && chmod 700 $SCRIPT && sha256sum $SCRIPT",
-            rollback = "rm -f $SCRIPT", failHint = "Не удалось скачать установщик с GitHub"))
+            "(curl -fsSL -m 180 ${Installer.shq(scriptUrl(p.tag))} -o $SCRIPT || wget -q -O $SCRIPT ${Installer.shq(scriptUrl(p.tag))}) && chmod 700 $SCRIPT && sha256sum $SCRIPT" +
+                ScriptPins.verify("MHSanaei/3x-ui", p.tag, "install.sh", SCRIPT).let { if (it.isEmpty()) "" else " && $it" },
+            rollback = "rm -f $SCRIPT", failHint = "Не удалось скачать установщик с GitHub или его SHA-256 не совпал с проверенным"))
         add(Step("xui-env", "Записать параметры установки (файл 0600; логин и пароль не показываются)",
             upload = Step.Upload(ENV_FILE, ("XUI_NONINTERACTIVE=1\nXUI_USERNAME=${p.username}\nXUI_PASSWORD=${p.password}\nXUI_PANEL_PORT=${p.port}\n" +
                 "XUI_WEB_BASE_PATH=${p.webPath}\nXUI_SSL_MODE=${when { !p.sslIp -> "none"; p.domain.isNotBlank() -> "domain\nXUI_DOMAIN=${p.domain}"; else -> "ip" }}\nXUI_ENABLE_FAIL2BAN=false\n").toByteArray(), 384)))
@@ -259,6 +285,26 @@ object XuiPanel {
         YANDEX("ya.ru:443", "ya.ru"),
         /** Зарубежный сайт без своих узлов в РФ — SNI не спорит с зарубежным IP сервера. */
         GITHUB("github.com:443", "github.com"),
+        /** Собственный сайт владельца; домен передаётся отдельно и не хранится в изменяемом состоянии enum. */
+        CUSTOM("", ""),
+    }
+
+    /** Безопасное имя REALITY target: ASCII/IDN-домен без схемы, порта, пути, пробелов и IP-адреса. */
+    fun normalizeRealityDomain(value: String): String? {
+        val input = value.trim().removeSuffix(".")
+        if (input.isEmpty() || input.length > 253 || input.any { it.isWhitespace() } || ':' in input || '/' in input || '\\' in input || '@' in input) return null
+        val domain = runCatching { java.net.IDN.toASCII(input, java.net.IDN.USE_STD3_ASCII_RULES).lowercase() }.getOrNull() ?: return null
+        if (domain.length > 253 || '.' !in domain) return null
+        val labels = domain.split('.')
+        if (labels.any { it.isEmpty() || it.length > 63 || it.startsWith('-') || it.endsWith('-') || it.any { c -> !c.isLetterOrDigit() && c != '-' } }) return null
+        if (labels.all { label -> label.all(Char::isDigit) }) return null // IPv4 и числовые псевдодомены не являются SNI
+        return domain
+    }
+
+    /** SNI выбранной маски; для [RealityMask.CUSTOM] проверяет и нормализует [customDomain]. */
+    fun realitySni(mask: RealityMask, customDomain: String = ""): String {
+        if (mask != RealityMask.CUSTOM) return mask.sni
+        return normalizeRealityDomain(customDomain) ?: throw IllegalArgumentException("Укажите корректный домен маскировки без https://, порта и пути")
     }
 
     /** Транспорт инбаунда Hydra (0.8.1-rc1). */
@@ -275,10 +321,11 @@ object XuiPanel {
      * Ключи — от панели ([XuiApi.newRealityKeys]).
      */
     fun defaultInbound(port: Int, priv: String, pub: String, mask: RealityMask = RealityMask.VK, remark: String = "Hydra",
-                       rnd: SecureRandom = SecureRandom(), transport: Transport = Transport.GRPC): JSONObject {
+                       rnd: SecureRandom = SecureRandom(), transport: Transport = Transport.GRPC, customDomain: String = ""): JSONObject {
         val shortId = ByteArray(8).also { rnd.nextBytes(it) }.joinToString("") { "%02x".format(it) }
+        val sni = realitySni(mask, customDomain)
         val settings = JSONObject().put("clients", JSONArray()).put("decryption", "none").put("encryption", "none").put("fallbacks", JSONArray())
-        val reality = JSONObject().put("show", false).put("xver", 0).put("target", mask.target).put("serverNames", JSONArray(listOf(mask.sni)))
+        val reality = JSONObject().put("show", false).put("xver", 0).put("target", if (mask == RealityMask.CUSTOM) "$sni:443" else mask.target).put("serverNames", JSONArray(listOf(sni)))
             .put("privateKey", priv).put("minClientVer", "").put("maxClientVer", "").put("maxTimediff", 0).put("shortIds", JSONArray(listOf(shortId)))
             .put("mldsa65Seed", "")
             .put("settings", JSONObject().put("publicKey", pub).put("fingerprint", "chrome").put("serverName", "").put("spiderX", "/").put("mldsa65Verify", ""))
@@ -323,8 +370,8 @@ object XuiPanel {
             "! (ss -ltnH 2>/dev/null | awk '{print \$4}' | grep -Eq '(^|:)80\$')",
             failHint = "Порт 80 занят другой программой (веб-сервер?) — сертификат так не выдать"))
         add(Step("cert-acme", "Поставить acme.sh и socat, если их нет",
-            "(command -v socat >/dev/null || (apt-get install -y -q socat || dnf install -y socat || yum install -y socat) >/dev/null 2>&1) && " +
-                "([ -x $acme ] || curl -fsSL https://get.acme.sh | sh >/dev/null 2>&1) && [ -x $acme ]",
+            "(command -v socat >/dev/null || (DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y -q socat || dnf install -y socat || yum install -y socat) >/dev/null 2>&1) && " +
+                "([ -x $acme ] || curl -fsSL -m 180 https://get.acme.sh | sh >/dev/null 2>&1) && [ -x $acme ]",
             failHint = "Не удалось поставить acme.sh"))
         add(Step("cert-issue", "Получить сертификат Let's Encrypt для $host" + if (ip) " (на IP, 6 дней, продлевается сам)" else "",
             "$acme --set-default-ca --server letsencrypt >/dev/null && $acme --issue -d $h --standalone --server letsencrypt --httpport 80 --force" +
@@ -335,6 +382,12 @@ object XuiPanel {
                 "--reloadcmd 'systemctl restart $service' >/dev/null 2>&1; chmod 600 $CERT_DIR/privkey.pem; test -s $CERT_DIR/fullchain.pem",
             failHint = "Файлы сертификата не появились"))
     }
+
+    /**
+     * SHA-256 именно leaf-сертификата в base64 (`tlsVerifyMode=pin` 3x-ui). Берётся по доверенному SSH из установленного
+     * файла, а не сетевым TLS-рукопожатием: иначе подменённый сертификат можно было бы «закрепить» как свой.
+     */
+    fun certFingerprintCommand() = "openssl x509 -in $CERT_DIR/fullchain.pem -outform DER | openssl dgst -sha256 -binary | openssl base64 -A"
 
     /**
      * Отдать панели сертификат из [CERT_DIR]: 3x-ui и x-ui — своей командой `x-ui cert` (у 3x-ui она ставит его и подписке),
@@ -348,6 +401,7 @@ object XuiPanel {
             PanelKind.XUI -> "/usr/local/x-ui/x-ui cert -webCert $crt -webCertKey $key >/dev/null && " +
                 OtherPanels.settingsCommand(kind, mapOf("subCertFile" to crt, "subKeyFile" to key))
             PanelKind.SUI -> OtherPanels.settingsCommand(kind, mapOf("webCertFile" to crt, "webKeyFile" to key, "subCertFile" to crt, "subKeyFile" to key))
+            PanelKind.PASARGUARD, PanelKind.REMNAWAVE, PanelKind.NEXORA -> error("${kind.title} в Hydra — только через туннель, без сертификата на IP")
         }
         add(Step("cert-panel", "Включить HTTPS у панели и подписки",
             "$cmd && systemctl restart $svc && sleep 2 && systemctl is-active $svc",

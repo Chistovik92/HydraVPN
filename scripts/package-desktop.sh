@@ -80,6 +80,9 @@ case "$TARGET" in
   windows-*) taskkill //F //IM Hydra.exe >/dev/null 2>&1 || true ;;
   *) pkill -f "$LAUNCHER" 2>/dev/null || kill "$pid" 2>/dev/null || true ;;
 esac
+# Маркер самообновления от дымового запуска (0600) не должен попадать в пакеты:
+# appimagetool требует «readable for all users», codesign на macOS — «unsealed contents».
+rm -f "$APP_DIR/.update-started"
 grep -iE 'exception|error' "$smoke_log" | head -5 || true
 echo "    запуск OK"
 

@@ -3,7 +3,6 @@ package ru.gidravpn.hydra.data.subscription
 import org.json.JSONObject
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
-import java.util.Base64
 
 /**
  * Собирает конфигурацию для amneziawg-go (движок AWG):
@@ -119,7 +118,7 @@ object WireGuardConfigBuilder {
     /** base64 (44 симв., .conf) → lowercase hex (64 симв., uapi). */
     internal fun b64ToHex(b64: String): String {
         if (b64.isBlank()) return ""
-        val bytes = Base64.getMimeDecoder().decode(b64.trim())
+        val bytes = java.util.Base64.getMimeDecoder().decode(b64.trim())
         return bytes.joinToString("") { "%02x".format(it) }
     }
 }

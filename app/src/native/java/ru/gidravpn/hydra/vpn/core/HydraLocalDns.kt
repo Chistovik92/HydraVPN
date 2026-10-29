@@ -21,9 +21,9 @@ import java.util.concurrent.TimeUnit
  * sing-box docs) — с `localDNSTransport() = null` пресет «Системный резолвер»
  * просто не отвечал бы. Повторяет LocalResolver из SagerNet/sing-box-for-android.
  *
- * [network] — реальная подложенная сеть от монитора интерфейса; null — сеть
- * процесса по умолчанию, что тоже не туннель (наш пакет исключён из VPN в
- * HydraVpnService.establishTun).
+ * [network] — реальная подложенная сеть (монитор интерфейса, иначе текущая физическая —
+ * HydraPlatformInterface). null — физической сети нет; тогда сеть процесса по умолчанию,
+ * и это может быть собственный туннель (с 0.8.0-rc3 приложение бывает внутри него).
  */
 internal class HydraLocalDns(private val network: () -> Network?) : LocalDNSTransport {
 
@@ -58,7 +58,8 @@ internal class HydraLocalDns(private val network: () -> Network?) : LocalDNSTran
 
     override fun lookup(ctx: ExchangeContext, network: String, domain: String) {
         // Вызывается только при raw() == false, т.е. на Android 8–9.
-        val addresses = InetAddress.getAllByName(domain).filter {
+        // Б0 (0.8.2-b): через выбранную физическую сеть, а не сеть процесса (она может быть нашим туннелем).
+        val addresses = (network()?.getAllByName(domain) ?: InetAddress.getAllByName(domain)).filter {
             when {
                 network.endsWith("4") -> it is Inet4Address
                 network.endsWith("6") -> it is Inet6Address

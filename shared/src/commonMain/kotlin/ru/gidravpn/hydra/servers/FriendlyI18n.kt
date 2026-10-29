@@ -284,6 +284,67 @@ object FriendlyI18n {
             "Якщо ви звикли до цієї панелі: усе керування — на її сайті.",
             "اگر به این پنل عادت دارید: همهٔ مدیریت در وب‌سایت آن است.",
             "如果您习惯使用这个面板：所有管理都在其网站上进行。"),
+        // ---------------------------------------------------------------- PasarGuard и Remnawave (0.8.2-a3)
+        "Install Docker if missing and the official %s installers of a pinned version" to arrayOf(
+            "Встановимо Docker, якщо його немає, і офіційні інсталятори %s закріпленої версії",
+            "در صورت نبود Docker را نصب می‌کنیم و نصب‌کننده‌های رسمی %s با نسخهٔ ثابت را",
+            "如未安装则安装 Docker，以及固定版本的 %s 官方安装程序"),
+        "Install the panel and a node (Xray core) on this server" to arrayOf(
+            "Встановимо панель і ноду (ядро Xray) на цьому сервері",
+            "پنل و یک نود (هستهٔ Xray) را روی همین سرور نصب می‌کنیم",
+            "在此服务器上安装面板和节点（Xray 内核）"),
+        "Create the panel owner with a strong login and password and connect the node" to arrayOf(
+            "Створимо власника панелі з надійним логіном і паролем та підключимо ноду",
+            "مالک پنل را با نام کاربری و رمز قوی می‌سازیم و نود را وصل می‌کنیم",
+            "以强用户名和密码创建面板所有者并连接节点"),
+        "The panel is reachable only through Hydra's secure tunnel — invisible from outside" to arrayOf(
+            "Панель буде доступна лише через захищений тунель Hydra — ззовні її не знайти",
+            "پنل فقط از طریق تونل امن Hydra در دسترس است — از بیرون دیده نمی‌شود",
+            "面板只能通过 Hydra 的安全隧道访问——外部无法发现"),
+        "Create connections with the “Create connection” button or on the panel website" to arrayOf(
+            "Підключення створюються кнопкою «Створити підключення» або на сайті панелі",
+            "اتصال‌ها با دکمهٔ «ساخت اتصال» یا در وب‌سایت پنل ساخته می‌شوند",
+            "可通过“创建连接”按钮或在面板网站上创建连接"),
+        "Install Docker if missing and the %s panel of a pinned version (database and cache in containers)" to arrayOf(
+            "Встановимо Docker, якщо його немає, і панель %s закріпленої версії (база й кеш — у контейнерах)",
+            "در صورت نبود Docker را نصب می‌کنیم و پنل %s با نسخهٔ ثابت (پایگاه داده و کش در کانتینرها)",
+            "如未安装则安装 Docker，以及固定版本的 %s 面板（数据库和缓存在容器中）"),
+        "Add a small proxy so the panel website opens through Hydra's secure tunnel — invisible from outside" to arrayOf(
+            "Додамо невеликий проксі, щоб сайт панелі відкривався через захищений тунель Hydra — ззовні її не знайти",
+            "یک پروکسی کوچک اضافه می‌کنیم تا سایت پنل از طریق تونل امن Hydra باز شود — از بیرون دیده نمی‌شود",
+            "添加一个小型代理，让面板网站通过 Hydra 的安全隧道打开——外部无法发现"),
+        "Create the owner with a strong login and password, install a node (Xray core) and connect it" to arrayOf(
+            "Створимо власника з надійним логіном і паролем, встановимо ноду (ядро Xray) і підключимо її",
+            "مالک را با نام کاربری و رمز قوی می‌سازیم، یک نود (هستهٔ Xray) نصب و وصل می‌کنیم",
+            "以强用户名和密码创建所有者，安装节点（Xray 内核）并连接"),
+        "Marzban's successor: users, groups, limits on the panel website. Runs in Docker." to arrayOf(
+            "Наступник Marzban: користувачі, групи, ліміти — на сайті панелі. Працює в Docker.",
+            "جانشین Marzban: کاربران، گروه‌ها و محدودیت‌ها در وب‌سایت پنل. در Docker اجرا می‌شود.",
+            "Marzban 的继任者：用户、分组、限额都在面板网站上。运行在 Docker 中。"),
+        "A modern panel: users, squads, limits, subscriptions on its website. Runs in Docker." to arrayOf(
+            "Сучасна панель: користувачі, загони, ліміти, підписки — на її сайті. Працює в Docker.",
+            "یک پنل مدرن: کاربران، گروه‌ها، محدودیت‌ها و اشتراک‌ها در وب‌سایت آن. در Docker اجرا می‌شود.",
+            "现代面板：用户、小队、限额、订阅都在其网站上。运行在 Docker 中。"),
+        "Download the pinned official %s installer and verify its SHA-256" to arrayOf(
+            "Завантажимо офіційний інсталятор Nexora закріпленої версії та перевіримо його SHA-256",
+            "نصب‌کنندهٔ رسمی Nexora با نسخهٔ ثابت را دانلود و SHA-256 آن را بررسی می‌کنیم",
+            "下载固定版本的 Nexora 官方安装程序并验证其 SHA-256"),
+        "Install the panel, create its owner and a long-lived API token" to arrayOf(
+            "Встановимо панель, створимо її власника та довготривалий API-токен",
+            "پنل را نصب می‌کنیم، مالک آن و یک توکن API بلندمدت می‌سازیم",
+            "安装面板，创建所有者和长期有效的 API 令牌"),
+        "The panel will only be available through Hydra's secure SSH tunnel" to arrayOf(
+            "Панель буде доступна лише через захищений SSH-тунель Hydra",
+            "پنل فقط از طریق تونل امن SSH در Hydra در دسترس خواهد بود",
+            "面板只能通过 Hydra 的安全 SSH 隧道访问"),
+        "Users, subscriptions and nodes can be added from the server card" to arrayOf(
+            "Користувачів, підписки та ноди можна додати з картки сервера",
+            "کاربران، اشتراک‌ها و نودها را می‌توان از کارت سرور افزود",
+            "可以从服务器卡片添加用户、订阅和节点"),
+        "A modern panel with a stable API: users, subscriptions and node installation." to arrayOf(
+            "Сучасна панель зі стабільним API: користувачі, підписки та встановлення нод.",
+            "پنلی مدرن با API پایدار: کاربران، اشتراک‌ها و نصب نود.",
+            "拥有稳定 API 的现代面板：用户、订阅和节点安装。"),
     )
 
     /** Все ключи — для проверки полноты в тестах. */

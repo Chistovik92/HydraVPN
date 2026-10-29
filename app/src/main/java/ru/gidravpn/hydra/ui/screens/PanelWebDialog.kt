@@ -86,12 +86,19 @@ fun PanelWebDialog(panel: PanelInstance, url: String, tunnel: Boolean, onClose: 
                     settings.setSupportMultipleWindows(false)
                     CookieManager.getInstance().setAcceptCookie(true)
                     var tried = false
+                    var startUrl = ""
                     webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, u: String?) {
                             // вход — один раз и только на сайте самой панели
                             if (!tried && login != null && u?.startsWith(origin) == true) {
                                 tried = true
+                                startUrl = u
                                 view.evaluateJavascript(PanelWeb.script(login), null)
+                            } else if (tried && u != null) {
+                                // форма ушла на другую страницу (метка скрипта пропала вместе со старой) — успех, если поля пароля нет
+                                view.evaluateJavascript(PanelWeb.PASSWORD_FIELDS_JS) { n ->
+                                    if (PanelWeb.loggedIn("", startUrl, u, n?.trim('"')?.toIntOrNull() ?: 1)) status = ""
+                                }
                             }
                         }
 

@@ -75,12 +75,28 @@ class Installer(
 
     /** @return true, если все шаги выполнены. */
     fun run(plan: List<Step>): Boolean {
+        val done = mutableListOf<Step>()
         plan.forEachIndexed { i, step ->
-            if (cancelled) { onEvent(InstallEvent.StepFailed(step, "Остановлено пользователем")); return false }
+            if (cancelled) {
+                onEvent(InstallEvent.StepFailed(step, "Остановлено пользователем"))
+                if (done.isNotEmpty()) {
+                    onEvent(InstallEvent.Output("Откат выполненных шагов…"))
+                    rollback(done)
+                }
+                return false
+            }
             onEvent(InstallEvent.StepStart(i + 1, plan.size, step))
             val err = try { exec(step) } catch (e: Exception) { e.message ?: e.javaClass.simpleName }
-            if (err != null) { onEvent(InstallEvent.StepFailed(step, redactor.clean(err))); return false }
+            if (err != null) {
+                onEvent(InstallEvent.StepFailed(step, redactor.clean(err)))
+                if (done.isNotEmpty()) {
+                    onEvent(InstallEvent.Output("Откат выполненных шагов…"))
+                    rollback(done)
+                }
+                return false
+            }
             onEvent(InstallEvent.StepOk(step))
+            done.add(step)
         }
         onEvent(InstallEvent.Done)
         return true

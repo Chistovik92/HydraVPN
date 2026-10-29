@@ -21,7 +21,11 @@ class SubscriptionFetcher(
         .followSslRedirects(false)
         .build()
 ) {
-    data class Result(val profiles: List<ServerProfile>, val info: SubscriptionHeaders.Info)
+    data class Result(
+        val profiles: List<ServerProfile>,
+        val info: SubscriptionHeaders.Info,
+        val partial: Boolean = false,
+    )
 
     suspend fun fetch(url: String, headers: Map<String, String>, subscriptionId: Long?): Result =
         withContext(Dispatchers.IO) {
@@ -36,9 +40,11 @@ class SubscriptionFetcher(
                     require(!src.request(MAX_BODY_BYTES + 1)) { "ответ подписки больше $MAX_BODY_MB МБ" }
                     src.readByteArray().toString(Charsets.UTF_8)
                 }
+                val parsed = LinkParser.parseSubscriptionDetailed(body, subscriptionId)
                 Result(
-                    profiles = LinkParser.parseSubscription(body, subscriptionId),
+                    profiles = parsed.profiles,
                     info = SubscriptionHeaders.parse { resp.header(it) },
+                    partial = !parsed.complete,
                 )
             }
         }

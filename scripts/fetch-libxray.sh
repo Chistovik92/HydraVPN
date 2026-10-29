@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+# Ядро Xray для Android: готовый libXray.aar из релиза апстрима (github.com/XTLS/libXray, MPL-2.0) → app/libs/libXray.aar.
+#
+# С 0.8.2-b берём официальную сборку вместо своей `gomobile bind` (docs/BUILD.md, раздел 2.2): классы (`libXray.LibXray`,
+# `DialerController`) побайтно те же, все четыре ABI (arm64-v8a, armeabi-v7a, x86_64, x86), сегменты выровнены по 16 КБ
+# (Android 15+), а символы отладки вырезаны — AAR 58 МБ вместо 99. Внутри — Xray-core того же коммита, что и у ПК
+# (desktop/build.gradle.kts, xrayVersion). Хеш архива закреплён: метки апстрима бывают перезалиты (урок OpenFlux 0.7.10).
+#
+# Нужны: curl (или gh), unzip, sha256sum. Использование:  scripts/fetch-libxray.sh
+#
+set -euo pipefail
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+LIBXRAY_VERSION="26.10.29"
+LIBXRAY_SHA256="8d7962e898d9e2e505f5e6e993506140a6aea3f10b66f1a91e8f133264a95bf6"
+# Коммит Xray-core внутри (go.mod libXray v26.10.29 = метка Xray-core v26.10.29). release.sh сверяет его с app/libs/libXray.aar.
+LIBXRAY_XRAY_COMMIT="0afec66085a8"
+
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+ZIP="$WORK/libxray-android.zip"
+# Апстрим удаляет релизы (v26.10.10 и v26.10.17 пропали): после апстрима — наше зеркало (релиз `deps`, scripts/mirror-deps.sh)
+# с тем же SHA-256.
+URLS=("https://github.com/XTLS/libXray/releases/download/v$LIBXRAY_VERSION/libxray-android.zip"
+      "https://github.com/Chistovik92/HydraVPN/releases/download/deps/libxray-android-$LIBXRAY_VERSION.zip")
+ok=0
+for URL in "${URLS[@]}"; do
+  echo "==> $URL"
+  if curl -fL --retry 4 --retry-delay 3 -o "$ZIP" "$URL" && [[ "$(sha256sum "$ZIP" | cut -d' ' -f1)" == "$LIBXRAY_SHA256" ]]; then ok=1; break; fi
+  echo "    не вышло (нет файла или другой SHA-256)" >&2
+done
+[[ $ok == 1 ]] || { echo "ОШИБКА: libxray-android.zip v$LIBXRAY_VERSION с SHA-256 $LIBXRAY_SHA256 не найден ни у апстрима, ни в зеркале" >&2; exit 1; }
+
+unzip -q -o "$ZIP" -d "$WORK"
+AAR="$WORK/libxray-android/libXray.aar"
+for abi in arm64-v8a armeabi-v7a x86_64 x86; do
+  # grep -c, а не -q: -q закрывает канал раньше конца, unzip получает SIGPIPE, и pipefail считает это провалом.
+  unzip -p "$AAR" "jni/$abi/libgojni.so" | grep -ac "xtls/xray-core.*$LIBXRAY_XRAY_COMMIT" >/dev/null \
+    || { echo "ОШИБКА: в jni/$abi/libgojni.so нет Xray-core $LIBXRAY_XRAY_COMMIT" >&2; exit 1; }
+done
+
+mkdir -p "$REPO/app/libs"
+cp "$AAR" "$REPO/app/libs/libXray.aar"
+echo "==> app/libs/libXray.aar: libXray v$LIBXRAY_VERSION (Xray-core $LIBXRAY_XRAY_COMMIT), $(du -h "$REPO/app/libs/libXray.aar" | cut -f1)"

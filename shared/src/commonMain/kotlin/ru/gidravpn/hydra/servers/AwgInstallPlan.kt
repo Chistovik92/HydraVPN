@@ -61,7 +61,7 @@ object AwgInstallPlan {
             }
             add(Step("deps", "Проверить зависимости (iptables, iproute2, bash)",
                 "command -v iptables >/dev/null && command -v ip >/dev/null && command -v bash >/dev/null || " +
-                    "(apt-get install -y iptables iproute2 bash || dnf install -y iptables iproute bash || apk add iptables iproute2 bash)",
+                    "(DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y iptables iproute2 bash || dnf install -y iptables iproute bash || apk add iptables iproute2 bash)",
                 failHint = "Не удалось поставить iptables/iproute2/bash"))
             add(Step("conf", "Записать $confPath (ключи не показываются)",
                 upload = Step.Upload(confPath, conf(spec, clients).toByteArray(), 384),

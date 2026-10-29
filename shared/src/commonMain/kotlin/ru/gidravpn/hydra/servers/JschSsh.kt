@@ -32,6 +32,12 @@ class HostKeyMismatch(val expected: String, val actual: String) :
 object SshConnector {
     private const val CONNECT_TIMEOUT_MS = 15_000
 
+    /**
+     * Только для живых тестов (0.8.2-b): подмена сеанса, когда пароля стенда нет — команды идут, например, через `wsl -u root`
+     * ([testSessions] возвращает null — обычный SSH). В приложении всегда null.
+     */
+    @Volatile var testSessions: ((SshTarget) -> SshSession?)? = null
+
     private class Pinned(private val expected: String?) : HostKeyRepository {
         @Volatile var seen: String? = null
         override fun check(host: String?, key: ByteArray): Int {
@@ -90,6 +96,7 @@ object SshConnector {
 
     /** Узнать отпечаток, не входя: для показа пользователю при первом подключении. */
     fun fingerprint(t: SshTarget): String {
+        testSessions?.invoke(t)?.let { it.close(); return "SHA256:test-session-${t.host}" }
         val repo = Pinned(null)
         val s = newSession(SshTarget(t.host, t.port, t.user), repo)
         var failure: Throwable? = null
@@ -106,6 +113,7 @@ object SshConnector {
 
     /** Подключиться, сверив отпечаток с [pinned]. */
     fun connect(t: SshTarget, pinned: String): SshSession {
+        testSessions?.invoke(t)?.let { return it }
         val repo = Pinned(pinned)
         val s = newSession(t, repo)
         try { s.connect(CONNECT_TIMEOUT_MS) } catch (e: JSchException) {

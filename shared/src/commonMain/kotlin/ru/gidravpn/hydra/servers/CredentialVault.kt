@@ -59,14 +59,40 @@ class MemoryVault : CredentialVault {
 class FileVault(private val file: File, private val cipher: VaultCipher) : CredentialVault {
     private val lock = Any()
 
+    /** Для чтения: нечитаемый файл — как пустой (приложение спросит пароль заново). */
     private fun read(): JSONObject = runCatching { if (file.isFile) JSONObject(file.readText()) else JSONObject() }.getOrDefault(JSONObject())
+
+    /**
+     * Для записи: временный сбой чтения (файл занят антивирусом) пробрасывается — иначе пустой список записался бы поверх
+     * сохранённых входов всех серверов. Повреждённый JSON откладывается рядом (`.corrupt`), хранилище начинается заново.
+     */
+    private fun readForWrite(): JSONObject {
+        if (!file.isFile) return JSONObject()
+        val text = file.readText()   // IOException — наверх, запись не выполняется
+        return try {
+            JSONObject(text)
+        } catch (_: org.json.JSONException) {
+            runCatching { file.copyTo(File(file.parentFile, file.name + ".corrupt"), overwrite = true) }
+            JSONObject()
+        }
+    }
 
     private fun write(o: JSONObject) {
         file.parentFile?.mkdirs()
         val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(o.toString())
+        tmp.delete()
+        // Права ставятся при создании, без окна, когда файл с шифротекстами читаем всем.
+        runCatching {
+            java.nio.file.Files.createFile(tmp.toPath(), java.nio.file.attribute.PosixFilePermissions.asFileAttribute(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")))
+        }
+        java.io.FileOutputStream(tmp).use { it.write(o.toString().toByteArray(Charsets.UTF_8)); it.flush(); runCatching { it.fd.sync() } }
         runCatching { tmp.setReadable(false, false); tmp.setReadable(true, true); tmp.setWritable(false, false); tmp.setWritable(true, true) }
-        if (!tmp.renameTo(file)) { file.delete(); if (!tmp.renameTo(file)) { file.writeText(o.toString()); tmp.delete() } }
+        // Замена без окна «файла нет»: раньше file.delete() шёл перед повторным переименованием.
+        try {
+            java.nio.file.Files.move(tmp.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+        } catch (_: Exception) {
+            java.nio.file.Files.move(tmp.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
     }
 
     override fun load(id: String): SavedLogin? = synchronized(lock) {
@@ -75,13 +101,13 @@ class FileVault(private val file: File, private val cipher: VaultCipher) : Crede
     }
 
     override fun save(id: String, login: SavedLogin) = synchronized(lock) {
-        val o = read()
+        val o = readForWrite()
         o.put(id, Base64.getEncoder().encodeToString(cipher.encrypt(login.toJson().toString().toByteArray(Charsets.UTF_8))))
         write(o)
     }
 
     override fun remove(id: String) = synchronized(lock) {
-        val o = read()
+        val o = readForWrite()
         if (o.has(id)) { o.remove(id); write(o) }
     }
 
@@ -91,13 +117,17 @@ class FileVault(private val file: File, private val cipher: VaultCipher) : Crede
 /** AES-256-GCM ключом из файла (создаётся при первом обращении, права 0600). ПК без DPAPI: Linux, macOS. */
 class KeyFileCipher(private val keyFile: File) : VaultCipher {
     private val key: javax.crypto.SecretKey by lazy {
-        if (!keyFile.isFile) {
+        // Файл ключа не 32 байта — недописан после сбоя: пользоваться им нельзя (SecretKeySpec упал бы на каждом вызове).
+        if (!keyFile.isFile || keyFile.length() != 32L) {
             keyFile.parentFile?.mkdirs()
             val k = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
-            keyFile.writeBytes(k)
+            // Создаём сразу с правами 0600 и заменяем целиком — без окна, когда ключ читаем всем или записан наполовину.
+            val tmp = File(keyFile.parentFile, keyFile.name + ".tmp").also { it.delete() }
             runCatching {
-                java.nio.file.Files.setPosixFilePermissions(keyFile.toPath(), java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"))
-            }.onFailure { keyFile.setReadable(false, false); keyFile.setReadable(true, true) }
+                java.nio.file.Files.createFile(tmp.toPath(), java.nio.file.attribute.PosixFilePermissions.asFileAttribute(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")))
+            }.onFailure { tmp.createNewFile(); tmp.setReadable(false, false); tmp.setReadable(true, true) }
+            tmp.writeBytes(k)
+            java.nio.file.Files.move(tmp.toPath(), keyFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
         }
         javax.crypto.spec.SecretKeySpec(keyFile.readBytes(), "AES")
     }

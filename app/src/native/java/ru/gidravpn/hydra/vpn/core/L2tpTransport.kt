@@ -62,6 +62,9 @@ class L2tpTransport(
     }
 
     private val random = SecureRandom()
+    // DNS once per connection, not for every control/data packet.
+    private val peerAddress: InetAddress = InetAddress.getByName(host)
+
     val socket = DatagramSocket().also {
         SocketGuard.protect(it) // иначе UDP-трафик уйдёт в собственный tun
     }
@@ -274,7 +277,7 @@ class L2tpTransport(
     private fun send(packet: ByteArray) {
         synchronized(sendLock) {
             runCatching {
-                socket.send(DatagramPacket(packet, packet.size, InetAddress.getByName(host), port))
+                socket.send(DatagramPacket(packet, packet.size, peerAddress, port))
             }
         }
     }

@@ -43,6 +43,13 @@ class SubscriptionSyncTest {
         assertEquals(1, plan.toDelete.size); assertEquals(1, plan.toInsert.size)
     }
 
+    @Test fun partialResponsePreservesUnmatchedProfiles() {
+        val existing = listOf(s(1, "a.example"), s(2, "b.example"))
+        val plan = SubscriptionSync.plan(7, existing, listOf(s(0, "a.example"), s(0, "c.example")), preserveMissing = true)
+        assertTrue(plan.toDelete.isEmpty())
+        assertEquals(listOf("c.example"), plan.toInsert.map { it.address })
+    }
+
     @Test fun duplicatesMatchedInOrder() {
         val plan = SubscriptionSync.plan(7, listOf(s(1, "a"), s(2, "a")), listOf(s(0, "a")))
         assertEquals(listOf(2L), plan.toDelete.map { it.id })

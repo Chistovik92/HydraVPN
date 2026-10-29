@@ -205,4 +205,14 @@
     <string name="ms_panel_open_msg">面板网站将再次可以通过其地址从互联网打开。建议启用 HTTPS。</string>
     <string name="ms_panel_open_btn">开放</string>
     <string name="ms_panel_https_install">面板 HTTPS：为服务器 IP 申请免费的 Let\'s Encrypt 证书（需开放 80/tcp；失败时面板保持 HTTP）</string>
+    <!-- 0.8.2-a2: все типы подключений 3x-ui -->
+    <string name="ms_conn_create">创建连接</string>
+    <string name="ms_conn_title">在面板中新建连接</string>
+    <string name="ms_conn_text">Hydra 会在面板中创建它并添加给面板主用户——其在“服务器”中的订阅会自动获得该连接。</string>
+    <string name="ms_conn_port">端口</string>
+    <string name="ms_conn_udp">基于 UDP 工作——端口将以 UDP 方式开放。部分移动网络会限制 UDP，此时请选择 VLESS/Trojan + REALITY。</string>
+    <string name="ms_conn_cert">需要服务器证书：请先为面板点击“启用 HTTPS”。</string>
+    <string name="ms_panel_pg_hint">Hydra 将安装 Docker（如未安装）、PasarGuard 面板及其节点（使用固定版本的官方安装程序），并以强登录名和密码创建所有者。面板只能通过 Hydra 的安全隧道访问。连接（VLESS / Trojan + REALITY、VMess）可通过“创建连接”按钮创建。安装需要 3–10 分钟。</string>
+    <string name="ms_panel_rw_hint">Hydra 将安装 Docker（如未安装）、固定版本的 Remnawave 面板（含数据库和缓存）、用于其网站的小型代理以及节点，并以强登录名和密码创建所有者。面板只能通过 Hydra 的安全隧道访问。连接（VLESS / Trojan + REALITY）可通过“创建连接”按钮创建。安装需要 3–10 分钟。</string>
+    <string name="ms_fp_changed">⚠ 此服务器的指纹已更改。之前为：%1$s。仅当您重装了服务器或更换了其 SSH 密钥时才信任；否则连接可能被截获。</string>
 </resources>

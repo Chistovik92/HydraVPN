@@ -7,7 +7,7 @@ public enum OpenFluxShare {
     public static let prefix = "openflux://v1/"
     static let minSecretChars = 16
     static let maxPayload = 16 << 10
-    static let knownTypes: Set<String> = ["yandex", "vyandex", "boards", "mailru", "cupsonline", "direct"]
+    static let knownTypes: Set<String> = ["yandex", "vyandex", "boards", "mailru", "cupsonline", "avito", "direct", "telemost"]
     static let streamTypes: Set<String> = ["cupsonline", "mailru"]
 
     public struct Transport: Equatable {

@@ -1,5 +1,7 @@
 package ru.gidravpn.hydra.ui.screens
 
+import ru.gidravpn.hydra.data.model.labelRes
+
 import androidx.compose.ui.res.stringResource
 import ru.gidravpn.hydra.R
 

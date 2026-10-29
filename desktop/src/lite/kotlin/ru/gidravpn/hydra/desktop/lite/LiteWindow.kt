@@ -41,6 +41,7 @@ internal class LiteWindow(
         val home = HomePanel(c, onRelaunchAdmin) { tabs.selectedIndex = 1 }
         val servers = ServersPanel(c)
         val subs = SubsPanel(c)
+        val myServers = MyServersPanel(c, scope)
         val routing = RoutingPanel(c)
         val dpi = DpiPanel(c)
         val settings = SettingsPanel(c)
@@ -49,6 +50,7 @@ internal class LiteWindow(
         tab("Главная", scrolled(home), home)
         tab("Серверы", servers, servers)
         tab("Подписки", subs, subs)
+        tab("Мои серверы", myServers, myServers)
         tab("Маршруты", routing.component, routing)
         tab("Обход DPI", dpi.component, dpi)
         tab("Настройки", settings.component, settings)

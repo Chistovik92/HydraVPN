@@ -28,14 +28,11 @@ object OtherPanels {
     val SUI = Spec(PanelKind.SUI, "alireza0/s-ui", "/usr/local/s-ui", "s-ui", "${ServerOps.STATE_DIR}/sui.installed")
     val XUI = Spec(PanelKind.XUI, "alireza0/x-ui", "/usr/local/x-ui", "x-ui", "${ServerOps.STATE_DIR}/xui-alireza.installed")
 
-    fun spec(kind: PanelKind): Spec? = when (kind) { PanelKind.SUI -> SUI; PanelKind.XUI -> XUI; PanelKind.XUI3 -> null }
+    fun spec(kind: PanelKind): Spec? = when (kind) { PanelKind.SUI -> SUI; PanelKind.XUI -> XUI; PanelKind.XUI3, PanelKind.PASARGUARD, PanelKind.REMNAWAVE, PanelKind.NEXORA -> null }
 
-    fun latestTag(s: Spec, timeoutMs: Int = 15_000): String {
-        val c = URL("https://api.github.com/repos/${s.repo}/releases/latest").openConnection() as HttpURLConnection
-        c.connectTimeout = timeoutMs; c.readTimeout = timeoutMs; c.setRequestProperty("Accept", "application/vnd.github+json")
-        val text = c.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
-        return JSONObject(text).getString("tag_name").also { require(XuiPanel.validTag(it)) { "Неожиданный тег $it" } }
-    }
+    /** Тег, который ставит Hydra (0.8.2-rc2): проверенный выпуск из [ScriptPins] (скрипт сверяется по SHA-256), а не «последний» у апстрима. */
+    @Suppress("UNUSED_PARAMETER")
+    fun latestTag(s: Spec, timeoutMs: Int = 15_000): String = if (s.kind == PanelKind.SUI) ScriptPins.SUI_TAG else ScriptPins.XUI_TAG
 
     fun scriptUrl(s: Spec, tag: String) = "https://raw.githubusercontent.com/${s.repo}/$tag/install.sh"
 
@@ -59,6 +56,7 @@ object OtherPanels {
         PanelKind.XUI -> "set -e\n/usr/local/x-ui/x-ui setting -username '${p.username}' -password '${p.password}' -port ${p.port} -webBasePath '/${p.path}/'\n" +
             "systemctl restart x-ui\n"
         PanelKind.XUI3 -> error("3x-ui ставится через XuiPanel")
+        PanelKind.PASARGUARD, PanelKind.REMNAWAVE, PanelKind.NEXORA -> error("${s.kind.title} ставится своим классом")
     }
 
     fun installSteps(s: Spec, p: Params, openFirewall: Boolean, firewall: String): List<Step> = buildList {
@@ -68,8 +66,9 @@ object OtherPanels {
         add(Step("panel-exists", "Проверить, что ${s.kind.title} и другой панели в ${s.home} ещё нет", "test ! -e ${s.home}",
             failHint = "На сервере уже стоит панель в ${s.home} — удалите её или подключите существующую"))
         add(Step("panel-fetch", "Загрузить установщик ${s.kind.title} ${p.tag} (закреплённый тег)",
-            "(curl -fsSL ${Installer.shq(scriptUrl(s, p.tag))} -o $sc || wget -q -O $sc ${Installer.shq(scriptUrl(s, p.tag))}) && chmod 700 $sc && sha256sum $sc",
-            rollback = "rm -f $sc", failHint = "Не удалось скачать установщик с GitHub"))
+            "(curl -fsSL -m 180 ${Installer.shq(scriptUrl(s, p.tag))} -o $sc || wget -q -O $sc ${Installer.shq(scriptUrl(s, p.tag))}) && chmod 700 $sc && sha256sum $sc" +
+                ScriptPins.verify(s.repo, p.tag, "install.sh", sc).let { if (it.isEmpty()) "" else " && $it" },
+            rollback = "rm -f $sc", failHint = "Не удалось скачать установщик с GitHub или его SHA-256 не совпал с проверенным"))
         val run = when (s.kind) {
             // s-ui спрашивает «изменить настройки?» — отвечаем «нет»: логин и порт задаём сами следующим шагом
             PanelKind.SUI -> "printf 'n\\n' | SUI_LANG=en bash $sc ${p.tag}"
@@ -112,7 +111,7 @@ object OtherPanels {
         val sql = values.entries.joinToString(" ") { (k, v) ->
             "UPDATE settings SET value='$v' WHERE key='$k'; INSERT INTO settings(key, value) SELECT '$k', '$v' WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key='$k');"
         }
-        return "(command -v sqlite3 >/dev/null || (apt-get install -y -q sqlite3 || (apt-get update -q && apt-get install -y -q sqlite3) || dnf install -y sqlite || yum install -y sqlite) >/dev/null 2>&1) && " +
+        return "(command -v sqlite3 >/dev/null || (DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y -q sqlite3 || (DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 update -q && DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y -q sqlite3) || dnf install -y sqlite || yum install -y sqlite) >/dev/null 2>&1) && " +
             "sqlite3 ${dbPath(kind)} ${Installer.shq(sql)}"
     }
 

@@ -25,9 +25,12 @@ class AmneziaWgCore : VpnCore {
     @Volatile private var handle = -1
     @Volatile private var running = false
     @Volatile private var deathListener: ((String) -> Unit)? = null
+    @Volatile private var networkGeneration = 0L
     private var statsThread: Thread? = null
 
     override fun setDeathListener(listener: (reason: String) -> Unit) { deathListener = listener }
+
+    override fun onNetworkChanged() { networkGeneration++ }
 
     override fun start(
         tun: ParcelFileDescriptor,
@@ -59,23 +62,45 @@ class AmneziaWgCore : VpnCore {
 
         // Сокеты Go — за пределы VPN. Приложение и так исключено из tun, но protect() — гарантия
         // при режиме split «только выбранные», где исключение не действует.
-        listOf(GoBackend.awgGetSocketV4(h), GoBackend.awgGetSocketV6(h)).filter { it >= 0 }
-            .forEach { SocketGuard.protect(it) }
+        fun protectSockets() {
+            listOf(GoBackend.awgGetSocketV4(h), GoBackend.awgGetSocketV6(h)).filter { it >= 0 }
+                .forEach { SocketGuard.protect(it) }
+        }
+        protectSockets()
         onLog("AmneziaWG: туннель поднят (handle=$h)")
 
         statsThread = thread(name = "awg-stats", isDaemon = true) {
+            var seenGeneration = networkGeneration
+            var lastHandshakeSec = 0L
+            var staleSince = 0L
             while (running) {
+                if (seenGeneration != networkGeneration) {
+                    seenGeneration = networkGeneration
+                    protectSockets()
+                    staleSince = System.currentTimeMillis()
+                    onLog("AmneziaWG: физическая сеть сменилась, сокеты привязаны заново")
+                }
                 val cfg = runCatching { GoBackend.awgGetConfig(h) }.getOrNull()
                 if (cfg == null) {
                     if (running) deathListener?.invoke("amneziawg-go не отвечает")
                     break
                 }
                 var rx = 0L; var tx = 0L
+                var handshakeSec = 0L
                 cfg.lineSequence().forEach { l ->
                     when {
                         l.startsWith("rx_bytes=") -> rx += l.substringAfter('=').toLongOrNull() ?: 0
                         l.startsWith("tx_bytes=") -> tx += l.substringAfter('=').toLongOrNull() ?: 0
+                        l.startsWith("last_handshake_time_sec=") -> handshakeSec = l.substringAfter('=').toLongOrNull() ?: 0
                     }
+                }
+                if (handshakeSec > lastHandshakeSec) {
+                    lastHandshakeSec = handshakeSec
+                    staleSince = 0L
+                } else if (staleSince == 0L) staleSince = System.currentTimeMillis()
+                if (AwgHealth.isHandshakeStale(lastHandshakeSec, staleSince, System.currentTimeMillis())) {
+                    if (running) deathListener?.invoke("AmneziaWG: рукопожатие устарело после смены сети или потери связи")
+                    break
                 }
                 onStats(TrafficStats(downBytes = rx, upBytes = tx))
                 try { Thread.sleep(1000) } catch (_: InterruptedException) { break }

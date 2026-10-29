@@ -54,10 +54,10 @@ class SelfUpdateTest {
         val marker = File(tmp, "launched.txt")
         val launcher: String?
         if (os == Os.WINDOWS) {
-            File(payload, "Hydra.cmd").writeText("@echo off\r\ntype \"%~dp0version.txt\" > \"${marker.absolutePath}\"\r\n")
+            File(payload, "Hydra.cmd").writeText("@echo off\r\ntype \"%~dp0version.txt\" > \"${marker.absolutePath}\"\r\necho started > \"%~dp0.update-started\"\r\n")
             launcher = "Hydra.cmd"
         } else {
-            File(payload, "run.sh").writeText("#!/bin/sh\ncat \"\$(dirname \"\$0\")/version.txt\" > '${marker.absolutePath}'\n")
+            File(payload, "run.sh").writeText("#!/bin/sh\ncat \"\$(dirname \"\$0\")/version.txt\" > '${marker.absolutePath}'\ntouch \"\$(dirname \"\$0\")/.update-started\"\n")
             launcher = "sh \"\$ROOT/run.sh\""
         }
         val dying = ProcessBuilder(if (os == Os.WINDOWS) listOf("ping", "-n", "3", "127.0.0.1") else listOf("sleep", "2")).start()
@@ -66,11 +66,41 @@ class SelfUpdateTest {
         val end = System.currentTimeMillis() + 40_000
         while (!marker.exists() && System.currentTimeMillis() < end) Thread.sleep(200)
         assertTrue("новая версия не запустилась", marker.exists())
-        Thread.sleep(2500)                                                   // скрипт чистит за собой после запуска
+        val cleanupEnd = System.currentTimeMillis() + 20_000                 // скрипт ждёт подтверждение запуска
+        while (File(tmp, "Hydra.old").exists() && System.currentTimeMillis() < cleanupEnd) Thread.sleep(200)
         assertEquals("new", File(root, "version.txt").readText().trim())
         assertFalse("старый файл не должен остаться", File(root, "stale.jar").exists())
         assertFalse(File(tmp, "Hydra.old").exists())
         assertTrue(marker.readText().trim() == "new")
         assertNotNull(root.listFiles())
+    }
+
+    @Test fun scriptRollsBackWhenNewVersionDoesNotConfirmStartup() {
+        val os = Platform.os
+        val tmp = Files.createTempDirectory("hydra-rollback").toFile()
+        val root = File(tmp, "Hydra").apply { mkdirs() }
+        File(root, "version.txt").writeText("old")
+        val stage = File(tmp, ".hydra-update-Hydra")
+        val payload = File(stage, "Hydra").apply { mkdirs() }
+        File(payload, "version.txt").writeText("broken")
+        val marker = File(tmp, "launched.txt")
+        val launcher: String?
+        if (os == Os.WINDOWS) {
+            File(payload, "Hydra.cmd").writeText("@echo off\r\nexit /b 1\r\n")
+            File(root, "Hydra.cmd").writeText("@echo off\r\ntype \"%~dp0version.txt\" > \"${marker.absolutePath}\"\r\n")
+            launcher = "Hydra.cmd"
+        } else {
+            File(payload, "run.sh").writeText("#!/bin/sh\nexit 1\n")
+            File(root, "run.sh").writeText("#!/bin/sh\ncat \"\$(dirname \"\$0\")/version.txt\" > '${marker.absolutePath}'\n")
+            launcher = "sh \"\$ROOT/run.sh\""
+        }
+        val dying = ProcessBuilder(if (os == Os.WINDOWS) listOf("ping", "-n", "2", "127.0.0.1") else listOf("sleep", "1")).start()
+        SelfUpdate.launch(os, root, payload, stage, launcher, pid = dying.pid())
+        val end = System.currentTimeMillis() + 45_000
+        while (!marker.exists() && System.currentTimeMillis() < end) Thread.sleep(200)
+        assertTrue("старая версия не была запущена после отката", marker.exists())
+        assertEquals("old", File(root, "version.txt").readText().trim())
+        assertFalse(File(tmp, "Hydra.old").exists())
+        assertTrue(File(tmp, "Hydra.update-failed").isDirectory)
     }
 }

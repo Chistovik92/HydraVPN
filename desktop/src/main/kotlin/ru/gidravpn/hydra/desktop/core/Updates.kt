@@ -82,8 +82,8 @@ object Updates {
             if (replaced) return true to "Обновление скачано: Hydra перезапустится сама через несколько секунд."
         }
         return when {
-            n.endsWith(".msi") -> { ProcessBuilder("msiexec", "/i", file.absolutePath).start(); true to "Запущен установщик — Hydra закроется." }
-            n.endsWith(".exe") -> { ProcessBuilder(file.absolutePath).start(); true to "Запущен установщик — Hydra закроется." }
+            n.endsWith(".msi") -> { startAfterExit(file, listOf("msiexec", "/i", file.absolutePath)); true to "Hydra закроется, установщик откроется следом." }
+            n.endsWith(".exe") -> { startAfterExit(file, listOf(file.absolutePath)); true to "Hydra закроется, установщик откроется следом." }
             n.endsWith(".dmg") -> { ProcessBuilder("open", file.absolutePath).start(); false to "Образ открыт: перетащите Hydra в «Программы», заменив старую, и перезапустите." }
             n.endsWith(".appimage") -> replaceAppImage(file)
             n.endsWith(".deb") || n.endsWith(".rpm") -> {
@@ -102,6 +102,45 @@ object Updates {
                 false to "Архив скачан: ${file.absolutePath}. Распакуйте поверх старой копии."
             }
         }
+    }
+
+    /**
+     * A7 (0.8.2-a4): установщик Windows — только после того, как Hydra и её ядра вышли. Раньше он запускался сразу, пока Hydra
+     * ещё закрывалась: занятые файлы (`runtime\lib\modules`, ресурсы, ядра) установщик без прав администратора заменить не
+     * может (ошибка 1304, проверка `installer-nonadmin` в CI), а старая версия к этому моменту уже удалена — Hydra пропадала,
+     * с окнами это выглядело как зависание. Ждёт скрытый PowerShell: выход этого процесса и процессов из папки установки.
+     */
+    private fun startAfterExit(installer: File, cmd: List<String>) {
+        val dir = Platform.selfExecutable?.let { File(it).parentFile?.absolutePath }
+        val ps1 = File(installer.parentFile, "hydra-install.ps1")
+        ProcessBuilder(powershellFile(writeScript(ps1, afterExitScript(ProcessHandle.current().pid(), dir, cmd)))).start()
+    }
+
+    /**
+     * Скрипт — файлом, а не в `-Command`: Java на Windows не экранирует кавычки внутри аргумента, и путь в кавычках
+     * (`msiexec /i "…\Hydra VPN\…"`) развалил бы командную строку. `-EncodedCommand` не годится: антивирусы
+     * (проверено: Kaspersky — «Отказано в доступе») не дают запустить скрытый PowerShell с закодированной командой.
+     * UTF-8 с BOM — иначе Windows PowerShell 5 прочтёт кириллицу в пути как ANSI.
+     */
+    internal fun writeScript(f: File, script: String): File = f.apply {
+        parentFile?.mkdirs()
+        writeBytes(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + script.toByteArray(Charsets.UTF_8))
+    }
+
+    internal fun powershellFile(f: File): List<String> = listOf("powershell", "-NoProfile", "-NonInteractive",
+        "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", f.absolutePath)
+
+    internal fun afterExitScript(pid: Long, installDir: String?, cmd: List<String>): String {
+        fun lit(s: String) = "'" + s.replace("'", "''") + "'"
+        val args = cmd.drop(1).joinToString(" ") { if (it.any { c -> c == ' ' || c == '\t' }) "\"$it\"" else it }
+        val waitDir = installDir?.let {
+            "\$d = ${lit(it.trimEnd('\\') + "\\")}; " +
+                "Get-Process -ErrorAction SilentlyContinue | Where-Object { \$_.Path -and \$_.Path.StartsWith(\$d, 'OrdinalIgnoreCase') -and \$_.Id -ne \$PID } | " +
+                "Wait-Process -Timeout 30 -ErrorAction SilentlyContinue; "
+        }.orEmpty()
+        return "Wait-Process -Id $pid -Timeout 90 -ErrorAction SilentlyContinue; $waitDir" +
+            "Start-Sleep -Seconds 2; " +
+            "Start-Process -FilePath ${lit(cmd.first())}" + (if (args.isNotEmpty()) " -ArgumentList ${lit(args)}" else "")
     }
 
     /** AppImage заменяет сам себя: новый файл ложится на место старого, запуск — вручную (старый ещё работает). */

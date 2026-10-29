@@ -13,13 +13,15 @@ ROOT="$PWD"
 OUT="$ROOT/dist/awg-server"
 WORK="${WORK:-$(mktemp -d)}"
 AWG_GO_VERSION="${AWG_GO_VERSION:-v3.1.20260828}"
-AWG_TOOLS_REF="${AWG_TOOLS_REF:-master}"
+# Текущий стабильный выпуск v3.1.20260812 (раньше здесь был подвижный master).
+AWG_TOOLS_REF="${AWG_TOOLS_REF:-ee0f0a9aa34ff0a0da4b3433b9512781cfe02843}"
 ARCHS=("$@"); [[ ${#ARCHS[@]} -gt 0 ]] || ARCHS=(amd64 arm64 armv7)
 
 git clone --depth 1 --branch "$AWG_GO_VERSION" https://github.com/amnezia-vpn/amneziawg-go.git "$WORK/go" 2>/dev/null \
   || git clone --depth 1 https://github.com/amnezia-vpn/amneziawg-go.git "$WORK/go"
 git clone --depth 1 --branch "$AWG_TOOLS_REF" https://github.com/amnezia-vpn/amneziawg-tools.git "$WORK/tools" 2>/dev/null \
-  || git clone https://github.com/amnezia-vpn/amneziawg-tools.git "$WORK/tools"
+  || { git clone https://github.com/amnezia-vpn/amneziawg-tools.git "$WORK/tools" \
+    && git -C "$WORK/tools" checkout --detach "$AWG_TOOLS_REF"; }
 echo "    amneziawg-go: $(git -C "$WORK/go" describe --tags --always)  tools: $(git -C "$WORK/tools" rev-parse --short HEAD)"
 
 for arch in "${ARCHS[@]}"; do

@@ -32,7 +32,9 @@ object WireGuardParser {
     /** Разворачивает ссылку wireguard://…/awg://… в текст .conf. */
     private fun maybeUnwrapLink(text: String): String? {
         val t = text.trim()
+        uriForm(t)?.let { return it }
         return when {
+            t.startsWith("vpn://", ignoreCase = true) -> decodeBody(t.substringAfter("://"))?.takeIf { "[Interface]" in it }
             t.startsWith("wireguard://", ignoreCase = true) -> decodeBody(t.substringAfter("://"))
             t.startsWith("wg://", ignoreCase = true) -> decodeBody(t.substringAfter("://"))
             t.startsWith("awg://", ignoreCase = true) -> decodeBody(t.substringAfter("://"))
@@ -48,6 +50,37 @@ object WireGuardParser {
         val pad = if (cleaned.length % 4 == 0) 0 else 4 - cleaned.length % 4
         String(Base64.decode(cleaned + "=".repeat(pad)))
     }.getOrElse { runCatching { decode(body) }.getOrNull() }
+
+    /**
+     * URI-форма `wireguard://<закрытый ключ>@хост:порт?publickey=…&address=…&mtu=…&presharedkey=…#имя` (так её отдают 3x-ui,
+     * v2rayN, sing-box) — в текст .conf (0.8.2-a2). null — это не URI-форма (тогда base64 целого конфига).
+     */
+    private fun uriForm(t: String): String? {
+        val scheme = t.substringBefore("://").lowercase()
+        if (scheme != "wireguard" && scheme != "wg") return null
+        val body = t.substringAfter("://").substringBefore("#")
+        if ('@' !in body || !body.contains("publickey=", true)) return null
+        // «+» в base64-ключах — не пробел (URLDecoder иначе портит ключ)
+        fun dec(v: String) = java.net.URLDecoder.decode(v.replace("+", "%2B"), "UTF-8")
+        val priv = dec(body.substringBeforeLast("@"))
+        val hostPort = body.substringAfterLast("@").substringBefore("?").removeSuffix("/")
+        val q = body.substringAfter("?", "").split("&").filter { '=' in it }
+            .associate { it.substringBefore("=").lowercase() to dec(it.substringAfter("=")) }
+        val pub = q["publickey"] ?: return null
+        return buildString {
+            appendLine("[Interface]")
+            appendLine("PrivateKey = $priv")
+            q["address"]?.let { appendLine("Address = $it") }
+            q["mtu"]?.let { appendLine("MTU = $it") }
+            q["dns"]?.let { appendLine("DNS = $it") }
+            appendLine("[Peer]")
+            appendLine("PublicKey = $pub")
+            q["presharedkey"]?.let { appendLine("PresharedKey = $it") }
+            appendLine("AllowedIPs = ${q["allowedips"] ?: "0.0.0.0/0, ::/0"}")
+            appendLine("Endpoint = $hostPort")
+            q["keepalive"]?.let { appendLine("PersistentKeepalive = $it") }
+        }
+    }
 
     /** Разбор .conf: первая секция [Interface] + первый [Peer]. */
     private fun parseConf(conf: String, isAmnezia: Boolean): Pair<Map<String, String>, JSONObject>? {

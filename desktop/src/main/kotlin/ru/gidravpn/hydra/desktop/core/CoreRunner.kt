@@ -72,6 +72,7 @@ class CoreRunner(
     @Synchronized
     fun start(session: Int, configJson: String, mode: ConnectionMode, xrayConfig: String? = null, xraySocksPort: Int = 0, sidecar: Sidecar? = null, extraSidecars: List<Sidecar> = emptyList()) {
         check(singBox?.alive != true && xray?.alive != true) { "ядро уже запущено" }
+        aborting = false
         val core = Platform.bundledCore()
             ?: error("Не найдено ядро sing-box в пакете приложения — переустановите Hydra")
         val dir = Platform.runDir
@@ -147,27 +148,35 @@ class CoreRunner(
     @Synchronized
     fun stop() {
         AppNet.clear()   // трафик Hydra снова напрямую: прокси ядра больше нет
-        singBox?.stop()
-        singBox = null
-        xray?.stop()
-        xray = null
+        // Каждый шаг отдельно, а ссылки сбрасываем до остановки: сбой одного (macOS: отказ в пароле при остановке
+        // корневого ядра) раньше обрывал stop() — остальные ядра и секреты оставались.
+        val sb = singBox; singBox = null
+        runCatching { sb?.stop() }
+        val xr = xray; xray = null
+        runCatching { xr?.stop() }
         extra.forEach { runCatching { it.stop() } }
         extra.clear()
         synchronized(this) { inProcess.forEach { runCatching { it.close() } }; inProcess.clear() }
         sidecarSecrets.forEach { runCatching { it.delete() } }
         sidecarSecrets = emptyList()
+        // Конфиги с UUID и паролями серверов нужны только работающему ядру.
+        listOf("config.json", "xray.json").forEach { runCatching { File(Platform.runDir, it).delete() } }
         // 0.8.0-rc2: в портативной Windows-сборке sing-box и Xray оставались в диспетчере задач после «Отключить» и выхода.
         // Добиваем всё, что запускали мы (с деревом), и любые процессы с путями наших ядер.
         spawned.toList().forEach { p -> runCatching { killTree(p) }; spawned.remove(p) }
         runCatching { killByExecutable(ownBinaries()) }
     }
 
-    private fun ownBinaries(): List<File> = listOfNotNull(Platform.bundledCore(), Platform.bundledXray(), Platform.bundledOpenFlux(), Platform.bundledOlcRtc(), Platform.bundledByeDpi())
+    private fun ownBinaries(): List<File> = listOfNotNull(Platform.bundledCore(), Platform.bundledXray(), Platform.bundledOpenFlux(), Platform.bundledOlcRtc(), Platform.bundledByeDpi(), File(Platform.dataDir, "bin/sing-box").takeIf { it.isFile })
+
+    /** «Отключить» во время запуска: ожидание готовности дочернего клиента (до 45 с) прерывается сразу, а не держит монитор. */
+    @Volatile private var aborting = false
+    fun abortStart() { aborting = true }
 
     private fun waitPort(port: Int, h: Handle, timeoutMs: Long = 8000): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
-            if (!h.alive) return false
+            if (!h.alive || aborting) return false
             val open = runCatching {
                 Socket(Proxy.NO_PROXY).use { it.connect(InetSocketAddress("127.0.0.1", port), 300) }
             }.isSuccess
@@ -187,10 +196,17 @@ class CoreRunner(
          * запуска держало бы порты. Гасим его, если pid всё ещё принадлежит нашему ядру.
          */
         fun killStale() {
-            killStale(CORE_PID, "sing-box")
-            killStale(XRAY_PID, "xray")
-            killStale(SIDECAR_PID, "olcrtc", "openflux")
-            (0 until 24).forEach { killStale("sidecar-$it.pid", "olcrtc", "openflux", "ciadpi") }
+            killStale(CORE_PID)
+            killStale(XRAY_PID)
+            killStale(SIDECAR_PID)
+            (0 until 24).forEach { killStale("sidecar-$it.pid") }
+            // Остатки прошлого запуска, если Hydra упала: конфиги с паролями серверов и ключи клиентов узлов.
+            runCatching {
+                Platform.runDir.listFiles()?.filter {
+                    it.name == "config.json" || it.name == "xray.json" ||
+                        (it.name.startsWith("openflux-") && it.name.endsWith(".key")) || (it.name.startsWith("olcrtc-client-") && it.name.endsWith(".yaml"))
+                }?.forEach { runCatching { it.delete() } }
+            }
         }
 
         /** Завершает процесс вместе с потомками; на Windows `destroy()` потомков не трогает. */
@@ -215,13 +231,24 @@ class CoreRunner(
             return n
         }
 
-        private fun killStale(pidName: String, vararg prefixes: String) {
+        /** Сравнение идентичности процесса по полному пути, а не по короткому имени (PID мог уже занять другой core). */
+        internal fun isOwnedProcess(handle: ProcessHandle, files: Collection<File>): Boolean {
+            val paths = files.mapNotNull { runCatching { it.canonicalPath.lowercase() }.getOrNull() }.toSet()
+            return paths.isNotEmpty() && handle.pid() != ProcessHandle.current().pid() &&
+                handle.info().command().map { c -> runCatching { File(c).canonicalPath.lowercase() in paths }.getOrDefault(false) }.orElse(false)
+        }
+
+        private fun ownCoreBinaries(): List<File> = listOfNotNull(
+            Platform.bundledCore(), Platform.bundledXray(), Platform.bundledOpenFlux(),
+            Platform.bundledOlcRtc(), Platform.bundledByeDpi(),
+            File(Platform.dataDir, "bin/sing-box").takeIf { it.isFile },
+        )
+
+        private fun killStale(pidName: String) {
             val pidFile = File(Platform.runDir, pidName)
             val pid = runCatching { pidFile.readText().trim().toLong() }.getOrNull()
             if (pid != null) {
-                ProcessHandle.of(pid).filter { h ->
-                    h.info().command().map { c -> prefixes.any { File(c).name.startsWith(it) } }.orElse(false)
-                }.ifPresent { h ->
+                ProcessHandle.of(pid).filter { isOwnedProcess(it, ownCoreBinaries()) }.ifPresent { h ->
                     h.destroy()
                     runCatching { h.onExit().get(3, TimeUnit.SECONDS) }
                     if (h.isAlive) h.destroyForcibly()
@@ -238,7 +265,7 @@ class CoreRunner(
         val p = pb.start()
         spawned += p
         val pidFile = File(dir, pidName)
-        runCatching { pidFile.writeText(p.pid().toString()) }
+        runCatching { Store.writePrivateAtomic(pidFile, p.pid().toString()) }
         thread(isDaemon = true, name = "$name-log") {
             runCatching { p.inputStream.bufferedReader().forEachLine { onLog(tag(it)) } }
             val code = runCatching { p.waitFor() }.getOrDefault(-1)
@@ -288,7 +315,7 @@ class CoreRunner(
     }
 
     private fun startMacRoot(session: Int, core: File, config: File, dir: File): Handle {
-        val log = File(dir, "sing-box.log").apply { writeText("") }
+        val log = File(dir, "sing-box.log").apply { writeText(""); Platform.privateFile(this) }
         fun q(f: File) = "'" + f.absolutePath.replace("'", "'\\''") + "'"
         val shell = "${q(core)} run -c ${q(config)} -D ${q(dir)} > ${q(log)} 2>&1 & echo \$!"
         val out = osascript("do shell script \"${shell.replace("\\", "\\\\").replace("\"", "\\\"")}\" with administrator privileges")

@@ -49,8 +49,18 @@ jobs:
     uses: ./.github/workflows/ios.yml
     secrets: inherit
 
+  # A7 (0.8.2-a4): MSI и EXE ставятся обычным пользователем Windows (без прав администратора), в т. ч. поверх прошлой версии.
+  installer-nonadmin:
+    needs: [ desktop ]
+    uses: ./.github/workflows/installer-nonadmin.yml
+    with:
+      artifact: hydra-desktop-windows-x64
+      # 0.8.2-rc2: обновление пре-релиза поверх пре-релиза (у rc1 MSI-версия 0.8.2 — как у беты; ошибка 1638 у владельца).
+      # Каждый следующий кандидат ставит сюда предыдущий пре-релиз.
+      old_tag: v0.8.2-rc1
+
   publish:
-    needs: [ desktop, ios, awg-server ]
+    needs: [ desktop, ios, awg-server, installer-nonadmin ]
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}

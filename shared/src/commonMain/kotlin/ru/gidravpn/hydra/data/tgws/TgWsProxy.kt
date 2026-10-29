@@ -263,22 +263,45 @@ class TgWsProxy(
     private fun sha256(b: ByteArray) = java.security.MessageDigest.getInstance("SHA-256").digest(b)
 
 
-    /** WebSocket до ЦОД: сначала домены `kws*`, у каждого - адреса из DNS и запасной. Помнит редиректы и недавние сбои. */
+    /** Последний рабочий адрес WebSocket для ЦОД (домен, IP) — пробуется первым. */
+    private val goodWs = ConcurrentHashMap<Pair<Int, Boolean>, Pair<String, String>>()
+    /** Адреса, до которых недавно не удалось подключиться (у провайдера заблокирован отдельный IP), — в конец очереди на 5 минут. */
+    private val badIp = ConcurrentHashMap<String, Long>()
+
+    /**
+     * WebSocket до ЦОД: домены `kws*`, у каждого — адреса из DNS и запасной. 0.8.2-a2 (владелец: «TG WS не работает»): раньше
+     * адреса пробовались **по очереди** с ожиданием до 10 с каждого — при заблокированном первом адресе (на стенде 15.10.2026:
+     * kws2 → 149.154.167.99, Connect timed out) Telegram не дожидался ответа и обрывал соединение. Теперь все адреса пробуются
+     * **одновременно** (первый ответивший побеждает, остальные закрываются), рабочий запоминается, недоступные уходят в конец очереди.
+     */
     private fun openWs(dc: Int, media: Boolean): WebSocket? {
         val key = dc to media
         if (key in wsBlacklist) return null
         val now = System.currentTimeMillis()
-        val timeout = if (now < (failUntil[key] ?: 0L)) 2_000 else 10_000
-        var allRedirects = true
-        for (domain in wsDomains(dc, media)) {
-            for (ip in candidateIps(domain, dcIps.getValue(dc))) {
-                try { return WebSocket.connect(ip, domain, timeout).also { allRedirects = false } }
-                catch (e: WebSocket.Redirect) { log("TG WS: ЦОД$dc $domain ($ip) → редирект ${e.code}") }
-                catch (e: Exception) { allRedirects = false; log("TG WS: ЦОД$dc $domain ($ip): ${e.message}") }
+        val timeout = if (now < (failUntil[key] ?: 0L)) 2_500 else 7_000
+        val good = goodWs[key]
+        val cands = wsDomains(dc, media).flatMap { d -> candidateIps(d, dcIps.getValue(dc)).map { d to it } }.distinct()
+            .sortedBy { c -> if (c == good) 0 else if ((badIp[c.second] ?: 0L) > now) 2 else 1 }
+        if (cands.isEmpty()) return null
+        val result = java.util.concurrent.CompletableFuture<WebSocket?>()
+        val left = java.util.concurrent.atomic.AtomicInteger(cands.size)
+        val redirects = java.util.concurrent.atomic.AtomicInteger(0)
+        cands.forEachIndexed { i, (domain, ip) ->
+            pool.execute {
+                try {
+                    // недоступные недавно — чуть позже: если живой адрес ответит сразу, к ним даже не подключаемся
+                    if ((badIp[ip] ?: 0L) > now) Thread.sleep(400L + 100L * i)
+                    if (result.isDone) return@execute
+                    val ws = WebSocket.connect(ip, domain, timeout)
+                    if (result.complete(ws)) goodWs[key] = domain to ip else ws.close()
+                } catch (e: WebSocket.Redirect) { redirects.incrementAndGet(); log("TG WS: ЦОД$dc $domain ($ip) → редирект ${e.code}") }
+                catch (e: Exception) { badIp[ip] = System.currentTimeMillis() + 300_000; log("TG WS: ЦОД$dc $domain ($ip): ${e.message}") }
+                finally { if (left.decrementAndGet() == 0) result.complete(null) }
             }
         }
-        if (allRedirects) wsBlacklist += key else failUntil[key] = now + 30_000
-        return null
+        val ws = runCatching { result.get(timeout + 3_000L, java.util.concurrent.TimeUnit.MILLISECONDS) }.getOrNull()
+        if (ws == null) { if (redirects.get() == cands.size) wsBlacklist += key else failUntil[key] = now + 30_000 }
+        return ws
     }
 
     /** Клиент говорит открытым MTProto: режем его по границам сообщений, шифруем своим потоком и в обратную сторону расшифровываем. */

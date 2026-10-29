@@ -90,7 +90,7 @@ public enum LinkParser {
         let main = String(hashSplit[0])
         let qSplit = main.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
         let transport = String(qSplit[0]).trimmingCharacters(in: .whitespaces).lowercased()
-        guard ["yandex", "vyandex", "oneme", "cupsonline", "mailru", "direct"].contains(transport) else { return nil }
+        guard ["yandex", "vyandex", "oneme", "cupsonline", "avito", "mailru", "telemost", "direct"].contains(transport) else { return nil }
         var q: [String: String] = [:]
         if qSplit.count > 1 {
             for kv in qSplit[1].split(separator: "&") where kv.contains("=") {

@@ -14,6 +14,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -288,6 +289,10 @@ private fun AddServerCard(m: MyServersManager, s: MyServersUi, onClose: () -> Un
                 Text(stringResource(R.string.ms_fp_text), color = TextSecondary, fontSize = 13.sp)
                 Spacer(Modifier.height(6.dp))
                 SelectionContainer { Text(s.fingerprint, fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = TextPrimary) }
+                if (s.previousFingerprint.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(stringResource(R.string.ms_fp_changed, s.previousFingerprint), color = androidx.compose.ui.graphics.Color(0xFFEF4444), fontSize = 13.sp)
+                }
                 Spacer(Modifier.height(10.dp))
                 MsRow {
                     if (!s.busy) MsChip(stringResource(R.string.ms_trust), AccentCyan) { m.confirmFingerprint() }
@@ -337,11 +342,18 @@ private fun ServerCard(srv: MyServer, m: MyServersManager, s: MyServersUi, onAdd
         }
 
         Divider()
+        // нода чужой панели (0.8.2-a4): службы на ней ставит и снимает главная панель
+        srv.nodeOf?.let { r ->
+            Text(stringResource(R.string.ms_node_of, r.kind.title, r.mainName), color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.ms_node_of_hint, r.mainName), color = TextMuted, fontSize = 12.sp)
+        }
+        if (srv.nodeOf == null) {
         AwgSection(srv, st, m, busy, onAddClient, onConfirm) { installKind = ServerKind.AMNEZIAWG }
         Divider()
         OfxSection(srv, st, m, busy, onConfirm) { installKind = ServerKind.OPENFLUX }
         Divider()
         PanelSection(srv, st, m, s, onAddUser, onConfirm) { k -> installKind = k }
+        }
 
         val inst = s.install?.takeIf { it.serverId == srv.id }
         if (installKind != null && inst == null) { Spacer(Modifier.height(8.dp)); InstallForm(installKind!!, busy, onCancel = { installKind = null }) { f -> m.prepareInstall(srv.id, f) } }
@@ -452,6 +464,7 @@ private fun PanelSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, 
     val ctx = LocalContext.current
     val p = srv.panel
     val busy = s.busy
+    var pickPanel by remember { mutableStateOf(false) }
     Text(p?.let { stringResource(R.string.ms_panel_kind, it.kind.title) } ?: stringResource(R.string.ms_panel_title), color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
     if (p == null) {
         Text(stringResource(R.string.ms_panel_none), color = TextMuted, fontSize = 12.sp)
@@ -462,6 +475,27 @@ private fun PanelSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, 
             if (st?.xuiInstalled != true) MsChip(stringResource(R.string.ms_panel_install), AccentViolet) { if (!busy) onInstall(ServerKind.PANEL_3XUI) }
             if (st?.suiInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "s-ui"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_SUI) }
             if (st?.xuiInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "x-ui"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_XUI) }
+            if (st?.pgInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "PasarGuard"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_PASARGUARD) }
+            if (st?.rwInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "Remnawave"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_REMNAWAVE) }
+            if (st?.nexoraInstalled != true) MsChip(stringResource(R.string.ms_panel_install_other, "Nexora"), TextSecondary) { if (!busy) onInstall(ServerKind.PANEL_NEXORA) }
+            if (!srv.hasServices) MsChip(stringResource(R.string.ms_node_install), AccentCyan) { if (!busy) pickPanel = true }
+        }
+        if (pickPanel) {
+            val panels = m.nodePanels(srv.id)
+            AlertDialog(onDismissRequest = { pickPanel = false },
+                title = { Text(stringResource(R.string.ms_node_install_title, srv.name)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (panels.isEmpty()) Text(stringResource(R.string.ms_node_install_none), fontSize = 13.sp)
+                        else {
+                            Text(stringResource(R.string.ms_node_install_hint), fontSize = 13.sp)
+                            panels.forEach { main ->
+                                OutlinedButton(onClick = { pickPanel = false; m.installNode(srv.id, main.id) }) { Text("${main.panel?.kind?.title} · ${main.name} (${main.host})") }
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { pickPanel = false }) { Text(stringResource(android.R.string.cancel)) } })
         }
         return
     }
@@ -469,6 +503,7 @@ private fun PanelSection(srv: MyServer, st: ServerStatus?, m: MyServersManager, 
     val state = st?.takeIf { it.error == null }?.xuiState?.takeIf { it.isNotBlank() }
     Text(stringResource(R.string.ms_panel_line, p.version.ifBlank { "—" }, state ?: "—"), color = if (state == "active") Success else TextMuted, fontSize = 12.sp)
     PanelBody(srv, m, s, onAddUser)
+    PanelBackupsSection(srv, m, s)
     Spacer(Modifier.height(6.dp))
     MsRow {
         MsChip(stringResource(R.string.ms_restart), TextSecondary) { if (!busy) m.restartService(srv.id, kind) }
@@ -510,7 +545,8 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
     }
     if (local) Text(stringResource(R.string.ms_panel_local), color = Success, fontSize = 11.sp)
     if (tunnel != null) Text(stringResource(R.string.ms_tunnel_open, tunnel), color = TextMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-    if (!XuiPanel.isHttps(p.baseUrl)) {
+    // PasarGuard слушает только 127.0.0.1 сервера: http:// идёт внутри SSH-туннеля
+    if (!XuiPanel.isHttps(p.baseUrl) && !p.kind.tunnelOnly) {
         Text(stringResource(R.string.ms_panel_http), color = TextMuted, fontSize = 11.sp)
         // сертификат на IP ставится по SSH — только у панели на своём сервере (у подключённой по токену SSH нет); с rc2 — у всех трёх
         if (ssh) MsRow { MsChip(stringResource(R.string.ms_panel_https), AccentCyan) { if (!busy) m.enablePanelHttps(srv.id) } }
@@ -522,14 +558,21 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
         if (p.password.isNotBlank()) MsChip(stringResource(R.string.ms_copy_password), TextSecondary) { copySecret(clip, p.password); Toast.makeText(ctx, pwMsg, Toast.LENGTH_SHORT).show() }
         if (tunnel != null) MsChip(stringResource(R.string.ms_tunnel_close), TextSecondary) { m.closePanelTunnel(srv.id) }
         // пользователи через API — только у 3x-ui (токен); у s-ui и x-ui — на сайте панели
-        if (p.token.isNotBlank()) {
+        if (ru.gidravpn.hydra.servers.OtherPanelUsers.supported(srv)) {
             MsChip(stringResource(R.string.ms_panel_users), AccentViolet) { if (!busy) m.loadPanelClients(srv.id) }
             MsChip(stringResource(R.string.ms_panel_add_user), AccentCyan) { if (!busy) onAddUser() }
         }
     }
-    if (p.token.isBlank()) Text(stringResource(R.string.ms_panel_site_only), color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+    // все типы подключений 3x-ui (0.8.2-a2)
+    var createConn by remember { mutableStateOf(false) }
+    if (ru.gidravpn.hydra.servers.OtherPanelConnections.canCreate(srv))
+        MsRow { MsChip(stringResource(R.string.ms_conn_create), AccentCyan) { if (!busy) createConn = true } }
+    if (createConn) CreateConnectionDialog(ru.gidravpn.hydra.servers.OtherPanelConnections.typesFor(p.kind), p.nodes, https = XuiPanel.isHttps(p.baseUrl), onClose = { createConn = false }) { type, port, mask, node, customDomain ->
+        createConn = false; m.createPanelConnection(srv.id, type, port, mask, node, customDomain)
+    }
+    if (!ru.gidravpn.hydra.servers.OtherPanelUsers.supported(srv)) Text(stringResource(R.string.ms_panel_site_only), color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
     // «ничего наружу без согласия» (0.8.1-rc2): панель слушает только сам сервер, сайт — через защищённый туннель
-    if (ssh) {
+    if (ssh && !p.kind.tunnelOnly) {
         val onConfirm = LocalConfirm.current
         MsRow {
             if (!p.local) MsChip(stringResource(R.string.ms_panel_close_ext), TextSecondary) {
@@ -539,6 +582,7 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
             }
         }
     }
+    if (ssh && ru.gidravpn.hydra.servers.PanelNodes.supports(p.kind)) PanelNodesSection(srv, m, s)
     s.panelClients[srv.id]?.let { emails ->
         if (emails.isEmpty()) Text(stringResource(R.string.ms_panel_no_users), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         emails.forEach { email ->
@@ -553,6 +597,43 @@ private fun PanelBody(srv: MyServer, m: MyServersManager, s: MyServersUi, onAddU
     }
 }
 
+/** Ноды панели (0.8.2-a4): список, «Добавить ноду» (второй сервер из «Моих серверов»), «Убрать». */
+@Composable
+private fun PanelNodesSection(srv: MyServer, m: MyServersManager, s: MyServersUi) {
+    val p = srv.panel ?: return
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val onConfirm = LocalConfirm.current
+    var pick by remember { mutableStateOf(false) }
+    Text(stringResource(R.string.ms_nodes), color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+    if (p.nodes.isEmpty()) Text(stringResource(R.string.ms_nodes_none), color = TextMuted, fontSize = 11.sp)
+    p.nodes.forEach { n ->
+        Column(Modifier.padding(vertical = 3.dp)) {
+            Text("• ${n.name} — ${n.host}", color = TextSecondary, fontSize = 13.sp)
+            MsRow {
+                MsChip(stringResource(R.string.ms_node_remove), Danger) {
+                    if (!s.busy) onConfirm(Confirm(ctx.getString(R.string.ms_node_remove_q, n.name), ctx.getString(R.string.ms_node_remove_msg, n.host), ctx.getString(R.string.ms_node_remove)) { m.removePanelNode(srv.id, n.serverId) })
+                }
+            }
+        }
+    }
+    MsRow { MsChip(stringResource(R.string.ms_node_add), AccentCyan) { if (!s.busy) pick = true } }
+    if (pick) {
+        val list = m.nodeCandidates(srv.id)
+        AlertDialog(onDismissRequest = { pick = false },
+            title = { Text(stringResource(R.string.ms_node_pick_title, p.kind.title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (list.isEmpty()) Text(stringResource(R.string.ms_node_pick_none), fontSize = 13.sp)
+                    else {
+                        Text(stringResource(R.string.ms_node_pick_hint), fontSize = 13.sp)
+                        list.forEach { cand -> OutlinedButton(onClick = { pick = false; m.addPanelNode(srv.id, cand.id) }) { Text("${cand.name} (${cand.host})") } }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { pick = false }) { Text(stringResource(android.R.string.cancel)) } })
+    }
+}
+
 /** Запись без отпечатка и без панели (панель 0.8.1-a, пересохранённая 0.8.0-rc4): подключить нечего — только убрать. */
 @Composable
 private fun BrokenCard(srv: MyServer, onForget: () -> Unit) = Card {
@@ -560,6 +641,44 @@ private fun BrokenCard(srv: MyServer, onForget: () -> Unit) = Card {
     Text(stringResource(R.string.ms_broken), color = TextMuted, fontSize = 12.sp)
     Spacer(Modifier.height(8.dp))
     MsChip(stringResource(R.string.ms_forget), TextSecondary) { onForget() }
+}
+
+/**
+ * Восстановление базы панели из копии (0.8.2-rc2, A3): копии лежат в `/root/hydra-backups` (Hydra делает их перед удалением и
+ * очисткой сервера). Выбор копии → подтверждение → Hydra проверяет копию, сохраняет текущую базу и подменяет её.
+ */
+@Composable
+private fun PanelBackupsSection(srv: MyServer, m: MyServersManager, s: MyServersUi) {
+    val p = srv.panel ?: return
+    if (srv.fingerprint.isBlank() || !ru.gidravpn.hydra.servers.PanelBackups.supports(p.kind)) return
+    var open by remember { mutableStateOf(false) }
+    var pick by remember { mutableStateOf<ru.gidravpn.hydra.servers.PanelBackups.Backup?>(null) }
+    MsRow { MsChip(stringResource(R.string.ms_backup_btn), TextSecondary) { if (!s.busy) { open = true; m.loadBackups(srv.id) } } }
+    if (open) {
+        val list = s.backups[srv.id]
+        AlertDialog(onDismissRequest = { open = false },
+            title = { Text(stringResource(R.string.ms_backup_title, p.kind.title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    when {
+                        list == null -> Text(stringResource(R.string.ms_backup_loading), fontSize = 13.sp)
+                        list.isEmpty() -> Text(stringResource(R.string.ms_backup_none), fontSize = 13.sp)
+                        else -> {
+                            Text(stringResource(R.string.ms_backup_hint), fontSize = 13.sp)
+                            list.forEach { b -> OutlinedButton(onClick = { open = false; pick = b }) { Text(b.title) } }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(android.R.string.cancel)) } })
+    }
+    pick?.let { b ->
+        AlertDialog(onDismissRequest = { pick = null },
+            title = { Text(stringResource(R.string.ms_backup_confirm_title, b.title)) },
+            text = { Text(stringResource(R.string.ms_backup_confirm_msg)) },
+            confirmButton = { TextButton(onClick = { pick = null; m.restoreBackup(srv.id, b.file) }) { Text(stringResource(R.string.ms_backup_restore), color = Danger) } },
+            dismissButton = { TextButton(onClick = { pick = null }) { Text(stringResource(android.R.string.cancel)) } })
+    }
 }
 
 /** Готовая панель, подключённая по адресу и токену (без SSH): только API панели. */
@@ -612,6 +731,51 @@ private fun ConnectPanelDialog(onClose: () -> Unit, onOk: (name: String, address
     )
 }
 
+/** Создать подключение в 3x-ui (0.8.2-a2): тип, порт, маскировка для REALITY. */
+@Composable
+private fun CreateConnectionDialog(types: List<ru.gidravpn.hydra.servers.XuiConnection>, nodes: List<ru.gidravpn.hydra.servers.PanelNode>, https: Boolean, onClose: () -> Unit, onOk: (ru.gidravpn.hydra.servers.XuiConnection, Int, XuiPanel.RealityMask, String?, String) -> Unit) {
+    var type by remember { mutableStateOf(ru.gidravpn.hydra.servers.XuiConnection.VLESS_GRPC_REALITY) }
+    var port by remember { mutableStateOf((20000 + java.security.SecureRandom().nextInt(40000)).toString()) }
+    var mask by remember { mutableStateOf(XuiPanel.RealityMask.VK) }
+    var customDomain by remember { mutableStateOf("") }
+    var node by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onClose, containerColor = Surface,
+        title = { Text(stringResource(R.string.ms_conn_title), color = TextPrimary) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(stringResource(R.string.ms_conn_text), color = TextSecondary, fontSize = 13.sp)
+                MsRow { types.forEach { t -> MsChip(t.title, TextSecondary, selected = type == t) { type = t } } }
+                if (nodes.isNotEmpty()) {
+                    Text("Сервер", color = TextSecondary, fontSize = 13.sp)
+                    MsRow {
+                        MsChip("Главный", TextSecondary, selected = node == null) { node = null }
+                        nodes.forEach { n -> MsChip(n.name, TextSecondary, selected = node == n.serverId) { node = n.serverId } }
+                    }
+                }
+                if (type.reality) {
+                    Text(stringResource(R.string.ms_xui_mask), color = TextSecondary, fontSize = 13.sp)
+                    MsRow { XuiPanel.RealityMask.entries.forEach { r -> MsChip(if (r == XuiPanel.RealityMask.CUSTOM) "Свой домен" else r.sni, TextSecondary, selected = mask == r) { mask = r } } }
+                    if (mask == XuiPanel.RealityMask.CUSTOM) {
+                        MsField("Свой домен", customDomain, hint = "example.com") { customDomain = it.trim() }
+                        Text("HTTPS-сайт на порту 443; без https://, порта и пути", color = TextMuted, fontSize = 12.sp)
+                    }
+                }
+                MsField(stringResource(R.string.ms_conn_port), port) { port = it.filter(Char::isDigit).take(5) }
+                if (type.udp) Text(stringResource(R.string.ms_conn_udp), color = TextMuted, fontSize = 12.sp)
+                if (type.needsCert && !https) Text(stringResource(R.string.ms_conn_cert), color = Danger, fontSize = 12.sp)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = (port.toIntOrNull() ?: 0) in 1..65535 && (!type.needsCert || https) &&
+                (mask != XuiPanel.RealityMask.CUSTOM || XuiPanel.normalizeRealityDomain(customDomain) != null), onClick = { onOk(type, port.toInt(), mask, node, customDomain) }) {
+                Text(stringResource(R.string.ms_create), color = AccentCyan)
+            }
+        },
+        dismissButton = { TextButton(onClose) { Text(stringResource(R.string.ms_cancel), color = TextMuted) } },
+    )
+}
+
 /** Пароль панели в буфер на 30 секунд: потом очищается, если там всё ещё он. */
 private fun copySecret(clip: androidx.compose.ui.platform.ClipboardManager, text: String) {
     clip.setText(AnnotatedString(text))
@@ -631,6 +795,7 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
     var accessPort by remember { mutableStateOf("443") }
     var sslIp by remember { mutableStateOf(true) }
     var mask by remember { mutableStateOf(XuiPanel.RealityMask.VK) }
+    var customDomain by remember { mutableStateOf("") }
     var transport by remember { mutableStateOf(XuiPanel.Transport.GRPC) }
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, Border, RoundedCornerShape(14.dp)).padding(12.dp)) {
         Text(when (kind) {
@@ -645,6 +810,8 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
                 Text(stringResource(R.string.ms_panel_https_install), color = TextSecondary, fontSize = 13.sp)
             }
         }
+        if (kind == ServerKind.PANEL_REMNAWAVE) Text(stringResource(R.string.ms_panel_rw_hint), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
+        if (kind == ServerKind.PANEL_PASARGUARD) Text(stringResource(R.string.ms_panel_pg_hint), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
         Spacer(Modifier.height(6.dp))
         if (kind == ServerKind.PANEL_3XUI) {
             Text(stringResource(R.string.ms_xui_hint), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
@@ -652,10 +819,14 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
             Text(stringResource(R.string.ms_xui_transport), color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
             MsRow { XuiPanel.Transport.entries.forEach { t -> MsChip(t.title, TextSecondary, selected = transport == t) { transport = t } } }
             Text(stringResource(R.string.ms_xui_mask), color = TextSecondary, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
-            MsRow { XuiPanel.RealityMask.entries.forEach { r -> MsChip(r.sni, TextSecondary, selected = mask == r) { mask = r } } }
-            Text(stringResource(when (mask) {
+            MsRow { XuiPanel.RealityMask.entries.forEach { r -> MsChip(if (r == XuiPanel.RealityMask.CUSTOM) "Свой домен" else r.sni, TextSecondary, selected = mask == r) { mask = r } } }
+            if (mask == XuiPanel.RealityMask.CUSTOM) {
+                MsField("Свой домен", customDomain, hint = "example.com") { customDomain = it.trim() }
+                Text("HTTPS-сайт на порту 443; без https://, порта и пути", color = TextMuted, fontSize = 12.sp)
+            } else Text(stringResource(when (mask) {
                 XuiPanel.RealityMask.VK, XuiPanel.RealityMask.YANDEX -> R.string.ms_xui_mask_ru
                 XuiPanel.RealityMask.GITHUB -> R.string.ms_xui_mask_foreign
+                XuiPanel.RealityMask.CUSTOM -> R.string.ms_xui_mask_foreign
             }), color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 4.dp))
             Row(Modifier.clickableNoRipple { sslIp = !sslIp }.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.material3.Checkbox(sslIp, { sslIp = it })
@@ -691,12 +862,12 @@ private fun InstallForm(kind: ServerKind, busy: Boolean, onCancel: () -> Unit, o
         val ok = when (kind) {
             ServerKind.AMNEZIAWG -> aport in 1024..65535
             ServerKind.OPENFLUX -> OfxNodeSpec.validChannel(channel)
-            ServerKind.PANEL_3XUI -> (accessPort.toIntOrNull() ?: 0) in 1..65535
-            ServerKind.PANEL_SUI, ServerKind.PANEL_XUI -> true
+            ServerKind.PANEL_3XUI -> (accessPort.toIntOrNull() ?: 0) in 1..65535 && (mask != XuiPanel.RealityMask.CUSTOM || XuiPanel.normalizeRealityDomain(customDomain) != null)
+            ServerKind.PANEL_SUI, ServerKind.PANEL_XUI, ServerKind.PANEL_PASARGUARD, ServerKind.PANEL_REMNAWAVE, ServerKind.PANEL_NEXORA -> true
         }
         Spacer(Modifier.height(8.dp))
         MsRow {
-            if (ok && !busy) MsChip(stringResource(R.string.ms_check_plan), AccentCyan) { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443, sslIp = sslIp, mask = mask, transport = transport)) }
+            if (ok && !busy) MsChip(stringResource(R.string.ms_check_plan), AccentCyan) { onNext(ServiceForm(kind, gen, aport, openFw, channel, yandex, mailru, accessPort = accessPort.toIntOrNull() ?: 443, sslIp = sslIp, mask = mask, transport = transport, customDomain = customDomain)) }
             MsChip(stringResource(R.string.ms_cancel), TextSecondary) { onCancel() }
         }
     }
@@ -750,7 +921,7 @@ private fun InstallPanel(i: InstallUi, s: MyServersUi, m: MyServersManager, onCl
                 MsChip(stringResource(R.string.ms_stop), Danger) { m.stop() }
             }
             InstallStage.DONE -> {
-                Text(stringResource(if (i.form.kind == ServerKind.PANEL_SUI || i.form.kind == ServerKind.PANEL_XUI) R.string.ms_install_done_panel else R.string.ms_install_done), color = Success, fontSize = 13.sp)
+                Text(stringResource(if (i.form.kind.panel != null && i.form.kind != ServerKind.PANEL_3XUI) R.string.ms_install_done_panel else R.string.ms_install_done), color = Success, fontSize = 13.sp)
                 Spacer(Modifier.height(6.dp)); LogBox(s.log); Spacer(Modifier.height(6.dp))
                 MsChip(stringResource(R.string.ms_close), AccentCyan) { onClose() }
             }

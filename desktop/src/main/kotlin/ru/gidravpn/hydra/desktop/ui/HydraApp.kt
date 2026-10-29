@@ -23,6 +23,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.filled.Search
@@ -157,7 +161,7 @@ fun HydraApp(c: AppController, ui: UiState, onRelaunchAdmin: () -> Unit, startTa
                 Box(Modifier.fillMaxSize().padding(24.dp)) {
                     when (tab) {
                         Tab.HOME -> HomeScreen(c, ui, onRelaunchAdmin, openServers = { tab = Tab.SERVERS })
-                        Tab.SERVERS -> ServersScreen(c, ui)
+                        Tab.SERVERS -> ServersScreen(c, ui, openMyServers = { tab = Tab.MYSERVERS })
                         Tab.SUBS -> SubscriptionsScreen(c, ui)
                         Tab.ROUTING -> RoutingScreen(c, ui)
                         Tab.ROUTERS -> RoutersScreen(c, ui)
@@ -191,14 +195,25 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
             Status.ERROR -> Danger
             Status.DISCONNECTED -> MaterialTheme.colorScheme.onSurfaceVariant
         }
+        // Сервера нет — ведём туда, где его берут, а не показываем «Выберите сервер».
+        val tapRing = { if (ui.selected == null && !ui.active) openServers() else c.toggle() }
+        // 0.8.2-rc1: «Управление с клавиатуры». Выключено (по умолчанию) — кольцо не берёт фокус, Пробел и Enter его не нажимают;
+        // раньше `clickable` делал кольцо фокусируемым, и случайный пробел включал или отключал VPN.
+        val keyboard = settings.keyboardControl
+        val ringFocus = remember { FocusRequester() }
+        LaunchedEffect(keyboard) { if (keyboard) runCatching { ringFocus.requestFocus() } }
+        val ringInput = if (keyboard) {
+            Modifier.focusRequester(ringFocus).clickable(enabled = ui.status != Status.STOPPING, onClick = tapRing)
+        } else {
+            Modifier.pointerInput(ui.status, ui.selected, ui.active) {
+                detectTapGestures { if (ui.status != Status.STOPPING) tapRing() }
+            }
+        }
         Box(
             Modifier.size(180.dp).clip(CircleShape)
                 .border(6.dp, ringColor, CircleShape)
                 .background(MaterialTheme.colorScheme.surface)
-                .clickable(enabled = ui.status != Status.STOPPING) {
-                    // Сервера нет — ведём туда, где его берут, а не показываем «Выберите сервер».
-                    if (ui.selected == null && !ui.active) openServers() else c.toggle()
-                },
+                .then(ringInput),
             contentAlignment = Alignment.Center,
         ) {
             if (ui.status == Status.CONNECTING || ui.status == Status.STOPPING) {
@@ -229,8 +244,9 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
                 else {
                     Text("${s.flag} ${s.name}", fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val engine = DesktopConfig.engineFor(s, settings, c.xrayAvailable)
-                    Text(s.summary + " · " + engineLabel(engine), fontSize = 12.sp,
+                    Text(s.summary + " · " + DesktopConfig.engineText(s, settings, c.xrayAvailable, ::engineLabel), fontSize = 12.sp,
                         color = if (engine == null) Danger else MaterialTheme.colorScheme.onSurfaceVariant)
+                    DesktopConfig.realityWarning(s, settings, c.xrayAvailable)?.let { Text(it, fontSize = 12.sp, color = Danger) }
                 }
             }
         }
@@ -293,7 +309,7 @@ private fun Stat(big: String, small: String) = Column(horizontalAlignment = Alig
 
 // ============================================================== Серверы
 @Composable
-private fun ServersScreen(c: AppController, ui: UiState) {
+private fun ServersScreen(c: AppController, ui: UiState, openMyServers: () -> Unit = {}) {
     var input by remember { mutableStateOf("") }
     var query by remember { mutableStateOf("") }
     var sortByPing by remember { mutableStateOf(false) }
@@ -305,6 +321,9 @@ private fun ServersScreen(c: AppController, ui: UiState) {
     }
     Column(Modifier.fillMaxSize()) {
         Header("Серверы") {
+            // 0.8.2-a2: владелец искал установку своего сервера и «Создать подключение» здесь, а они — во вкладке «Мои серверы»
+            // (на Android вход есть прямо на экране «Серверы»). Теперь и на ПК.
+            Button(onClick = openMyServers) { Text("Мой сервер и панели") }
             FilterChip(selected = sortByPing, onClick = { sortByPing = !sortByPing }, label = { Text("По пингу") })
             OutlinedButton(onClick = { c.import(clipboard()) }) { Text("Вставить из буфера") }
             OutlinedButton(onClick = { manual = true }) { Text("Добавить вручную") }
@@ -373,7 +392,7 @@ private fun ServerRow(c: AppController, ui: UiState, s: ServerProfile, onDelete:
                 (s.protocol?.displayName ?: s.protocolId) + " · " + s.address + ":" + s.port + " · " +
                     when {
                         !supported -> "на ПК недоступно"
-                        else -> engineLabel(engine)
+                        else -> DesktopConfig.engineText(s, ui.data.settings, c.xrayAvailable, ::engineLabel)
                     },
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )

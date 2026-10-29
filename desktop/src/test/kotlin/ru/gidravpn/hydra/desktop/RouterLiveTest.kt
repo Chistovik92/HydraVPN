@@ -76,6 +76,57 @@ class RouterLiveTest {
         assertFalse(c.radar().optBoolean("linked"))
     }
 
+    /** Роутер 1.3.0+: правила, списки, серверы (скрытые ключи не затираются), настройки, ядра, SMS. */
+    @Test fun fullManagement() {
+        val c = client; assumeTrue(c != null); c!!
+        val caps = c.capabilities()
+        assumeTrue("роутер до 1.3.0", caps.api >= 3)
+        listOf("rules", "lists", "settings", "servers.edit", "sections.unmask", "cores", "sms").forEach { assertTrue(it, caps.has(it)) }
+
+        val tag = "hydra_t" + System.currentTimeMillis() % 100000
+        c.addSection(JSONObject().put("name", tag).put("enabled", true).put("action", "connection")
+            .put("selector_proxy_links", org.json.JSONArray().put("trojan://secret-pass@t.example.com:443#t")))
+        try {
+            // Раздел с личной ссылкой теперь правится: роутер вернёт ключ на место.
+            val s = c.sections().first { it.name == tag }.copy(serverUnmasks = caps.has("sections.unmask"))
+            assertTrue(s.editable)
+            c.replaceSection(tag, JSONObject(s.raw.toString()).put("label", "L"))
+            assertEquals("L", c.sections().first { it.name == tag }.label)
+
+            c.addRule(JSONObject().put("section", tag).put("enabled", true).put("domain_suffix", org.json.JSONArray().put("example.org")))
+            val rule = c.rules().last()
+            assertEquals(tag, rule.section)
+            c.replaceRule(rule.index, JSONObject(rule.raw.toString()).put("port", "443"))
+            assertEquals("443", c.rules()[rule.index].raw.optString("port"))
+            c.deleteRule(rule.index)
+
+            c.addList(JSONObject().put("name", tag).put("type", "domain").put("entries", org.json.JSONArray().put("a.example")))
+            assertTrue(c.lists().any { it.name == tag && it.entries == listOf("a.example") })
+            c.deleteList(tag)
+
+            c.addServer(JSONObject().put("name", tag).put("protocol", "vless").put("listen_port", 18443).put("server_uuid", "11111111-2222-3333-4444-555555555555"))
+            val srv = c.servers().first { it.optString("name") == tag }
+            assertEquals("********", srv.optString("server_uuid"))
+            c.replaceServer(tag, JSONObject(srv.toString()).put("listen_port", 18444))
+            assertEquals(18444, c.servers().first { it.optString("name") == tag }.optInt("listen_port"))
+            c.deleteServer(tag)
+
+            val before = c.settings().optBoolean("exclude_ntp")
+            c.patchSettings(JSONObject().put("exclude_ntp", !before))
+            assertEquals(!before, c.settings().optBoolean("exclude_ntp"))
+            c.patchSettings(JSONObject().put("exclude_ntp", before))
+            try { c.patchSettings(JSONObject().put("api_token", "x".repeat(20))); error("ожидался отказ") } catch (e: RouterException) { assertEquals(400, e.code) }
+
+            assertTrue(c.cores().map { it.name }.containsAll(listOf("sing-box", "xray", "openflux", "olcrtc", "amneziawg")))
+            c.sms() // модема нет — пустые списки, а не ошибка
+        } finally {
+            runCatching { c.rules().filter { it.section == tag }.sortedByDescending { it.index }.forEach { c.deleteRule(it.index) } }
+            runCatching { c.deleteList(tag) }
+            runCatching { c.deleteServer(tag) }
+            runCatching { c.deleteSection(tag) }
+        }
+    }
+
     @Test fun radarStatusAndLogs() {
         val c = client; assumeTrue(c != null); c!!
         assertFalse(c.radar().optBoolean("linked"))

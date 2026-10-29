@@ -161,8 +161,8 @@ internal fun resolveRouting(ctx: android.content.Context?): RoutingOptions {
  * Реализация PlatformInterface (libbox 1.12.x) поверх VpnService:
  *  - tun поднят сервисом заранее, openTun отдаёт его fd;
  *  - монитор дефолтного интерфейса — ConnectivityManager.NetworkCallback;
- *  - сокеты sing-box не требуют protect: собственное приложение исключено
- *    из VPN правилами establishTun (addDisallowedApplication).
+ *  - сокеты sing-box защищаются через autoDetectInterfaceControl → protect(): с 0.8.0-rc3 приложение
+ *    может быть внутри своего туннеля (AppTunnelPolicy), исключение addDisallowedApplication — не всегда.
  */
 class HydraPlatformInterface(
     private val existingTun: ParcelFileDescriptor,
@@ -174,7 +174,11 @@ class HydraPlatformInterface(
     private var monitorThread: HandlerThread? = null
     // Последняя реальная (не-VPN) сеть от монитора — через неё идёт local DNS.
     @Volatile private var underlyingNetwork: Network? = null
-    private val localDns = HydraLocalDns { underlyingNetwork }
+    // Б0 (0.8.2-b): монитор ещё не выбрал сеть (старт, окно смены сети) — берём текущую физическую, а не сеть процесса:
+    // с 0.8.0-rc3 приложение может быть внутри своего туннеля, и запрос ушёл бы в петлю.
+    private val localDns = HydraLocalDns {
+        underlyingNetwork ?: appContext?.getSystemService(ConnectivityManager::class.java)?.let { PhysicalNetwork.pick(it) }
+    }
 
     /** libbox запрашивает tun через openTun — отдаём дескриптор нашего VpnService. */
     override fun openTun(options: TunOptions): Int = existingTun.detachFd()

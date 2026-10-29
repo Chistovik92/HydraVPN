@@ -115,8 +115,8 @@ require (
 	github.com/pion/sctp v1.11.3 // indirect
 	github.com/pion/sdp/v3 v3.0.20 // indirect
 	github.com/pion/srtp/v3 v3.1.0 // indirect
-	github.com/pion/stun/v3 v3.1.5 // indirect
-	github.com/pion/transport/v4 v4.0.2 // indirect
+	github.com/pion/stun/v4 v4.0.1 // indirect
+	github.com/pion/transport/v5 v5.1.1 // indirect
 	github.com/pion/turn/v5 v5.1.2 // indirect
 	github.com/pion/webrtc/v4 v4.2.22 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -206,24 +206,27 @@ require (
 // Модуль `mobile` OpenFlux объявлен как `openflux-mobile` и ссылается на корень через replace —
 // поэтому оба берутся из клона закреплённого коммита (build.sh кладёт его в third_party/OpenFlux).
 replace (
+	github.com/openlibrecommunity/olcrtc => ./third_party/olcrtc
 	github.com/p1neappleXpress/OpenFlux => ./third_party/OpenFlux
-	// OpenFlux 0.4.2 ждёт pion transport/v5, а olcRTC собран на v4: в одном бинарнике — одна версия pion (как у olcRTC);
-	// OpenFlux использует только webrtc/v4 (oneme).
-	github.com/pion/datachannel => github.com/pion/datachannel v1.6.0
-	github.com/pion/dtls/v3 => github.com/pion/dtls/v3 v3.1.4
-	github.com/pion/ice/v4 => github.com/pion/ice/v4 v4.2.7
-	github.com/pion/interceptor => github.com/pion/interceptor v0.1.45
+	github.com/pion/datachannel => github.com/pion/datachannel v1.6.3
+	github.com/pion/dtls/v3 => github.com/pion/dtls/v3 v3.1.9
+	github.com/pion/ice/v4 => github.com/pion/ice/v4 v4.4.4
+	github.com/pion/interceptor => github.com/pion/interceptor v0.1.49
 	github.com/pion/logging => github.com/pion/logging v0.2.4
-	github.com/pion/mdns/v2 => github.com/pion/mdns/v2 v2.1.0
+	github.com/pion/mdns/v2 => github.com/pion/mdns/v2 v2.2.1
 	github.com/pion/randutil => github.com/pion/randutil v0.1.0
-	github.com/pion/rtcp => github.com/pion/rtcp v1.2.16
-	github.com/pion/rtp => github.com/pion/rtp v1.10.2
-	github.com/pion/sctp => github.com/pion/sctp v1.10.0
-	github.com/pion/sdp/v3 => github.com/pion/sdp/v3 v3.0.19
-	github.com/pion/srtp/v3 => github.com/pion/srtp/v3 v3.0.11
+	github.com/pion/rtcp => github.com/pion/rtcp v1.2.18
+	github.com/pion/rtp => github.com/pion/rtp v1.10.5
+	// OpenFlux v0.17.1 требует pion transport/v5 и свою однострочную правку sctp (SetOutboundMTU).
+	// olcRTC v4.2.22 и WebRTC olcRTC совместимы с этим набором; замену transport/v4 убрать нельзя частично —
+	// типы v4/v5 несовместимы в SettingEngine.SetNet.
+	github.com/pion/sctp => ./third_party/OpenFlux/third_party/sctp
+	github.com/pion/sdp/v3 => github.com/pion/sdp/v3 v3.0.20
+	github.com/pion/srtp/v3 => github.com/pion/srtp/v3 v3.1.0
 	github.com/pion/stun/v3 => github.com/pion/stun/v3 v3.1.5
-	github.com/pion/transport/v4 => github.com/pion/transport/v4 v4.0.2
-	github.com/pion/turn/v5 => github.com/pion/turn/v5 v5.0.9
-	github.com/pion/webrtc/v4 => github.com/pion/webrtc/v4 v4.2.15
+	github.com/pion/turn/v5 => github.com/pion/turn/v5 v5.1.2
+	github.com/pion/webrtc/v4 => github.com/pion/webrtc/v4 v4.2.22
+	// sing-box v1.12.25 + scripts/sing-box-reality-mlkem.patch (REALITY к Xray-core >= 26.9.8, SagerNet/sing-box#4520); клон — build.sh.
+	github.com/sagernet/sing-box => ./third_party/sing-box
 	openflux-mobile => ./third_party/OpenFlux/mobile
 )

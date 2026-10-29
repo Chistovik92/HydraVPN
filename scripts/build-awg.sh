@@ -26,10 +26,17 @@ HOST="$(ls "$NDK/toolchains/llvm/prebuilt" | head -1)"
 BIN="$NDK/toolchains/llvm/prebuilt/$HOST/bin"
 EXT=""; [[ "$HOST" == windows* ]] && EXT=".cmd"
 
+# Коммит amneziawg-android закреплён (0.8.2-b): раньше клонировался HEAD. 5c16489 — выпуск v3.1.20260814, последний коммит,
+# менявший tunnel/tools/libwg-go (на 16.10.2026). Сменить: AWG_ANDROID_REF=<sha> scripts/build-awg.sh
+AWG_ANDROID_REF="${AWG_ANDROID_REF:-5c16489e2cd9ed3a0a7a27c7445bba5238132f86}"
 if [[ ! -d "$WORK/.git" ]]; then
   # submodule'и (wg-tools, elf-cleaner) для libwg-go не нужны — без --recurse-submodules
-  git clone --depth 1 https://github.com/amnezia-vpn/amneziawg-android.git "$WORK"
+  git init -q "$WORK"
+  git -C "$WORK" remote add origin https://github.com/amnezia-vpn/amneziawg-android.git
 fi
+git -C "$WORK" fetch -q --depth 1 origin "$AWG_ANDROID_REF"
+git -C "$WORK" checkout -q --force FETCH_HEAD
+echo "    amneziawg-android: $AWG_ANDROID_REF"
 cd "$WORK/tunnel/tools/libwg-go"
 
 # Версия ядра amneziawg-go закреплена здесь, а не берётся из go.mod клиента: клиент отстаёт от ядра
@@ -61,10 +68,11 @@ build() { # abi goarch cc [goarm]
   GOARCH="$goarch" GOARM="$goarm" CC="$BIN/$cc$EXT" \
     go build -tags linux -ldflags="$LDFLAGS" -trimpath -buildvcs=false \
     -o "out/$abi/libwg-go.so" -buildmode c-shared
-  mkdir -p "$REPO/app/libs/awg/$abi"
-  cp "out/$abi/libwg-go.so" "$REPO/app/libs/awg/$abi/"
+  # 0.8.2-b: в выпусках до 0.8.2-a4 оказался v3.1.20260814 вместо закреплённого — сверяем версию ядра в самом файле.
+  grep -ac "amneziawg-go/v3.$AWG_GO_VERSION" "out/$abi/libwg-go.so" >/dev/null     || { echo "ОШИБКА: в $abi/libwg-go.so не amneziawg-go $AWG_GO_VERSION" >&2; exit 1; }
+  mkdir -p "$HYDRA_ROOT/app/libs/awg/$abi"
+  cp "out/$abi/libwg-go.so" "$HYDRA_ROOT/app/libs/awg/$abi/"
 }
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 build arm64-v8a   arm64 aarch64-linux-android26-clang
 build armeabi-v7a arm   armv7a-linux-androideabi26-clang 7
 build x86_64      amd64 x86_64-linux-android26-clang

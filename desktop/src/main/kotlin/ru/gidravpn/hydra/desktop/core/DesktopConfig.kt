@@ -49,6 +49,18 @@ object DesktopConfig {
     fun engineFor(p: ServerProfile, settings: DesktopSettings, xrayAvailable: Boolean): EngineToggles.Kind? =
         if (!isSupported(p) || p.protocol == Protocol.PPTP) null else settings.engines.engineFor(p, xrayAvailable)
 
+    /** A5 (0.8.2-a4): подпись ядра с причиной выбора — «Xray (REALITY)», если Xray взят из-за REALITY. */
+    fun engineText(p: ServerProfile, settings: DesktopSettings, xrayAvailable: Boolean, label: (EngineToggles.Kind?) -> String): String {
+        val k = engineFor(p, settings, xrayAvailable)
+        return label(k) + if (k != null && settings.engines.isRealityViaXray(p, xrayAvailable)) " (REALITY)" else ""
+    }
+
+    /** A5: REALITY пойдёт через sing-box (Xray выключен) — новые серверы Xray такое подключение молча не пустят. */
+    fun realityWarning(p: ServerProfile, settings: DesktopSettings, xrayAvailable: Boolean): String? =
+        if (isSupported(p) && settings.engines.realityWithoutXray(p, xrayAvailable)) REALITY_WARNING else null
+
+    const val REALITY_WARNING = "REALITY через sing-box: новые серверы Xray его не пустят — включите Xray (Настройки → Туннель)"
+
     data class Api(val port: Int, val secret: String)
 
     /** Локальный socks-inbound Xray, к которому подключается мост sing-box. */
@@ -248,7 +260,7 @@ object DesktopConfig {
     }
 
     /** outbound type=wireguard (удалён в sing-box 1.13) → endpoint wireguard. */
-    private fun convertWireGuard(root: JSONObject) {
+    internal fun convertWireGuard(root: JSONObject) {
         val outbounds = root.getJSONArray("outbounds")
         val idx = (0 until outbounds.length()).firstOrNull {
             outbounds.getJSONObject(it).optString("type") == "wireguard"

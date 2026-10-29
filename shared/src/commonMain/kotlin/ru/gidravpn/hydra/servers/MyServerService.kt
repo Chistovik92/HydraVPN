@@ -3,7 +3,8 @@ package ru.gidravpn.hydra.servers
 /** Итог операции над сервером. */
 sealed interface DeployResult {
     data class Ok(val server: MyServer, val links: List<String> = emptyList()) : DeployResult
-    data class Failed(val reason: String) : DeployResult
+    /** [partial] — панель уже стоит на сервере: её данные сохраняем, чтобы вход не пропал (пароль и токен есть только в памяти). */
+    data class Failed(val reason: String, val partial: MyServer? = null) : DeployResult
 }
 
 /**
@@ -23,6 +24,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
      * @return обновлённая запись и нужно ли записать копию состояния на сервер (её не было — сервер поставлен rc1–rc3).
      */
     fun reconcile(s: MyServer, st: ServerStatus): Pair<MyServer, Boolean> {
+        if (!st.complete) return s to false   // оборванный вывод: не стираем AWG-клиентов, панель и узел OpenFlux
         var r = s.copy(osName = st.osName.ifBlank { s.osName }, arch = st.arch.ifBlank { s.arch })
         var writeState = false
         if (st.awgInstalled) {
@@ -41,13 +43,13 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
 
         // панель, поставленная по SSH, исчезла с сервера — убираем; подключённую без SSH (panelOnly) не трогаем
         if (s.panel != null && !s.panelOnly) {
-            val present = when (s.panel.kind) { PanelKind.SUI -> st.suiInstalled; else -> st.xuiInstalled }
+            val present = when (s.panel.kind) { PanelKind.SUI -> st.suiInstalled; PanelKind.PASARGUARD -> st.pgInstalled; PanelKind.REMNAWAVE -> st.rwInstalled; PanelKind.NEXORA -> st.nexoraInstalled; else -> st.xuiInstalled }
             if (!present) r = r.copy(panel = null)
         }
         // копия записи панели на сервере (любой вид) — второе устройство берёт панель под управление
         if (r.panel == null && st.panelStateJson.trim().startsWith("{")) {
             runCatching { PanelInstance.fromJson(org.json.JSONObject(st.panelStateJson)) }.getOrNull()
-                ?.takeIf { (it.kind == PanelKind.SUI && st.suiInstalled) || (it.kind != PanelKind.SUI && st.xuiInstalled) }
+                ?.takeIf { when (it.kind) { PanelKind.SUI -> st.suiInstalled; PanelKind.PASARGUARD -> st.pgInstalled; PanelKind.REMNAWAVE -> st.rwInstalled; PanelKind.NEXORA -> st.nexoraInstalled; else -> st.xuiInstalled } }
                 ?.let { r = r.copy(panel = it) }
         }
         // панель поставлена Hydra с другого устройства — берём под управление по её install-result.env
@@ -86,21 +88,30 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
             listOf(spec.clientConf(first)))
     }
 
-    fun addClient(s: MyServer, name: String, installer: Installer): Pair<MyServer, AwgClient>? {
+    fun addClient(ssh: SshSession, s: MyServer, name: String, installer: Installer): Pair<MyServer, AwgClient>? {
         val spec = s.awg ?: return null
-        val addr = spec.nextAddress(s.clients.map { it.address }) ?: return null
+        // R5 (часть 2): перечитываем состояние сервера — клиентов могли добавить с другого устройства
+        val st = status(ssh, spec.iface)
+        val (fresh, _) = reconcile(s, st)
+        val currentSpec = fresh.awg ?: return null
+        val currentClients = fresh.clients
+        val addr = currentSpec.nextAddress(currentClients.map { it.address }) ?: return null
         val c = AwgServerSpec.newClient(name, addr)
         installer.addSecret(c.privateKey); installer.addSecret(c.presharedKey)
-        val all = s.clients + c
-        if (!installer.run(AwgInstallPlan.applyClientsSteps(spec, all))) return null
-        return s.copy(clients = all) to c
+        val all = currentClients + c
+        if (!installer.run(AwgInstallPlan.applyClientsSteps(currentSpec, all))) return null
+        return fresh.copy(clients = all) to c
     }
 
-    fun removeClient(s: MyServer, name: String, installer: Installer): MyServer? {
+    fun removeClient(ssh: SshSession, s: MyServer, name: String, installer: Installer): MyServer? {
         val spec = s.awg ?: return null
-        val all = s.clients.filterNot { it.name == name }
-        if (!installer.run(AwgInstallPlan.applyClientsSteps(spec, all))) return null
-        return s.copy(clients = all)
+        // R5 (часть 2): перечитываем состояние сервера — клиентов могли удалить с другого устройства
+        val st = status(ssh, spec.iface)
+        val (fresh, _) = reconcile(s, st)
+        val currentSpec = fresh.awg ?: return null
+        val all = fresh.clients.filterNot { it.name == name }
+        if (!installer.run(AwgInstallPlan.applyClientsSteps(currentSpec, all))) return null
+        return fresh.copy(clients = all)
     }
 
     fun uninstallAwg(s: MyServer, installer: Installer): MyServer? =
@@ -149,9 +160,9 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
 
     /** Что будет выполнено при установке панели — для показа до запуска. */
     fun planPreviewXui(tag: String, openFirewall: Boolean, pre: Preflight, sslIp: Boolean = false, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK,
-                       transport: XuiPanel.Transport = XuiPanel.Transport.GRPC): List<Step> =
+                       transport: XuiPanel.Transport = XuiPanel.Transport.GRPC, customDomain: String = ""): List<Step> =
         XuiPanel.installSteps(XuiPanel.InstallParams(tag, "••••", "••••", 0, "••••", sslIp), openFirewall, pre.firewall) + listOf(
-            Step("xui-access", "Создать доступ: инбаунд VLESS + ${transport.title} + Reality (маскировка под ${mask.sni}) и клиент — через API панели, по токену",
+            Step("xui-access", "Создать доступ: инбаунд VLESS + ${transport.title} + Reality (маскировка под ${XuiPanel.realitySni(mask, customDomain)}) и клиент — через API панели, по токену",
                 "curl … /panel/api/inbounds/add, /panel/api/clients/add"),
             Step("xui-import", "Добавить подписку клиента в «Серверы» — правки на сайте панели будут приходить сами"),
         )
@@ -159,7 +170,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
     fun deployXui(
         ssh: SshSession, srv: MyServer, tag: String, accessPort: Int, openFirewall: Boolean, pre: Preflight,
         installer: Installer, sslIp: Boolean = false, mask: XuiPanel.RealityMask = XuiPanel.RealityMask.VK,
-        transport: XuiPanel.Transport = XuiPanel.Transport.GRPC, onLog: (String) -> Unit,
+        transport: XuiPanel.Transport = XuiPanel.Transport.GRPC, customDomain: String = "", onLog: (String) -> Unit,
     ): DeployResult {
         // сертификат: на IPv4 — профиль shortlived Let's Encrypt, на имя — обычный; IPv6-адрес установщик 3x-ui не поддерживает
         val v4 = Regex("""^\d{1,3}(\.\d{1,3}){3}$""").matches(srv.host)
@@ -186,14 +197,14 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
             waitPanelReady(api, onLog) // служба запущена, но порт панель открывает не сразу; заодно проверяется токен
             onLog("Токен принят, панель отвечает")
             val (priv, pub) = api.newRealityKeys()
-            val inboundId = api.addInbound(XuiPanel.defaultInbound(accessPort, priv, pub, mask, remark = "Hydra", transport = transport))
+            val inboundId = api.addInbound(XuiPanel.defaultInbound(accessPort, priv, pub, mask, remark = "Hydra", transport = transport, customDomain = customDomain))
             if (openFirewall) ServerOps.openPortStep(pre.firewall, "$accessPort/tcp")?.let { installer.run(listOf(it)) }
             val email = "hydra-1"
             val subId = XuiPanel.random(16).lowercase()
             api.addClient(email, subId, listOf(inboundId), flow = "")
             val links = api.links(email)
             if (links.isEmpty()) return DeployResult.Failed("Панель не выдала ссылку клиента")
-            onLog("Создан инбаунд VLESS + ${transport.title} + Reality (маскировка под ${mask.sni}) на порту $accessPort и клиент $email")
+            onLog("Создан инбаунд VLESS + ${transport.title} + Reality (маскировка под ${XuiPanel.realitySni(mask, customDomain)}) на порту $accessPort и клиент $email")
             // подписка вместо голой ссылки: правки инбаунда на сайте панели приложение заберёт само (запрос владельца 15.10.2026)
             val sub = runCatching { api.subscriptionUrl(srv.host, subId) }.getOrNull()
             if (sub != null) onLog("Подписка клиента: ${sub.substringBeforeLast('/')}/…")
@@ -201,8 +212,12 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
                 params.username, params.password, token, version, inboundId, email)
             installer.run(OtherPanels.stateSteps(panel))
             return DeployResult.Ok(srv.copy(panel = panel), sub?.let { listOf(it) } ?: links)
-        } catch (e: XuiApiException) {
-            return DeployResult.Failed("Панель установлена, но доступ создать не удалось: ${e.message}. Адрес: http://${srv.host}:$port/$path")
+        } catch (e: Exception) {
+            // Не только XuiApiException: панель другой версии отвечает иной формой JSON (JSONException и т. п.).
+            val bare = PanelInstance(PanelKind.XUI3, "$scheme://${if (srv.host.contains(':')) "[${srv.host}]" else srv.host}:$port/$path",
+                params.username, params.password, token, res["XUI_VERSION"].orEmpty().ifBlank { tag })
+            return DeployResult.Failed("Панель установлена, но доступ создать не удалось: ${e.message ?: e::class.simpleName}. Адрес: http://${srv.host}:$port/$path",
+                partial = srv.copy(panel = bare))
         }
     }
 
@@ -212,7 +227,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
      * Панель не поднялась с сертификатом — пути к нему стираются, панель возвращается на HTTP.
      */
     fun enablePanelHttps(s: MyServer, pre: Preflight, openFirewall: Boolean, installer: Installer): MyServer? {
-        val panel = s.panel ?: return null
+        val panel = s.panel?.takeIf { !it.kind.tunnelOnly } ?: return null
         if (!issueAndApplyCert(s.host, panel, pre, openFirewall, installer)) return null
         val upd = panel.copy(baseUrl = XuiPanel.toHttps(panel.baseUrl))
         installer.run(OtherPanels.stateSteps(upd))
@@ -244,7 +259,8 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
      * через SSH-туннель, а API 3x-ui вызывает `curl`-ом на сервере.
      */
     fun setPanelLocal(s: MyServer, local: Boolean, pre: Preflight, installer: Installer): MyServer? {
-        val panel = s.panel ?: return null
+        // PasarGuard и Remnawave в Hydra слушают только 127.0.0.1 — открыть извне нельзя
+        val panel = s.panel?.takeIf { !it.kind.tunnelOnly } ?: return null
         if (!installer.run(OtherPanels.listenSteps(panel, local, pre.firewall))) return null
         val upd = panel.copy(local = local)
         installer.run(OtherPanels.stateSteps(upd))
@@ -311,10 +327,124 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
         return DeployResult.Ok(srv.copy(panel = panel))
     }
 
+    fun planPreviewPasarGuard(): List<Step> = PasarGuardPanel.installSteps("••••") + PasarGuardPanel.setupPreviewSteps()
+
+    /**
+     * Установка PasarGuard (0.8.2-a3): официальными скриптами — панель и нода в Docker; владелец (логин и пароль придумывает Hydra)
+     * — по одноразовому ключу CLI; нода регистрируется в панели. Панель без сертификата слушает только 127.0.0.1 — в Hydra она
+     * сразу «закрыта извне» (сайт — через туннель, API — `curl` на сервере).
+     */
+    fun deployPasarGuard(ssh: SshSession, srv: MyServer, installer: Installer, onLog: (String) -> Unit = {}): DeployResult {
+        val nodeKey = java.util.UUID.randomUUID().toString()
+        val user = "hy" + XuiPanel.random(6).lowercase(); val pass = PasarGuardPanel.newPassword()
+        installer.addSecret(nodeKey); installer.addSecret(pass)
+        if (!installer.run(PasarGuardPanel.installSteps(nodeKey))) return DeployResult.Failed("Установка остановлена")
+        val api = PasarGuardApi(ssh, user, pass)
+        try {
+            val key = ssh.exec(PasarGuardPanel.tempKeyCommand()).out.trim()
+            if (key.isBlank()) return DeployResult.Failed("PasarGuard не выдала ключ владельца")
+            installer.addSecret(key)
+            api.createOwner(key)
+            api.login()
+            onLog("Владелец панели создан")
+            val ca = ssh.exec("cat ${PasarGuardPanel.NODE_CERT}").out.trim()
+            api.addLocalNode(nodeKey, ca)
+            onLog(if (api.waitNodeConnected()) "Нода подключена к панели" else "Нода пока не подключилась — проверьте её на сайте панели")
+        } catch (e: Exception) {
+            val h = if (srv.host.contains(':')) "[${srv.host}]" else srv.host
+            return DeployResult.Failed("PasarGuard: ${e.message ?: e::class.simpleName}. Панель установлена — вход сохранён в карточке сервера",
+                partial = srv.copy(panel = PanelInstance(PanelKind.PASARGUARD, "http://$h:${PasarGuardPanel.PORT}/dashboard/", user, pass, "", "", local = true)))
+        }
+        val host = if (srv.host.contains(':')) "[${srv.host}]" else srv.host
+        val panel = PanelInstance(PanelKind.PASARGUARD, "http://$host:${PasarGuardPanel.PORT}/dashboard/", user, pass, "", api.version(), local = true)
+        installer.run(OtherPanels.stateSteps(panel))
+        return DeployResult.Ok(srv.copy(panel = panel))
+    }
+
+    fun planPreviewRemnawave(host: String): List<Step> = RemnawavePanel.installSteps(host) + RemnawavePanel.setupPreviewSteps()
+
+    /**
+     * Установка Remnawave (0.8.2-a3): панель в Docker (закреплённые образы) за Caddy на 127.0.0.1; владелец — регистрацией
+     * (открыта, пока владельца нет; наружу панель не видна), нода — с ключом от панели, на адресе шлюза сети Docker.
+     */
+    fun deployRemnawave(ssh: SshSession, srv: MyServer, installer: Installer, onLog: (String) -> Unit = {}): DeployResult {
+        val user = "hy" + XuiPanel.random(6).lowercase(); val pass = RemnawavePanel.newPassword()
+        installer.addSecret(pass)
+        if (!installer.run(RemnawavePanel.installSteps(srv.host))) return DeployResult.Failed("Установка остановлена")
+        val api = RemnawaveApi(ssh, user, pass)
+        try {
+            api.register()
+            onLog("Владелец панели создан")
+            val key = api.secretKey()
+            installer.addSecret(key)
+            if (!installer.run(RemnawavePanel.nodeSteps(key))) return DeployResult.Failed("Нода Remnawave не запустилась")
+            val gw = ssh.exec("docker network inspect remnawave-network -f '{{range .IPAM.Config}}{{.Gateway}} {{end}}'").out.trim().split(' ').firstOrNull { it.contains('.') } ?: "172.17.0.1"
+            api.addLocalNode(gw)
+            onLog(if (api.waitNodeConnected()) "Нода подключена к панели" else "Нода пока не подключилась — проверьте её на сайте панели")
+        } catch (e: Exception) {
+            val h = if (srv.host.contains(':')) "[${srv.host}]" else srv.host
+            return DeployResult.Failed("Remnawave: ${e.message ?: e::class.simpleName}. Панель установлена — вход сохранён в карточке сервера",
+                partial = srv.copy(panel = PanelInstance(PanelKind.REMNAWAVE, "http://$h:${RemnawavePanel.WEB_PORT}/", user, pass, "", RemnawavePanel.TAG, local = true)))
+        }
+        val host = if (srv.host.contains(':')) "[${srv.host}]" else srv.host
+        val panel = PanelInstance(PanelKind.REMNAWAVE, "http://$host:${RemnawavePanel.WEB_PORT}/", user, pass, "", RemnawavePanel.TAG, local = true)
+        installer.run(OtherPanels.stateSteps(panel))
+        return DeployResult.Ok(srv.copy(panel = panel))
+    }
+
+    fun planPreviewNexora(): List<Step> = NexoraPanel.installSteps() + NexoraPanel.setupPreviewSteps()
+
+    /** Nexora: официальный установщик, первичная настройка по одноразовому токену и Bearer API v1. */
+    fun deployNexora(ssh: SshSession, srv: MyServer, installer: Installer, onLog: (String) -> Unit = {}): DeployResult {
+        val user = "hy" + XuiPanel.random(6).lowercase()
+        val pass = "Hx1!" + XuiPanel.random(16)
+        val port = 20000 + java.security.SecureRandom().nextInt(40000)
+        installer.addSecret(pass)
+        if (!installer.run(NexoraPanel.installSteps())) return DeployResult.Failed("Установка остановлена")
+        val host = if (':' in srv.host) "[${srv.host}]" else srv.host
+        val base = "http://$host:$port/"
+        val local = "http://127.0.0.1:$port"
+        fun bare(token: String = "") = PanelInstance(PanelKind.NEXORA, base, user, pass, token, NexoraPanel.TAG, local = true)
+        try {
+            val setupToken = ssh.exec("${NexoraPanel.HOME}/nexora-panel setup-token 2>/dev/null").out.trim().lines().lastOrNull().orEmpty()
+            if (setupToken.isBlank()) return DeployResult.Failed("Nexora не выдала одноразовый setup-token", partial = srv.copy(panel = bare()))
+            installer.addSecret(setupToken)
+            NexoraPanel.setup(ssh, local, setupToken, user, pass, port)
+            onLog("Владелец панели создан; жду перезапуск Nexora…")
+            var ready = false
+            repeat(30) {
+                val r = ssh.exec("curl -s -o /dev/null -w '%{http_code}' -m 3 ${Installer.shq("$local/api/setup")}")
+                if (r.out.trim() == "200") { ready = true; return@repeat }
+                Thread.sleep(2000)
+            }
+            if (!ready) throw XuiApiException("Панель не начала отвечать после первичной настройки")
+            val token = NexoraPanel.createToken(ssh, local, user, pass)
+            installer.addSecret(token)
+            NexoraApi(SshXuiTransport(ssh, local, token, srv.host)).me()
+            val panel = bare(token)
+            installer.run(OtherPanels.stateSteps(panel))
+            onLog("API-токен Hydra создан; панель доступна через защищённый туннель")
+            return DeployResult.Ok(srv.copy(panel = panel))
+        } catch (e: Exception) {
+            return DeployResult.Failed("Nexora: ${e.message ?: e::class.simpleName}. Панель установлена — вход сохранён в карточке сервера",
+                partial = srv.copy(panel = bare()))
+        }
+    }
+
     /** Удалить панель любого вида с сервера; порт панели закрывается, если его открывала Hydra. */
     fun uninstallPanel(s: MyServer, installer: Installer): MyServer? {
         val panel = s.panel ?: return null
         if (panel.kind == PanelKind.XUI3) return uninstallXui(s, installer)?.also { installer.run(listOf(Step("panel-state-rm", "Удалить копию данных панели", "rm -f ${OtherPanels.PANEL_STATE}"))) }
+        if (panel.kind == PanelKind.PASARGUARD) return if (installer.run(listOf(ServerOps.backupPanelsStep(),
+                Step("panel-remove", "Удалить PasarGuard (панель и ноду) с сервера", PasarGuardPanel.uninstallCommand() + "; test ! -e ${PasarGuardPanel.DIR}", failHint = "Панель удалить не удалось"),
+                Step("panel-fw-close", "Закрыть порты подключений PasarGuard, если их открывала Hydra", PasarGuardPanel.closePortsCommand()))))
+            s.copy(panel = null) else null
+        if (panel.kind == PanelKind.NEXORA) return if (installer.run(NexoraPanel.uninstallSteps())) s.copy(panel = null) else null
+        if (panel.kind == PanelKind.REMNAWAVE) return if (installer.run(listOf(
+                Step("panel-backup", "Сохранить копию базы панели (пользователи, настройки) в ${ServerOps.BACKUP_DIR}", RemnawavePanel.backupCommand()),
+                Step("panel-remove", "Удалить Remnawave (панель и ноду) с сервера", RemnawavePanel.uninstallCommand() + "; test ! -e ${RemnawavePanel.DIR}", failHint = "Панель удалить не удалось"),
+                Step("panel-fw-close", "Закрыть порты подключений Remnawave, если их открывала Hydra", PasarGuardPanel.closePortsCommand(RemnawavePanel.PORTS)))))
+            s.copy(panel = null) else null
         val spec = OtherPanels.spec(panel.kind) ?: return null
         val port = runCatching { java.net.URL(panel.baseUrl).port }.getOrDefault(-1)
         val ok = installer.run(listOfNotNull(
@@ -326,6 +456,16 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
     }
 
     fun restartPanel(kind: PanelKind, installer: Installer): Boolean {
+        if (kind == PanelKind.PASARGUARD) return installer.run(listOf(Step("restart", "Перезапустить панель и ноду PasarGuard",
+            "cd ${PasarGuardPanel.DIR} && docker compose -p pasarguard restart >/dev/null 2>&1 && cd ${PasarGuardPanel.NODE_DIR} && docker compose restart >/dev/null 2>&1 && sleep 5 && " +
+                "curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:${PasarGuardPanel.PORT}/api/admin/token",
+            accept = { it.out.trim().startsWith("4") || it.out.trim().startsWith("2") }, failHint = "Панель не запустилась (docker compose -p pasarguard logs)")))
+        if (kind == PanelKind.REMNAWAVE) return installer.run(listOf(Step("restart", "Перезапустить панель и ноду Remnawave",
+            "cd ${RemnawavePanel.DIR} && docker compose restart >/dev/null 2>&1 && cd ${RemnawavePanel.NODE_DIR} && docker compose restart >/dev/null 2>&1; " +
+                "for i in \$(seq 1 30); do c=\$(curl -s -o /dev/null -w '%{http_code}' ${RemnawaveApi.HEADERS} http://127.0.0.1:${RemnawavePanel.API_PORT}/api/auth/status); [ \"\$c\" = 200 ] && break; sleep 3; done; echo \$c",
+            accept = { it.out.trim().endsWith("200") }, failHint = "Панель не запустилась (cd ${RemnawavePanel.DIR} && docker compose logs)")))
+        if (kind == PanelKind.NEXORA) return installer.run(listOf(Step("restart", "Перезапустить панель Nexora",
+            "systemctl restart ${NexoraPanel.SERVICE} && systemctl is-active ${NexoraPanel.SERVICE}", failHint = "Панель не запустилась (journalctl -u ${NexoraPanel.SERVICE})")))
         val svc = OtherPanels.spec(kind)?.service ?: "x-ui"
         return installer.run(listOf(Step("restart", "Перезапустить панель", "systemctl restart $svc && systemctl is-active $svc", failHint = "Панель не запустилась (journalctl -u $svc)")))
     }
@@ -338,7 +478,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
 
     /** Полная очистка сервера от всего, что ставила Hydra; запись остаётся (с ней можно снова что-то поставить). */
     fun wipe(s: MyServer, installer: Installer): MyServer? =
-        if (installer.run(ServerOps.wipeSteps())) s.copy(awg = null, ofx = null, panel = null, clients = emptyList()) else null
+        if (installer.run(ServerOps.wipeSteps())) s.copy(awg = null, ofx = null, panel = null, nodeOf = null, clients = emptyList()) else null
 
     /** Перезагрузка сервера: команда уходит в фон, сеанс закрывается сам. */
     fun reboot(ssh: SshSession) { ssh.exec("nohup sh -c 'sleep 2; systemctl reboot' >/dev/null 2>&1 &") }

@@ -24,7 +24,8 @@ HOST="$(ls "$NDK/toolchains/llvm/prebuilt" | head -1)"
 BIN="$NDK/toolchains/llvm/prebuilt/$HOST/bin"
 EXT=""; [[ "$HOST" == windows* ]] && EXT=".cmd"
 
-# Метка v0.17.3 (26.03.2026). Сменить: BYEDPI_REF=<sha|tag> scripts/build-byedpi.sh
+# Метка v0.17.3 (22.09.2025) — последний выпуск; в main с тех пор 38 коммитов (кэш по группам, TLS freeze, UDP/ICMP), без
+# выпуска и с изменёнными ключами (убран глобальный --cache-ttl) — в 0.8.2-b не берём. Сменить: BYEDPI_REF=<sha|tag> scripts/build-byedpi.sh
 BYEDPI_REF="${BYEDPI_REF:-v0.17.3}"
 if [[ ! -d "$WORK/.git" ]]; then
   git init -q "$WORK"

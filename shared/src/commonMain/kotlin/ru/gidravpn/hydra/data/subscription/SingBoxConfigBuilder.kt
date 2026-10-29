@@ -4,11 +4,11 @@ import ru.gidravpn.hydra.data.model.DnsEndpoint
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
 import ru.gidravpn.hydra.data.model.HotspotSettings
 import ru.gidravpn.hydra.data.model.MtuPreset
+import ru.gidravpn.hydra.data.model.TlsFragmentMode
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.SplitTunnel
 import ru.gidravpn.hydra.data.model.SplitTunnelMode
-import ru.gidravpn.hydra.data.model.TlsFragmentMode
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -40,7 +40,8 @@ object SingBoxConfigBuilder {
         mtu: Int = MtuPreset.AUTO.value,
         tlsFragment: TlsFragmentMode = TlsFragmentMode.OFF,
         hotspot: HotspotSettings? = null,
-    ): JSONObject = baseConfig(outboundFor(profile, tlsFragment), splitTunnel, dns, geoRouting, mtu, hotspot)
+        ipv6: Boolean = false,
+    ): JSONObject = baseConfig(outboundFor(profile, tlsFragment), splitTunnel, dns, geoRouting, mtu, hotspot, ipv6)
 
     /**
      * Мост Xray → tun (см. `XrayCore` в native-flavor): Xray сам tun не
@@ -55,12 +56,13 @@ object SingBoxConfigBuilder {
         geoRouting: GeoRouting? = null,
         mtu: Int = MtuPreset.AUTO.value,
         hotspot: HotspotSettings? = null,
+        ipv6: Boolean = false,
         socksAuth: XrayConfigBuilder.SocksAuth? = null,
     ): JSONObject {
         val outbound = JSONObject().put("type", "socks").put("tag", "proxy")
             .put("server", "127.0.0.1").put("server_port", socksPort)
         socksAuth?.let { outbound.put("username", it.user).put("password", it.pass) }
-        return baseConfig(outbound, splitTunnel, dns, geoRouting, mtu, hotspot)
+        return baseConfig(outbound, splitTunnel, dns, geoRouting, mtu, hotspot, ipv6)
     }
 
     private fun baseConfig(
@@ -70,10 +72,11 @@ object SingBoxConfigBuilder {
         geoRouting: GeoRouting?,
         mtu: Int,
         hotspot: HotspotSettings?,
+        ipv6: Boolean = false,
     ): JSONObject {
         val root = JSONObject()
 
-        root.put("log", JSONObject().put("level", "info").put("timestamp", true))
+        root.put("log", JSONObject().put("level", "warn").put("timestamp", true))
 
         // Счётчики трафика libbox отдаёт из clash-сервера: без этого блока
         // StatusMessage.trafficAvailable = false и в UI вечные 0,0 MB.
@@ -118,7 +121,10 @@ object SingBoxConfigBuilder {
                 put("tag", "tun-in")
                 put("interface_name", "hydra-tun")
                 put("mtu", mtu)
-                put("address", JSONArray().put("172.19.0.1/28"))
+                // IPv6-адрес — только в режиме Ipv6Mode.ENABLE; тот же, что у VpnService.Builder.
+                put("address", JSONArray().put("172.19.0.1/28").apply {
+                    if (ipv6) put("${ru.gidravpn.hydra.data.model.Ipv6Mode.TUN_ADDRESS}/${ru.gidravpn.hydra.data.model.Ipv6Mode.TUN_PREFIX}")
+                })
                 put("auto_route", false)
                 put("strict_route", false)
                 put("stack", "gvisor")
@@ -201,7 +207,47 @@ object SingBoxConfigBuilder {
             put("default_domain_resolver", "local")
         })
 
+        wireGuardToEndpoints(root)
         return root
+    }
+
+    /**
+     * 0.8.2-b: WireGuard — эндпоинтом sing-box 1.11+ (как на ПК, DesktopConfig.convertWireGuard), а не устаревшим outbound
+     * `wireguard`. Со старым outbound WG на Android подключался, но качал ~5 КБ/с (эмулятор, WG от x-ui и 3x-ui: 0,3 МБ за
+     * минуту против 10 МБ у того же сервера через amneziawg-go). Тег сохраняется — правила, группы и цепочки ссылаются на него.
+     */
+    internal fun wireGuardToEndpoints(root: JSONObject) {
+        val outbounds = root.optJSONArray("outbounds") ?: return
+        val endpoints = root.optJSONArray("endpoints") ?: JSONArray()
+        var i = 0
+        while (i < outbounds.length()) {
+            val wg = outbounds.getJSONObject(i)
+            if (wg.optString("type") != "wireguard") { i++; continue }
+            outbounds.remove(i)
+            val peer = JSONObject()
+                .put("address", wg.getString("server"))
+                .put("port", wg.getInt("server_port"))
+                .put("public_key", wg.optString("peer_public_key"))
+                .put("allowed_ips", JSONArray().put("0.0.0.0/0").put("::/0"))
+            wg.optString("pre_shared_key").takeIf { it.isNotEmpty() }?.let { peer.put("pre_shared_key", it) }
+            wg.optInt("keepalive", 0).takeIf { it > 0 }?.let { peer.put("persistent_keepalive_interval", it) }
+            val endpoint = JSONObject()
+                .put("type", "wireguard").put("tag", wg.optString("tag", "proxy"))
+                .put("address", JSONArray(wgAddresses(wg.optJSONArray("local_address"))))
+                .put("private_key", wg.optString("private_key"))
+                .put("peers", JSONArray().put(peer))
+            if (wg.has("mtu")) endpoint.put("mtu", wg.getInt("mtu"))
+            endpoints.put(endpoint)
+        }
+        if (endpoints.length() > 0) root.put("endpoints", endpoints)
+    }
+
+    /** sing-box требует префикс: "10.0.0.2" → "10.0.0.2/32", IPv6 → /128. */
+    private fun wgAddresses(raw: JSONArray?): List<String> {
+        val list = raw?.let { a -> (0 until a.length()).map { a.optString(it).trim() } }.orEmpty()
+            .filter { it.isNotEmpty() }
+            .map { if ('/' in it) it else if (':' in it) "$it/128" else "$it/32" }
+        return list.ifEmpty { listOf("172.19.0.2/32") }
     }
 
     /**
@@ -255,6 +301,7 @@ object SingBoxConfigBuilder {
                     ))
                 if (extra.has("preshared_key")) o.put("pre_shared_key", extra.optString("preshared_key"))
                 if (extra.has("mtu")) o.put("mtu", extra.optInt("mtu", 1408))
+                extra.optString("keepalive").toIntOrNull()?.takeIf { it > 0 }?.let { o.put("keepalive", it) }   // → эндпоинт (wireGuardToEndpoints)
             }
             Protocol.TUIC -> {
                 o.put("type", "tuic").put("uuid", p.uuidOrPassword)
@@ -291,6 +338,7 @@ object SingBoxConfigBuilder {
             TlsFragmentMode.OFF -> Unit
             TlsFragmentMode.RECORD -> tls.put("record_fragment", true)
             TlsFragmentMode.TCP -> tls.put("fragment", true)
+            else -> Unit
         }
         return tls
     }

@@ -33,6 +33,25 @@ val pkgVersion: String = appVersion.substringBefore('-').split('.').take(3)
     .let { it + List(3 - it.size) { "0" } }
     .joinToString(".")
 
+// Windows (MSI/EXE): ProductVersion из трёх чисел, а Windows Installer при той же версии и том же UpgradeCode отвечает
+// ошибкой 1638 («Уже установлена другая версия этого продукта») — поэтому 0.8.2-b → 0.8.2-rc1 не ставился поверх.
+// Пре-релиз кодируем в третье число: PATCH*100 + ступень (a = 10+n-1, b = 30+n-1, rcN = 60+N, выпуск = 99):
+// 0.8.2-b = 0.8.230 < 0.8.2-rc1 = 0.8.261 < 0.8.2 = 0.8.299 < 0.8.3-a = 0.8.310. Ранее выпущенные 0.8.x (PATCH < 100) меньше.
+val winPkgVersion: String = run {
+    val (major, minor, patch) = pkgVersion.split('.').map(String::toInt)
+    val suffix = appVersion.substringAfter('-', "")
+    val n = suffix.dropWhile(Char::isLetter).toIntOrNull() ?: 1
+    val stage = when {
+        suffix.isEmpty() -> 99
+        suffix.startsWith("rc") -> 60 + n
+        suffix.startsWith("b") -> 30 + n - 1
+        suffix.startsWith("a") -> 10 + n - 1
+        else -> error("Неизвестный суффикс версии: $appVersion")
+    }
+    require(patch * 100 + stage <= 65535) { "PATCH слишком велик для MSI: $appVersion" }
+    "$major.$minor.${patch * 100 + stage}"
+}
+
 // macOS (DMG/CFBundleVersion) требует MAJOR > 0: 0.X.Y → 1.X.Y. Порядок версий
 // сохраняется; настоящая версия видна в самом приложении (hydra.version).
 val macPkgVersion: String = pkgVersion.split('.').let { (a, b, c) -> "${a.toInt() + 1}.$b.$c" }
@@ -72,6 +91,23 @@ fun hostTarget(): String {
 val coreCacheDir = layout.buildDirectory.dir("sing-box-cache")
 val appResourcesDir = layout.buildDirectory.dir("hydra-app-resources")
 
+/** Апстрим, затем зеркало; битый ответ одного источника не подменяет закреплённый архив. */
+fun fetchPinned(urls: List<String>, file: File, sha256: String) {
+    var lastError: Exception? = null
+    val got = urls.any { url ->
+        try {
+            logger.lifecycle("Скачиваю $url")
+            URI(url).toURL().openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+            MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") { "%02x".format(it) } == sha256
+        } catch (e: Exception) {
+            lastError = e
+            logger.lifecycle("  не вышло: ${e.message}")
+            false
+        }
+    }
+    if (!got) throw GradleException("Не скачан ${file.name} ни с апстрима, ни с зеркала", lastError)
+}
+
 /**
  * Скачивает (с проверкой SHA-256) и распаковывает sing-box для текущей ОС/архитектуры
  * в <appResources>/<os>-<arch>/. Compose Desktop кладёт в пакет только каталог своей
@@ -91,9 +127,7 @@ val downloadSingBox by tasks.registering {
         fun sha(f: File) = MessageDigest.getInstance("SHA-256").digest(f.readBytes())
             .joinToString("") { "%02x".format(it) }
         if (!file.exists() || sha(file) != core.sha256) {
-            val url = "https://github.com/SagerNet/sing-box/releases/download/v$singBoxVersion/$archiveName"
-            logger.lifecycle("Скачиваю $url")
-            URI(url).toURL().openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+            fetchPinned(listOf("https://github.com/SagerNet/sing-box/releases/download/v$singBoxVersion/$archiveName", "$depsMirror/$archiveName"), file, core.sha256)
         }
         val actual = sha(file)
         check(actual == core.sha256) { "SHA-256 $archiveName не совпал: $actual (ожидался ${core.sha256})" }
@@ -110,19 +144,21 @@ val downloadSingBox by tasks.registering {
 }
 
 // ---- Ядро Xray-core (второй движок, как на Android) ------------------------------
-// 26.9.30 — пре-релиз по меткам апстрима, но тот же коммит (b26a91d), что собран в libXray.aar на Android,
-// так что на всех платформах один и тот же Xray. Стабильный 26.9.30 отстаёт на полгода, а панели (3x-ui 3.9,
-// PasarGuard и др.) выдают настройки под свежий Xray. SHA-256 — дайджесты ассетов релиза
-// https://github.com/XTLS/Xray-core/releases/tag/v26.9.30 .
-val xrayVersion = "26.9.30"
+// 26.10.29 (0.8.2-rc3), коммит 0afec66085a8 — тот же, что в libXray v26.10.29 на Android
+// (scripts/fetch-libxray.sh), так что на всех платформах один и тот же Xray. Панели выдают настройки под свежий Xray.
+// SHA-256 — дайджесты ассетов релиза https://github.com/XTLS/Xray-core/releases/tag/v26.10.29 .
+val xrayVersion = "26.10.29"
+
+/** Зеркало сторонних сборок: релиз `deps` в нашем репозитории (scripts/mirror-deps.sh); имена — `Xray-<версия>-<архив>.zip`. */
+val depsMirror = (System.getenv("HYDRA_DEPS_MIRROR") ?: "https://github.com/Chistovik92/HydraVPN/releases/download/deps").trimEnd('/')
 
 val xrayArchives = mapOf(
-    "windows-x64" to ("windows-64" to "b17a619343c11b89d8faf36278298856749b15c52277d875d32051b33dcda617"),
-    "windows-arm64" to ("windows-arm64-v8a" to "5cf7ad4fd9aac5aa248ae7e598f3f0a0d0f79a6195089d611ddef9653830f1b0"),
-    "linux-x64" to ("linux-64" to "f851110beaff16e78d643f0ccfd9524b4a44dfd59bae3e34bb52bba378f7690e"),
-    "linux-arm64" to ("linux-arm64-v8a" to "9886f077f9fd8e6713b84c377c1c7db4e53b9bfa8c276a5bd12561139522b473"),
-    "macos-x64" to ("macos-64" to "1f366aaf21d3c3003d1556d066c4e08f9dd62d1f96555ecedde85b397df0f684"),
-    "macos-arm64" to ("macos-arm64-v8a" to "4b363bd924df5bf09f87bd445755ff8e5742b9a8a0480cda261061416c3c7dce"),
+    "windows-x64" to ("windows-64" to "fce33e81cccf50e7aab572b175519a50b5e0f9d2f5c8d1ed73012ea5c9ad4d58"),
+    "windows-arm64" to ("windows-arm64-v8a" to "b5314598249b2da55135e0d875adb653aadf926fa1bca73d34fdce78600f4204"),
+    "linux-x64" to ("linux-64" to "8a5f3e6a1057e4bd0f8a7c57c9d91204b4be0b74222a6e210d070603101163c2"),
+    "linux-arm64" to ("linux-arm64-v8a" to "afe01f19045b05237420328028ee1ee2e1edd2100eb41a8cbbf50e683b0a6e58"),
+    "macos-x64" to ("macos-64" to "fb6e024e9cbdcf480748b0ead2c24ada45de24419e68fb3799404fe09406d9b6"),
+    "macos-arm64" to ("macos-arm64-v8a" to "57755127d38c0c4357e667761c78b257cf617f05015bad5060bf2dae75fcd00b"),
 )
 
 /** Xray-core своей платформы в тот же каталог ресурсов, что и sing-box. */
@@ -140,9 +176,18 @@ val downloadXray by tasks.registering {
         fun sha(f: File) = MessageDigest.getInstance("SHA-256").digest(f.readBytes())
             .joinToString("") { "%02x".format(it) }
         if (!file.exists() || sha(file) != sha256) {
-            val url = "https://github.com/XTLS/Xray-core/releases/download/v$xrayVersion/Xray-$suffix.zip"
-            logger.lifecycle("Скачиваю $url")
-            URI(url).toURL().openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+            // апстрим удаляет релизы (v26.10.10 и v26.10.17 пропали, 0.8.2-rc2): после апстрима — наше зеркало с тем же SHA-256
+            val urls = listOf("https://github.com/XTLS/Xray-core/releases/download/v$xrayVersion/Xray-$suffix.zip",
+                "$depsMirror/Xray-$xrayVersion-$suffix.zip")
+            var lastError: Exception? = null
+            val got = urls.any { url ->
+                try {
+                    logger.lifecycle("Скачиваю $url")
+                    URI(url).toURL().openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+                    sha(file) == sha256
+                } catch (e: Exception) { lastError = e; logger.lifecycle("  не вышло: ${e.message}"); false }
+            }
+            if (!got) throw GradleException("Xray $xrayVersion ($suffix) не скачан ни с апстрима, ни с зеркала $depsMirror", lastError)
         }
         val actual = sha(file)
         check(actual == sha256) { "SHA-256 ${file.name} не совпал: $actual (ожидался $sha256)" }
@@ -167,17 +212,16 @@ val syncGeoAssets by tasks.registering(Sync::class) {
 
 
 // ---- olcRTC и OpenFlux (0.7.4, BETA): клиенты-подпроцессы -------------------------
-// OpenFlux — готовые бинари из релиза апстрима (GPL-3.0), SHA-256 закреплены (SHA256SUMS.txt релиза v0.4.2).
-// 04.10.2026 апстрим переставил метку v0.3.0 на новый коммит bb55dc3 («Boards, mailru and yandex: the new native transports»)
-// и перезалил все бинари — хеши обновлены; Android собирается из того же коммита (scripts/build-openflux.sh).
-val openFluxVersion = "0.4.2"
+// OpenFlux — готовые бинари из релиза апстрима (GPL-3.0), SHA-256 закреплены (релиз v0.17.1, 0.8.2-rc3; коммит f492a1a).
+// Android и iOS собираются из того же коммита; нода использует его deploy/node-install.sh.
+val openFluxVersion = "0.17.1"
 val openFluxBinaries = mapOf(
-    "windows-x64" to ("openflux-windows-amd64.exe" to "c6b4b2db082099aba88a1dbf28b93defd62e8759351f7204aaa0c6eb7340f520"),
-    "windows-arm64" to ("openflux-windows-arm64.exe" to "dbf1b33b6d38fbab59d12a1dd3ee9912620d44313c968aaa5aaaae8390a55a8f"),
-    "linux-x64" to ("openflux-linux-amd64" to "c51e82c1dc9c74b1fd6b264ee25533fb5d885e3e8bea451fb8920245ac1bf2c1"),
-    "linux-arm64" to ("openflux-linux-arm64" to "5e69a7ce3160684cf7e4c51592cb71084ef56819407b556478bb4abc75156427"),
-    "macos-x64" to ("openflux-darwin-amd64" to "f20268215c8952698b424824180f9f1bd24cc789163fb09a620d780b751367b7"),
-    "macos-arm64" to ("openflux-darwin-arm64" to "c2c41fadbfbb2eeba8bfa22e89787e0cb9b796045cf09a6ed2e401320ff778e0"),
+    "windows-x64" to ("openflux-windows-amd64.exe" to "8dcf3ac44efa32779a4f33dbed69ce2ff9d3f08b2118f3ab607bde4a2abe5a56"),
+    "windows-arm64" to ("openflux-windows-arm64.exe" to "9ed874c8738329b3474c1316671c1f5bf60020f1a5b467d1ecf18e7d49649c15"),
+    "linux-x64" to ("openflux-linux-amd64" to "c0d00461e8cc59e48429b239fd8044b1c1aaa3769968a7c9160c488f4bd63f3b"),
+    "linux-arm64" to ("openflux-linux-arm64" to "053456982e0668d60f7533c91ec4703870553b5022403abfd072dbf1fe57483d"),
+    "macos-x64" to ("openflux-darwin-amd64" to "2830230fd0ccdf638f7bd62a67a20aa4a0bebacf1b20ef6fbe9f840565690801"),
+    "macos-arm64" to ("openflux-darwin-arm64" to "83af230cf4ecc966bfd1a6668199a19b3c54814962a70dd1c7a0b2a0497bff76"),
 )
 
 val downloadOpenFlux by tasks.registering {
@@ -193,9 +237,7 @@ val downloadOpenFlux by tasks.registering {
         val file = cache.resolve("OpenFlux-$openFluxVersion-$asset")
         fun sha(f: File) = MessageDigest.getInstance("SHA-256").digest(f.readBytes()).joinToString("") { "%02x".format(it) }
         if (!file.exists() || sha(file) != sha256) {
-            val url = "https://github.com/p1neappleXpress/OpenFlux/releases/download/v$openFluxVersion/$asset"
-            logger.lifecycle("Скачиваю $url")
-            URI(url).toURL().openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+            fetchPinned(listOf("https://github.com/p1neappleXpress/OpenFlux/releases/download/v$openFluxVersion/$asset", "$depsMirror/OpenFlux-$openFluxVersion-$asset"), file, sha256)
         }
         val actual = sha(file)
         check(actual == sha256) { "SHA-256 ${file.name} не совпал: $actual (ожидался $sha256)" }
@@ -357,6 +399,19 @@ val generateIcons by tasks.registering {
     }
 }
 
+// ---- JavaFX (сайт панели внутри приложения, 0.8.2-a2) ------------------------------
+val javafxVersion = "21.0.5"
+// HYDRA_FX_PLATFORM — подменить платформу (проверка ветки linux-aarch64 на другой машине)
+val javafxPlatform: String = System.getenv("HYDRA_FX_PLATFORM") ?: run {
+    val os = System.getProperty("os.name").lowercase()
+    val arm = System.getProperty("os.arch").lowercase().let { it == "aarch64" || it == "arm64" }
+    when {
+        os.contains("win") -> "win"
+        os.contains("mac") -> if (arm) "mac-aarch64" else "mac"
+        else -> if (arm) "linux-aarch64" else "linux"
+    }
+}
+
 // ---- Зависимости ---------------------------------------------------------------
 dependencies {
     implementation(project(":shared"))
@@ -366,6 +421,14 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.json:json:20240303")
     implementation("net.java.dev.jna:jna-platform:5.14.0")
+    // Сайт панели внутри Hydra (0.8.2-a2): WebView из JavaFX — встроенного браузера в Compose Desktop нет. Нативная часть — под
+    // платформу сборки (как compose.desktop.currentOs: каждый пакет собирается на своей ОС); в Hydra Classic JavaFX не входит.
+    // У JavaFX 21 нет сборки под linux-aarch64 (CI 0.8.2-a2: «Could not find javafx-web-21.0.5-linux-aarch64.jar»): там классы — только
+    // для компиляции (они одинаковы на всех платформах), в пакет JavaFX не входит, и сайт панели открывается в браузере (PanelWebFx.available).
+    listOf("base", "graphics", "controls", "media", "web", "swing").forEach {
+        if (javafxPlatform == "linux-aarch64") { compileOnly("org.openjfx:javafx-$it:$javafxVersion:linux"); testImplementation("org.openjfx:javafx-$it:$javafxVersion:linux") }
+        else implementation("org.openjfx:javafx-$it:$javafxVersion:$javafxPlatform")
+    }
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
@@ -427,7 +490,9 @@ compose.desktop {
             // Модули JRE сверх java.base/java.desktop: OkHttp (logging, TLS с EC-шифрами),
             // JNA (jdk.unsupported), Compose (management/naming/accessibility). java.net.http не нужен: всё идёт через OkHttp и HttpURLConnection.
             modules("java.logging", "java.naming", "java.management",
-                "jdk.crypto.ec", "jdk.unsupported", "jdk.accessibility")
+                "jdk.crypto.ec", "jdk.unsupported", "jdk.accessibility",
+                // JavaFX WebView (0.8.2-a2): мост JavaScript ↔ Java и DOM
+                "jdk.jsobject", "jdk.xml.dom", "java.scripting")
 
             windows {
                 iconFile.set(iconsDir.map { it.file("hydra.ico") })
@@ -435,6 +500,8 @@ compose.desktop {
                 shortcut = true
                 dirChooser = true
                 perUserInstall = true
+                msiPackageVersion = winPkgVersion
+                exePackageVersion = winPkgVersion
                 // Постоянный UUID: без него MSI новой версии не заменяет старую.
                 upgradeUuid = "6f1d0c0e-5c7b-4b8e-9a44-2d6f0b9e1a37"
             }
@@ -526,23 +593,29 @@ val cacheDir = layout.buildDirectory.dir("classic-cache")
 fun sha256(f: File): String = MessageDigest.getInstance("SHA-256").digest(f.readBytes()).joinToString("") { "%02x".format(it) }
 
 /** Скачивает [url] в кэш и сверяет SHA-256; уже скачанный и совпавший файл не трогает. */
-fun fetch(url: String, sha: String, name: String): File {
+fun fetch(url: String, sha: String, name: String, mirrorName: String = name): File {
     val dir = cacheDir.get().asFile.apply { mkdirs() }
     val file = File(dir, name)
     if (!file.exists() || sha256(file) != sha) {
-        logger.lifecycle("Скачиваю $url")
-        var attempt = 0
-        while (true) {
-            try {
-                URI(url).toURL().openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
-                break
-            } catch (e: java.io.IOException) {
-                // GitHub иногда отвечает 503/5xx на скачивание релизов — повторяем с паузой.
-                if (++attempt >= 4) throw e
-                logger.lifecycle("  не вышло (${e.message}), повтор $attempt…")
-                Thread.sleep(3000L * attempt)
+        var lastError: Exception? = null
+        val got = listOf(url, "$depsMirror/$mirrorName").any { source ->
+            var attempt = 0
+            while (true) {
+                try {
+                    logger.lifecycle("Скачиваю $source")
+                    URI(source).toURL().openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+                    if (sha256(file) == sha) return@any true
+                    break
+                } catch (e: java.io.IOException) {
+                    lastError = e
+                    if (++attempt >= 4) break
+                    logger.lifecycle("  не вышло (${e.message}), повтор $attempt…")
+                    Thread.sleep(3000L * attempt)
+                }
             }
+            false
         }
+        if (!got) throw GradleException("Не скачан $name ни с апстрима, ни с зеркала", lastError)
     }
     val actual = sha256(file)
     check(actual == sha) { "SHA-256 $name не совпал: $actual (ожидался $sha)" }
@@ -575,28 +648,28 @@ val classicTargets = listOf(
     // olcRTC и OpenFlux (0.7.10) собраны обычным Go и работают только с Windows 8.1/10: на Windows 7 Hydra Classic их
     // не предлагает (Platform.goClientsSupported), на 32-битной Windows 10 — работают.
     Classic("windows-x86", "WindowsX86", "windows", "x86",
-        "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "e4024508be5616015353c893b0d3f2dd3c080617a750ef6bd64f8183107611c8",
-        "Xray-win7-32.zip", "3d73134f74e119589cc117c8f45b4564a14417f9b74508cc48599f142ac3aa81",
+        "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "e1cb15e4a381f685c6253dcb885354b607e4a9f047e2171a78b1e622faac2cbb",
+        "Xray-win7-32.zip", "cee7fa0765a7543fea86be4dca24c209038f7750ce30a2d4d9e1d9ebcbd6e805",
         olcRtc = Triple("windows", "386", ""), openFluxSrc = Triple("windows", "386", ""),
         byeDpi = "byedpi-17.3-i686-w64.zip" to "3f3d0af999371cfa623bd641738a42785e107a9d829b38480ed3d942dafea28a",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.29%2B7/OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip",
             "OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip", "b747698a05a39391a58b9caac30310275e4e6bd9fef92d6c149cba310d91d2be")),
     Classic("windows-x64", "WindowsX64", "windows", "x64",
-        "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "4f27f807f99198b2681a59c1f12564b3683331e68215344e75761ee9199a9b90",
-        "Xray-win7-64.zip", "75e67c738fdfafb9649f1a81a7ab6b3ba97a0f2e09a44254bff03c5b077547d3",
+        "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "aebaaac4eece1a1d95787edaff683b4e4cd2d5e07764634b5d575a4cc6f1a031",
+        "Xray-win7-64.zip", "fae1c63254b500f7b4ef6f68a83849dedec9e54f473cd049224523c1e03e9d98",
         olcRtc = Triple("windows", "amd64", ""), openFluxSrc = Triple("windows", "amd64", ""),
         byeDpi = "byedpi-17.3-x86_64-w64.zip" to "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.32.1%2B1/OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip",
             "OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip", "f8c7da672f5dba36b6f870608820b6b598cfae91296929f1b8f21ef2f1e8a0dd")),
     Classic("linux-x86", "LinuxX86", "linux", "x86",
         "sing-box-$singBoxVersion-linux-386.tar.gz", "b2361b5eb0ef6da8f068d9bba762b9edbb3a8637515e30251ee8d5d78b30d846",
-        "Xray-linux-32.zip", "277ffde84d86cb593ae9c3d144b11a5e4c80ba579fdfe6fe09830e04c85d04aa",
+        "Xray-linux-32.zip", "a02065c652dd8f25806242edc9656a21495a0afc10b3c2f22dda14cd71b70726",
         olcRtc = Triple("linux", "386", ""), openFluxSrc = Triple("linux", "386", ""),
         byeDpi = "byedpi-17.3-i686.tar.gz" to "655452c2f8e1e3a99b021043b0a68f57927c97010efe19b06ac3b9949fd784ed"),
     Classic("linux-armv7", "LinuxArmv7", "linux", "armv7",
         "sing-box-$singBoxVersion-linux-armv7.tar.gz", "9eedd8eb2d3ea66a48794359d1cc1e32ce618b6e1b105c9cd314da6408c9fc87",
-        "Xray-linux-arm32-v7a.zip", "0b9719471c7c69752857714e9711d4da57cf38a6beb75dcddfb21425f7919908",
-        openFlux = "openflux-linux-arm" to "489387fd9bd8eed248933b147ed8f9964d61188baae5f9d9f6a06b6b810214f7",
+        "Xray-linux-arm32-v7a.zip", "263fa7325c63b3a7f7316405f561e7c790b44c1461992ea648007f0374e9bdf4",
+        openFlux = "openflux-linux-arm" to "1a6aed5fa8044e758e0a9c542781d2c307af5170d8648b2bd2d336b4d47acf12",
         olcRtc = Triple("linux", "arm", "7"),
         byeDpi = "byedpi-17.3-armv7l.tar.gz" to "d231b95fc130a40994ef593ac87498ad8614e003b263e3a453bd62af096abb0c"),
 )
@@ -605,8 +678,8 @@ val classicTargets = listOf(
 fun buildOlcRtc(goos: String, goarch: String, goarm: String, dest: File) =
     buildGoClient("olcrtc-src", "https://github.com/openlibrecommunity/olcrtc.git", olcRtcCommit, "./cmd/olcrtc", goos, goarch, goarm, dest)
 
-/** Коммит OpenFlux — тот же, что у готовых бинарей (метка v0.4.2) и у Android-сборки. */
-val openFluxCommit = "74cac6d47bf4c27947348ee957538a2c0728a485"
+/** Коммит OpenFlux — тот же, что у готовых бинарей (метка v0.17.1) и у Android/iOS-сборки. */
+val openFluxCommit = "f492a1a33b7581ad8f88118f97e0b866adda3cdc"
 fun buildOpenFlux(goos: String, goarch: String, goarm: String, dest: File) =
     buildGoClient("openflux-src", "https://github.com/p1neappleXpress/OpenFlux.git", openFluxCommit, ".", goos, goarch, goarm, dest)
 
@@ -717,12 +790,12 @@ val classicDistTasks = classicTargets.map { t ->
                     into(res)
                 }
             }
-            extract(fetch("https://github.com/SagerNet/sing-box/releases/download/v$singBoxVersion/${t.singBoxAsset}", t.singBoxSha, t.singBoxAsset),
+            extract(fetch("$depsMirror/${t.singBoxAsset}", t.singBoxSha, t.singBoxAsset, t.singBoxAsset),
                 "sing-box$exe", "sing-box$exe", "LICENSE-sing-box")
-            val xrayFile = fetch("https://github.com/XTLS/Xray-core/releases/download/v$xrayVersion/${t.xrayAsset}", t.xraySha, t.xrayAsset)
+            val xrayFile = fetch("https://github.com/XTLS/Xray-core/releases/download/v$xrayVersion/${t.xrayAsset}", t.xraySha, t.xrayAsset, "Xray-$xrayVersion-${t.xrayAsset.removePrefix("Xray-")}")
             extract(xrayFile, "xray$exe", "xray$exe", "LICENSE-xray")
             t.openFlux?.let { (asset, sha) ->
-                val f = fetch("https://github.com/p1neappleXpress/OpenFlux/releases/download/v$openFluxVersion/$asset", sha, "OpenFlux-$openFluxVersion-$asset")
+                val f = fetch("https://github.com/p1neappleXpress/OpenFlux/releases/download/v$openFluxVersion/$asset", sha, "OpenFlux-$openFluxVersion-$asset", "OpenFlux-$openFluxVersion-$asset")
                 f.copyTo(File(res, "openflux$exe"), overwrite = true)
             }
             t.byeDpi?.let { (asset, sha) ->

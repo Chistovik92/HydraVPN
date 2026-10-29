@@ -15,7 +15,7 @@ env:
   # Приватный DNS Hydra VPN (секрет репозитория): нужен сборке, в исходниках его нет. Пусто — пункт DNS скрыт.
   HYDRA_PRIVATE_DNS: ${{ secrets.HYDRA_PRIVATE_DNS }}
   SING_BOX_VERSION: "1.12.25"
-  AWG_APPLE_COMMIT: "9d5ee60"
+  AWG_APPLE_COMMIT: "9d5ee60edefa95b933a738dd7cda671dd18021fc"
 
 jobs:
   # Переносимая логика: парсеры, конфиг sing-box, резервная копия, маска ключей.
@@ -38,7 +38,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ios/Frameworks/Libbox.xcframework
-          key: libbox-ios-${{ env.SING_BOX_VERSION }}-bridge-${{ hashFiles('ios/Bridge/go.sum', 'ios/Bridge/**/*.go', 'ios/Bridge/build.sh') }}
+          key: libbox-ios-${{ env.SING_BOX_VERSION }}-bridge-${{ hashFiles('ios/Bridge/go.sum', 'ios/Bridge/**/*.go', 'ios/Bridge/build.sh', 'ios/Bridge/go.mod', 'scripts/sing-box-reality-mlkem.patch') }}
       # 0.7.10: Go — по go.mod моста (olcRTC и OpenFlux требуют 1.26).
       - uses: actions/setup-go@v5
         with:
@@ -60,7 +60,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ios/Frameworks/Libbox.xcframework
-          key: libbox-ios-${{ env.SING_BOX_VERSION }}-bridge-${{ hashFiles('ios/Bridge/go.sum', 'ios/Bridge/**/*.go', 'ios/Bridge/build.sh') }}
+          key: libbox-ios-${{ env.SING_BOX_VERSION }}-bridge-${{ hashFiles('ios/Bridge/go.sum', 'ios/Bridge/**/*.go', 'ios/Bridge/build.sh', 'ios/Bridge/go.mod', 'scripts/sing-box-reality-mlkem.patch') }}
       # AmneziaWG: WireGuardKit из amneziawg-apple на зафиксированном коммите + libwg-go.a (amneziawg-go).
       - name: Restore amneziawg-apple
         id: awg

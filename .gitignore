@@ -15,6 +15,7 @@ gradle/wrapper/gradle-wrapper.jar
 
 # Не коммитим тяжёлые нативные ядра — собираются отдельно (см. docs/BUILD.md)
 /app/libs/*.aar
+/app/libs/*.aar.patch
 /app/libs/*.so
 /app/src/main/jniLibs/**/*.so
 
@@ -51,3 +52,8 @@ keystore.properties
 /desktop/build
 /ios/build
 /.kotlin/
+
+# Зеркала сторонних сборок и исходников
+/mirror/
+/.upstream-mirror/
+/skill-observations/

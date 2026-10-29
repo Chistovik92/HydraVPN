@@ -100,13 +100,16 @@ data class RoutePlan(
     )
 
     /** План без всего, что опирается на ByeDPI: если он не запустился, соединение всё равно поднимается. */
-    fun withoutDpi() = copy(
-        dpi = dpi.copy(enabled = false),
-        proxyVia = proxyVia?.takeIf { it != RouteTarget.DPI },
-        rules = rules.filter { it.target != RouteTarget.DPI },
-        nodes = nodes.map { if (it.via == RouteTarget.DPI) it.copy(via = null) else it },
-        groups = groups.map { g -> g.copy(members = g.members.filter { it != RouteTarget.DPI }) },
-    )
+    fun withoutDpi(): RoutePlan {
+        require(proxyVia != RouteTarget.DPI && nodes.none { it.via == RouteTarget.DPI }) {
+            "явная цепочка требует ByeDPI, но он не запустился"
+        }
+        return copy(
+            dpi = dpi.copy(enabled = false),
+            rules = rules.filter { it.target != RouteTarget.DPI },
+            groups = groups.map { g -> g.copy(members = g.members.filter { it != RouteTarget.DPI }) },
+        )
+    }
 }
 
 object RoutePlanApplier {
@@ -150,6 +153,12 @@ object RoutePlanApplier {
         }
         plan.nodes.forEach { chain(it.tag, it.via) }
         chain(RouteTarget.PROXY, plan.proxyVia)
+        plan.proxyVia?.let {
+            check(byTag(RouteTarget.PROXY)?.optString("detour") == it) {
+                "явная цепочка «$it → proxy» не применена — подключение без неё запрещено"
+            }
+        }
+
 
         // Группы выходов. Члены, которых нет, пропускаются; пустая группа не создаётся.
         for (g in plan.groups) {
@@ -267,6 +276,8 @@ object RoutePlanApplier {
             }
             if (route.optString("final") == "direct") route.put("final", RouteTarget.DPI)
         }
+        // 0.8.2-b: узлы WireGuard — эндпоинтами, как и основной выход (SingBoxConfigBuilder.wireGuardToEndpoints).
+        ru.gidravpn.hydra.data.subscription.SingBoxConfigBuilder.wireGuardToEndpoints(root)
         return warn
     }
 

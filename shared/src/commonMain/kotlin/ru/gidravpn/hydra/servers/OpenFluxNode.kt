@@ -61,10 +61,10 @@ data class OfxNodeSpec(
 
 object OpenFluxNode {
     /** Тот же коммит апстрима, что и у встроенного клиента (scripts/build-openflux.sh). */
-    const val SCRIPT_REF = "74cac6d47bf4c27947348ee957538a2c0728a485"
+    const val SCRIPT_REF = "f492a1a33b7581ad8f88118f97e0b866adda3cdc"
     const val SCRIPT_URL = "https://raw.githubusercontent.com/p1neappleXpress/OpenFlux/$SCRIPT_REF/deploy/node-install.sh"
     /** SHA-256 файла по [SCRIPT_URL]; при смене коммита пересчитать (`curl -sL URL | sha256sum`). */
-    const val SCRIPT_SHA256 = "11b65510d0ded807f33e172357c70d787c67b02facc9eb8e37156c25f8fb2ba1"
+    const val SCRIPT_SHA256 = "5795c109bc37837238b8487df9977702eb5549167e47e7f08a07af7d9abeca83"
     const val SCRIPT = "/root/.hydra-openflux-node-install.sh"
 
     private val okJson = { r: ExecResult -> r.out.lineSequence().any { it.trim().startsWith("{") && it.contains("\"ok\":true") } }
@@ -79,7 +79,7 @@ object OpenFluxNode {
 
     fun fetchSteps(): List<Step> = listOf(
         Step("ofx-fetch", "Загрузить скрипт установки узла OpenFlux (закреплённый коммит)",
-            "(curl -fsSL ${Installer.shq(SCRIPT_URL)} -o $SCRIPT || wget -q -O $SCRIPT ${Installer.shq(SCRIPT_URL)}) && chmod 700 $SCRIPT",
+            "(curl -fsSL -m 180 ${Installer.shq(SCRIPT_URL)} -o $SCRIPT || wget -q -O $SCRIPT ${Installer.shq(SCRIPT_URL)}) && chmod 700 $SCRIPT",
             rollback = "rm -f $SCRIPT", failHint = "Не удалось скачать скрипт с GitHub"),
         Step("ofx-verify", "Проверить SHA-256 скрипта",
             "echo '$SCRIPT_SHA256  $SCRIPT' | sha256sum -c -", failHint = "Контрольная сумма скрипта не совпала — установка остановлена"),

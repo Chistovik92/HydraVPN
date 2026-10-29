@@ -2,6 +2,7 @@ package ru.gidravpn.hydra.desktop.core
 
 import ru.gidravpn.hydra.desktop.Os
 import ru.gidravpn.hydra.desktop.Platform
+import ru.gidravpn.hydra.desktop.Store
 import java.io.File
 import java.nio.file.Files
 import java.util.zip.ZipInputStream
@@ -15,6 +16,13 @@ import java.util.zip.ZipInputStream
  * приложения, поэтому подмена их не трогает.
  */
 object SelfUpdate {
+    /** Подтверждение нового процесса: без него обновление считается неуспешным и откатывается. */
+    const val STARTED_MARKER = ".update-started"
+
+    fun markStarted() {
+        val root = appRoot() ?: return
+        runCatching { Store.writePrivateAtomic(File(root, STARTED_MARKER), Platform.version) }
+    }
 
     /** Корень установки по пути запущенного файла; null — Hydra запущена не из упакованного приложения (например, `gradle run`). */
     fun appRoot(os: Os = Platform.os, exe: String? = Platform.selfExecutable): File? {
@@ -103,24 +111,43 @@ object SelfUpdate {
             """
             |@echo off
             |chcp 65001 >nul
+            |rem ping вместо timeout /t: у timeout нет stdin (CI/сервисы) и он падает «Input redirection is not supported».
             |:wait
-            |tasklist /FI "PID eq $pid" 2>nul | find "$pid" >nul && (timeout /t 1 /nobreak >nul & goto wait)
+            |tasklist /FI "PID eq $pid" 2>nul | find "$pid" >nul && (ping -n 2 127.0.0.1 >nul & goto wait)
             |set "ROOT=${root.absolutePath}"
             |set "NEW=${payload.absolutePath}"
             |set "OLD=%ROOT%.old"
+            |set "FAILED=%ROOT%.update-failed"
             |rd /s /q "%OLD%" 2>nul
+            |rd /s /q "%FAILED%" 2>nul
             |set N=0
             |:retry
             |move "%ROOT%" "%OLD%" >nul 2>&1 && goto moved
             |set /a N+=1
             |if %N% geq 30 goto launch
-            |timeout /t 1 /nobreak >nul
+            |ping -n 2 127.0.0.1 >nul
             |goto retry
             |:moved
-            |move "%NEW%" "%ROOT%" >nul 2>&1 || move "%OLD%" "%ROOT%" >nul 2>&1
+            |move "%NEW%" "%ROOT%" >nul 2>&1 || goto rollback
+            |start "" "%ROOT%\\$start"
+            |ping -n 11 127.0.0.1 >nul
+            |rem Hydra создаёт этот маркер только после успешного запуска.
+            |if exist "%ROOT%\\.update-started" goto success
+            |move "%ROOT%" "%FAILED%" >nul 2>&1
+            |move "%OLD%" "%ROOT%" >nul 2>&1
+            |start "" "%ROOT%\$start"
+            |goto cleanup
+            |:rollback
+            |move "%OLD%" "%ROOT%" >nul 2>&1
+            |goto launch
+            |:success
+            |del /q "%ROOT%\\.update-started" >nul 2>&1
+            |rd /s /q "%OLD%" 2>nul
+            |rd /s /q "%FAILED%" 2>nul
+            |goto cleanup
             |:launch
             |start "" "%ROOT%\$start"
-            |rd /s /q "%OLD%" 2>nul
+            |:cleanup
             |rd /s /q "${stage.absolutePath}" 2>nul
             |(goto) 2>nul & del "%~f0"
             """.trimMargin().replace("\n", "\r\n") + "\r\n"
@@ -133,13 +160,27 @@ object SelfUpdate {
             |ROOT='${root.absolutePath.replace("'", "'\\''")}'
             |NEW='${payload.absolutePath.replace("'", "'\\''")}'
             |OLD="${'$'}ROOT.old"
-            |rm -rf "${'$'}OLD"
+            |FAILED="${'$'}ROOT.update-failed"
+            |rm -rf "${'$'}OLD" "${'$'}FAILED"
             |if mv "${'$'}ROOT" "${'$'}OLD" 2>/dev/null; then
-            |  mv "${'$'}NEW" "${'$'}ROOT" 2>/dev/null || mv "${'$'}OLD" "${'$'}ROOT"
+            |  if mv "${'$'}NEW" "${'$'}ROOT" 2>/dev/null; then
+            |    $run >/dev/null 2>&1 &
+            |    sleep 10
+            |    if [ -f "${'$'}ROOT/$STARTED_MARKER" ]; then
+            |      rm -f "${'$'}ROOT/$STARTED_MARKER"
+            |      rm -rf "${'$'}OLD"
+            |    else
+            |      mv "${'$'}ROOT" "${'$'}FAILED" 2>/dev/null
+            |      if mv "${'$'}OLD" "${'$'}ROOT" 2>/dev/null; then $run >/dev/null 2>&1 & fi
+            |    fi
+            |  else
+            |    mv "${'$'}OLD" "${'$'}ROOT" 2>/dev/null
+            |    $run >/dev/null 2>&1 &
+            |  fi
+            |else
+            |  $run >/dev/null 2>&1 &
             |fi
-            |$run >/dev/null 2>&1 &
-            |sleep 2
-            |rm -rf "${'$'}OLD" '${stage.absolutePath.replace("'", "'\\''")}'
+            |rm -rf '${stage.absolutePath.replace("'", "'\\''")}'
             |rm -f "${'$'}0"
             """.trimMargin() + "\n"
         }

@@ -188,7 +188,7 @@ class DesktopConfigTest {
         val state = HydraState(
             servers = listOf(parse(links.getValue("vless-reality")).copy(subscriptionId = 3, pingMs = 42)),
             settings = DesktopSettings(
-                mode = ConnectionMode.TUN, selectedServerId = 1, preferXray = true, killSwitch = true,
+                mode = ConnectionMode.TUN, selectedServerId = 1, preferXray = true, killSwitch = true, keyboardControl = true,
                 routing = RoutingSettings(
                     dns = "https://dns.example/dns-query", appMode = SplitTunnelMode.EXCLUDE, apps = listOf("chrome.exe", "C:\\Apps\\tg.exe"),
                     netMode = SplitTunnelMode.INCLUDE, netRules = listOf(NetworkRule(NetRuleType.DOMAIN_SUFFIX, "youtube.com")),
@@ -200,6 +200,11 @@ class DesktopConfigTest {
         )
         store.save(state)
         assertEquals(state, store.load())
+        assertTrue(store.load().settings.keyboardControl)
+        // управление с клавиатуры по умолчанию выключено (Пробел не переключает VPN), в старом файле без поля — тоже
+        assertEquals(false, DesktopSettings().keyboardControl)
+        store.save(HydraState())
+        assertEquals(false, store.load().settings.keyboardControl)
         // битый файл не роняет приложение
         f.writeText("{oops")
         assertEquals(HydraState(), store.load())

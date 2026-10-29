@@ -1,12 +1,11 @@
 package ru.gidravpn.hydra.data.subscription
 
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.OptIn
-import org.json.JSONObject
 import ru.gidravpn.hydra.data.model.Protocol
 import ru.gidravpn.hydra.data.model.ServerProfile
+import org.json.JSONObject
 import java.net.URLDecoder
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Парсер стандартных ссылок-конфигов, которые выдают панели x-ui / 3x-ui /
@@ -16,14 +15,27 @@ import java.net.URLDecoder
 object LinkParser {
 
     /** Разбирает содержимое подписки: plain-список ссылок ИЛИ base64-блоб. */
-    fun parseSubscription(raw: String, subscriptionId: Long? = null): List<ServerProfile> {
+    fun parseSubscription(raw: String, subscriptionId: Long? = null): List<ServerProfile> =
+        parseSubscriptionDetailed(raw, subscriptionId).profiles
+
+    fun parseSubscriptionDetailed(raw: String, subscriptionId: Long? = null): SubscriptionParseResult {
         val text = maybeBase64Decode(raw.trim())
-        return text.lineSequence()
+        var failed = 0
+        val profiles = text.lineSequence()
             .map { it.trim() }
             .filter { it.isNotEmpty() && "://" in it }
-            .mapNotNull { runCatching { parseLine(it) }.getOrNull() }
+            .mapNotNull {
+                val parsed = runCatching { parseLine(it) }.getOrNull()
+                if (parsed == null) failed++
+                parsed
+            }
             .map { it.copy(subscriptionId = subscriptionId) }
             .toList()
+        return SubscriptionParseResult(profiles, failed)
+    }
+
+    data class SubscriptionParseResult(val profiles: List<ServerProfile>, val failedLines: Int) {
+        val complete get() = failedLines == 0
     }
 
     fun parseLine(link: String): ServerProfile? {
@@ -37,6 +49,8 @@ object LinkParser {
             "tuic"      -> parseTuic(link)
             "wireguard", "wg" -> WireGuardParser.toProfile(link, "WireGuard", isAmnezia = false)
             "awg", "amnezia" -> WireGuardParser.toProfile(link, "AmneziaWG", isAmnezia = true)
+            // 3x-ui (0.8.2-a2) отдаёт AmneziaWG как `vpn://` + base64 готового .conf; формат AmneziaVPN (сжатый JSON) сюда не подходит — null
+            "vpn" -> WireGuardParser.toProfile(link, "AmneziaWG", isAmnezia = false)
             "sstp"      -> parseUserPass(link, Protocol.SSTP, 443)
             "l2tp"      -> parseUserPass(link, Protocol.L2TP, 1701)
             "pptp"      -> parseUserPass(link, Protocol.PPTP, 1723)
@@ -59,12 +73,12 @@ object LinkParser {
         val uri = UriParser.parse(link)
         val q = uri.queryMap()
         val userInfo = uri.userInfo.orEmpty()
-        val user = userInfo.substringBefore(":")   // userInfo уже декодирован UriParser
+        val user = urlDecode(userInfo.substringBefore(":"))
         val pass = userInfo.substringAfter(":", "")
         return ServerProfile(
             name = tag(uri) ?: "${protocol.displayName} ${uri.host}",
             protocolId = protocol.id,
-            address = uri.host.orEmpty(),
+            address = uri.host.orEmpty().removeSurrounding("[", "]"),
             port = uri.port.takeIf { it > 0 } ?: defaultPort,
             uuidOrPassword = pass,
             sni = q["sni"].orEmpty(),
@@ -90,7 +104,7 @@ object LinkParser {
         return ServerProfile(
             name = tag(uri) ?: "VLESS ${uri.host}",
             protocolId = Protocol.VLESS.id,
-            address = uri.host.orEmpty(),
+            address = uri.host.orEmpty().removeSurrounding("[", "]"),
             port = uri.port.takeIf { it > 0 } ?: 443,
             uuidOrPassword = uri.userInfo.orEmpty(),
             flow = q["flow"].orEmpty(),
@@ -111,7 +125,7 @@ object LinkParser {
         return ServerProfile(
             name = tag(uri) ?: "Trojan ${uri.host}",
             protocolId = Protocol.TROJAN.id,
-            address = uri.host.orEmpty(),
+            address = uri.host.orEmpty().removeSurrounding("[", "]"),
             port = uri.port.takeIf { it > 0 } ?: 443,
             uuidOrPassword = uri.userInfo.orEmpty(),
             sni = q["sni"] ?: q["peer"].orEmpty(),
@@ -121,8 +135,12 @@ object LinkParser {
             alpn = q["alpn"].orEmpty(),
             extra = JSONObject().apply {
                 q["host"]?.takeIf { it.isNotBlank() }?.let { put("ws_host", it) }
+                // Trojan + REALITY (0.8.2-a2, 3x-ui): без ключа REALITY Xray не собирал конфиг («empty password»)
+                q["pbk"]?.let { put("reality_pbk", it) }
+                q["sid"]?.let { put("reality_sid", it) }
                 if (insecureFlag(q)) put("insecure", true)
             }.toString(),
+            fingerprint = q["fp"] ?: "chrome",
         )
     }
 
@@ -148,7 +166,7 @@ object LinkParser {
     // ss://base64(method:password)@host:port#name   ИЛИ   ss://base64(method:password@host:port)#name
     private fun parseShadowsocks(link: String): ServerProfile {
         val body = link.removePrefix("ss://")
-        val name = body.substringAfter("#", "").let { if (it.isEmpty()) "" else decode(it) }
+        val name = body.substringAfter("#", "").let { if (it.isEmpty()) "" else urlDecode(it) }
         val core = body.substringBefore("#")
         val (method, password, host, port) = decodeSs(core)
         return ServerProfile(
@@ -167,7 +185,7 @@ object LinkParser {
         return ServerProfile(
             name = tag(uri) ?: "Hysteria2 ${uri.host}",
             protocolId = Protocol.HYSTERIA2.id,
-            address = uri.host.orEmpty(),
+            address = uri.host.orEmpty().removeSurrounding("[", "]"),
             port = uri.port.takeIf { it > 0 } ?: 443,
             uuidOrPassword = uri.userInfo.orEmpty(),
             sni = q["sni"].orEmpty(),
@@ -190,7 +208,7 @@ object LinkParser {
         return ServerProfile(
             name = tag(uri) ?: "TUIC ${uri.host}",
             protocolId = Protocol.TUIC.id,
-            address = uri.host.orEmpty(),
+            address = uri.host.orEmpty().removeSurrounding("[", "]"),
             port = uri.port.takeIf { it > 0 } ?: 443,
             uuidOrPassword = uuid,
             sni = q["sni"].orEmpty(),
@@ -208,14 +226,13 @@ object LinkParser {
     private fun insecureFlag(q: Map<String, String>) =
         listOf("insecure", "allowInsecure", "allow_insecure").any { q[it] == "1" || q[it].equals("true", true) }
 
-    private fun tag(uri: UriParser): String? = uri.fragment?.let { decode(it) }?.ifBlank { null }
+    private fun tag(uri: UriParser): String? = urlDecode(uri.fragment).ifBlank { null }
+
+    private fun urlDecode(s: String) = runCatching { URLDecoder.decode(s, "UTF-8") }.getOrDefault(s)
 
     @OptIn(ExperimentalEncodingApi::class)
     private fun b64(s: String): ByteArray =
-        // Android Base64.DEFAULT пропускает переводы строк/пробелы, kotlin.io.encoding — нет:
-        // подписки часто отдают base64, порезанный по 76 символов.
-        Base64.decode(s.filterNot { it.isWhitespace() }.trimEnd('=')
-            .replace('-', '+').replace('_', '/').padBase64())
+        Base64.decode(s.filterNot { it.isWhitespace() }.replace('-', '+').replace('_', '/').padBase64())
 
     private fun String.padBase64(): String {
         val m = length % 4
@@ -233,12 +250,16 @@ object LinkParser {
     private operator fun Ss.component3() = host
     private operator fun Ss.component4() = port
 
-    private fun decodeSs(core: String): Ss {
+    private fun decodeSs(core0: String): Ss {
+        // параметры после порта (`?type=tcp` у 3x-ui) — не часть порта: раньше порт терялся и подставлялся 8388
+        val core = core0.substringBefore("?").removeSuffix("/")
         return if ("@" in core) {
-            val creds = String(b64(core.substringBefore("@")))
+            val user = core.substringBeforeLast("@")
+            // SIP002 позволяет `метод:пароль` открытым текстом (URL-кодированным) — так их отдаёт 3x-ui для Shadowsocks 2022 (0.8.2-a2)
+            val creds = if (':' in user || user.contains("%3A", true)) java.net.URLDecoder.decode(user.replace("+", "%2B"), "UTF-8") else String(b64(user))
             val method = creds.substringBefore(":")
             val password = creds.substringAfter(":")
-            val hostPort = core.substringAfter("@")
+            val hostPort = core.substringAfterLast("@")
             Ss(method, password, hostPort.substringBeforeLast(":"),
                 hostPort.substringAfterLast(":").toIntOrNull() ?: 8388)
         } else {

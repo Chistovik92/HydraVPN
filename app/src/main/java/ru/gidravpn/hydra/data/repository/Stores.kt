@@ -2,7 +2,9 @@ package ru.gidravpn.hydra.data.repository
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 
 /*
@@ -15,19 +17,25 @@ import androidx.datastore.preferences.preferencesDataStore
  * Для каждого имени — ровно одно объявление в процессе, иначе DataStore
  * падает с "multiple DataStores active for the same file".
  */
-internal val Context.settingsStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
-internal val Context.themeStore: DataStore<Preferences> by preferencesDataStore(name = "theme_settings")
-internal val Context.engineStore: DataStore<Preferences> by preferencesDataStore(name = "engine_settings")
-internal val Context.vpnSettingsStore: DataStore<Preferences> by preferencesDataStore(name = "vpn_settings")
-internal val Context.routingStore: DataStore<Preferences> by preferencesDataStore(name = "routing_settings")
-internal val Context.profilesStore: DataStore<Preferences> by preferencesDataStore(name = "routing_profiles")
+/**
+ * Повреждённый файл настроек (восстановление из облачной копии, нехватка места) раньше давал CorruptionException в каждом
+ * подписчике — падали интерфейс, BootReceiver и подключение. Теперь файл сбрасывается к значениям по умолчанию.
+ */
+private val resetOnCorruption = ReplaceFileCorruptionHandler<Preferences> { emptyPreferences() }
+
+internal val Context.settingsStore: DataStore<Preferences> by preferencesDataStore(name = "settings", corruptionHandler = resetOnCorruption)
+internal val Context.themeStore: DataStore<Preferences> by preferencesDataStore(name = "theme_settings", corruptionHandler = resetOnCorruption)
+internal val Context.engineStore: DataStore<Preferences> by preferencesDataStore(name = "engine_settings", corruptionHandler = resetOnCorruption)
+internal val Context.vpnSettingsStore: DataStore<Preferences> by preferencesDataStore(name = "vpn_settings", corruptionHandler = resetOnCorruption)
+internal val Context.routingStore: DataStore<Preferences> by preferencesDataStore(name = "routing_settings", corruptionHandler = resetOnCorruption)
+internal val Context.profilesStore: DataStore<Preferences> by preferencesDataStore(name = "routing_profiles", corruptionHandler = resetOnCorruption)
 
 /**
  * Роутеры HydraVPN for Router. Намеренно НЕ входит в [allStores]: токены зашифрованы ключом
  * Android Keystore этого устройства, в резервной копии на другом телефоне они бесполезны
  * (и не должны туда попадать), а сброс настроек Hydra не должен молча разрывать сопряжение.
  */
-internal val Context.routersStore: DataStore<Preferences> by preferencesDataStore(name = "routers")
+internal val Context.routersStore: DataStore<Preferences> by preferencesDataStore(name = "routers", corruptionHandler = resetOnCorruption)
 
 /** Имя файла → хранилище; порядок стабилен (бэкап, сброс). */
 internal fun Context.allStores(): Map<String, DataStore<Preferences>> = linkedMapOf(

@@ -15,6 +15,7 @@ import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.vpn.core.ConnectionState
 import ru.gidravpn.hydra.vpn.core.CoreFactoryProvider
 import ru.gidravpn.hydra.vpn.core.PhysicalNetwork
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.isActive
 import ru.gidravpn.hydra.vpn.core.VpnCore
 import kotlinx.coroutines.CancellationException
@@ -109,6 +110,7 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             else -> {
                 // Явное подключение пользователя отменяет идущий цикл переподключения.
                 userStopped = false
+                lifecycle++
                 reconnectJob?.cancel()
                 reconnectJob = null
                 val serverId = intent?.getLongExtra(EXTRA_SERVER_ID, -1) ?: -1
@@ -134,10 +136,26 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
 
     private fun connect(serverId: Long) {
         connectJob?.cancel()
-        connectJob = scope.launch { doConnect(serverId) }
+        val stopping = stopJob   // быстрое «Отключить → Подключить»: сначала дорабатывает остановка, иначе она погасила бы новое ядро
+        connectJob = scope.launch { stopping?.join(); doConnect(serverId) }
     }
 
-    private suspend fun doConnect(serverId: Long, reconnecting: Boolean = false): Boolean {
+    /**
+     * Попытки подключения идут строго по одной. `connectJob.cancel()` не прерывает уже идущий синхронный `vpnCore.start()`
+     * (Xray до 10 с, SocksBridge/SSTP до 45 с), и раньше новая попытка стартовала параллельно со старой: проигравшая потом
+     * гасила общие объекты победителя (SingBoxRuntime — глобальный) и занимала те же порты. Теперь новая ждёт, пока старая
+     * доберётся до ensureActive() и сама приберёт за собой; отменённый ожидающий выходит сразу.
+     */
+    private val connectMutex = kotlinx.coroutines.sync.Mutex()
+
+    /** Растёт при каждом явном подключении и остановке: хвост отложенной остановки не должен гасить более новое подключение. */
+    @Volatile private var lifecycle = 0
+    @Volatile private var stopJob: Job? = null
+
+    private suspend fun doConnect(serverId: Long, reconnecting: Boolean = false): Boolean =
+        connectMutex.withLock { doConnectLocked(serverId, reconnecting) }
+
+    private suspend fun doConnectLocked(serverId: Long, reconnecting: Boolean = false): Boolean {
         // Переключение на другой сервер при уже активном соединении вызывает
         // connect() повторно — без явного гашения предыдущих core/tun они
         // просто перезаписываются полями ниже и утекают активными в фоне
@@ -258,11 +276,9 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             // fd) номер — fdsan валит процесс SIGABRT
             // ("failed to exchange ownership... was expected to be unowned").
             if (t is CancellationException) {
-                if (newTun?.fileDescriptor?.valid() == true) {
-                    runCatching { newTun.close() }
-                } else if (newTunFd >= 0) {
-                    runCatching { ParcelFileDescriptor.adoptFd(newTunFd).close() }
-                }
+                // newCore.stop() owns a detached fd and may already have closed it.
+                // Re-adopting the saved number here could close an unrelated fd.
+                closeOwnedTun(newTun)
                 throw t
             }
 
@@ -279,6 +295,9 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
                 }.getOrNull() == true
                 if (ks && newTun != null) {
                     tun = newTun; tunFd = newTunFd; core = null; killSwitchBlocking = true
+                } else if (newTun == null) {
+                    // establish() не дошёл (сервер удалён, ядро выключено, сбой чтения настроек): прежний tun — «чёрная дыра»
+                    // Kill Switch — остаётся как есть, иначе ссылка на него терялась, и трафик утекал напрямую до сборки мусора.
                 } else {
                     closeTun(newTun, newTunFd)
                     tun = null; tunFd = -1
@@ -296,11 +315,7 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             if (killSwitch) {
                 enterKillSwitch(newTun, newTunFd, "тоннель не поднялся")
             } else {
-                if (newTun?.fileDescriptor?.valid() == true) {
-                    runCatching { newTun.close() }
-                } else if (newTunFd >= 0) {
-                    runCatching { ParcelFileDescriptor.adoptFd(newTunFd).close() }
-                }
+                closeOwnedTun(newTun)
                 VpnState.state.value = ConnectionState.ERROR
                 stopTunnel()
             }
@@ -308,7 +323,16 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
         return false
     }
 
-    /** Закрывает tun так же, как везде выше: сначала PFD, если он ещё владеет fd, иначе сырой fd. */
+    /** Закрывает только дескриптор, которым ещё владеет PFD. */
+    private fun closeOwnedTun(t: ParcelFileDescriptor?) {
+        if (t?.fileDescriptor?.valid() == true) runCatching { t.close() }
+    }
+
+    /**
+     * Закрывает tun одним владельцем: PFD, пока он владеет fd, иначе сырой fd,
+     * отданный ядру через detachFd(). Никогда не делает adoptFd() после close()
+     * того же PFD — номер уже мог быть переиспользован другим подключением.
+     */
     private fun closeTun(t: ParcelFileDescriptor?, fd: Int) {
         if (t?.fileDescriptor?.valid() == true) {
             runCatching { t.close() }
@@ -456,7 +480,10 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
         // Должен совпадать с tun-инбаундом sing-box (тот же RoutingRepository.mtu).
         val mtu = (ru.gidravpn.hydra.data.repository.RoutingRepository(applicationContext).mtu.firstOrNull()
             ?: ru.gidravpn.hydra.data.model.MtuPreset.AUTO).value
-        val awg = profile.protocol == ru.gidravpn.hydra.data.model.Protocol.AMNEZIAWG
+        // 0.8.2-b: и обычный WireGuard, если его обслужит amneziawg-go (EngineToggles) — tun так же по конфигу
+        val awg = profile.protocol == ru.gidravpn.hydra.data.model.Protocol.AMNEZIAWG ||
+            (ru.gidravpn.hydra.data.repository.EngineRepository(applicationContext).toggles.firstOrNull() ?: ru.gidravpn.hydra.data.model.EngineToggles())
+                .engineFor(profile, ru.gidravpn.hydra.BuildConfig.XRAY_AVAILABLE) == ru.gidravpn.hydra.data.model.EngineToggles.Kind.AWG
         val builder = Builder().setSession("Hydra")
         if (awg) {
             // AmneziaWG: WireGuard не делает NAT — адрес tun обязан быть тем, что сервер знает как
@@ -488,7 +515,14 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
             val routeCfg = ru.gidravpn.hydra.data.repository.RoutingRepository(applicationContext).routeConfig.firstOrNull()
                 ?: ru.gidravpn.hydra.data.routing.RouteConfig()
             val serverRepo = ru.gidravpn.hydra.data.repository.ServerRepository(applicationContext)
-            !ru.gidravpn.hydra.vpn.core.AppTunnelPolicy.needsAppBypass(profile, routeCfg) { id -> kotlinx.coroutines.runBlocking { serverRepo.byId(id) } }
+            val toggles = ru.gidravpn.hydra.data.repository.EngineRepository(applicationContext).toggles.firstOrNull()
+                ?: ru.gidravpn.hydra.data.model.EngineToggles()
+            val xrayServes = { p: ru.gidravpn.hydra.data.model.ServerProfile ->
+                toggles.engineFor(p, ru.gidravpn.hydra.BuildConfig.XRAY_AVAILABLE) in setOf(
+                    ru.gidravpn.hydra.data.model.EngineToggles.Kind.XRAY, ru.gidravpn.hydra.data.model.EngineToggles.Kind.AWG)
+            }
+            !ru.gidravpn.hydra.vpn.core.AppTunnelPolicy.needsAppBypass(profile, routeCfg,
+                lookup = { id -> kotlinx.coroutines.runBlocking { serverRepo.byId(id) } }, servedByXray = xrayServes)
         }
         VpnState.log(if (appInTunnel) "Трафик самой Hydra (SSH, подписки) идёт через туннель"
             else "Трафик самой Hydra идёт мимо туннеля (настройка выключена или режим с подпроцессами)")
@@ -526,8 +560,10 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
         reconnectJob = null
         connectJob?.cancel()
         connectJob = null
-        scope.launch {
+        val gen = ++lifecycle
+        stopJob = scope.launch {
             releaseTun()
+            if (lifecycle != gen) return@launch   // за время остановки пришло новое подключение — не трогаем его состояние и сервис
             VpnState.state.value = ConnectionState.DISCONNECTED
             VpnState.activeServer.value = null
             VpnState.connectedSince.value = 0L; VpnState.resetSpeed()
@@ -540,7 +576,9 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
     override fun onRevoke() { stopTunnel() }
     override fun onDestroy() {
         // Система может уничтожить сервис, не пройдя через stopTunnel(): ядро и tun не должны остаться без владельца.
-        runCatching { releaseTun() }
+        // Не на главном потоке без ограничения: core.stop() (libbox, bindService к :xray) может держать секунды — ANR.
+        val releasing = Thread { runCatching { releaseTun() } }.apply { isDaemon = true; start() }
+        runCatching { releasing.join(3_000) }
         unregisterNetworkWatcher()
         SocketGuard.detach()
         scope.cancel()
@@ -637,7 +675,9 @@ ACTION_DISCONNECT -> { stopTunnel(); return START_NOT_STICKY }
         val best = PhysicalNetwork.pick(cm, exclude)
         runCatching { setUnderlyingNetworks(best?.let { arrayOf(it) }) }
         if (best != lastUnderlying) {
+            val changed = lastUnderlying != null
             lastUnderlying = best
+            if (changed && best != null) runCatching { core?.onNetworkChanged() }
             val kind = best?.let { cm.getNetworkCapabilities(it) }?.let { c ->
                 when {
                     c.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"

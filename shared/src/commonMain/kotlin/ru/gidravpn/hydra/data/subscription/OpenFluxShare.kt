@@ -21,7 +21,7 @@ object OpenFluxShare {
     const val PREFIX = "openflux://v1/"
     const val MIN_SECRET_CHARS = 16
     private const val MAX_PAYLOAD = 16 shl 10
-    private val KNOWN_TYPES = setOf("yandex", "vyandex", "boards", "mailru", "cupsonline", "direct")
+    private val KNOWN_TYPES = setOf("yandex", "vyandex", "boards", "mailru", "cupsonline", "avito", "direct", "telemost")
     private val STREAM_TYPES = setOf("cupsonline", "mailru")
 
     class Transport(val type: String, val url: String = "", val priority: Int = 0, val dial: String = "", val name: String = "")
