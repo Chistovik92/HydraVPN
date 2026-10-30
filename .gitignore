@@ -57,3 +57,6 @@ keystore.properties
 /mirror/
 /.upstream-mirror/
 /skill-observations/
+
+# Локальная история Claude Code: содержит данные сессий и пути worktree
+/claude-history/
