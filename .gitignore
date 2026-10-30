@@ -60,3 +60,6 @@ keystore.properties
 
 # Локальная история Claude Code: содержит данные сессий и пути worktree
 /claude-history/
+
+# Локальное состояние desktop-приложения при запуске из IDE (файл создаёт Store при отладке)
+/desktop/signin-state
