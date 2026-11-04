@@ -190,7 +190,7 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(24.dp))
         val ringColor = when (ui.status) {
-            Status.CONNECTED -> if (ui.delayMs != null) Accent else Warn
+            Status.CONNECTED -> if (ui.serverPingMs != null) Accent else Warn
             Status.CONNECTING, Status.STOPPING -> Warn
             Status.ERROR -> Danger
             Status.DISCONNECTED -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -224,7 +224,7 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
         }
         Spacer(Modifier.height(20.dp))
         Text(ui.statusText, style = MaterialTheme.typography.titleMedium, color = if (ui.status == Status.ERROR) Danger else MaterialTheme.colorScheme.onSurface)
-        ui.delayMs?.let { Text("Проверка через туннель: $it мс", color = Accent, fontSize = 13.sp) }
+        ui.serverPingMs?.let { Text("Пинг до сервера: $it мс", color = Accent, fontSize = 13.sp) }
         if (ui.blocked) {
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = { c.disconnect() }) { Text("Снять блокировку (kill switch)") }

@@ -33,7 +33,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import ru.gidravpn.hydra.R
+import ru.gidravpn.hydra.data.net.PingMeasurer
 import ru.gidravpn.hydra.servers.AwgGeneration
 import ru.gidravpn.hydra.servers.FriendlyText
 import ru.gidravpn.hydra.servers.InstallStage
@@ -321,6 +323,9 @@ private fun ServerCard(srv: MyServer, m: MyServersManager, s: MyServersUi, onAdd
     var installKind by remember { mutableStateOf<ServerKind?>(null) }
     var more by remember { mutableStateOf(false) }
     var rename by remember { mutableStateOf(false) }
+    val pingScope = rememberCoroutineScope()
+    var pingMs by remember { mutableStateOf<Int?>(null) }
+    var pinging by remember { mutableStateOf(false) }
     Card {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(srv.name, color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, modifier = Modifier.weight(1f))
@@ -332,9 +337,22 @@ private fun ServerCard(srv: MyServer, m: MyServersManager, s: MyServersUi, onAdd
             Text(stringResource(R.string.ms_status_line, uptime(it.uptimeSec), it.load, it.mem, it.disk), color = TextMuted, fontSize = 11.sp)
         }
         Text(stringResource(if (srv.id in s.saved) R.string.ms_login_saved else R.string.ms_login_not_saved), color = TextMuted, fontSize = 11.sp)
+        pingMs?.let { ms ->
+            Text(if (ms > 0) stringResource(R.string.ms_ping_ms, ms) else stringResource(R.string.ms_ping_unreachable),
+                color = if (ms > 0) Success else Danger, fontSize = 11.sp)
+        }
         Spacer(Modifier.height(8.dp))
         MsRow {
             MsChip(stringResource(R.string.ms_check), AccentCyan) { if (!busy) m.refresh(srv.id) }
+            MsChip(if (pinging) stringResource(R.string.ms_ping) + "…" else stringResource(R.string.ms_ping), TextSecondary) {
+                if (!busy && !pinging) {
+                    pinging = true
+                    pingScope.launch {
+                        pingMs = PingMeasurer.measure(srv.host, srv.sshPort)
+                        pinging = false
+                    }
+                }
+            }
             MsChip(stringResource(R.string.ms_login_btn), TextSecondary) { if (!busy) onLogin() }
             MsChip(stringResource(R.string.ms_reboot), TextSecondary) {
                 if (!busy) onConfirm(Confirm(ctx.getString(R.string.ms_reboot_q, srv.name), ctx.getString(R.string.ms_reboot_msg), ctx.getString(R.string.ms_reboot)) { m.reboot(srv.id) })

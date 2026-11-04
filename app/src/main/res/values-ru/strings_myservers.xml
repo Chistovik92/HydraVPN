@@ -52,6 +52,9 @@
     <string name="ms_reboot">Перезагрузить</string>
     <string name="ms_reboot_q">Перезагрузить «%1$s»?</string>
     <string name="ms_reboot_msg">Сервер будет недоступен 1–2 минуты; VPN на нём поднимется сам.</string>
+    <string name="ms_ping">Пинг</string>
+    <string name="ms_ping_ms">Пинг: %1$d мс</string>
+    <string name="ms_ping_unreachable">Пинг: сервер не отвечает</string>
     <string name="ms_restart">Перезапустить</string>
     <string name="ms_more">Ещё</string>
     <string name="ms_hide">Скрыть</string>

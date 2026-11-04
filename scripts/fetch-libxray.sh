@@ -12,10 +12,10 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-LIBXRAY_VERSION="26.10.29"
-LIBXRAY_SHA256="8d7962e898d9e2e505f5e6e993506140a6aea3f10b66f1a91e8f133264a95bf6"
-# Коммит Xray-core внутри (go.mod libXray v26.10.29 = метка Xray-core v26.10.29). release.sh сверяет его с app/libs/libXray.aar.
-LIBXRAY_XRAY_COMMIT="0afec66085a8"
+LIBXRAY_VERSION="26.10.31"
+LIBXRAY_SHA256="fb99f04acf379cc2957c1e1d0ce2b3c0005d3f49974a44c09a11242a0562c1ca"
+# Коммит Xray-core внутри (go.mod libXray v26.10.31 = метка Xray-core v26.10.31). release.sh сверяет его с app/libs/libXray.aar.
+LIBXRAY_XRAY_COMMIT="a4a3dff5b20c"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT

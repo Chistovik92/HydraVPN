@@ -52,6 +52,9 @@
     <string name="ms_reboot">راه‌اندازی دوباره</string>
     <string name="ms_reboot_q">«%1$s» دوباره راه‌اندازی شود؟</string>
     <string name="ms_reboot_msg">سرور ۱ تا ۲ دقیقه در دسترس نخواهد بود؛ VPN روی آن خودکار بالا می‌آید.</string>
+    <string name="ms_ping">پینگ</string>
+    <string name="ms_ping_ms">پینگ: %1$d میلی‌ثانیه</string>
+    <string name="ms_ping_unreachable">پینگ: سرور پاسخ نمی‌دهد</string>
     <string name="ms_restart">راه‌اندازی دوباره سرویس</string>
     <string name="ms_more">بیشتر</string>
     <string name="ms_hide">پنهان</string>

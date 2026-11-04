@@ -100,6 +100,8 @@ data class UiState(
     val upTotal: Long = 0,
     val downTotal: Long = 0,
     val delayMs: Int? = null,
+    /** Настоящий пинг до сервера (TCP/ICMP), обновляемый пока CONNECTED; показывается на главной вместо туннельной задержки. */
+    val serverPingMs: Int? = null,
     /** Растёт после обновления geo-баз: экран «Geo-базы» перечитывает хранилище. */
     val geoTick: Int = 0,
     val log: List<String> = emptyList(),
@@ -698,7 +700,7 @@ class AppController(
         val sessionId = ++session
         _ui.update {
             it.copy(log = emptyList(), upTotal = 0, downTotal = 0, status = Status.CONNECTING, statusText = "Подключение PPTP (Windows)…",
-                connectedId = profile.id, engine = null, upSpeed = 0, downSpeed = 0, delayMs = null, needsElevation = false, blocked = false)
+                connectedId = profile.id, engine = null, upSpeed = 0, downSpeed = 0, delayMs = null, serverPingMs = null, needsElevation = false, blocked = false)
         }
         scope.launch(Dispatchers.IO) {
             connLock.withLock {
@@ -735,7 +737,7 @@ class AppController(
         val sessionId = ++session
         _ui.update {
             it.copy(status = Status.CONNECTING, statusText = text, connectedId = profile.id, engine = engine,
-                upSpeed = 0, downSpeed = 0, delayMs = null, needsElevation = false)
+                upSpeed = 0, downSpeed = 0, delayMs = null, serverPingMs = null, needsElevation = false)
         }
         scope.launch(Dispatchers.IO) { connLock.withLock { startSession(sessionId, profile, effectiveSettings(settings), engine) } }
     }
@@ -795,7 +797,10 @@ class AppController(
             if (session == sessionId && settings.mode == ConnectionMode.PROXY && appInTunnel) AppNet.use(settings.proxyPort)
             _ui.update { it.copy(blocked = false) }
             verify(clash, sessionId, settings, engine)
-            if (session == sessionId && runner.isAlive) watchNetwork(sessionId, profile, engine)
+            if (session == sessionId && runner.isAlive) {
+                watchNetwork(sessionId, profile, engine)
+                watchServerPing(sessionId, profile)
+            }
         } catch (e: NeedsElevation) {
             exitHandled = sessionId   // останов ядер после неудачного старта — не авария: onCoreExit не запускает цикл переподключений
             runCatching { runner.stop() }
@@ -832,6 +837,18 @@ class AppController(
         if (session == sessionId && runner.isAlive) {
             // Ядро живо, но сервер не отвечает: держим соединение, но честно показываем проблему.
             _ui.update { it.copy(status = Status.CONNECTED, delayMs = null, statusText = "Ядро запущено ($how), но сервер не отвечает: $lastError") }
+        }
+    }
+
+    /**
+     * Настоящий пинг до сервера (TCP/ICMP через [Ping.profile]) — показывается на главной вместо туннельной задержки.
+     * Обновляется каждые ~5 с, пока ядро живо и пользователь не отключился; при обрыве сеанса цикл сам завершается.
+     */
+    private fun watchServerPing(sessionId: Int, profile: ServerProfile) = scope.launch(Dispatchers.IO) {
+        while (isActive && session == sessionId && !userStopped && runner.isAlive) {
+            val ms = Ping.profile(profile)
+            if (session == sessionId) _ui.update { it.copy(serverPingMs = if (ms > 0) ms else null) }
+            delay(5_000)
         }
     }
 
@@ -895,7 +912,7 @@ class AppController(
                 runCatching { if (WindowsPptp.active) WindowsPptp.disconnect() }
             }
             _ui.update { it.copy(status = Status.DISCONNECTED, statusText = "Не подключено", connectedId = null,
-                upSpeed = 0, downSpeed = 0, delayMs = null, blocked = false) }
+                upSpeed = 0, downSpeed = 0, delayMs = null, serverPingMs = null, blocked = false) }
         }
     }
 
@@ -922,7 +939,7 @@ class AppController(
             val n = reconnectAttempt++
             val wait = ReconnectPolicy.backoffMs(n)
             appendLog("Hydra: $died — переподключение через ${wait / 1000} с (попытка ${n + 1}/${ReconnectPolicy.MAX_ATTEMPTS})")
-            _ui.update { it.copy(status = Status.CONNECTING, blocked = blocked, upSpeed = 0, downSpeed = 0, delayMs = null,
+            _ui.update { it.copy(status = Status.CONNECTING, blocked = blocked, upSpeed = 0, downSpeed = 0, delayMs = null, serverPingMs = null,
                 statusText = "Соединение потеряно — переподключение (${n + 1}/${ReconnectPolicy.MAX_ATTEMPTS})…") }
             scope.launch(Dispatchers.IO) {
                 delay(wait)
@@ -935,7 +952,7 @@ class AppController(
             return
         }
         _ui.update {
-            it.copy(status = Status.ERROR, connectedId = null, upSpeed = 0, downSpeed = 0, blocked = blocked,
+            it.copy(status = Status.ERROR, connectedId = null, upSpeed = 0, downSpeed = 0, blocked = blocked, serverPingMs = null,
                 statusText = if (blocked) "$died. Kill switch: интернет заблокирован до отключения" else died)
         }
     }

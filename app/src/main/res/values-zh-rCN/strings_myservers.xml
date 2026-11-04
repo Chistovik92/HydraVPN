@@ -52,6 +52,9 @@
     <string name="ms_reboot">重启服务器</string>
     <string name="ms_reboot_q">重启「%1$s」？</string>
     <string name="ms_reboot_msg">服务器将有 1–2 分钟不可用；上面的 VPN 会自动启动。</string>
+    <string name="ms_ping">Ping</string>
+    <string name="ms_ping_ms">Ping: %1$d ms</string>
+    <string name="ms_ping_unreachable">Ping: 服务器无响应</string>
     <string name="ms_restart">重启服务</string>
     <string name="ms_more">更多</string>
     <string name="ms_hide">收起</string>

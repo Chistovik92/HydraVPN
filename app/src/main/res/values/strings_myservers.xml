@@ -52,6 +52,9 @@
     <string name="ms_reboot">Reboot</string>
     <string name="ms_reboot_q">Reboot \"%1$s\"?</string>
     <string name="ms_reboot_msg">The server will be unavailable for 1–2 minutes; the VPN on it starts by itself.</string>
+    <string name="ms_ping">Ping</string>
+    <string name="ms_ping_ms">Ping: %1$d ms</string>
+    <string name="ms_ping_unreachable">Ping: server not responding</string>
     <string name="ms_restart">Restart</string>
     <string name="ms_more">More</string>
     <string name="ms_hide">Hide</string>

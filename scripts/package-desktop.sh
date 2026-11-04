@@ -26,6 +26,25 @@ rm -rf "$DIST"; mkdir -p "$DIST"
 step() { printf '\n==> %s\n' "$*"; }
 err() { echo "::error::$*" >&2; exit 1; }
 
+# Кодирует пре-релиз в третье число версии пакета — как winPkgVersion в desktop/build.gradle.kts:
+# 0.8.2 → 0.8.299, 0.8.3-a → 0.8.310, 0.8.3-rc1 → 0.8.361. Раньше jpackage получал "${VERSION%%-*}"
+# (голый 0.8.2 на всех пре-релизах), и apt/rpm считали обновление «не новее» — приложение пропадало (Simply Linux).
+pkg_version() {
+  local v="$1" core suffix major minor patch n stage
+  core="${v%%-*}"; suffix="${v#*-}"; [ "$suffix" = "$v" ] && suffix=""
+  major="${core%%.*}"; minor="${core#*.}"; patch="${minor#*.}"; minor="${minor%%.*}"; patch="${patch%%.*}"
+  : "${minor:=0}"; : "${patch:=0}"
+  n="$(printf '%s' "$suffix" | tr -cd '0-9')"; n="${n:-1}"
+  case "$suffix" in
+    "")        stage=99 ;;
+    rc*|RC*)   stage=$((60 + n)) ;;
+    b*|B*)     stage=$((30 + n - 1)) ;;
+    a*|A*)     stage=$((10 + n - 1)) ;;
+    *)         stage=0 ;;   # неизвестный суффикс — как голый номер
+  esac
+  printf '%s.%s.%s' "$major" "$minor" "$((patch * 100 + stage))"
+}
+
 case "$TARGET" in
   windows-*) CORE="sing-box.exe"; XRAY="xray.exe"; OPENFLUX="openflux.exe"; OLCRTC="olcrtc.exe"; APP_DIR="$BIN/app/Hydra"; LAUNCHER="$APP_DIR/Hydra.exe"; RES="$APP_DIR/app/resources" ;;
   linux-*)   CORE="sing-box";     XRAY="xray"; OPENFLUX="openflux"; OLCRTC="olcrtc"; APP_DIR="$BIN/app/Hydra"; LAUNCHER="$APP_DIR/bin/Hydra";  RES="$APP_DIR/lib/app/resources" ;;
@@ -44,7 +63,7 @@ case "$TARGET" in
     for type in deb rpm; do
       mkdir -p "$BIN/$type"
       "$JPACKAGE" --type "$type" --app-image "$APP_DIR" --dest "$BIN/$type" \
-        --name Hydra --app-version "${VERSION%%-*}" --vendor "Hydra VPN" \
+        --name Hydra --app-version "$(pkg_version "$VERSION")" --vendor "Hydra VPN" \
         --description "Hydra VPN client" --license-file LICENSE \
         --icon desktop/build/icons/hydra.png \
         --linux-package-name hydra-vpn --linux-deb-maintainer "Hydra VPN <dev@shadowlink.local>" \

@@ -32,6 +32,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,8 +42,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import ru.gidravpn.hydra.desktop.AppController
 import ru.gidravpn.hydra.desktop.UiState
+import ru.gidravpn.hydra.desktop.core.Ping
 import ru.gidravpn.hydra.servers.AwgGeneration
 import ru.gidravpn.hydra.servers.FriendlyText
 import ru.gidravpn.hydra.servers.InstallStage
@@ -287,6 +290,9 @@ private fun ServerCard(c: AppController, srv: MyServer, m: MyServersManager, s: 
     val busy = s.busy
     var installKind by remember { mutableStateOf<ServerKind?>(null) }
     var rename by remember { mutableStateOf(false) }
+    val pingScope = rememberCoroutineScope()
+    var pingMs by remember { mutableStateOf<Int?>(null) }
+    var pinging by remember { mutableStateOf(false) }
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -295,6 +301,10 @@ private fun ServerCard(c: AppController, srv: MyServer, m: MyServersManager, s: 
             }
             Text("${srv.sshUser}@${srv.host}:${srv.sshPort}" + listOf(st?.osName ?: srv.osName, st?.arch ?: srv.arch).filter { it.isNotBlank() }.joinToString(" · ", " · "),
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            pingMs?.let { ms ->
+                Text(if (ms > 0) "Пинг: $ms мс" else "Пинг: сервер не отвечает", fontSize = 12.sp,
+                    color = if (ms > 0) Ok else Danger)
+            }
             st?.takeIf { it.error == null && it.uptimeSec > 0 }?.let {
                 Text("Работает ${uptime(it.uptimeSec)} · нагрузка ${it.load} · память ${it.mem} · диск ${it.disk}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -302,6 +312,14 @@ private fun ServerCard(c: AppController, srv: MyServer, m: MyServersManager, s: 
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             ChipRow {
                 OutlinedButton(onClick = { m.refresh(srv.id) }, enabled = !busy) { Text("Проверить") }
+                OutlinedButton(onClick = {
+                    if (pinging) return@OutlinedButton
+                    pinging = true
+                    pingScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        pingMs = Ping.tcp(srv.host, srv.sshPort)
+                        pinging = false
+                    }
+                }, enabled = !busy && !pinging) { Text(if (pinging) "Пинг…" else "Пинг") }
                 OutlinedButton(onClick = onLogin, enabled = !busy) { Text("Данные входа") }
                 OutlinedButton(onClick = { rename = true }, enabled = !busy) { Text("Переименовать") }
                 OutlinedButton(onClick = {
