@@ -66,9 +66,13 @@ case "$TARGET" in
         --name Hydra --app-version "$(pkg_version "$VERSION")" --vendor "Hydra VPN" \
         --description "Hydra VPN client" --license-file LICENSE \
         --icon desktop/build/icons/hydra.png \
-        --linux-package-name hydra-vpn --linux-deb-maintainer "Hydra VPN <dev@shadowlink.local>" \
-        --linux-menu-group Network --linux-app-category Network --linux-shortcut \
+        --linux-package-name hydra-vpn --linux-deb-maintainer "dev@shadowlink.local" \
+        --linux-menu-group Network --linux-app-category Network \
         --linux-rpm-license-type "GPL-3.0-or-later"
+    done
+    # 0.8.3-b: системный ярлык — обычный файл пакета, а не результат xdg-desktop-menu из postinst/%post.
+    for package in "$BIN"/deb/*.deb "$BIN"/rpm/*.rpm; do
+      bash scripts/add-linux-shortcut.sh "$package"
     done
     ;;
   macos-*)   "$GRADLE" :desktop:createDistributable --stacktrace ;;
@@ -118,17 +122,8 @@ case "$TARGET" in
     ;;
   linux-*)
     cp "$BIN"/deb/*.deb "$DIST/$NAME.deb"
-    dpkg-deb -c "$DIST/$NAME.deb" | grep 'resources/sing-box' | sed 's/^/    deb: /'
-    # Без grep -q в конвейере: под pipefail его ранний выход даёт SIGPIPE и ложную ошибку.
-    for bin in sing-box xray openflux olcrtc; do
-      line="$(dpkg-deb -c "$DIST/$NAME.deb" | grep "resources/$bin\$" || true)"
-      [[ "$line" == -rwx* ]] || err "в DEB $bin без бита исполнения"
-    done
     cp "$BIN"/rpm/*.rpm "$DIST/$NAME.rpm"
-    for bin in sing-box xray openflux olcrtc; do
-      line="$(rpm -qplv "$DIST/$NAME.rpm" | grep "resources/$bin\$" || true)"
-      [[ "$line" == -rwx* ]] || err "в RPM $bin без бита исполнения"
-    done
+    bash scripts/check-linux-packages.sh "$DIST/$NAME.deb" "$DIST/$NAME.rpm" "$(pkg_version "$VERSION")"
     tar -C "$BIN/app" -czf "$DIST/$NAME.tar.gz" Hydra
 
     arch="x86_64"; [[ "$TARGET" == "linux-arm64" ]] && arch="aarch64"

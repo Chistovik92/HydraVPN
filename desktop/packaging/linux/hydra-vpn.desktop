@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Hydra
+Comment=Hydra VPN client
+Exec=/opt/hydra-vpn/bin/Hydra
+Icon=hydra-vpn
+Categories=Network;
+Terminal=false

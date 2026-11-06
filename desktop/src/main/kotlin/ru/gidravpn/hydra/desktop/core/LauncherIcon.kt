@@ -71,7 +71,7 @@ object LauncherIcon {
         val icon = File(Platform.dataDir, "icons").apply { mkdirs() }.resolve("hydra-" + res.substringAfterLast('/')).apply { writeBytes(png) }
         val home = System.getProperty("user.home")
         val target = File(System.getenv("XDG_DATA_HOME")?.takeIf { it.isNotBlank() } ?: "$home/.local/share", "applications").apply { mkdirs() }
-        val roots = listOf(File("/usr/share/applications"), File("/opt/hydra/lib"), File("/opt/Hydra/lib"))
+        val roots = listOf(File("/usr/share/applications"), File("/opt/hydra-vpn/lib"), File("/opt/hydra/lib"), File("/opt/Hydra/lib"))
         roots.flatMap { r -> r.listFiles { f -> f.isFile && f.name.endsWith(".desktop") && f.name.contains("ydra") }?.toList().orEmpty() }.forEach { src ->
             val text = src.readText()
             val out = if (Regex("(?m)^Icon=").containsMatchIn(text)) text.replace(Regex("(?m)^Icon=.*$"), "Icon=" + icon.absolutePath) else text + "\nIcon=${icon.absolutePath}\n"
