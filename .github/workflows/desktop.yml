@@ -110,11 +110,11 @@ jobs:
         if: inputs.package
         run: bash scripts/package-desktop.sh ${{ matrix.target }} gradle
 
-      - name: DEB: чистая установка, обновление и запуск установленной Hydra
+      - name: "DEB: чистая установка, обновление и запуск установленной Hydra"
         if: inputs.package && matrix.os == 'linux'
         run: bash scripts/test-linux-install.sh deb
 
-      - name: RPM: чистая установка, обновление и запуск установленной Hydra
+      - name: "RPM: чистая установка, обновление и запуск установленной Hydra"
         if: inputs.package && matrix.os == 'linux'
         run: bash scripts/test-linux-install.sh rpm
 
