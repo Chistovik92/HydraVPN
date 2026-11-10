@@ -8,6 +8,7 @@ import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.Subscription
 import ru.gidravpn.hydra.data.subscription.LinkParser
 import ru.gidravpn.hydra.data.subscription.SubscriptionSync
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import ru.gidravpn.hydra.data.db.toEntity
@@ -49,11 +50,25 @@ class ServerRepository(context: Context) {
     /**
      * Добавить подписку и подтянуть её содержимое. Повторное добавление того же URL не плодит
      * дубликат — обновляется существующая подписка.
+     *
+     * 0.8.3-b2: панель применяет нового клиента/инбаунд с задержкой (ядра x-ui/s-ui/Remnawave перечитывают
+     * конфиг не мгновенно), поэтому первый запрос подписки сразу после добавления часто пустой или с ошибкой.
+     * Раньше Hydra забирала его один раз и откладывала «подключение заработает позже» на часовой воркер — теперь
+     * подписку перечитываем с нарастающей паузой, пока не появится хотя бы один сервер.
      */
     suspend fun addSubscription(name: String, url: String): Int {
         val existing = subs.getAll().map { it.toModel() }.firstOrNull { it.url.trim() == url.trim() }
         val subId = existing?.id ?: subs.upsert(Subscription(name = name, url = url).toEntity())
-        return refreshSubscription(subId)
+        var last: Exception? = null
+        repeat(3) { attempt ->
+            try {
+                return refreshSubscription(subId)
+            } catch (e: Exception) {
+                last = e
+                if (attempt < 2) delay(2500L * (attempt + 1))
+            }
+        }
+        throw last ?: IllegalStateException("подписка не загрузилась")
     }
 
     /** Итог синхронизации с аккаунтом бота: подписок взято, серверов в них, подписок с ошибкой. */

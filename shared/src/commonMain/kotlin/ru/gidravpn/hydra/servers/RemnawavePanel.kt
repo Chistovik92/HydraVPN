@@ -10,8 +10,8 @@ import org.json.JSONObject
  * добавляет эти заголовки: сайт панели открывается через SSH-туннель Hydra, наружу панель не видна; API — `curl` на сервере.
  */
 object RemnawavePanel {
-    const val TAG = "3.4.8"
-    const val NODE_TAG = "3.4.3"
+    const val TAG = "3.4.10"
+    const val NODE_TAG = "3.4.5"
     const val CADDY = "caddy:2.11.7-alpine"
     const val DIR = "/opt/remnawave"
     const val NODE_DIR = "/opt/remnanode"

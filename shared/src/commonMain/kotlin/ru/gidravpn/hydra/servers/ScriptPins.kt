@@ -22,8 +22,8 @@ object ScriptPins {
         "Nexora-VPN/panel@v0.0.6/install.sh" to "93d94a7e77fa804752a579211e33dbab80079f1585380671f0c9e2bfca34aa9f",
         "PasarGuard/scripts@v0.1.11/pasarguard.sh" to "8125699258ba272b1fce5915c0f18f593fe1734a9961f2fad3579af3a8969743",
         "PasarGuard/scripts@v0.1.11/pg-node.sh" to "abedef14e3d7988ebc126ce58b179c1ab4311fca34da21687eb7e4d1cb2ee1c0",
-        "remnawave/backend@3.4.8/docker-compose-prod.yml" to "4f9ca29cbb19c389a1cd6c10e378259dd2ec6bab8e7e06b78851207c2395b8a5",
-        "remnawave/backend@3.4.8/.env.sample" to "45be9ce2071db59a50321994607bcb22280425572d0b6c7fb68f8878cbcbb2b7",
+        "remnawave/backend@3.4.10/docker-compose-prod.yml" to "4f9ca29cbb19c389a1cd6c10e378259dd2ec6bab8e7e06b78851207c2395b8a5",
+        "remnawave/backend@3.4.10/.env.sample" to "45be9ce2071db59a50321994607bcb22280425572d0b6c7fb68f8878cbcbb2b7",
     )
 
     fun sha256(repo: String, ref: String, file: String): String? = SHA256["$repo@$ref/$file"]

@@ -149,21 +149,21 @@ val downloadSingBox by tasks.registering {
 }
 
 // ---- Ядро Xray-core (второй движок, как на Android) ------------------------------
-// 26.10.31 (0.8.3-a), коммит a4a3dff5b20c — тот же, что в libXray v26.10.31 на Android
+// 26.11.9 (0.8.3-b2), коммит 676eaf66f8f0 — тот же, что в libXray v26.11.9 на Android
 // (scripts/fetch-libxray.sh), так что на всех платформах один и тот же Xray. Панели выдают настройки под свежий Xray.
-// SHA-256 — дайджесты ассетов релиза https://github.com/XTLS/Xray-core/releases/tag/v26.10.31 .
-val xrayVersion = "26.10.31"
+// SHA-256 — дайджесты ассетов релиза https://github.com/XTLS/Xray-core/releases/tag/v26.11.9 .
+val xrayVersion = "26.11.9"
 
 /** Зеркало сторонних сборок: релиз `deps` в нашем репозитории (scripts/mirror-deps.sh); имена — `Xray-<версия>-<архив>.zip`. */
 val depsMirror = (System.getenv("HYDRA_DEPS_MIRROR") ?: "https://github.com/Chistovik92/HydraVPN/releases/download/deps").trimEnd('/')
 
 val xrayArchives = mapOf(
-    "windows-x64" to ("windows-64" to "2e04a9995a6f2ad1b28c0bb25c708ecb2695e43a1c9c7889c4b6ac2b48cf7a6a"),
-    "windows-arm64" to ("windows-arm64-v8a" to "db062e8a177facacc8ae53d4c9c0df4132b13fc3a89acda6f21d92d36633077e"),
-    "linux-x64" to ("linux-64" to "e4bd9119f50ae7c41658b1abd0679ae06f98bd864a2907ff33f2f2cf7081b214"),
-    "linux-arm64" to ("linux-arm64-v8a" to "1811c8f1da0c3b6dc707ebaf1c8390e987ba39859a8f0a7aadd8526157f2ec8d"),
-    "macos-x64" to ("macos-64" to "37c60b63c77ef5edcfb46a0d70349f7d96e0c132e6a356ead4fd20aeeacc5c75"),
-    "macos-arm64" to ("macos-arm64-v8a" to "0a05dca3bd311b0bc5a89c7ce56350cab1e829e131e4b2bcd48eb304fac07e9a"),
+    "windows-x64" to ("windows-64" to "1262522266337b824f07beb8e1375786b437683b3890105469088f8e17e0a69d"),
+    "windows-arm64" to ("windows-arm64-v8a" to "9fdd48ff890e54ffdc37f92df9037c940fe4d4f914755b70cc644b97e9678a83"),
+    "linux-x64" to ("linux-64" to "b651f7e1d9966ee2c1b1ee1bf8b52c72771824d3065dce96bbc8bcc19ed95f82"),
+    "linux-arm64" to ("linux-arm64-v8a" to "64ed6858982a7f5eb85d88b811089063bd4f17561f4c8f44e0f1dc8e6f6430be"),
+    "macos-x64" to ("macos-64" to "488963e676e06f5e48547f9dd38116aaca8de4234959b4272ae8f284e658dfd0"),
+    "macos-arm64" to ("macos-arm64-v8a" to "233f0c66681cd0726f81a6b2b6ed6a5710869e312047b522e46ed53035bebd26"),
 )
 
 /** Xray-core своей платформы в тот же каталог ресурсов, что и sing-box. */
@@ -655,26 +655,26 @@ val classicTargets = listOf(
     // не предлагает (Platform.goClientsSupported), на 32-битной Windows 10 — работают.
     Classic("windows-x86", "WindowsX86", "windows", "x86",
         "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "e1cb15e4a381f685c6253dcb885354b607e4a9f047e2171a78b1e622faac2cbb",
-        "Xray-win7-32.zip", "120511f3fc7001ecf624d3f6dc9dc8c2610221b41e933383c0f2b863e7df09c5",
+        "Xray-win7-32.zip", "48a8b160a0f45d21bd56aa81d74c2420758fa72abac75b4b6faf45767c5ef48f",
         olcRtc = Triple("windows", "386", ""), openFluxSrc = Triple("windows", "386", ""),
         byeDpi = "byedpi-17.3-i686-w64.zip" to "3f3d0af999371cfa623bd641738a42785e107a9d829b38480ed3d942dafea28a",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.29%2B7/OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip",
             "OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip", "b747698a05a39391a58b9caac30310275e4e6bd9fef92d6c149cba310d91d2be")),
     Classic("windows-x64", "WindowsX64", "windows", "x64",
         "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "aebaaac4eece1a1d95787edaff683b4e4cd2d5e07764634b5d575a4cc6f1a031",
-        "Xray-win7-64.zip", "be02446a7f765af93adbf4c7addd8fa0d125cb748c3b8d511c7c4c1116cd6b8d",
+        "Xray-win7-64.zip", "df87ef380c58d3e2286b4e49834f4b6a4819a8155ebf9124b4610b0d8148af7e",
         olcRtc = Triple("windows", "amd64", ""), openFluxSrc = Triple("windows", "amd64", ""),
         byeDpi = "byedpi-17.3-x86_64-w64.zip" to "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.32.1%2B1/OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip",
             "OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip", "f8c7da672f5dba36b6f870608820b6b598cfae91296929f1b8f21ef2f1e8a0dd")),
     Classic("linux-x86", "LinuxX86", "linux", "x86",
         "sing-box-$singBoxVersion-linux-386.tar.gz", "b2361b5eb0ef6da8f068d9bba762b9edbb3a8637515e30251ee8d5d78b30d846",
-        "Xray-linux-32.zip", "4064a12c7712f28f0a85082be3564c088f7861f2220ddb5e4de409c91837511d",
+        "Xray-linux-32.zip", "225343a01db48e23c1d3091e7fa45971b0d12c20943927846a4a87da374e384d",
         olcRtc = Triple("linux", "386", ""), openFluxSrc = Triple("linux", "386", ""),
         byeDpi = "byedpi-17.3-i686.tar.gz" to "655452c2f8e1e3a99b021043b0a68f57927c97010efe19b06ac3b9949fd784ed"),
     Classic("linux-armv7", "LinuxArmv7", "linux", "armv7",
         "sing-box-$singBoxVersion-linux-armv7.tar.gz", "9eedd8eb2d3ea66a48794359d1cc1e32ce618b6e1b105c9cd314da6408c9fc87",
-        "Xray-linux-arm32-v7a.zip", "2387f55239ee7799fd67d5382e79f589c1da07a97d993e86b058f2290b8e456b",
+        "Xray-linux-arm32-v7a.zip", "19c51e08a6562705fb1cb032a84fd87df21d7e27b194f035be7e754dbe3a97b3",
         openFlux = "openflux-linux-arm" to "1a6aed5fa8044e758e0a9c542781d2c307af5170d8648b2bd2d336b4d47acf12",
         olcRtc = Triple("linux", "arm", "7"),
         byeDpi = "byedpi-17.3-armv7l.tar.gz" to "d231b95fc130a40994ef593ac87498ad8614e003b263e3a453bd62af096abb0c"),

@@ -339,13 +339,26 @@ class AppController(
         _ui.update { if (id in it.updatingSubs) it else { started = true; it.copy(updatingSubs = it.updatingSubs + id) } }
         if (!started) return false
         try {
-            val result = runCatching { Subscriptions.fetch(sub.url, id) }
-            result.onSuccess { f -> mutate { s -> if (s.subscriptions.none { it.id == id }) s else applySubscription(s, id, f) } }
-            result.onFailure { e ->
+            // 0.8.3-b2: панель применяет нового клиента/инбаунд с задержкой (ядра x-ui/s-ui/Remnawave перечитывают
+            // конфиг не мгновенно), поэтому первый запрос подписки сразу после добавления часто пустой или с ошибкой.
+            // Перечитываем с нарастающей паузой, а не один раз — иначе «подключение заработает позже» зависело бы от
+            // 30-минутного фонового цикла.
+            var lastError: Throwable? = null
+            for (attempt in 0 until 3) {
+                val result = runCatching { Subscriptions.fetch(sub.url, id) }
+                if (result.isSuccess) {
+                    val f = result.getOrThrow()
+                    mutate { s -> if (s.subscriptions.none { it.id == id }) s else applySubscription(s, id, f) }
+                    return true
+                }
+                lastError = result.exceptionOrNull()
+                if (attempt < 2) Thread.sleep(2500L * (attempt + 1))
+            }
+            lastError?.let { e ->
                 mutate { s -> s.copy(subscriptions = s.subscriptions.map { if (it.id == id) it.copy(lastError = e.message ?: e.toString()) else it }) }
                 if (!quiet) toast("Подписка «${sub.displayName}»: ${e.message}")
             }
-            return result.isSuccess
+            return false
         } finally {
             _ui.update { it.copy(updatingSubs = it.updatingSubs - id) }
         }
@@ -474,6 +487,10 @@ class AppController(
 
     fun refreshAll() = _ui.value.data.subscriptions.forEach { refreshSubscription(it.id) }
 
+    /** Устойчивый ключ сервера: протокол + адрес + порт + учётные данные (имя панели часто меняет — не участвует). */
+    private fun stableKey(p: ServerProfile) =
+        listOf(p.protocolId, p.address.lowercase(), p.port, p.uuidOrPassword).joinToString("|")
+
     private fun applySubscription(s: HydraState, id: Long, f: Subscriptions.Fetched): HydraState {
         val old = s.servers.filter { it.subscriptionId == id }
         val connected = _ui.value.connectedId
@@ -481,7 +498,10 @@ class AppController(
         // Сохраняем id совпадающих серверов — выбор, пинг и текущее подключение переживают обновление.
         val used = mutableSetOf<Long>()
         val fresh = f.servers.filter { it.hasValidEndpoint }.map { n ->
-            val same = old.firstOrNull { it.id !in used && it.address == n.address && it.port == n.port && it.name == n.name }
+            // 0.8.3-b2: совпадение по устойчивому ключу, а не по адресу+порту+имени — панель часто меняет имя
+            // (флаг, остаток трафика), и прежнее сравнение ломало выбор/подключение после обновления подписки.
+            val nKey = stableKey(n)
+            val same = old.firstOrNull { it.id !in used && stableKey(it) == nKey }
             same?.let { used += it.id }
             n.copy(id = same?.id ?: next++, subscriptionId = id, pingMs = same?.pingMs ?: -1).let { fresh ->
                 // «Пустить через …» (0.7.13) хранится в профиле — обновление подписки его не стирает.
