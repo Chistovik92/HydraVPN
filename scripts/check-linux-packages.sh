@@ -28,6 +28,12 @@ check_desktop() {
   for bin in sing-box xray openflux olcrtc; do
     [[ -x "$root/opt/hydra-vpn/lib/app/resources/$bin" ]] || fail "$file: $bin отсутствует или не исполняем"
   done
+  # Ровно один системный ярлык: jpackage-пакеты 0.8.3-a и ранее оставляли второй hydra-vpn-Hydra.desktop.
+  local count; count="$(find "$root/usr/share/applications" -maxdepth 1 -type f -name '*.desktop' | wc -l)"
+  [[ "$count" -eq 1 ]] || fail "$file: в /usr/share/applications $count ярлыков, ожидался ровно один"
+  [[ ! -f "$root/usr/share/applications/hydra-vpn-Hydra.desktop" ]] || fail "$file: остался ярлык hydra-vpn-Hydra.desktop от jpackage"
+  [[ ! -e "$root/opt/hydra-vpn/lib/hydra-vpn-Hydra.desktop" ]] || fail "$file: в payload остался /opt/hydra-vpn/lib/hydra-vpn-Hydra.desktop"
+  [[ ! -e "$root/opt/hydra-vpn/lib/Hydra.png" ]] || fail "$file: в payload остался /opt/hydra-vpn/lib/Hydra.png"
 }
 
 mkdir -p "$WORK/deb" "$WORK/rpm"

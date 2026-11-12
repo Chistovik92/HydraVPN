@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.8.3-rc1] — кандидат в релиз: одна иконка в меню Linux
+
+Пре-релиз (ветка `claude/0-8-3-alpha`, versionCode 85), 12.11.2026. Убирает вторую иконку Hydra в меню приложений
+Simply Linux и других дистрибутивов, оставшуюся после обновления с 0.8.3-a и ранее. Содержит всё из 0.8.3-b2.
+
+### Исправлено
+- **Linux: две иконки в меню**. jpackage (JDK 17) кладёт в пакет собственный ярлык
+  `/opt/hydra-vpn/lib/hydra-vpn-Hydra.desktop` и значок `Hydra.png`; в 0.8.3-a их ставил в `/usr/share/applications`
+  скриптлет `xdg-desktop-menu`, который при обновлении не удалял файл — рядом с новым `hydra-vpn.desktop` оставался
+  `hydra-vpn-Hydra.desktop`, и в меню появлялось два пункта Hydra. Теперь `scripts/add-linux-shortcut.sh` вычищает
+  осиротевшие `hydra-vpn-Hydra.desktop`/`Hydra.png` из payload пакета, а `postinst` (DEB) и `%post` (RPM) удаляют
+  оставшийся от старых версий ярлык из `/usr/share/applications` и `/usr/local/share/applications` и обновляют
+  `update-desktop-database`. `scripts/check-linux-packages.sh` теперь требует ровно один `.desktop` в
+  `/usr/share/applications` и отсутствие осиротевших файлов jpackage в payload.
+
+### Проверки
+- `git diff --check`; `bash -n` всех скриптов; постобработка DEB/RPM на копиях опубликованных пакетов 0.8.3-b2
+  в WSL Ubuntu — ровно один ярлык, скриптлет очистки на месте, отрицательный и положительный тест
+  `check-linux-packages.sh` проходят. Полная сборка и тесты ПК — в CI (`desktop.yml`).
+
+### Гейт релиза (здесь не проверяется)
+- Чистая установка и обновление 0.8.3-a / 0.8.3-b2 → 0.8.3-rc1 на Simply Linux: в меню ровно одна иконка.
+
 ## [0.8.3-b2] — бета: свежий Xray и Remnawave, подписка подхватывается сразу после добавления
 
 Пре-релиз (ветка `claude/0-8-3-alpha`, versionCode 84), 10.11.2026. Исправляет «подписку добавил, а подключается только

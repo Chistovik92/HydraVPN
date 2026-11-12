@@ -17,6 +17,9 @@ case "$PACKAGE" in
     mkdir -p "$ROOT/usr/share/applications" "$ROOT/usr/share/icons/hicolor/512x512/apps" "$CONTROL"
     dpkg-deb -x "$PACKAGE" "$ROOT"
     dpkg-deb -e "$PACKAGE" "$CONTROL"
+    # jpackage кладёт в payload свой .desktop и значок (/opt/hydra-vpn/lib/hydra-vpn-Hydra.desktop,
+    # /opt/hydra-vpn/lib/Hydra.png). До 0.8.3-b их ставили в меню второй иконкой; убираем из payload.
+    rm -f "$ROOT/opt/hydra-vpn/lib/hydra-vpn-Hydra.desktop" "$ROOT/opt/hydra-vpn/lib/Hydra.png"
     install -m 644 "$DESKTOP" "$ROOT/usr/share/applications/hydra-vpn.desktop"
     install -m 644 "$ICON" "$ROOT/usr/share/icons/hicolor/512x512/apps/hydra-vpn.png"
     sed -i -E 's/(^Depends:.*), xdg-utils/\1/; s/^Depends: xdg-utils, /Depends: /; /^Depends: xdg-utils$/d' "$CONTROL/control"
@@ -24,7 +27,24 @@ case "$PACKAGE" in
     # В DEBIAN не должно быть пустых строк: dpkg воспринимает текст после них как второй control.
     sed -i '/^$/d' "$CONTROL/control"
     printf 'Installed-Size: %s\n' "$(du -sk "$ROOT" | cut -f1)" >> "$CONTROL/control"
-    rm -f "$CONTROL/postinst" "$CONTROL/prerm"
+    # 0.8.3-rc1: postinst чистит второй ярлык, оставшийся после обновления с 0.8.3-a и ранее.
+    rm -f "$CONTROL/prerm"
+    cat > "$CONTROL/postinst" <<'EOF'
+#!/bin/sh
+# Убрать ярлык, оставшийся от jpackage-пакетов 0.8.3-a и ранее (вторая иконка в меню).
+set -e
+case "$1" in
+  configure)
+    rm -f /usr/share/applications/hydra-vpn-Hydra.desktop \
+          /usr/local/share/applications/hydra-vpn-Hydra.desktop
+    if command -v update-desktop-database >/dev/null 2>&1; then
+      update-desktop-database -q 2>/dev/null || true
+    fi
+    ;;
+esac
+exit 0
+EOF
+    chmod 0755 "$CONTROL/postinst"
     mv "$CONTROL" "$ROOT/DEBIAN"
     dpkg-deb --root-owner-group --build "$ROOT" "$PACKAGE" >/dev/null
     ;;
@@ -32,6 +52,8 @@ case "$PACKAGE" in
     ROOT="$WORK/root"
     mkdir -p "$ROOT"
     (cd "$ROOT" && rpm2cpio "$PACKAGE" | cpio -idm --quiet)
+    # jpackage кладёт в payload свой .desktop и значок; до 0.8.3-b их ставили в меню второй иконкой — убираем.
+    rm -f "$ROOT/opt/hydra-vpn/lib/hydra-vpn-Hydra.desktop" "$ROOT/opt/hydra-vpn/lib/Hydra.png"
     install -d -m 755 "$ROOT/usr/share/applications" "$ROOT/usr/share/icons/hicolor/512x512/apps"
     install -m 644 "$DESKTOP" "$ROOT/usr/share/applications/hydra-vpn.desktop"
     install -m 644 "$ICON" "$ROOT/usr/share/icons/hicolor/512x512/apps/hydra-vpn.png"
@@ -53,8 +75,13 @@ BuildArch: %{getenv:HYDRA_RPM_ARCH}
 Hydra VPN client
 %install
 cp -a %{getenv:HYDRA_RPM_ROOT}/. %{buildroot}/
-# Scriptlet не нужен: оба файла принадлежат пакету, RPM удалит их сам,
-# а при обновлении новая версия оставит их на месте.
+# 0.8.3-rc1: чистим второй ярлык, оставшийся после обновления с 0.8.3-a и ранее.
+%post
+rm -f /usr/share/applications/hydra-vpn-Hydra.desktop \
+      /usr/local/share/applications/hydra-vpn-Hydra.desktop
+if command -v update-desktop-database >/dev/null 2>&1; then
+  update-desktop-database -q 2>/dev/null || true
+fi
 %files
 /opt
 /usr/share/applications
