@@ -76,12 +76,12 @@ Hydra VPN client
 %install
 cp -a %{getenv:HYDRA_RPM_ROOT}/. %{buildroot}/
 # 0.8.3-rc1: чистим второй ярлык, оставшийся после обновления с 0.8.3-a и ранее.
-%post
-rm -f /usr/share/applications/hydra-vpn-Hydra.desktop \
-      /usr/local/share/applications/hydra-vpn-Hydra.desktop
-if command -v update-desktop-database >/dev/null 2>&1; then
-  update-desktop-database -q 2>/dev/null || true
-fi
+# Lua-скриптлет вместо shell-%post: shell-скриптлет даёт авто-Requires: /bin/sh,
+# который ломает rpm -Uvh на системах без базы зависимостей (Ubuntu CI). Луа не даёт /bin/sh.
+%post -p <lua>
+os.remove("/usr/share/applications/hydra-vpn-Hydra.desktop")
+os.remove("/usr/local/share/applications/hydra-vpn-Hydra.desktop")
+os.execute("update-desktop-database -q >/dev/null 2>&1 || true")
 %files
 /opt
 /usr/share/applications
