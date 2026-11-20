@@ -15,7 +15,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 OUT="${1:-$PWD}"
 
-SING_BOX_VERSION="${SING_BOX_VERSION:-1.12.25}"
+SING_BOX_VERSION="${SING_BOX_VERSION:-1.14.4}"
 # Тот же коммит OpenFlux, что у ПК и Android (scripts/build-openflux.sh, desktop/build.gradle.kts).
 OPENFLUX_REF="${OPENFLUX_REF:-f492a1a33b7581ad8f88118f97e0b866adda3cdc}"
 
@@ -52,8 +52,8 @@ git -c advice.detachedHead=false clone -q --depth 1 --branch "v$SING_BOX_VERSION
 git -C third_party/sing-box apply "$PWD/../../scripts/sing-box-reality-mlkem.patch"
 echo "    sing-box: v$SING_BOX_VERSION + scripts/sing-box-reality-mlkem.patch"
 
-go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.8
-go install github.com/sagernet/gomobile/cmd/gobind@v0.1.8
+go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
+go install github.com/sagernet/gomobile/cmd/gobind@v0.1.12
 export PATH="$PATH:$(go env GOPATH)/bin"
 gomobile init
 

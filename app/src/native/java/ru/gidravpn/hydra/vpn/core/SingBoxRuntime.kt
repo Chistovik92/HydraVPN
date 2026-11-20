@@ -1,15 +1,17 @@
 package ru.gidravpn.hydra.vpn.core
 
-import android.content.Context
-import io.nekohasekai.libbox.BoxService
 import io.nekohasekai.libbox.CommandClient
 import io.nekohasekai.libbox.CommandClientHandler
 import io.nekohasekai.libbox.CommandClientOptions
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.CommandServerHandler
-import io.nekohasekai.libbox.Connections
+import io.nekohasekai.libbox.ConnectionEvents
 import io.nekohasekai.libbox.Libbox
+import io.nekohasekai.libbox.LogIterator
+import io.nekohasekai.libbox.OutboundGroupItemIterator
 import io.nekohasekai.libbox.OutboundGroupIterator
+import io.nekohasekai.libbox.OverrideOptions
+import io.nekohasekai.libbox.PlatformInterface
 import io.nekohasekai.libbox.SetupOptions
 import io.nekohasekai.libbox.StatusMessage
 import io.nekohasekai.libbox.StringIterator
@@ -17,28 +19,19 @@ import io.nekohasekai.libbox.SystemProxyStatus
 import java.io.File
 
 /**
- * Одноразовая инициализация libbox + живая статистика трафика.
+ * Одноразовая инициализация libbox 1.14 и владение VPN-сервисом через CommandServer.
  *
- * Как это устроено в libbox: счётчики отдаёт не сам [BoxService], а пара
- * CommandServer ↔ CommandClient поверх локального сокета (тот же механизм,
- * что использует sing-box-for-android). Порядок обязателен:
- *   1. [startCommandServer] — до создания сервиса;
- *   2. [attachService] — сразу после `Libbox.newService(...)`;
- *   3. [startStatsPolling] — клиент подписывается на COMMAND_STATUS.
- *
- * Требование к конфигу: `experimental.clash_api` — без него libbox отдаёт
- * `trafficAvailable = false` и нули (см. SingBoxConfigBuilder).
+ * В 1.14 отдельного BoxService больше нет: CommandServer запускает сервис, а CommandClient
+ * получает статистику по локальному gRPC-сокету. Обрыв клиента статистики по-прежнему не
+ * считается смертью ядра; CommandServerHandler.serviceStop() обрабатывает внешнюю
+ * RPC-команду остановки, а не асинхронное завершение sing-box.
  */
 object SingBoxRuntime {
-
-    /** Контекст для платформенных методов HydraPlatformInterface. */
-    private val appContext: Context? get() = ru.gidravpn.hydra.AppCtx.appContext
 
     @Volatile private var isSetup = false
     private val baseDir: File get() = ru.gidravpn.hydra.AppCtx.filesDir
 
     @Volatile private var commandServer: CommandServer? = null
-    /** Колбэк смерти сервиса (Фаза 7a) и защёлка штатной остановки. */
     @Volatile var onServiceClosed: ((String) -> Unit)? = null
     @Volatile private var stopping = false
     @Volatile private var statsClient: CommandClient? = null
@@ -46,7 +39,6 @@ object SingBoxRuntime {
     @Synchronized
     fun ensureSetup() {
         if (isSetup) return
-        // Сигнатура Setup зависит от версии; в 1.11+ используется SetupOptions.
         val opts = SetupOptions().apply {
             basePath = baseDir.absolutePath
             workingPath = File(baseDir, "work").apply { mkdirs() }.absolutePath
@@ -56,39 +48,48 @@ object SingBoxRuntime {
         isSetup = true
     }
 
-    /** Поднимает command-server. Вызывать ДО `Libbox.newService(...)`. */
+    /** Поднимает CommandServer и запускает принадлежащий ему VPN-сервис. */
     @Synchronized
-fun startCommandServer(onLog: (String) -> Unit) {
+    fun startService(config: String, platform: PlatformInterface, onLog: (String) -> Unit) {
+        stopping = true
+        stopStatsPolling()
+        commandServer?.let { old ->
+            runCatching { old.closeService() }
+            runCatching { old.close() }
+            commandServer = null
+        }
         stopping = false
-        if (commandServer != null) return
         val handler = object : CommandServerHandler {
-            // Системный прокси нам не нужен — VPN идёт через tun.
             override fun getSystemProxyStatus(): SystemProxyStatus =
                 SystemProxyStatus().apply { available = false; enabled = false }
 
-/**
-             * libbox зовёт это, когда сервис закрылся не по нашей команде. Наша же
-             * остановка идёт через [shutdown] и защёлкой [stopping] смертью не считается.
-             */
-            override fun postServiceClose() {
-                if (!stopping) onServiceClosed?.invoke("sing-box закрыл сервис")
+            override fun serviceStop() {
+                if (!stopping) onServiceClosed?.invoke("sing-box остановил сервис")
             }
+
             override fun serviceReload() {}
             override fun setSystemProxyEnabled(isEnabled: Boolean) {}
+            override fun triggerNativeCrash() {
+                throw UnsupportedOperationException("native crash не поддерживается Hydra")
+            }
+            override fun writeDebugMessage(message: String?) {
+                if (!message.isNullOrBlank()) onLog("sing-box: $message")
+            }
+            override fun connectSSHAgent(): Int {
+                throw UnsupportedOperationException("SSH agent не поддерживается Android-клиентом Hydra")
+            }
         }
-        runCatching {
-            val server = Libbox.newCommandServer(handler, 300)
+        val server = Libbox.newCommandServer(handler, platform)
+        try {
             server.start()
             commandServer = server
-        }.onFailure {
-            // Не фатально: туннель работает и без счётчиков.
-            onLog("sing-box: командный сервер не поднялся (${it.message}) — счётчики трафика будут нулевыми")
+            server.startOrReloadService(config, OverrideOptions())
+        } catch (e: Throwable) {
+            commandServer = null
+            runCatching { server.closeService() }
+            runCatching { server.close() }
+            throw e
         }
-    }
-
-    /** Связывает поднятый сервис с command-server'ом, иначе статус будет пустым. */
-    fun attachService(service: BoxService) {
-        runCatching { commandServer?.setService(service) }
     }
 
     /** Подписывается на COMMAND_STATUS и отдаёт наверх суммарные счётчики. */
@@ -100,38 +101,27 @@ fun startCommandServer(onLog: (String) -> Unit) {
                 val m = message ?: return
                 if (firstStatus) {
                     firstStatus = false
-                    // Разовая отметка: видно, что канал статистики реально живой,
-                    // а не молча висит (частая причина вечных 0,0 MB).
                     onLog("sing-box: статистика подключена (traffic_available=${m.trafficAvailable})")
                 }
                 onStats(TrafficStats(downBytes = m.downlinkTotal, upBytes = m.uplinkTotal))
             }
 
             override fun connected() {}
-
-            /**
-             * Канал статистики отвалился. Фаза 7a **не** считает это смертью
-             * ядра и не гасит туннель: `CommandClient` — наш собственный
-             * локальный сокет к `CommandServer`, он может отвалиться и при
-             * живом sing-box, а ложное срабатывание уронило бы рабочее
-             * соединение. Но раньше этот колбэк был пустым, и обрыв канала
-             * выглядел как «счётчики просто замерли» — теперь он хотя бы виден
-             * в логах. Настоящий признак смерти самого `BoxService` в libbox
-             * ещё предстоит найти — см. HANDOFF, Фаза 7a, открытый хвост.
-             */
             override fun disconnected(message: String?) {
                 onLog("sing-box: канал статистики отключён (${message ?: "без сообщения"})")
             }
+            override fun setDefaultLogLevel(level: Int) {}
             override fun clearLogs() {}
             override fun initializeClashMode(modes: StringIterator?, currentMode: String?) {}
             override fun updateClashMode(newMode: String?) {}
-            override fun writeConnections(message: Connections?) {}
+            override fun writeConnectionEvents(events: ConnectionEvents?) {}
             override fun writeGroups(message: OutboundGroupIterator?) {}
-            override fun writeLogs(messageList: StringIterator?) {}
+            override fun writeOutbounds(message: OutboundGroupItemIterator?) {}
+            override fun writeLogs(messageList: LogIterator?) {}
         }
         val options = CommandClientOptions().apply {
-            command = Libbox.CommandStatus
-            statusInterval = 1_000_000_000L   // go time.Duration → наносекунды, 1 с
+            addCommand(Libbox.CommandStatus)
+            statusInterval = 1_000_000_000L
         }
         runCatching {
             val client = CommandClient(handler, options)
@@ -147,11 +137,12 @@ fun startCommandServer(onLog: (String) -> Unit) {
         statsClient = null
     }
 
-    /** Полное гашение: клиент + command-server. Вызывается при остановке ядра. */
+    /** Штатная остановка: сначала сервис, затем gRPC-сервер. */
     @Synchronized
-fun shutdown() {
+    fun shutdown() {
         stopping = true
         stopStatsPolling()
+        runCatching { commandServer?.closeService() }
         runCatching { commandServer?.close() }
         commandServer = null
     }

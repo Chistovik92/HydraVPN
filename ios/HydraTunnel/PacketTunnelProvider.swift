@@ -9,7 +9,6 @@ import NetworkExtension
 final class PacketTunnelProvider: NEPacketTunnelProvider {
     private let store = HydraStore.shared()
     private var commandServer: LibboxCommandServer?
-    private var boxService: LibboxBoxService?
     /// Telegram через WebSocket (0.7.20): локальный SOCKS5, живёт столько же, сколько туннель.
     private var tgWs: TgWsServer?
     private lazy var platform = TunnelPlatformInterface(self)
@@ -21,11 +20,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         setup.basePath = store.directory.path
         setup.workingPath = store.directory.appendingPathComponent("work", isDirectory: true).path
         setup.tempPath = FileManager.default.temporaryDirectory.path
+        setup.logMaxLines = 300
+        // На iOS лимит памяти Network Extension теперь обслуживает oom-killer libbox.
+        setup.oomKillerEnabled = true
         try? FileManager.default.createDirectory(atPath: setup.workingPath, withIntermediateDirectories: true)
         LibboxSetup(setup, &setupError)
         if let setupError { throw fail("настройка libbox: \(setupError.localizedDescription)") }
-        // Лимит памяти Network Extension (~50 МБ): libbox сам подрезает буферы под него.
-        LibboxSetMemoryLimit(true)
 
         let state = store.load()
         let serverId = (options?["serverId"] as? NSNumber)?.int64Value ?? state.app.lastServerId
@@ -60,37 +60,49 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         let config = try buildConfig(server, o, state: state, engine: engine)
         store.appendLog("Подключение к \(server.address)… (sing-box \(LibboxVersion()))")
 
-        let server0: LibboxCommandServer? = LibboxNewCommandServer(platform, 300)
-        commandServer = server0
-        do { try server0?.start() } catch { throw fail("командный сервер: \(error.localizedDescription)") }
-
-        var serviceError: NSError?
-        guard let service = LibboxNewService(config, platform, &serviceError) else {
-            throw fail("создание сервиса: \(serviceError?.localizedDescription ?? "неизвестно")")
+        // В libbox 1.14 CommandServer создаёт и владеет sing-box service.
+        var serverError: NSError?
+        let createdServer = LibboxNewCommandServer(platform, platform, &serverError)
+        if let serverError {
+            throw fail("создание командного сервера: \(serverError.localizedDescription)")
         }
-        do { try service.start() } catch { throw fail("запуск: \(error.localizedDescription)") }
-        server0?.setService(service)
-        boxService = service
+        guard let server0 = createdServer else {
+            throw fail("создание командного сервера: неизвестная ошибка")
+        }
+        do {
+            try server0.start()
+            try server0.startOrReloadService(config, options: LibboxOverrideOptions())
+            commandServer = server0
+        } catch {
+            try? server0.closeService()
+            server0.close()
+            throw fail("запуск: \(error.localizedDescription)")
+        }
         store.appendLog("Подключено: \(ServerLocation.label(server))")
     }
 
     override func stopTunnel(with reason: NEProviderStopReason) async {
         store.appendLog("Туннель: остановка (\(reason.rawValue))")
-        try? boxService?.close()
-        boxService = nil
+        if let server = commandServer {
+            do {
+                try server.closeService()
+            } catch {
+                store.appendLog("Ошибка остановки sing-box: \(error.localizedDescription)")
+            }
+            server.close()
+        }
+        commandServer = nil
         tgWs?.stop()
         tgWs = nil
         HydraolcStop()
         HydrafluxStop()
         ByeDpiRunner.shared.stop()
-        commandServer?.setService(nil)
-        try? commandServer?.close()
-        commandServer = nil
         platform.reset()
     }
 
-    override func sleep() async { boxService?.pause() }
-    override func wake() { boxService?.wake() }
+    override func sleep() async { commandServer?.pause() }
+    // Wake() в libbox 1.14 на iOS не снимает pause: wakeNow() сохраняет реальное пробуждение.
+    override func wake() { commandServer?.wakeNow() }
 
     /// Сообщения от приложения: пока только «пинг» статистики.
     override func handleAppMessage(_ messageData: Data) async -> Data? { messageData }
@@ -99,7 +111,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
     func serviceClosed() {
         store.appendLog("Ошибка: ядро sing-box остановилось")
-        boxService = nil
         cancelTunnelWithError(NSError(domain: "Hydra", code: 2, userInfo: [NSLocalizedDescriptionKey: "sing-box stopped"]))
     }
 

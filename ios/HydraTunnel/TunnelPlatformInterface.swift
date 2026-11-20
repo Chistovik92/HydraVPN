@@ -4,18 +4,24 @@ import Libbox
 import Network
 import NetworkExtension
 
-/// PlatformInterface libbox 1.12.x для iOS — аналог HydraPlatformInterface на Android.
-/// Сверено с sing-box-for-apple (ExtensionPlatformInterface, октябрь 2025 — та же ветка libbox).
+/// PlatformInterface libbox 1.14.x для iOS — аналог HydraPlatformInterface на Android.
+/// Сверено с sing-box-for-apple (ExtensionPlatformInterface) и фактическими bindings 1.14.4.
 /// Главное: openTun превращает маршруты, которые вычислил sing-box, в NEPacketTunnelNetworkSettings
 /// и отдаёт ядру fd utun-интерфейса.
 final class TunnelPlatformInterface: NSObject, LibboxPlatformInterfaceProtocol, LibboxCommandServerHandlerProtocol {
     private unowned let tunnel: PacketTunnelProvider
     private var networkSettings: NEPacketTunnelNetworkSettings?
     private var monitor: NWPathMonitor?
+    private var lastNetworkPath: String?
 
     init(_ tunnel: PacketTunnelProvider) { self.tunnel = tunnel }
 
-    func reset() { networkSettings = nil }
+    func reset() {
+        networkSettings = nil
+        monitor?.cancel()
+        monitor = nil
+        lastNetworkPath = nil
+    }
 
     // MARK: - tun
 
@@ -28,11 +34,17 @@ final class TunnelPlatformInterface: NSObject, LibboxPlatformInterfaceProtocol, 
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
         if options.getAutoRoute() {
             settings.mtu = NSNumber(value: options.getMTU())
-            let dnsServer = try options.getDNSServerAddress()
-            let dns = NEDNSSettings(servers: [dnsServer.value])
-            dns.matchDomains = [""]
-            dns.matchDomainsNoSearch = true
-            settings.dnsSettings = dns
+            if options.getDNSMode()!.value != LibboxDNSModeDisabled {
+                let iterator = try options.getDNSServerAddress()
+                var dnsServers: [String] = []
+                while iterator.hasNext() { dnsServers.append(iterator.next()) }
+                if !dnsServers.isEmpty {
+                    let dns = NEDNSSettings(servers: dnsServers)
+                    dns.matchDomains = [""]
+                    dns.matchDomainsNoSearch = true
+                    settings.dnsSettings = dns
+                }
+            }
 
             var v4Addr: [String] = [], v4Mask: [String] = []
             let a4 = options.getInet4Address()!
@@ -105,6 +117,10 @@ final class TunnelPlatformInterface: NSObject, LibboxPlatformInterfaceProtocol, 
     }
 
     private func update(_ listener: LibboxInterfaceUpdateListenerProtocol, _ path: Network.NWPath) {
+        let networkPath = describeNetworkPath(path)
+        listener.updateNetworkPath(networkPath)
+        if networkPath == lastNetworkPath { return }
+        lastNetworkPath = networkPath
         guard path.status != .unsatisfied, let iface = path.availableInterfaces.first else {
             listener.updateDefaultInterface("", interfaceIndex: -1, isExpensive: false, isConstrained: false)
             return
@@ -113,9 +129,26 @@ final class TunnelPlatformInterface: NSObject, LibboxPlatformInterfaceProtocol, 
                                         isExpensive: path.isExpensive, isConstrained: path.isConstrained)
     }
 
+    private func describeNetworkPath(_ path: Network.NWPath) -> String {
+        var components: [String] = ["status=\(path.status)"]
+        if !path.availableInterfaces.isEmpty {
+            components.append("interfaces=" + path.availableInterfaces.map { "\($0.name)#\($0.index)/\($0.type)" }.joined(separator: ","))
+        }
+        if !path.gateways.isEmpty {
+            components.append("gateways=" + path.gateways.map { "\($0)" }.sorted().joined(separator: ","))
+        }
+        if path.supportsIPv4 { components.append("ipv4") }
+        if path.supportsIPv6 { components.append("ipv6") }
+        if path.supportsDNS { components.append("dns") }
+        if path.isExpensive { components.append("expensive") }
+        if path.isConstrained { components.append("constrained") }
+        return components.joined(separator: " ")
+    }
+
     func closeDefaultInterfaceMonitor(_: LibboxInterfaceUpdateListenerProtocol?) throws {
         monitor?.cancel()
         monitor = nil
+        lastNetworkPath = nil
     }
 
     func getInterfaces() throws -> LibboxNetworkInterfaceIteratorProtocol {
@@ -149,20 +182,13 @@ final class TunnelPlatformInterface: NSObject, LibboxPlatformInterfaceProtocol, 
     func includeAllNetworks() -> Bool { HydraKitBridge.killSwitch }
     func usePlatformAutoDetectControl() -> Bool { false }
     func autoDetectControl(_: Int32) throws {}
-    func useProcFS() -> Bool { false }
+    private var unsupportedPlatformError: NSError {
+        NSError(domain: "Hydra", code: 13, userInfo: [NSLocalizedDescriptionKey: "not supported on iOS"])
+    }
 
     func findConnectionOwner(_: Int32, sourceAddress _: String?, sourcePort _: Int32, destinationAddress _: String?,
-                             destinationPort _: Int32, ret0_ _: UnsafeMutablePointer<Int32>?) throws {
-        throw NSError(domain: "Hydra", code: 13, userInfo: [NSLocalizedDescriptionKey: "not supported on iOS"])
-    }
-    func packageName(byUid _: Int32, error _: NSErrorPointer) -> String { "" }
-    func uid(byPackageName _: String?, ret0_ _: UnsafeMutablePointer<Int32>?) throws {
-        throw NSError(domain: "Hydra", code: 14, userInfo: [NSLocalizedDescriptionKey: "not supported on iOS"])
-    }
-
-    func writeLog(_ message: String?) {
-        guard let message, !message.isEmpty else { return }
-        tunnel.log(message)
+                             destinationPort _: Int32) throws -> LibboxConnectionOwner {
+        throw unsupportedPlatformError
     }
 
     func clearDNSCache() {
@@ -175,15 +201,53 @@ final class TunnelPlatformInterface: NSObject, LibboxPlatformInterfaceProtocol, 
 
     func readWIFIState() -> LibboxWIFIState? { nil }
     func send(_: LibboxNotification?) throws {}
+    func cancelNotification(_: String?, typeID _: Int32) throws {}
+    func startNeighborMonitor(_: LibboxNeighborUpdateListenerProtocol?) throws {}
+    func closeNeighborMonitor(_: LibboxNeighborUpdateListenerProtocol?) throws {}
+    func registerMyInterface(_: String?) {}
     func localDNSTransport() -> (any LibboxLocalDNSTransportProtocol)? { nil }
     func systemCertificates() -> (any LibboxStringIteratorProtocol)? { nil }
 
+    // SSH/shell, neighbor, Tailscale и bridge не используются в Hydra на iOS.
+    func usePlatformShell() -> Bool { false }
+    func checkPlatformShell() throws { throw unsupportedPlatformError }
+    func openShellSession(_: LibboxPlatformUser?, command _: String?, environ _: (any LibboxStringIteratorProtocol)?,
+                          term _: String?, rows _: Int32, cols _: Int32) throws -> any LibboxShellSessionProtocol {
+        throw unsupportedPlatformError
+    }
+    func lookupUser(_: String?) throws -> LibboxPlatformUser { throw unsupportedPlatformError }
+    func lookupSFTPServer(_ error: NSErrorPointer) -> String {
+        error?.pointee = unsupportedPlatformError
+        return ""
+    }
+    func readSystemSSHHostKey(_ error: NSErrorPointer) -> String {
+        error?.pointee = unsupportedPlatformError
+        return ""
+    }
+    func tailscaleHostname() -> String { "" }
+    func usePlatformBridge() -> Bool { false }
+    func createBridge(_: LibboxBridgeOptions?) throws -> any LibboxBridgeSessionProtocol {
+        throw unsupportedPlatformError
+    }
+
     // MARK: - CommandServerHandler
 
+    // Внешняя RPC-команда ManagedService.StopService, а не уведомление об аварийном завершении ядра.
+    func serviceStop() throws { tunnel.serviceClosed() }
     func serviceReload() throws {}
-    func postServiceClose() { tunnel.serviceClosed() }
-    func getSystemProxyStatus() -> LibboxSystemProxyStatus? { LibboxSystemProxyStatus() }
+    func getSystemProxyStatus() throws -> LibboxSystemProxyStatus {
+        let status = LibboxSystemProxyStatus()
+        status.available = false
+        status.enabled = false
+        return status
+    }
     func setSystemProxyEnabled(_: Bool) throws {}
+    func triggerNativeCrash() throws { throw unsupportedPlatformError }
+    func writeDebugMessage(_ message: String?) {
+        guard let message, !message.isEmpty else { return }
+        tunnel.log(message)
+    }
+    func connectSSHAgent(_: UnsafeMutablePointer<Int32>?) throws { throw unsupportedPlatformError }
 }
 
 /// Чтение настроек из App Group для синхронных колбэков libbox.

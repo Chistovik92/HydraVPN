@@ -50,11 +50,9 @@
 Нужен Mac с Xcode 16+ (CI: `.github/workflows/ios.yml`, собирает без подписи на каждом push).
 
 ```bash
-# 1. Libbox.xcframework из исходников sing-box той же версии, что на Android (1.12.25)
-git clone --depth 1 --branch v1.12.25 https://github.com/SagerNet/sing-box && cd sing-box
-go install github.com/sagernet/gomobile/cmd/gomobile@latest github.com/sagernet/gomobile/cmd/gobind@latest
-gomobile init && go run ./cmd/internal/build_libbox -target apple -platform ios
-mv Libbox.xcframework ../Hydra/ios/Frameworks/
+# 1. Libbox.xcframework: sing-box 1.14.4 + REALITY-патч + olcRTC/OpenFlux одной Go-сборкой
+mkdir -p ios/Frameworks
+bash ios/Bridge/build.sh "$PWD/ios/Frameworks"
 
 # 2. amneziawg-apple (коммит — AWG_APPLE_COMMIT в .github/workflows/ios.yml), нужен Go 1.26
 git clone https://github.com/amnezia-vpn/amneziawg-apple ios/Vendor/amneziawg-apple

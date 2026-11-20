@@ -18,7 +18,7 @@ import java.io.File
 /**
  * Структура конфига sing-box. Каждый сгенерированный конфиг дополнительно
  * пишется в app/build/singbox-configs/ — его можно прогнать настоящим
- * `sing-box check -c <file>` той же версии, что в libbox.aar (1.12.25).
+ * `sing-box check -c <file>` той же версии, что в libbox.aar (1.14.4).
  */
 class SingBoxConfigBuilderTest {
 
@@ -211,6 +211,15 @@ class SingBoxConfigBuilderTest {
     }
 
     private fun proxyOut(cfg: JSONObject) = cfg.getJSONArray("outbounds").objects().single { it.getString("tag") == "proxy" }
+
+    @Test fun vlessWithoutTlsDoesNotEnableTls() {
+        val p = LinkParser.parseLine(
+            "vless://11111111-1111-4111-8111-111111111111@10.0.2.2:24443?encryption=none&security=none&type=tcp#LocalSmoke",
+        )!!
+        assertEquals("none", p.security)
+        val o = proxyOut(dump("vless_no_tls", SingBoxConfigBuilder.build(p)))
+        assertFalse("VLESS security=none не должен отправлять TLS ClientHello", o.has("tls"))
+    }
 
     @Test fun wsHostHeader() {
         val p = profile.copy(transport = "ws", transportPath = "/ws", sni = "cdn.example.com", extra = JSONObject().put("ws_host", "ws.example.com").toString())

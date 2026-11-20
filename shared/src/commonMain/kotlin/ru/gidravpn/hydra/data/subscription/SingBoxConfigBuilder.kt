@@ -265,7 +265,7 @@ object SingBoxConfigBuilder {
             Protocol.VLESS -> {
                 o.put("type", "vless").put("uuid", p.uuidOrPassword)
                 if (p.flow.isNotEmpty()) o.put("flow", p.flow)
-                o.put("tls", tlsBlock(p, extra, tlsFragment))
+                if (p.security != "none") o.put("tls", tlsBlock(p, extra, tlsFragment))
                 transportBlock(p, extra)?.let { o.put("transport", it) }
             }
             Protocol.VMESS -> {

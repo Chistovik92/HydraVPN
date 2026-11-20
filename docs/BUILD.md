@@ -29,7 +29,7 @@ gradle wrapper --gradle-version 8.9   # один раз, если нет gradlew
 ```bash
 git clone https://github.com/SagerNet/sing-box
 cd sing-box
-git checkout v1.12.25          # версия, против которой собран/проверен Hydra
+git checkout v1.14.4          # версия, против которой собран/проверен Hydra
 # 0.8.2-b: правка REALITY — без неё нет подключения к Xray-core >= 26.9.8 (SagerNet/sing-box#4520)
 git apply /path/to/Hydra/scripts/sing-box-reality-mlkem.patch
 # инструмент gomobile от SagerNet
@@ -42,7 +42,7 @@ gomobile init
 TAGS="with_gvisor,with_quic,with_utls,with_clash_api,with_wireguard,with_conntrack"
 gomobile bind -v -androidapi 21 -javapkg=io.nekohasekai -libname=box \
   -tags "$TAGS" -trimpath -buildvcs=false \
-  -ldflags="-X github.com/sagernet/sing-box/constant.Version=1.12.25 -s -w -buildid= -checklinkname=0" \
+  -ldflags="-X github.com/sagernet/sing-box/constant.Version=1.14.4 -s -w -buildid= -checklinkname=0" \
   -o libbox.aar ./experimental/libbox
 
 cp libbox.aar /path/to/Hydra/app/libs/
