@@ -42,7 +42,7 @@ cd "$WORK/tunnel/tools/libwg-go"
 # Версия ядра amneziawg-go закреплена здесь, а не берётся из go.mod клиента: клиент отстаёт от ядра
 # (0.7.8: клиент тянул v3.1.20260814, а в v3.1.20260828 — исправление «underload при DisableCookies»).
 # Сменить: AWG_GO_VERSION=v3.1.2026XXXX scripts/build-awg.sh
-AWG_GO_VERSION="${AWG_GO_VERSION:-v3.1.20260828}"
+AWG_GO_VERSION="${AWG_GO_VERSION:-v3.1.20261116}"
 go get "github.com/amnezia-vpn/amneziawg-go/v3@$AWG_GO_VERSION"
 echo "    amneziawg-go: $AWG_GO_VERSION"
 

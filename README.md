@@ -5,7 +5,7 @@
 
 - Пакет / appId: `ru.gidravpn.hydra` · Лицензия: **GPL-3.0**
 - Сайт: https://gidravpn.ru · Telegram: https://t.me/+WWJFBZVhxBs4ZmNi
-- Статус ветки `claude/0-8-2-alpha`: **0.8.2-rc2** (кандидат в выпуск, пре-релиз) — установка Windows поверх пре-релиза, пользователи s-ui и x-ui, восстановление базы панели, «Установить ноду», аудит устойчивости, свежие ядра, интернет не пропадает при смене сети, ноды панелей, PasarGuard, Remnawave · последний выпуск: **0.8.1** · [Пре-релизы](https://github.com/Chistovik92/HydraVPN/releases) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md) · [Документация](docs/README.md)
+- Статус: последний выпуск — **0.8.3** (20.11.2026): одна иконка в меню Linux, актуальные ядра и панели (amneziawg-go 3.1.20261116, s-ui 1.6.8, Remnawave 3.4.11) · [Пре-релизы](https://github.com/Chistovik92/HydraVPN/releases) · [CHANGELOG](CHANGELOG.md) · [Дорожная карта](docs/ROADMAP.md) · [Документация](docs/README.md)
 
 > **⚠️ Windows: с версии 0.7.20 антивирус может ругаться.** Kaspersky блокирует установку и `Hydra.exe`, ссылаясь на поведенческий анализ
 > (`PDM:Trojan.Win32.Generic`); другие антивирусы могут вести себя так же. Мы считаем это ложным срабатыванием: код открыт (GPL-3.0), SHA-256 файлов указан в релизе.

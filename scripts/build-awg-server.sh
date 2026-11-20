@@ -12,7 +12,7 @@ cd "$(dirname "$0")/.."
 ROOT="$PWD"
 OUT="$ROOT/dist/awg-server"
 WORK="${WORK:-$(mktemp -d)}"
-AWG_GO_VERSION="${AWG_GO_VERSION:-v3.1.20260828}"
+AWG_GO_VERSION="${AWG_GO_VERSION:-v3.1.20261116}"
 # Текущий стабильный выпуск v3.1.20260812 (раньше здесь был подвижный master).
 AWG_TOOLS_REF="${AWG_TOOLS_REF:-ee0f0a9aa34ff0a0da4b3433b9512781cfe02843}"
 ARCHS=("$@"); [[ ${#ARCHS[@]} -gt 0 ]] || ARCHS=(amd64 arm64 armv7)
