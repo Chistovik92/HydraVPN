@@ -109,7 +109,7 @@ object ServerOps {
         append("echo PG_MARK=\$([ -f ${PasarGuardPanel.MARK} ] && echo 1 || echo 0); ")
         append("echo RW=\$([ -e ${RemnawavePanel.DIR}/docker-compose.yml ] && echo 1 || echo 0); ")
         append("echo RW_MARK=\$([ -f ${RemnawavePanel.MARK} ] && echo 1 || echo 0); ")
-        append("echo NEXORA=\$([ -x ${NexoraPanel.HOME}/nexora-panel ] && echo 1 || echo 0); ")
+        append("echo NEXORA=\$([ -x ${NexoraPanel.BIN} ] && echo 1 || echo 0); ")
         append("echo NEXORA_MARK=\$([ -f ${NexoraPanel.MARK} ] && echo 1 || echo 0); ")
         append("echo NEXORA_STATE=\$(systemctl is-active ${NexoraPanel.SERVICE} 2>/dev/null); ")
         append("echo '---AWGDUMP'; $AWG_ENV ${AwgInstallPlan.BIN_DIR}/awg show $iface dump 2>/dev/null; ")

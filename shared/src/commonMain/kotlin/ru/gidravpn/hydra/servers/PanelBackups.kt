@@ -51,7 +51,7 @@ object PanelBackups {
         return when (kind) {
             PanelKind.PASARGUARD -> pasarguardSteps(file)
             PanelKind.REMNAWAVE -> remnawaveSteps(file)
-            PanelKind.NEXORA -> error("Восстановление Nexora выполняется из копии каталога /var/opt/nexora")
+            PanelKind.NEXORA -> error("Восстановление NX Panel выполняется из копии каталога /var/opt/nx-panel")
             else -> sqliteSteps(kind, file)
         }
     }

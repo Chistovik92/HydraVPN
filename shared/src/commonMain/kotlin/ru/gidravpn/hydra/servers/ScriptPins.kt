@@ -12,14 +12,16 @@ object ScriptPins {
     const val XUI3_TAG = "v3.11.0"
     const val SUI_TAG = "v1.6.8"
     const val XUI_TAG = "v1.15.0"
-    const val NEXORA_TAG = "v0.0.6"
+    const val NEXORA_TAG = "v0.1.2"
+    /** Репозиторий NX Panel (с 0.1.x репо переехало с `Nexora-VPN/panel`). */
+    const val NEXORA_REPO = "nx-panel/panel"
 
     /** Ключ — `репозиторий@тег/файл`. */
     private val SHA256 = mapOf(
         "MHSanaei/3x-ui@v3.11.0/install.sh" to "e81707f6cced0c4144bcf420b1704ec7cba71650ab66ff3ec5c0ddedf418c5db",
         "alireza0/s-ui@v1.6.8/install.sh" to "dd006096233be273514f476fcc804b17c158d9133de5192f86a61c80415abcdb",
         "alireza0/x-ui@v1.15.0/install.sh" to "c22b96dbc0fcd016d6f9ab2065aff4c04d2ecb75844984410a190049344253dc",
-        "Nexora-VPN/panel@v0.0.6/install.sh" to "93d94a7e77fa804752a579211e33dbab80079f1585380671f0c9e2bfca34aa9f",
+        "nx-panel/panel@v0.1.2/install.sh" to "3219a450b02abcbd75cfba8626898e787999acff",
         "PasarGuard/scripts@v0.1.11/pasarguard.sh" to "8125699258ba272b1fce5915c0f18f593fe1734a9961f2fad3579af3a8969743",
         "PasarGuard/scripts@v0.1.11/pg-node.sh" to "abedef14e3d7988ebc126ce58b179c1ab4311fca34da21687eb7e4d1cb2ee1c0",
         "remnawave/backend@3.4.11/docker-compose-prod.yml" to "4f9ca29cbb19c389a1cd6c10e378259dd2ec6bab8e7e06b78851207c2395b8a5",

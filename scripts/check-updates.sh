@@ -65,7 +65,7 @@ row "olcRTC (коммит)" "${OLCRTC:0:12}" "${OLC_LATEST:0:12}" "(апстри
 
 echo
 printf '%-22s %s\n' "панели (для каталога)" "последняя"
-for r in MHSanaei/3x-ui alireza0/s-ui alireza0/x-ui PasarGuard/panel remnawave/panel Nexora-VPN/panel; do
+for r in MHSanaei/3x-ui alireza0/s-ui alireza0/x-ui PasarGuard/panel remnawave/panel nx-panel/panel; do
   printf '%-22s %s\n' "${r#*/}" "$(latest_release "$r")"
 done
 echo

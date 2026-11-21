@@ -394,7 +394,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
 
     fun planPreviewNexora(): List<Step> = NexoraPanel.installSteps() + NexoraPanel.setupPreviewSteps()
 
-    /** Nexora: официальный установщик, первичная настройка по одноразовому токену и Bearer API v1. */
+    /** NX Panel: официальный установщик, первичная настройка CLI (`migrate` + `ingress reset`) и Bearer API v1. */
     fun deployNexora(ssh: SshSession, srv: MyServer, installer: Installer, onLog: (String) -> Unit = {}): DeployResult {
         val user = "hy" + XuiPanel.random(6).lowercase()
         val pass = "Hx1!" + XuiPanel.random(16)
@@ -406,15 +406,18 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
         val local = "http://127.0.0.1:$port"
         fun bare(token: String = "") = PanelInstance(PanelKind.NEXORA, base, user, pass, token, NexoraPanel.TAG, local = true)
         try {
-            val setupToken = ssh.exec("${NexoraPanel.HOME}/nexora-panel setup-token 2>/dev/null").out.trim().lines().lastOrNull().orEmpty()
-            if (setupToken.isBlank()) return DeployResult.Failed("Nexora не выдала одноразовый setup-token", partial = srv.copy(panel = bare()))
-            installer.addSecret(setupToken)
-            NexoraPanel.setup(ssh, local, setupToken, user, pass, port)
-            onLog("Владелец панели создан; жду перезапуск Nexora…")
+            // NX 0.1.x: владелец создаётся CLI без браузера, слушатель переводится на петлю — вместо JSON /api/setup.
+            if (!installer.run(listOf(
+                    Step("nexora-migrate", "Создать владельца панели без браузера", NexoraPanel.migrateCommand(user, pass),
+                        failHint = "nx-panel migrate не удался — посмотрите журнал на сервере"),
+                    Step("nexora-ingress", "Перевести панель на 127.0.0.1:$port", NexoraPanel.ingressCommand(port),
+                        failHint = "nx-panel ingress reset не удался — панель не слушает петлю"),
+                ))) return DeployResult.Failed("Настройка NX Panel остановлена", partial = srv.copy(panel = bare()))
+            onLog("Владелец панели создан; жду перезапуск NX Panel…")
             var ready = false
             repeat(30) {
-                val r = ssh.exec("curl -s -o /dev/null -w '%{http_code}' -m 3 ${Installer.shq("$local/api/setup")}")
-                if (r.out.trim() == "200") { ready = true; return@repeat }
+                val r = ssh.exec("curl -s -o /dev/null -w '%{http_code}' -m 3 ${Installer.shq("$local/api/login")}")
+                if (r.out.trim() == "200" || r.out.trim() == "401" || r.out.trim() == "405") { ready = true; return@repeat }
                 Thread.sleep(2000)
             }
             if (!ready) throw XuiApiException("Панель не начала отвечать после первичной настройки")
@@ -426,7 +429,7 @@ class MyServerService(private val bundleFor: (arch: String) -> AwgBundle) {
             onLog("API-токен Hydra создан; панель доступна через защищённый туннель")
             return DeployResult.Ok(srv.copy(panel = panel))
         } catch (e: Exception) {
-            return DeployResult.Failed("Nexora: ${e.message ?: e::class.simpleName}. Панель установлена — вход сохранён в карточке сервера",
+            return DeployResult.Failed("NX Panel: ${e.message ?: e::class.simpleName}. Панель установлена — вход сохранён в карточке сервера",
                 partial = srv.copy(panel = bare()))
         }
     }

@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.8.4-b] — NX Panel и стабилизация (в разработке)
+
+### Обновлено
+- Nexora **v0.0.6 → NX Panel v0.1.2**: репозиторий `Nexora-VPN/panel` → `nx-panel/panel`, бинарь/служба `nexora-*`
+  → `nx-*`, каталоги `/opt/nexora-panel` → `/opt/nx-panel`, `/var/opt/nexora` → `/var/opt/nx-panel`, нода `nx-node`
+  (порт 62050 без изменений). Установщик `install.sh` сам переносит данные 0.0.6 → 0.1.x.
+- Первичная настройка NX Panel переведена с JSON `/api/setup` на CLI: `nx-panel migrate -user -pass` (владелец без
+  браузера) и `nx-panel ingress reset -listen 127.0.0.1:PORT -yes` (слушатель на петле). Версия и SHA-256 установщика
+  закреплены в `ScriptPins` (`NEXORA_TAG = "v0.1.2"`, репо `nx-panel/panel`).
+
+### Исправлено
+- Desktop: флаги стран серверов не отображались (на мобильных — отображались). `ServerLocation` перенесён в общий
+  модуль; строки серверов ПК используют `ServerLocation.flag`/`bareName`.
+
+### Проверки
+- `:desktop:compileTestKotlin` и `:desktop:test --tests NexoraPanelTest` — BUILD SUCCESSFUL, 0 ошибок.
+- Живой стенд NX Panel (установка с нуля, обновление 0.0.6 → 0.1.x, headless-владелец, токен, нода, подписка)
+  — обязателен перед выпуском: исходники NX закрыты, точные JSON-схемы сверяются по `/api/openapi.json` стенда.
+
+### Ограничения этапа
+- Оплата из Hydra (Crypto Pay + Platega) и управление сетью роутера (DHCP/Wi-Fi/LAN) — в 0.8.5.
+- Новые протоколы (Naive/OpenVPN/OpenConnect/Snell) и MASQUE в эту бету не входят.
+
 ## [0.8.4-a] — техническая альфа sing-box/libbox 1.14.4 (в разработке)
 
 ### Обновлено

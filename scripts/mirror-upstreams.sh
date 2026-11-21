@@ -19,7 +19,7 @@ repos=(
   amnezia-vpn/amneziawg-go amnezia-vpn/amneziawg-android amnezia-vpn/amneziawg-apple amnezia-vpn/amneziawg-tools
   openlibrecommunity/olcrtc hufrea/byedpi sagernet/gomobile
   MHSanaei/3x-ui alireza0/s-ui alireza0/x-ui PasarGuard/panel PasarGuard/scripts
-  remnawave/backend remnawave/node Nexora-VPN/panel
+  remnawave/backend remnawave/node nx-panel/panel
 )
 for upstream in "${repos[@]}"; do basenames[${upstream#*/}]=$(( ${basenames[${upstream#*/}]:-0} + 1 )); done
 # GitHub не принимает refs/pull/*, а git push по HTTPS из WSL без credential-хелпера

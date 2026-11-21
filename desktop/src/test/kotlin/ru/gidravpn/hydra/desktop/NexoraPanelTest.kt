@@ -8,7 +8,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** Nexora v0.0.6: стабильные тела запросов, пагинация API v1 и SSH install-jobs. */
+/** NX Panel v0.1.2 (бывш. Nexora): стабильные тела запросов, пагинация API v1 и SSH install-jobs. */
 class NexoraPanelTest {
     private class FakeTransport : XuiTransport {
         val calls = mutableListOf<Triple<String, String, String?>>()
@@ -19,12 +19,12 @@ class NexoraPanelTest {
         }
     }
 
-    @Test fun setupTokenAndCredentialsHaveStableShapes() {
-        val setup = NexoraPanel.setupBody("once", "hydra", "Strong-password1", 23456)
-        assertEquals("127.0.0.1", setup.getString("listenIp"))
-        assertEquals("23456", setup.getString("listenPort"))
-        assertEquals("none", setup.getString("tlsMode"))
-        assertEquals("sub", setup.getString("subBasepath"))
+    @Test fun migrateIngressAndCredentialsHaveStableShapes() {
+        // Первичная настройка NX 0.1.x — CLI, а не JSON /api/setup.
+        val migrate = NexoraPanel.migrateCommand("hydra", "Strong-password1")
+        assertTrue("nx-panel migrate" in migrate && "-user" in migrate && "-pass" in migrate)
+        assertTrue("hydra" in migrate && "Strong-password1" in migrate)
+        assertTrue("127.0.0.1:23456" in NexoraPanel.ingressCommand(23456))
         val target = SshTarget("[2001:db8::1]", 2222, "root", "secret")
         val creds = NexoraPanel.credentials(target)
         assertEquals("2001:db8::1", creds.getString("sshHost"))
@@ -43,6 +43,7 @@ class NexoraPanelTest {
         assertEquals("Hydra-node", node.getString("name"))
         assertTrue(NexoraPanel.userBody("alice").getBoolean("allTemplates"))
         assertEquals("Hydra", NexoraPanel.tokenBody().getString("desc"))
+        assertFalse(NexoraPanel.tokenBody().has("role"))
     }
 
     @Test fun usersReadEveryPaginatedPageAndCreateSubscription() {
@@ -92,10 +93,10 @@ class NexoraPanelTest {
     }
 
     @Test fun installAndCleanupUsePinnedOfficialInstaller() {
-        assertEquals("93d94a7e77fa804752a579211e33dbab80079f1585380671f0c9e2bfca34aa9f",
+        assertEquals("3219a450b02abcbd75cfba8626898e787999acff",
             ScriptPins.sha256(NexoraPanel.REPO, NexoraPanel.TAG, "install.sh"))
         val install = NexoraPanel.installSteps().first { it.id == "nexora-install" }.command!!
-        assertTrue("--version v0.0.6" in install && "--node-version v0.0.6" in install)
+        assertTrue("--version v0.1.2" in install && "--node-version" !in install)
         val uninstall = NexoraPanel.uninstallSteps().single { it.id == "nexora-remove" }.command!!
         assertTrue("--uninstall" in uninstall && "sha256sum -c" in uninstall && "rm -rf ${NexoraPanel.DATA}" in uninstall)
     }

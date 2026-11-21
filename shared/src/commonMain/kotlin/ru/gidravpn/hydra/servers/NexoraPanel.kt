@@ -4,46 +4,60 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Nexora v0.0.6: панель ставится официальным закреплённым установщиком, а ноды — штатными SSH-заданиями самой панели.
- * Используется только стабильный `/api/v1`; пароль и ключ ноды передаются панели в запросе и нигде ею не сохраняются.
- * Сайт панели слушает 127.0.0.1 и открывается через SSH-туннель Hydra.
+ * NX Panel v0.1.x (бывш. Nexora): панель ставится официальным закреплённым установщиком, ноды — штатными
+ * SSH-заданиями самой панели. Используется только стабильный `/api/v1`; пароль и ключ ноды передаются панели
+ * в запросе и нигде ею не сохраняются. Сайт панели слушает 127.0.0.1 и открывается через SSH-туннель Hydra.
+ *
+ * С 0.1.x репо переехало `Nexora-VPN/panel` → `nx-panel/panel`, а бинарь/служба/каталоги переименованы
+ * `nexora-*` → `nx-*`. Первичная настройка больше не JSON `/api/setup`, а CLI: `nx-panel migrate -user -pass`
+ * создаёт владельца без браузера, `nx-panel ingress reset -listen 127.0.0.1:PORT -yes` переводит панель на петлю.
  */
 object NexoraPanel {
-    const val TAG = "v0.0.6"
-    const val REPO = "Nexora-VPN/panel"
-    const val HOME = "/opt/nexora-panel"
-    const val DATA = "/var/opt/nexora"
-    const val SERVICE = "nexora-panel"
+    const val TAG = "v0.1.2"
+    const val REPO = "nx-panel/panel"
+    const val HOME = "/opt/nx-panel"
+    const val DATA = "/var/opt/nx-panel"
+    const val SERVICE = "nx-panel"
     const val NODE_PORT = 62050
+    /** Бинарь панели (в PATH после установки, но используется полный путь). */
+    const val BIN = "$HOME/nx-panel"
     const val MARK = "${ServerOps.STATE_DIR}/nexora.installed"
     const val NODE_MARK = "${ServerOps.STATE_DIR}/nexora-node.installed"
     private const val SCRIPT = "/root/.hydra-nexora-install.sh"
 
     fun scriptUrl(tag: String = TAG) = "https://raw.githubusercontent.com/$REPO/$tag/install.sh"
 
-    private fun fetchStep() = Step("nexora-fetch", "Загрузить официальный установщик Nexora $TAG",
+    private fun fetchStep() = Step("nexora-fetch", "Загрузить официальный установщик NX Panel $TAG",
         "curl -fsSL -m 180 ${Installer.shq(scriptUrl())} -o $SCRIPT && chmod 700 $SCRIPT && sha256sum $SCRIPT && " +
             ScriptPins.verify(REPO, TAG, "install.sh", SCRIPT),
-        rollback = "rm -f $SCRIPT", failHint = "Не удалось скачать установщик Nexora или его SHA-256 не совпал с проверенным")
+        rollback = "rm -f $SCRIPT", failHint = "Не удалось скачать установщик NX Panel или его SHA-256 не совпал с проверенным")
 
     fun installSteps(): List<Step> = listOf(
-        Step("nexora-exists", "Проверить, что Nexora ещё не установлена", "test ! -e $HOME",
-            failHint = "На сервере уже стоит Nexora — удалите её или выберите другой сервер"),
+        Step("nexora-exists", "Проверить, что NX Panel ещё не установлена", "test ! -e $HOME",
+            failHint = "На сервере уже стоит NX Panel — удалите её или выберите другой сервер"),
         fetchStep(),
-        Step("nexora-install", "Установить Nexora Panel $TAG и подготовить Nexora Node $TAG",
-            "bash $SCRIPT --version $TAG --node-version $TAG < /dev/null > /tmp/.hydra-nexora.log 2>&1; rc=\$?; " +
+        Step("nexora-install", "Установить NX Panel $TAG",
+            "bash $SCRIPT --version $TAG < /dev/null > /tmp/.hydra-nexora.log 2>&1; rc=\$?; " +
                 "if [ \$rc -ne 0 ]; then tail -n 8 /tmp/.hydra-nexora.log; fi; rm -f /tmp/.hydra-nexora.log $SCRIPT; exit \$rc",
-            rollback = uninstallCommand(), failHint = "Установка Nexora не удалась"),
-        Step("nexora-active", "Проверить службу Nexora", "systemctl is-active $SERVICE && test -x $HOME/nexora-panel",
+            rollback = uninstallCommand(), failHint = "Установка NX Panel не удалась"),
+        Step("nexora-active", "Проверить службу NX Panel", "systemctl is-active $SERVICE && test -x $BIN",
             failHint = "Панель не запустилась (journalctl -u $SERVICE)"),
         Step("nexora-mark", "Отметить, что панель поставила Hydra",
             "mkdir -p ${ServerOps.STATE_DIR} && chmod 700 ${ServerOps.STATE_DIR} && touch $MARK"),
     )
 
+    /** Первичная настройка (CLI): создать владельца и перевести панель на петлю — сюда подставляются креды из [MyServerService.deployNexora]. */
     fun setupPreviewSteps() = listOf(
-        Step("nexora-setup", "Создать владельца панели; панель будет слушать только 127.0.0.1", "curl … /api/setup"),
+        Step("nexora-setup", "Создать владельца панели без браузера (nx-panel migrate)", "nx-panel migrate …"),
+        Step("nexora-ingress", "Перевести панель на 127.0.0.1 (nx-panel ingress reset)", "nx-panel ingress reset …"),
         Step("nexora-token", "Выпустить API-токен Hydra (его открытый текст панель показывает один раз)", "curl … /api/tokens"),
     )
+
+    /** Команда CLI-создания владельца панели без браузера. Пароль передаётся отдельно (секрет Installer, не в `ps`). */
+    fun migrateCommand(user: String, pass: String) = "$BIN migrate -user ${Installer.shq(user)} -pass ${Installer.shq(pass)}"
+
+    /** Перевести панель на один слушатель 127.0.0.1:<port> (обычный HTTP, панель в корне). */
+    fun ingressCommand(port: Int) = "$BIN ingress reset -listen 127.0.0.1:$port -yes"
 
     /** Официальный uninstall сохраняет базу; полная очистка Hydra удаляет и её после явного подтверждения пользователя. */
     fun uninstallCommand(): String =
@@ -52,24 +66,20 @@ object NexoraPanel {
             "rm -f $SCRIPT; [ \$rc -eq 0 ] && rm -rf $DATA && rm -f $MARK ${OtherPanels.PANEL_STATE}; exit \$rc"
 
     fun uninstallSteps(): List<Step> = listOf(
-        Step("nexora-backup", "Сохранить копию данных Nexora в ${ServerOps.BACKUP_DIR}",
+        Step("nexora-backup", "Сохранить копию данных NX Panel в ${ServerOps.BACKUP_DIR}",
             "mkdir -p ${ServerOps.BACKUP_DIR} && chmod 700 ${ServerOps.BACKUP_DIR}; if [ -d $DATA ]; then " +
                 "cp -a $DATA ${ServerOps.BACKUP_DIR}/nexora-\$(date +%Y%m%d-%H%M%S) || exit 1; fi"),
-        Step("nexora-remove", "Удалить Nexora официальным установщиком и очистить её данные", uninstallCommand(),
-            failHint = "Nexora удалить не удалось; данные сохранены в ${ServerOps.BACKUP_DIR}"),
+        Step("nexora-remove", "Удалить NX Panel официальным установщиком и очистить её данные", uninstallCommand(),
+            failHint = "NX Panel удалить не удалось; данные сохранены в ${ServerOps.BACKUP_DIR}"),
     )
 
     /** Аварийная очистка ноды, если главная панель уже недоступна. Обычное удаление идёт через install-job панели. */
     fun nodeUninstallCommand() =
-        "systemctl disable --now nexora-node >/dev/null 2>&1; rm -f /etc/systemd/system/nexora-node.service /usr/local/bin/nexora-node; " +
-            "systemctl daemon-reload; rm -rf /opt/nexora-node /var/opt/nexora-node; rm -f $NODE_MARK; true"
+        "systemctl disable --now nx-node >/dev/null 2>&1; rm -f /etc/systemd/system/nx-node.service /usr/local/bin/nx-node; " +
+            "systemctl daemon-reload; rm -rf /opt/nx-node /var/opt/nx-node; rm -f $NODE_MARK; true"
 
-    fun setupBody(setupToken: String, username: String, password: String, port: Int): JSONObject = JSONObject()
-        .put("token", setupToken).put("username", username).put("password", password)
-        .put("listenIp", "127.0.0.1").put("listenPort", port.toString()).put("basepath", "")
-        .put("subBasepath", "sub").put("tlsMode", "none").put("timezone", "UTC")
-
-    fun tokenBody() = JSONObject().put("desc", "Hydra").put("role", "sudo").put("scopes", JSONArray()).put("rateLimit", 0).put("expiry", 0)
+    /** Тело создания API-токена: без ограничений по областям (`scopes` пуст) — токен действует в рамках роли владельца. */
+    fun tokenBody() = JSONObject().put("desc", "Hydra").put("scopes", JSONArray()).put("rateLimit", 0).put("expiry", 0)
 
     fun userBody(name: String) = JSONObject().put("name", name).put("enable", true).put("allTemplates", true)
 
@@ -127,7 +137,7 @@ object NexoraPanel {
                     throw XuiApiException("Nexora: вход или создание токена отклонены (${codes.joinToString("/")}) $detail")
                 }
                 val token = runCatching { JSONObject(ssh.exec("cat $tokenOut").out).getString("token") }.getOrDefault("")
-                if (token.isBlank()) throw XuiApiException("Nexora не выдала API-токен")
+                if (token.isBlank()) throw XuiApiException("NX Panel не выдала API-токен")
                 return token
             } finally {
                 ssh.exec("rm -f $loginIn $tokenIn $loginOut $tokenOut")
@@ -135,10 +145,6 @@ object NexoraPanel {
         } finally {
             ssh.exec("rm -f $cookies")
         }
-    }
-
-    fun setup(ssh: SshSession, localBase: String, setupToken: String, username: String, password: String, port: Int) {
-        post(ssh, localBase.trimEnd('/') + "/api/setup", setupBody(setupToken, username, password, port))
     }
 }
 
