@@ -16,8 +16,9 @@
 
 ### Проверки
 - `:desktop:compileTestKotlin` и `:desktop:test --tests NexoraPanelTest` — BUILD SUCCESSFUL, 0 ошибок.
-- Живой стенд NX Panel (установка с нуля, обновление 0.0.6 → 0.1.x, headless-владелец, токен, нода, подписка)
-  — обязателен перед выпуском: исходники NX закрыты, точные JSON-схемы сверяются по `/api/openapi.json` стенда.
+- **Живой стенд NX Panel (21.11.2026) — пройден:** установка v0.1.2 с нуля, обновление 0.0.6 → 0.1.x, headless-владелец
+  (`migrate` + `ingress reset`), вход `/api/login`, Bearer-токен `/api/tokens`, нода `/api/v1/nodes/{id}/install`,
+  подписка в один клик. JSON-схемы сверены со стендом (исходники NX закрыты).
 
 ### Ограничения этапа
 - Оплата из Hydra (Crypto Pay + Platega) и управление сетью роутера (DHCP/Wi-Fi/LAN) — в 0.8.5.
