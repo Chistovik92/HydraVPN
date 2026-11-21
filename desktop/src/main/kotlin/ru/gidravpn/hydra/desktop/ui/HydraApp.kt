@@ -84,6 +84,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.gidravpn.hydra.data.model.GeoRoutingMode
+import ru.gidravpn.hydra.data.model.ServerLocation
 import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.TlsFragmentMode
 import ru.gidravpn.hydra.desktop.AppController
@@ -242,7 +243,7 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
                 val s = ui.selected
                 if (s == null) Text("Не выбран — добавьте ссылку или подписку", fontWeight = FontWeight.Medium)
                 else {
-                    Text("${s.flag} ${s.name}", fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${ServerLocation.flag(s)} ${ServerLocation.bareName(s)}", fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val engine = DesktopConfig.engineFor(s, settings, c.xrayAvailable)
                     Text(s.summary + " · " + DesktopConfig.engineText(s, settings, c.xrayAvailable, ::engineLabel), fontSize = 12.sp,
                         color = if (engine == null) Danger else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -386,7 +387,7 @@ private fun ServerRow(c: AppController, ui: UiState, s: ServerProfile, onDelete:
     ) {
         RadioButton(selected = selected, onClick = { c.select(s.id) }, enabled = supported && !ui.active)
         Column(Modifier.weight(1f)) {
-            Text("${s.flag} ${s.name}", maxLines = 1, overflow = TextOverflow.Ellipsis,
+            Text("${ServerLocation.flag(s)} ${ServerLocation.bareName(s)}", maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = if (supported) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 (s.protocol?.displayName ?: s.protocolId) + " · " + s.address + ":" + s.port + " · " +
