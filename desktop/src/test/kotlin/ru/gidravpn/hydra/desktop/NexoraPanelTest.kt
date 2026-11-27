@@ -8,7 +8,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** NX Panel v0.1.2 (бывш. Nexora): стабильные тела запросов, пагинация API v1 и SSH install-jobs. */
+/** NX Panel v0.2.1 (бывш. Nexora): стабильные тела запросов, пагинация API v1 и SSH install-jobs. */
 class NexoraPanelTest {
     private class FakeTransport : XuiTransport {
         val calls = mutableListOf<Triple<String, String, String?>>()
@@ -96,7 +96,7 @@ class NexoraPanelTest {
         assertEquals("d83493dc3dc37c57b85528bafbcc7ef0281cb53c4e40e57d0d4b9c80965501c2",
             ScriptPins.sha256(NexoraPanel.REPO, NexoraPanel.TAG, "install.sh"))
         val install = NexoraPanel.installSteps().first { it.id == "nexora-install" }.command!!
-        assertTrue("--version v0.1.2" in install && "--node-version" !in install)
+        assertTrue("--version v0.2.1" in install && "--node-version" !in install)
         val uninstall = NexoraPanel.uninstallSteps().single { it.id == "nexora-remove" }.command!!
         assertTrue("--uninstall" in uninstall && "sha256sum -c" in uninstall && "rm -rf ${NexoraPanel.DATA}" in uninstall)
     }

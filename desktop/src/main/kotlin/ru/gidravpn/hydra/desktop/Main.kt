@@ -82,6 +82,8 @@ fun main(args: Array<String>) {
             }
             deepLink?.let { controller.import(it) }
             ru.gidravpn.hydra.desktop.core.LinkHandoff.watch { link -> scope.launch { controller.import(link) } }
+            // macOS: ссылку работающему экземпляру приносит Apple Event (LaunchServices) — приём через eawt (0.8.4-rc2).
+            ru.gidravpn.hydra.desktop.core.MacLinkHandler.attach { link -> scope.launch { controller.import(link) } }
         }
 
         Window(

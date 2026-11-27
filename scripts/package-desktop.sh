@@ -153,6 +153,15 @@ EOF
     ARCH="$arch" APPIMAGE_EXTRACT_AND_RUN=1 "$tool" --no-appstream "$appdir" "$DIST/$NAME.AppImage"
     ;;
   macos-*)
+    # Схема hydra:// в Info.plist (0.8.4-rc2): клик по ссылке в чате или письме открывает Hydra.
+    # jpackage Info.plist не расширяется — записи добавляет PlistBuddy до подписи, иначе код подписи увидит изменённый файл.
+    plist="$APP_DIR/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c 'Delete :CFBundleURLTypes' "$plist" >/dev/null 2>&1 || true
+    /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes array' "$plist" >/dev/null
+    /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes:0:CFBundleURLName string ru.gidravpn.hydra.desktop' "$plist" >/dev/null
+    /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes:0:CFBundleURLSchemes array' "$plist" >/dev/null
+    /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string hydra' "$plist" >/dev/null
+    plutil -extract CFBundleURLTypes.0.CFBundleURLSchemes.0 raw "$plist" | grep -qx hydra || err "схема hydra:// не попала в Info.plist"
     # Без Apple Developer ID: ad-hoc подпись (обязательна для arm64) + DMG.
     codesign --force --deep --sign - "$APP_DIR"
     codesign --verify --deep --strict "$APP_DIR"

@@ -27,8 +27,14 @@ export GOTOOLCHAIN="${GOTOOLCHAIN:-go1.25.5}"
 
 rm -rf "$WORK"
 git -c advice.detachedHead=false clone -q --depth 1 --branch "v$SING_BOX_VERSION" https://github.com/SagerNet/sing-box "$WORK"
-git -C "$WORK" apply "$PATCH"
-echo "==> sing-box v$SING_BOX_VERSION + $(basename "$PATCH"), $(go version)"
+# 1.14.5: фикс #4520 вошёл в апстрим — патч накладывается, только если ещё применим к этой версии.
+PATCHED=0
+if git -C "$WORK" apply --check "$PATCH" 2>/dev/null; then
+    git -C "$WORK" apply "$PATCH"; PATCHED=1
+    echo "==> sing-box v$SING_BOX_VERSION + $(basename "$PATCH"), $(go version)"
+else
+    echo "==> sing-box v$SING_BOX_VERSION (фикс REALITY #4520 в апстриме, патч не нужен), $(go version)"
+fi
 
 go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.8
 go install github.com/sagernet/gomobile/cmd/gobind@v0.1.8
@@ -41,5 +47,10 @@ gomobile bind -v -androidapi 21 -javapkg=io.nekohasekai -libname=box \
   -tags "$TAGS" -trimpath -buildvcs=false \
   -ldflags="-X github.com/sagernet/sing-box/constant.Version=$SING_BOX_VERSION -s -w -buildid= -checklinkname=0" \
   -o "$REPO/app/libs/libbox.aar" ./experimental/libbox
-tr -d '\r' < "$PATCH" | sha256sum | cut -d' ' -f1 > "$REPO/app/libs/libbox.aar.patch"
-echo "==> app/libs/libbox.aar (sing-box $SING_BOX_VERSION, патч $(cut -c1-12 "$REPO/app/libs/libbox.aar.patch")…)"
+# Маркер для release.sh: SHA-256 наложенного патча или UPSTREAM-FIXED (фикс в апстриме, патч не нужен).
+if [[ "$PATCHED" -eq 1 ]]; then
+    tr -d '\r' < "$PATCH" | sha256sum | cut -d' ' -f1 > "$REPO/app/libs/libbox.aar.patch"
+else
+    printf 'UPSTREAM-FIXED\n' > "$REPO/app/libs/libbox.aar.patch"
+fi
+echo "==> app/libs/libbox.aar (sing-box $SING_BOX_VERSION, маркер: $(cat "$REPO/app/libs/libbox.aar.patch"))"

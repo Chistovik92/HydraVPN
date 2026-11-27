@@ -31,8 +31,8 @@ android {
         applicationId = "ru.gidravpn.hydra"
         minSdk = 26            // Android 8.0. VpnService доступен с API 14
         targetSdk = 35
-        versionCode = 88
-        versionName = "0.8.4-rc1"
+        versionCode = 89
+        versionName = "0.8.4-rc2"
         // Приватный DNS (DoH с токеном в пути) для вошедших через бота: секрет, в репозитории его нет.
         // Свойство Gradle `hydraPrivateDns` или переменная окружения HYDRA_PRIVATE_DNS; пусто — пункт скрыт.
         val privateDns = ((project.findProperty("hydraPrivateDns") as String?) ?: System.getenv("HYDRA_PRIVATE_DNS") ?: "")
@@ -358,7 +358,7 @@ dependencies {
 
     // === Нативные ядра. Файлы .aar кладутся в app/libs вручную (см. docs/BUILD.md) ===
     // sing-box: github.com/SagerNet/sing-box (experimental/libbox), собран через gomobile.
-    // Проверено против libbox 1.14.4 (docs/BUILD.md: сборка с -checklinkname=0).
+    // Проверено против libbox 1.14.5 (docs/BUILD.md: сборка с -checklinkname=0).
     "nativeImplementation"(":libbox@aar")
     // Xray-core: github.com/XTLS/libXray — опционален (XrayCore честно откажет
     // при подключении, пока .aar не собран). НЕ подключаем как обычную

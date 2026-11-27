@@ -35,7 +35,7 @@
 
 | Версия | Ветка | Состояние |
 |---|---|---|
-| **0.8.4-a** | `claude/0-8-4-alpha` | **в разработке**: sing-box/libbox 1.14.4 и перенос Android/iOS на новый `CommandServer` API. План всех этапов — [`versions/0.8.4.md`](versions/0.8.4.md) |
+| **0.8.4-a** | `claude/0-8-4-alpha` | **в разработке**: sing-box/libbox 1.14.4 и перенос Android/iOS на новый `CommandServer` API; rc2 — 1.14.5, NX Panel 0.2.1, PasarGuard 5.6.0, macOS-схема. План всех этапов — [`versions/0.8.4.md`](versions/0.8.4.md) |
 | 0.8.3 | `master` | выпуск 20.11.2026 (versionCode 85): amneziawg-go 3.1.20261116, s-ui 1.6.8, Remnawave 3.4.11; включает 0.8.3-rc1 |
 | 0.8.3-b2 | `claude/0-8-3-alpha` | бета: Xray-core/libXray 26.11.9, Remnawave 3.4.10 (нода 3.4.5); подписка подхватывается сразу после добавления (retry на Android и ПК); совпадение серверов на ПК по устойчивому ключу. Включает 0.8.3-b и 0.8.3-a |
 | 0.8.3-b | `claude/0-8-3-alpha` | бета: системный ярлык `/usr/share/applications` входит непосредственно в DEB/RPM, установка/обновление и запуск пакетов проверяются в Linux CI. Включает 0.8.3-a: Xray 26.10.31, обновлённые панели, пинг и фикс версий self-update |

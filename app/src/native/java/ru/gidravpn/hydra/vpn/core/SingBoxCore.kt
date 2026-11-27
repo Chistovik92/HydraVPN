@@ -39,7 +39,7 @@ import ru.gidravpn.hydra.data.subscription.SingBoxConfigBuilder
 /**
  * Интеграция sing-box через libbox.aar (gomobile-биндинг experimental/libbox).
  *
- * Собрано против **libbox 1.14.4** (сигнатуры PlatformInterface сверены с
+ * Собрано против **libbox 1.14.5** (сигнатуры PlatformInterface сверены с
  * фактическим .aar). При обновлении .aar компилятор укажет расхождения —
  * реф. SagerNet/sing-box-for-android → PlatformInterfaceWrapper.
  */

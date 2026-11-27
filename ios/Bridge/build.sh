@@ -15,7 +15,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 OUT="${1:-$PWD}"
 
-SING_BOX_VERSION="${SING_BOX_VERSION:-1.14.4}"
+SING_BOX_VERSION="${SING_BOX_VERSION:-1.14.5}"
 # Тот же коммит OpenFlux, что у ПК и Android (scripts/build-openflux.sh, desktop/build.gradle.kts).
 OPENFLUX_REF="${OPENFLUX_REF:-f492a1a33b7581ad8f88118f97e0b866adda3cdc}"
 
@@ -45,12 +45,17 @@ find third_party/olcrtc/internal/protect -name '*.go' | while read -r f; do
 done
 echo "    olcRTC: $OLCRTC_REF + transport/v5 compatibility"
 
-# sing-box — тоже клоном (go.mod: replace → third_party/sing-box) с правкой REALITY (0.8.2-b, SagerNet/sing-box#4520):
-# без неё sing-box не подключается к серверам Xray-core >= 26.9.8 (3x-ui 3.10), а Xray на iOS нет.
+# sing-box — тоже клоном (go.mod: replace → third_party/sing-box); правка REALITY (0.8.2-b, SagerNet/sing-box#4520)
+# нужна только до 1.14.4: без неё sing-box не подключается к серверам Xray-core >= 26.9.8 (3x-ui 3.10), а Xray на iOS нет.
 rm -rf third_party/sing-box
 git -c advice.detachedHead=false clone -q --depth 1 --branch "v$SING_BOX_VERSION" https://github.com/SagerNet/sing-box third_party/sing-box
-git -C third_party/sing-box apply "$PWD/../../scripts/sing-box-reality-mlkem.patch"
-echo "    sing-box: v$SING_BOX_VERSION + scripts/sing-box-reality-mlkem.patch"
+# 1.14.5: фикс #4520 вошёл в апстрим — патч накладывается, только если ещё применим.
+if git -C third_party/sing-box apply --check "$PWD/../../scripts/sing-box-reality-mlkem.patch" 2>/dev/null; then
+    git -C third_party/sing-box apply "$PWD/../../scripts/sing-box-reality-mlkem.patch"
+    echo "    sing-box: v$SING_BOX_VERSION + scripts/sing-box-reality-mlkem.patch"
+else
+    echo "    sing-box: v$SING_BOX_VERSION (фикс REALITY #4520 в апстриме, патч не нужен)"
+fi
 
 go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
 go install github.com/sagernet/gomobile/cmd/gobind@v0.1.12

@@ -75,7 +75,7 @@ jobs:
   build-native:
     runs-on: ubuntu-latest
     env:
-      SING_BOX_VERSION: "1.14.4"
+      SING_BOX_VERSION: "1.14.5"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -99,8 +99,7 @@ jobs:
         run: |
           set -euo pipefail
           git clone --depth 1 --branch "v${SING_BOX_VERSION}" https://github.com/SagerNet/sing-box /tmp/sing-box
-          # REALITY к Xray-core >= 26.9.8 (0.8.2-b, SagerNet/sing-box#4520).
-          git -C /tmp/sing-box apply "$GITHUB_WORKSPACE/scripts/sing-box-reality-mlkem.patch"
+          # REALITY к Xray-core >= 26.9.8: фикс #4520 вошёл в апстрим sing-box 1.14.5 (0.8.4-rc2), патч не накладывается.
           go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.8
           go install github.com/sagernet/gomobile/cmd/gobind@v0.1.8
           export PATH="$PATH:$(go env GOPATH)/bin"

@@ -63,8 +63,9 @@ val linuxPkgVersion: String = winPkgVersion
 
 // ---- Ядро sing-box -------------------------------------------------------------
 // Та же версия, что libbox в Android и Libbox.xcframework в iOS (ios.yml).
-// SHA-256 архивов с https://github.com/SagerNet/sing-box/releases/tag/v1.14.4 .
-val singBoxVersion = "1.14.4"
+// SHA-256 архивов с https://github.com/SagerNet/sing-box/releases/tag/v1.14.5 .
+// 1.14.5: фикс REALITY/X25519MLKEM768 (SagerNet/sing-box#4520) вошёл в апстрим — патч больше не нужен.
+val singBoxVersion = "1.14.5"
 
 data class CoreArchive(val target: String, val archive: String, val sha256: String) {
     val isZip get() = archive.endsWith(".zip")
@@ -72,12 +73,12 @@ data class CoreArchive(val target: String, val archive: String, val sha256: Stri
 }
 
 val coreArchives = listOf(
-    CoreArchive("windows-x64", "windows-amd64.zip", "99185d75d314a07dbba4a130c8ad986cbeb629a07927975636b341ca61f991df"),
-    CoreArchive("windows-arm64", "windows-arm64.zip", "8cd0a4d0cd8cd480be5731ac31f17038969a42d12add9feb6e031fd43d85bbae"),
-    CoreArchive("linux-x64", "linux-amd64.tar.gz", "699a1b510aa4396b2176d32d1181920399ebf1e267835da6f3b598d0f7c24968"),
-    CoreArchive("linux-arm64", "linux-arm64.tar.gz", "436441f76ee2f7fe21b5b2d426d3cb261a480455a704865789ad533e4273ec26"),
-    CoreArchive("macos-x64", "darwin-amd64.tar.gz", "eae86b9b033bba50b7c44ab719e4bfac0aca05efd28483390ed3aa510f32db25"),
-    CoreArchive("macos-arm64", "darwin-arm64.tar.gz", "0d8c7f5ed5d587b0f1a5e9772a708ec3bfa4ac4c9329604b01d8d9c2ba406838"),
+    CoreArchive("windows-x64", "windows-amd64.zip", "b935f7b38bffcc1f600165e79e5d0c2d58b547942ac1b6cf61a27b5447c089e7"),
+    CoreArchive("windows-arm64", "windows-arm64.zip", "6c309af5981d40517a84144cb0df8434779ae98774846b04923feefbc74af9d4"),
+    CoreArchive("linux-x64", "linux-amd64.tar.gz", "ca57e405be6b7dc79a0efa91823a0cc4d81138cbe4a9aacbfd749c65e6fca3b2"),
+    CoreArchive("linux-arm64", "linux-arm64.tar.gz", "1bd0560b1afd4695fb29a28f86131f8426f6cd3ac5f6e844cafae0ab6f493023"),
+    CoreArchive("macos-x64", "darwin-amd64.tar.gz", "13510a651737873b7a2464b4a222a56737c33361bbe809a9ec8dd38d680fed77"),
+    CoreArchive("macos-arm64", "darwin-arm64.tar.gz", "8550351d344ba28b6358d2b011d96384b70b299e6c4c254df7a5dae47430fcd4"),
 )
 
 /** Цель текущей машины в терминах каталогов ресурсов Compose (<os>-<arch>). */
@@ -654,26 +655,26 @@ val classicTargets = listOf(
     // olcRTC и OpenFlux (0.7.10) собраны обычным Go и работают только с Windows 8.1/10: на Windows 7 Hydra Classic их
     // не предлагает (Platform.goClientsSupported), на 32-битной Windows 10 — работают.
     Classic("windows-x86", "WindowsX86", "windows", "x86",
-        "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "90401eb22f795803db44b72ec5a3ba3a2014d411ced3c5d75c7992e94e90a16e",
+        "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "f47701522bdd0324f2cffe26d067644eb5949a648354e4923f3eec6f11d824ed",
         "Xray-win7-32.zip", "48a8b160a0f45d21bd56aa81d74c2420758fa72abac75b4b6faf45767c5ef48f",
         olcRtc = Triple("windows", "386", ""), openFluxSrc = Triple("windows", "386", ""),
         byeDpi = "byedpi-17.3-i686-w64.zip" to "3f3d0af999371cfa623bd641738a42785e107a9d829b38480ed3d942dafea28a",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.29%2B7/OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip",
             "OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip", "b747698a05a39391a58b9caac30310275e4e6bd9fef92d6c149cba310d91d2be")),
     Classic("windows-x64", "WindowsX64", "windows", "x64",
-        "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "d7d4dc70328eb60b5dd90125bab31b0913c0370ee730e55acd5034a7e1bd19af",
+        "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "e6156e268af67d567ef8d29ea8072533eb59b04febad8d3c2cd0b654009697fe",
         "Xray-win7-64.zip", "df87ef380c58d3e2286b4e49834f4b6a4819a8155ebf9124b4610b0d8148af7e",
         olcRtc = Triple("windows", "amd64", ""), openFluxSrc = Triple("windows", "amd64", ""),
         byeDpi = "byedpi-17.3-x86_64-w64.zip" to "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.32.1%2B1/OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip",
             "OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip", "f8c7da672f5dba36b6f870608820b6b598cfae91296929f1b8f21ef2f1e8a0dd")),
     Classic("linux-x86", "LinuxX86", "linux", "x86",
-        "sing-box-$singBoxVersion-linux-386.tar.gz", "efb46daaa48ee55e090bd1dfcaee34bfbe9bdbd9b89fa9f328d25f81a619e865",
+        "sing-box-$singBoxVersion-linux-386.tar.gz", "940cb80e27b3b659e0c910232183189d0026f27eccefdeb962e4fef7b797450f",
         "Xray-linux-32.zip", "225343a01db48e23c1d3091e7fa45971b0d12c20943927846a4a87da374e384d",
         olcRtc = Triple("linux", "386", ""), openFluxSrc = Triple("linux", "386", ""),
         byeDpi = "byedpi-17.3-i686.tar.gz" to "655452c2f8e1e3a99b021043b0a68f57927c97010efe19b06ac3b9949fd784ed"),
     Classic("linux-armv7", "LinuxArmv7", "linux", "armv7",
-        "sing-box-$singBoxVersion-linux-armv7.tar.gz", "fd164ed45ebc784f657a3e1d0e0ad0f68afdcff864ee57122c2cfed3ddb80a00",
+        "sing-box-$singBoxVersion-linux-armv7.tar.gz", "08514142fcf582abc3868d39a4912b3495f39f6da227fd6e93618f0fe5fec4bb",
         "Xray-linux-arm32-v7a.zip", "19c51e08a6562705fb1cb032a84fd87df21d7e27b194f035be7e754dbe3a97b3",
         openFlux = "openflux-linux-arm" to "1a6aed5fa8044e758e0a9c542781d2c307af5170d8648b2bd2d336b4d47acf12",
         olcRtc = Triple("linux", "arm", "7"),

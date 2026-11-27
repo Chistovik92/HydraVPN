@@ -13,7 +13,7 @@ import org.json.JSONObject
  * создаёт владельца без браузера, `nx-panel ingress reset -listen 127.0.0.1:PORT -yes` переводит панель на петлю.
  */
 object NexoraPanel {
-    const val TAG = "v0.1.2"
+    const val TAG = "v0.2.1"
     const val REPO = "nx-panel/panel"
     const val HOME = "/opt/nx-panel"
     const val DATA = "/var/opt/nx-panel"

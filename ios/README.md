@@ -50,7 +50,7 @@
 Нужен Mac с Xcode 16+ (CI: `.github/workflows/ios.yml`, собирает без подписи на каждом push).
 
 ```bash
-# 1. Libbox.xcframework: sing-box 1.14.4 + REALITY-патч + olcRTC/OpenFlux одной Go-сборкой
+# 1. Libbox.xcframework: sing-box 1.14.5 + olcRTC/OpenFlux одной Go-сборкой (фикс REALITY #4520 — в апстриме с 1.14.5)
 mkdir -p ios/Frameworks
 bash ios/Bridge/build.sh "$PWD/ios/Frameworks"
 

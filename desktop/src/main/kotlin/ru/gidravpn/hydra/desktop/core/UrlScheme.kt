@@ -48,7 +48,7 @@ object UrlScheme {
                 runCatching { ProcessBuilder("update-desktop-database", f.parentFile.absolutePath).start().waitFor() }
                 true
             }
-            Os.MACOS -> false // схема объявляется в Info.plist пакета при сборке — из кода её не добавить
+            Os.MACOS -> false // схема — в Info.plist пакета (PlistBuddy в scripts/package-desktop.sh); приём ссылок — MacLinkHandler через eawt
         }
     }.getOrDefault(false)
 }

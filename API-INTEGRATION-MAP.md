@@ -523,7 +523,7 @@ Content-Type: application/json
 | Radar Bot API | 5.9.1+ | HydraVPN 0.8.0+ |
 | HydraVPN Android/Desktop | 0.8.3 | Radar 5.9.1+ |
 | HydraVPN for Routers | 1.2.5+ | Radar 5.9.1+ |
-| sing-box (client) | 1.14.4 | любая панель |
+| sing-box (client) | 1.14.5 | любая панель |
 | sing-box (routers) | 1.13.1 | любая панель |
 
 ---
