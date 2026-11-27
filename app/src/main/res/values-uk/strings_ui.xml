@@ -279,6 +279,7 @@
     <string name="import_done_servers">Додано серверів: %1$d</string>
     <string name="import_json_unsupported">Це повний JSON-конфіг (sing-box/Xray). Поки не підтримується — імпортуйте посилання або підписку.</string>
     <string name="import_unknown">Не вдалося розпізнати як посилання на сервер, підписку чи конфіг.</string>
+    <string name="import_hydra_link">Посилання hydra:// пошкоджене або створене іншою версією Hydra — скопіюйте його заново повністю.</string>
     <string name="share_action">Поділитися</string>
     <string name="share_qr_desc">QR-код</string>
     <string name="share_send">Надіслати посилання + QR</string>

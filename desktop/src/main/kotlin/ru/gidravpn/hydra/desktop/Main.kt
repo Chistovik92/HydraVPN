@@ -18,12 +18,16 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import ru.gidravpn.hydra.desktop.ui.HydraApp
+import kotlinx.coroutines.launch
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
+    // hydra://crypt1/… из зарегистрированной схемы ОС (0.8.4-rc1): ссылку забирает запущенный экземпляр.
+    val deepLink = args.firstOrNull { it.startsWith("hydra://", ignoreCase = true) }
     // Второй экземпляр запустил бы второе ядро на тех же портах.
     if (!SingleInstance.acquire()) {
-        javax.swing.JOptionPane.showMessageDialog(null, "Hydra уже запущена.", "Hydra", javax.swing.JOptionPane.INFORMATION_MESSAGE)
+        if (deepLink != null) ru.gidravpn.hydra.desktop.core.LinkHandoff.offer(deepLink)
+        else javax.swing.JOptionPane.showMessageDialog(null, "Hydra уже запущена.", "Hydra", javax.swing.JOptionPane.INFORMATION_MESSAGE)
         exitProcess(0)
     }
     AppNet.install()
@@ -72,6 +76,12 @@ fun main(args: Array<String>) {
             Runtime.getRuntime().addShutdownHook(Thread { controller.shutdown() })
             controller.quitHandler = ::quit
             controller.onStartup(ru.gidravpn.hydra.desktop.core.Elevation.RECONNECT_ARG in args)
+            // Схема hydra:// в ОС и передача ссылки от второго экземпляра (0.8.4-rc1).
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { ru.gidravpn.hydra.desktop.core.UrlScheme.register() }
+            }
+            deepLink?.let { controller.import(it) }
+            ru.gidravpn.hydra.desktop.core.LinkHandoff.watch { link -> scope.launch { controller.import(link) } }
         }
 
         Window(

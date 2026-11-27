@@ -39,6 +39,18 @@ Hydra распространяется под GPL-3.0 (см. [LICENSE](../LICENS
 | OkHttp | Apache-2.0 |
 | kotlinx.serialization | Apache-2.0 |
 
+## Графика (0.8.4-rc1)
+
+| Компонент | Источник | Лицензия | Где |
+|---|---|---|---|
+| Twemoji — флаги стран 72x72 PNG, 251 файл, ~485 КБ | github.com/jdecked/twemoji, тег 15.1.0 | **CC-BY 4.0** | desktop/src/main/resources/flags/*.png — Windows не содержит шрифтовых флагов стран, а панели кладут эмодзи-флаги в имена серверов; атрибуция: Twemoji, Twitter/X и участники jdecked/twemoji |
+
+## Формат шифрованных ссылок подписок (0.8.4-rc1)
+
+| Компонент | Источник | Лицензия | Где |
+|---|---|---|---|
+| Идея и структура формата `hydra://crypt1/…` вдохновлены incy-link-encoder; код Hydra собственный, ключевые константы свои | github.com/INCY-DEV/incy-link-encoder | MIT | `shared/.../HydraCryptLink.kt`, `ios/Packages/HydraKit/Sources/HydraKit/HydraCryptLink.swift` |
+
 ## Спецификации, использованные при реализации
 
 - RFC 1661 (PPP), RFC 1332 (IPCP), RFC 1878 (IPCP DNS-опции)

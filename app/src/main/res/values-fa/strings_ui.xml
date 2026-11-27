@@ -279,6 +279,7 @@
     <string name="import_done_servers">سرورهای اضافه‌شده: %1$d</string>
     <string name="import_json_unsupported">این یک پیکربندی کامل JSON است (sing-box/Xray). هنوز پشتیبانی نمی‌شود — به‌جای آن پیوند یا اشتراک را درون‌ریزی کنید.</string>
     <string name="import_unknown">به‌عنوان پیوند سرور، اشتراک یا پیکربندی شناخته نشد.</string>
+    <string name="import_hydra_link">پیوند hydra:// خراب است یا در نسخهٔ دیگری از Hydra ساخته شده — آن را کامل و دوباره کپی کنید.</string>
     <string name="share_action">اشتراک‌گذاری</string>
     <string name="share_qr_desc">QR کد</string>
     <string name="share_send">ارسال پیوند + QR</string>

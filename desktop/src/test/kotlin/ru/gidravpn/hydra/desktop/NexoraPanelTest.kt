@@ -93,7 +93,7 @@ class NexoraPanelTest {
     }
 
     @Test fun installAndCleanupUsePinnedOfficialInstaller() {
-        assertEquals("3219a450b02abcbd75cfba8626898e787999acff",
+        assertEquals("d83493dc3dc37c57b85528bafbcc7ef0281cb53c4e40e57d0d4b9c80965501c2",
             ScriptPins.sha256(NexoraPanel.REPO, NexoraPanel.TAG, "install.sh"))
         val install = NexoraPanel.installSteps().first { it.id == "nexora-install" }.command!!
         assertTrue("--version v0.1.2" in install && "--node-version" !in install)

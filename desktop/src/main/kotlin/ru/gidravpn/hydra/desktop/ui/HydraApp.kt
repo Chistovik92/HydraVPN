@@ -243,7 +243,7 @@ private fun HomeScreen(c: AppController, ui: UiState, onRelaunchAdmin: () -> Uni
                 val s = ui.selected
                 if (s == null) Text("Не выбран — добавьте ссылку или подписку", fontWeight = FontWeight.Medium)
                 else {
-                    Text("${ServerLocation.flag(s)} ${ServerLocation.bareName(s)}", fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    ServerNameRow(s) { Text(ServerLocation.bareName(s), fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     val engine = DesktopConfig.engineFor(s, settings, c.xrayAvailable)
                     Text(s.summary + " · " + DesktopConfig.engineText(s, settings, c.xrayAvailable, ::engineLabel), fontSize = 12.sp,
                         color = if (engine == null) Danger else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -387,8 +387,8 @@ private fun ServerRow(c: AppController, ui: UiState, s: ServerProfile, onDelete:
     ) {
         RadioButton(selected = selected, onClick = { c.select(s.id) }, enabled = supported && !ui.active)
         Column(Modifier.weight(1f)) {
-            Text("${ServerLocation.flag(s)} ${ServerLocation.bareName(s)}", maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = if (supported) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+            ServerNameRow(s) { Text(ServerLocation.bareName(s), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = if (supported) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant) }
             Text(
                 (s.protocol?.displayName ?: s.protocolId) + " · " + s.address + ":" + s.port + " · " +
                     when {
@@ -484,6 +484,13 @@ private fun SubscriptionsScreen(c: AppController, ui: UiState) {
                                 Text(if (s.autoUpdateHours > 0) "Обновлять автоматически (раз в ${s.autoUpdateHours} ч)" else "Автообновление выключено", fontSize = 12.sp)
                             }
                         }
+                        IconButton(onClick = {
+                            // 0.8.4-rc1: ссылка подписки уходит зашифрованной hydra://crypt1/… —
+                            // адрес панели и токен не видны в чате/на скриншоте; открывается в Hydra.
+                            val link = ru.gidravpn.hydra.data.subscription.HydraCryptLink.encode(s.url, s.displayName) ?: s.url
+                            setClipboard(link)
+                            c.toast("Зашифрованная ссылка на «${s.displayName}» скопирована в буфер.\nОткрывается в Hydra; адрес подписки в ней скрыт.")
+                        }) { Icon(Icons.Default.Share, "Поделиться зашифрованной ссылкой", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                         if (s.id in ui.updatingSubs) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                         else IconButton(onClick = { c.refreshSubscription(s.id) }) { Icon(Icons.Default.Refresh, "Обновить") }
                         IconButton(onClick = { confirmDelete = s }, enabled = !ui.active) { Icon(Icons.Default.Delete, "Удалить") }

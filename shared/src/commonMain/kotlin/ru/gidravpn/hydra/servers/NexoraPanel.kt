@@ -53,7 +53,7 @@ object NexoraPanel {
         Step("nexora-token", "Выпустить API-токен Hydra (его открытый текст панель показывает один раз)", "curl … /api/tokens"),
     )
 
-    /** Команда CLI-создания владельца панели без браузера. Пароль передаётся отдельно (секрет Installer, не в `ps`). */
+    /** Команда CLI-создания владельца панели без браузера. Пароль маскируется в журналах Hydra (секрет Installer); в аргументах CLI он виден в `ps` сервера лишь секунды выполнения — как у CLI-установщиков других панелей. */
     fun migrateCommand(user: String, pass: String) = "$BIN migrate -user ${Installer.shq(user)} -pass ${Installer.shq(pass)}"
 
     /** Перевести панель на один слушатель 127.0.0.1:<port> (обычный HTTP, панель в корне). */

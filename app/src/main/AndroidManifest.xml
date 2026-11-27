@@ -80,6 +80,7 @@
                 <data android:scheme="byedpi" />
                 <data android:scheme="openflux" />
                 <data android:scheme="olcbox" />
+                <data android:scheme="hydra" />
             </intent-filter>
             <!-- Android TV (Фаза 8): в лаунчер TV попадает сама активность — ярлыки-alias
                  ниже переключаются вместе с иконкой и на TV пропадали бы. -->
