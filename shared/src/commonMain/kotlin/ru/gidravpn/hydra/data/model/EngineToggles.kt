@@ -41,7 +41,8 @@ data class EngineToggles(
             Engine.OLCRTC -> if (olcRtc) Kind.OLCRTC else null
             Engine.OPENFLUX -> if (openFlux) Kind.OPENFLUX else null
             Engine.BYEDPI -> Kind.BYEDPI  // отдельного тумблера нет: это обход DPI, а не VPN-протокол
-            Engine.WDTT, Engine.UNAVAILABLE -> null
+            // TrustTunnel выбирается напрямую по протоколу в NativeCoreFactory (нативный trusttunnel_client); отдельного тумблера нет.
+            Engine.TRUSTTUNNEL, Engine.WDTT, Engine.UNAVAILABLE -> null
         }
     }
 

@@ -1,4 +1,37 @@
 # Changelog
+
+## [0.8.4] — релиз TrustTunnel, аудит протоколов, dragon-иконки
+
+### Новые возможности
+- **TrustTunnel (AdGuard, Apache-2.0) — новый VPN-протокол** `Protocol.TRUSTTUNNEL` /
+  `Engine.TRUSTTUNNEL`. HTTPS-туннель TCP/UDP/ICMP, HTTP/1.1 + HTTP/2 (`h2`) + HTTP/3
+  (`h3`/QUIC), «как обычный HTTPS» (анти-DPI), TLS 1.2+, SNI, `Basic`-авторизация,
+  проверка сертификата обязательна (opt-out `skip_verification`), `tls_profile`,
+  `client_random[/mask]` + `client_random_auth_key`, `custom_sni`/`sni|remote_id`,
+  `post_quantum_group_enabled`, `anti_dpi`. Клиент — нативный `trusttunnel_client`
+  (TrustTunnelClient `libtrusttunnel.so`, `scripts/build-trusttunnel.sh`) → локальный
+  SOCKS5 → sing-box (`TrustTunnelCore`, `TrustTunnelArgs`); **все платформы** (shared KMP).
+  Импорт `tt://` / `trusttunnel://` + `[endpoint]` TOML (`TrustTunnelLink`; канонический
+  декодер `tt://` — `trusttunnel_deeplink_decode`), ручной ввод (`ManualLink`).
+  **Разворачивание сервера** `trusttunnel_endpoint` (`TrustTunnel/TrustTunnel`, Apache-2.0)
+  поверх SSH: `servers.TrustTunnelServer`. Additive — старые протоколы не затронуты.
+  См. `docs/TRUSTTUNNEL.md`. (Сквозной тест зависит от нативного `libtrusttunnel.so` +
+  живого эндпоинта; см. `docs/PROTOCOL-AUDIT-0.8.4.md`.)
+- **Dragon-иконки**: 3 PNG-артворка конвертированы в SVG (`vtracer`) с цветовыми
+  темами `light`/`dark`/`mono`, Android VectorDrawable `drawable` + `drawable-night`,
+  `_color`, `_mono`; сырые `.svg` в `app/src/main/assets/dragon/` и `design/dragon-svg/`.
+  Старые иконки сохранены (бэкап `icon-backups/pre-dragon-0.8.4/`, ничего не удалено).
+  Скрипт `scripts/convert_dragon_icons.py`. Источники `IMG_0555/0556/0559` не изменены.
+- **Аудит VPN-протоколов** `docs/PROTOCOL-AUDIT-0.8.4.md`: WireGuard/AmneziaWG,
+  Hysteria2, OpenVPN (статус), TrustTunnel, общие находки по `insecure`, DNS, секретам.
+
+### Безопасность / целостность
+- SingBoxConfigBuilder VLESS-фикс TLS (из 0.8.4-a); sing-box 1.14.5.
+- TrustTunnel: пароль/ключи/сертификат во временных `0600`, не в лог, чистка в `stop()`.
+
+### Совместимость
+- versionCode **90**, versionName **0.8.4**. Backward-compatible: enum/ссылки additive.
+
 ## [0.8.4-rc2] — обновления ядер и панелей 25–27.11, macOS-схема hydra://
 
 ### Обновлено

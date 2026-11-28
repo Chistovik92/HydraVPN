@@ -18,6 +18,8 @@ Hydra распространяется под GPL-3.0 (см. [LICENSE](../LICENS
 | WDTT libclient (beta) | upstream WDTT | **проверить перед включением** | WG через TURN ВК |
 | olcRTC (beta) | github.com/openlibrecommunity/olcrtc | WTFPL (апстрим заархивирован) | TCP over WebRTC; Android — libolcrtc.so, ПК — собирается из закреплённого коммита |
 | OpenFlux (beta) | github.com/p1neappleXpress/OpenFlux | GPL-3.0 | TCP-туннель с транспортами; Android — libopenflux.so, ПК — бинарь релиза v0.3.0 (SHA-256 закреплён) |
+| TrustTunnel | github.com/TrustTunnel/TrustTunnel | **Apache-2.0** | эндпоинт-сервер trusttunnel_endpoint; протокол HTTPS (h2/h3) TCP/UDP/ICMP; AdGuard |
+| TrustTunnelClient (libtrusttunnel) | github.com/TrustTunnel/TrustTunnelClient | **Apache-2.0** | нативный trusttunnel_client libtrusttunnel.so + trusttunnel_deeplink_decode; Android adapter; scripts/build-trusttunnel.sh |
 
 ## ByeDPI и стратегии обхода DPI (0.7.13)
 

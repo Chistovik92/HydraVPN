@@ -30,7 +30,8 @@ enum class Protocol(
     WDTT      ("wdtt",   "WDTT (WG over TURN, VK)",   Engine.WDTT,  beta = true),
     OLCRTC    ("olcrtc", "olcRTC (TCP over WebRTC)", Engine.OLCRTC, beta = true),
     OPENFLUX  ("openflux", "OpenFlux (Yandex/MAX/Mail.ru)", Engine.OPENFLUX, beta = true, shortCode = "OFX"),
-    BYEDPI    ("byedpi", "Обход DPI (ByeDPI)",       Engine.BYEDPI, shortCode = "DPI");
+    BYEDPI    ("byedpi", "Обход DPI (ByeDPI)",       Engine.BYEDPI, shortCode = "DPI"),
+    TRUSTTUNNEL("trusttunnel", "TrustTunnel",        Engine.TRUSTTUNNEL, shortCode = "TT");
 
     companion object {
         fun fromId(id: String): Protocol? = entries.firstOrNull { it.id == id }
@@ -50,6 +51,7 @@ enum class Protocol(
             "olcrtc" -> OLCRTC
             "openflux" -> OPENFLUX
             "byedpi" -> BYEDPI
+            "trusttunnel", "tt" -> TRUSTTUNNEL
             else -> null
         }
     }
@@ -65,6 +67,7 @@ enum class Protocol(
  *  - [OLCRTC] — исполняемый libolcrtc.so, подпроцесс + SOCKS5 → sing-box (TCP over WebRTC) — beta;
  *  - [OPENFLUX] — исполняемый libopenflux.so, подпроцесс + SOCKS5 → sing-box — beta;
  *  - [BYEDPI] — исполняемый libciadpi.so (ByeDPI), подпроцесс + SOCKS5 → sing-box: обход DPI без сервера;
+ *  - [TRUSTTUNNEL] — нативный trusttunnel_client (TrustTunnelClient, Apache-2.0), подпроцесс + SOCKS5 → sing-box;
  *  - [UNAVAILABLE] — зарезервировано для протоколов, невозможных на платформе (сейчас не используется).
  */
-enum class Engine { SINGBOX, XRAY, AWG, USERSPACE, WDTT, OLCRTC, OPENFLUX, BYEDPI, UNAVAILABLE }
+enum class Engine { SINGBOX, XRAY, AWG, USERSPACE, WDTT, OLCRTC, OPENFLUX, BYEDPI, TRUSTTUNNEL, UNAVAILABLE }

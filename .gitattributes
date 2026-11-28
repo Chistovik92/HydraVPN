@@ -1,2 +1,6 @@
 # Контекстные Go-строки внутри .patch закономерно начинаются с пробела перед табуляцией.
 *.patch whitespace=-space-before-tab
+
+# Shell/Python scripts: LF always (run via Git Bash on Windows).
+*.sh text eol=lf
+*.py text eol=lf
