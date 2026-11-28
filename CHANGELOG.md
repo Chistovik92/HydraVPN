@@ -1,5 +1,157 @@
 # Changelog
 
+## [0.8.4] — релиз TrustTunnel, аудит протоколов, dragon-иконки
+
+### Новые возможности
+- **TrustTunnel (AdGuard, Apache-2.0) — новый VPN-протокол** `Protocol.TRUSTTUNNEL` /
+  `Engine.TRUSTTUNNEL`. HTTPS-туннель TCP/UDP/ICMP, HTTP/1.1 + HTTP/2 (`h2`) + HTTP/3
+  (`h3`/QUIC), «как обычный HTTPS» (анти-DPI), TLS 1.2+, SNI, `Basic`-авторизация,
+  проверка сертификата обязательна (opt-out `skip_verification`), `tls_profile`,
+  `client_random[/mask]` + `client_random_auth_key`, `custom_sni`/`sni|remote_id`,
+  `post_quantum_group_enabled`, `anti_dpi`. Клиент — нативный `trusttunnel_client`
+  (TrustTunnelClient `libtrusttunnel.so`, `scripts/build-trusttunnel.sh`) → локальный
+  SOCKS5 → sing-box (`TrustTunnelCore`, `TrustTunnelArgs`); **все платформы** (shared KMP).
+  Импорт `tt://` / `trusttunnel://` + `[endpoint]` TOML (`TrustTunnelLink`; канонический
+  декодер `tt://` — `trusttunnel_deeplink_decode`), ручной ввод (`ManualLink`).
+  **Разворачивание сервера** `trusttunnel_endpoint` (`TrustTunnel/TrustTunnel`, Apache-2.0)
+  поверх SSH: `servers.TrustTunnelServer`. Additive — старые протоколы не затронуты.
+  См. `docs/TRUSTTUNNEL.md`. (Сквозной тест зависит от нативного `libtrusttunnel.so` +
+  живого эндпоинта; см. `docs/PROTOCOL-AUDIT-0.8.4.md`.)
+- **Dragon-иконки**: 3 PNG-артворка конвертированы в SVG (`vtracer`) с цветовыми
+  темами `light`/`dark`/`mono`, Android VectorDrawable `drawable` + `drawable-night`,
+  `_color`, `_mono`; сырые `.svg` в `app/src/main/assets/dragon/` и `design/dragon-svg/`.
+  Старые иконки сохранены (бэкап `icon-backups/pre-dragon-0.8.4/`, ничего не удалено).
+  Скрипт `scripts/convert_dragon_icons.py`. Источники `IMG_0555/0556/0559` не изменены.
+- **Аудит VPN-протоколов** `docs/PROTOCOL-AUDIT-0.8.4.md`: WireGuard/AmneziaWG,
+  Hysteria2, OpenVPN (статус), TrustTunnel, общие находки по `insecure`, DNS, секретам.
+
+### Безопасность / целостность
+- SingBoxConfigBuilder VLESS-фикс TLS (из 0.8.4-a); sing-box 1.14.5.
+- TrustTunnel: пароль/ключи/сертификат во временных `0600`, не в лог, чистка в `stop()`.
+
+### Совместимость
+- versionCode **90**, versionName **0.8.4**. Backward-compatible: enum/ссылки additive.
+
+## [0.8.4-rc2] — обновления ядер и панелей 25–27.11, macOS-схема hydra://
+
+### Обновлено
+- **sing-box 1.14.4 → 1.14.5** на всех платформах (Android/iOS — пересборка libbox, ПК — официальные архивы
+  с новыми SHA-256). Ключевое: фикс REALITY/X25519MLKEM768 (SagerNet/sing-box#4520) **вошёл в апстрим 1.14.5** —
+  Hydra-патч больше не накладывается; `build-libbox.sh`/`ios/Bridge/build.sh` применяют его, только если он ещё
+  применим, а маркер `libbox.aar.patch` для `release.sh` — SHA-256 патча либо `UPSTREAM-FIXED`. Для ПК это ещё и
+  закрытие старого расхождения: официальный бинарь 1.14.4 содержал баг, теперь и ПК-клиент без патча корректно
+  подключается REALITY к Xray-core ≥ 26.9.8. Экспортируемый API libbox между 1.14.4 и 1.14.5 изменился только
+  добавлениями (`CommandServer.NewHTTPClient`, `ParseConfig`) — интеграция Android/iOS не задета.
+- **NX Panel v0.1.2 → v0.2.1** — новый тег с тем же установщиком (install.sh байт-в-байт совпадает с v0.1.2, хеш
+  не менялся). Изменения апстрима (телеметрия путей для аддонов — по умолчанию выключена, лицензии/ключи контрибьютора,
+  UI аддонов) контракт Hydra не задели: CLI `migrate`/`ingress reset`, `/api/login`, `/api/tokens`, `/api/v1/nodes` без изменений.
+- **PasarGuard-scripts остаются v0.1.11**: новых тегов скриптов нет; закреплённый скрипт ставит `pasarguard/panel:latest`
+  — панель v5.6.0 (03.11) уже устанавливается. Требуется живой перепрогон стенда по rc-гейту.
+
+### Добавлено
+- **Схема hydra:// на macOS**: `CFBundleURLTypes` в Info.plist пакета (PlistBuddy при сборке DMG), приём ссылок
+  через Apple Events/eawt (`MacLinkHandler`, отражение — классов eawt нет на Windows/Linux). Deep-link
+  `hydra://crypt1/…` замыкается на всех четырёх платформах.
+
+### Проверки
+- libbox.aar 1.14.5 пересобран локально (маркер `UPSTREAM-FIXED`), 10 SHA-256 официальных архивов sing-box сверены
+  с живым GitHub (локальные хеши совпали с дайджестами релиза).
+- Desktop: :desktop:test — 207 тестов, 0 ошибок, 23 пропущено (NexoraPanelTest зелёный на теге v0.2.1). Android:
+  testStub+testNative — 420 тестов, 0 ошибок; Classic компилируется и пакуется. macOS-схема (Info.plist, DMG) и
+  Libbox.xcframework 1.14.5 собирает и проверяет CI на macos-15.
+- iOS-сборка: первый CI-прогон rc2 упал на go.mod бриджа, закреплённом под 1.14.4 — граф перетайден против 1.14.5,
+  тег переставлен на фикс-коммит и Release перезапущен (пре-релиз не публиковался).
+- Живые стенды rc-гейта (28.11.2026, WSL): **PasarGuard 5.6.0** — свежая установка мастером Hydra, 5 подключений
+  (VLESS TCP/gRPC/XHTTP REALITY, Trojan REALITY, VMess WS) с живым трафиком через xray.exe/sing-box.exe, удаление
+  без следов, бэкап базы. **NX Panel v0.2.1** — установка с нуля (пин SHA-256 совпал), CLI migrate/ingress, вход и
+  токен, нода через SSH install-job (connected 0.2.1), подписка наполнилась, живой трафик по её ссылке, удаление
+  официальным путём с бэкапом. Тег v0.8.4-rc2 опубликован pre-release'ом: 29 артефактов, все платформы CI зелёные.
+
+## [0.8.4-rc1] — 28.11.2026: исправления выпуска — пины установщиков, флаги на ПК и шифрованные ссылки подписок
+
+### Добавлено
+- **Шифрованные ссылки подписок `hydra://crypt1/…`** (по запросу владельца; аналог incy-link-encoder):
+  «Поделиться» подписки на Android, ПК и iOS отдаёт не голый `https://sub.provider.example/abc123token`,
+  а AES-256-GCM-обёртку — адрес панели и токен не светятся ботам, RKN-сканерам и в скриншотах. Ссылка
+  открывается в Hydra (deep-link) и импортируется одним нажатием; формат кроссплатформенный, закреплён
+  тест-векторами. Честно: ключ зашит в клиенты — это защита от автоматических сканеров, не от реверсера
+  (при компрометации появится `crypt2/`). На ПК схема `hydra://` регистрируется в системе (Windows — реестр
+  HKCU, Linux — `.desktop`; macOS — Info.plist пакета, с rc2), второй экземпляр передаёт ссылку уже работающему.
+
+### Исправлено
+- **Установка панелей 3x-ui, x-ui и NX Panel падала на проверке SHA-256** — их закреплённые хеши не совпадали
+  с живым `raw.githubusercontent.com`, откуда Hydra скачивает установщики. У NX Panel по ошибке был записан
+  git-blob SHA-1 из поля `sha` GitHub API вместо SHA-256 файла; у 3x-ui/x-ui неверные хеши жили с закрепления
+  в 0.8.2-rc3. Контент тегов при этом не менялся (последние коммиты `install.sh` — 06–09.10.2026, до закрепления
+  и до живых стендов), поэтому исправленные хеши — тот же контент, что проверялся на стендах. Все 8 пинов
+  пересверены с живым апстримом 27.11.2026; добавлен страж «64 hex-символа» в `ScriptPinsTest`, ловящий
+  повторение ошибки с blob-SHA.
+- **Флаги стран в Desktop** (регресс 0.8.4-b): эмодзи-флаги из имён серверов подписок не отображались на
+  Windows — в системе нет шрифта с флагами стран (пар regional indicator). Теперь флаги рисуются PNG-картинками
+  Twemoji (CC-BY 4.0, 251 файл ~485 КБ) по ISO-коду из имени сервера; не-страновые эмодзи остаются текстом.
+  Затронуты карточка «Сервер» главного экрана и строки списка серверов.
+
+### Без изменений (заморозка rc)
+- Ядра и панели остаются на проверенных версиях: sing-box 1.14.4, Xray/libXray 26.11.9, amneziawg-go
+  3.1.20261116, OpenFlux 0.17.1, olcRTC f3ad8fb7c0d0; 3x-ui v3.11.0, s-ui v1.6.8, x-ui v1.15.0, NX Panel v0.1.2,
+  PasarGuard-scripts v0.1.11, Remnawave 3.4.11.
+- Вышедшие 25–27.11 обновления отложены по правилу rc-заморозки: sing-box 1.14.5, NX Panel v0.2.1, PasarGuard Panel
+  v5.6.0. *По решению владельца 28.11 всё включено в релизный 0.8.4 через rc2, macOS-схема hydra:// — там же*
+
+### Проверки
+- Все 8 закреплённых SHA-256 установщиков/файлов панелей пересверены с живым апстримом (27.11.2026) — совпадают.
+- Desktop: :desktop:test — 207 тестов, 0 ошибок, 23 пропущено (было 199; +4 — флаги, +4 — hydra://crypt1).
+- Android: :app:testStubDebugUnitTest + :app:testNativeDebugUnitTest — 420 тестов, 0 ошибок (210+210).
+
+## [0.8.4-b] — NX Panel и стабилизация (в разработке)
+
+### Обновлено
+- Nexora **v0.0.6 → NX Panel v0.1.2**: репозиторий `Nexora-VPN/panel` → `nx-panel/panel`, бинарь/служба `nexora-*`
+  → `nx-*`, каталоги `/opt/nexora-panel` → `/opt/nx-panel`, `/var/opt/nexora` → `/var/opt/nx-panel`, нода `nx-node`
+  (порт 62050 без изменений). Установщик `install.sh` сам переносит данные 0.0.6 → 0.1.x.
+- Первичная настройка NX Panel переведена с JSON `/api/setup` на CLI: `nx-panel migrate -user -pass` (владелец без
+  браузера) и `nx-panel ingress reset -listen 127.0.0.1:PORT -yes` (слушатель на петле). Версия и SHA-256 установщика
+  закреплены в `ScriptPins` (`NEXORA_TAG = "v0.1.2"`, репо `nx-panel/panel`).
+
+### Исправлено
+- Desktop: флаги стран серверов не отображались (на мобильных — отображались). `ServerLocation` перенесён в общий
+  модуль; строки серверов ПК используют `ServerLocation.flag`/`bareName`.
+
+### Проверки
+- `:desktop:compileTestKotlin` и `:desktop:test --tests NexoraPanelTest` — BUILD SUCCESSFUL, 0 ошибок.
+- **Живой стенд NX Panel (21.11.2026) — пройден:** установка v0.1.2 с нуля, обновление 0.0.6 → 0.1.x, headless-владелец
+  (`migrate` + `ingress reset`), вход `/api/login`, Bearer-токен `/api/tokens`, нода `/api/v1/nodes/{id}/install`,
+  подписка в один клик. JSON-схемы сверены со стендом (исходники NX закрыты).
+
+### Ограничения этапа
+- Оплата из Hydra (Crypto Pay + Platega) и управление сетью роутера (DHCP/Wi-Fi/LAN) — в 0.8.5.
+- Новые протоколы (Naive/OpenVPN/OpenConnect/Snell) и MASQUE в эту бету не входят.
+
+## [0.8.4-a] — техническая альфа sing-box/libbox 1.14.4 (в разработке)
+
+### Обновлено
+- sing-box **1.12.25 → 1.14.4** на Android, iOS и ПК; на ПК обновлены SHA-256 всех официальных архивов.
+- Android и iOS переведены с удалённого `BoxService` на управление сервисом через `CommandServer`;
+  обновлены platform/command callbacks, DNS iterator, статистика и pause/wake.
+- Патч REALITY/X25519MLKEM768 адаптирован к 1.14.4; Android `libbox.aar` пересобран для четырёх ABI.
+- Android: `versionCode = 86`, `versionName = 0.8.4-a`.
+
+### Исправлено
+- VLESS со `security=none` больше не получает принудительный TLS: такой outbound отправлял TLS ClientHello
+  вместо VLESS и не пропускал трафик. Добавлен регрессионный тест на отсутствие блока `tls`.
+
+### Проверки
+- Android: **210 тестов**, desktop: **199 тестов**, ошибок нет; 31 сгенерированный Android-конфиг проходит
+  `sing-box check` 1.14.4. Полный native debug APK проверен на Android 15 x86_64: HTTPS через локальный VLESS,
+  статистика, Disconnect, повторный Connect и Wi-Fi off/on работают.
+- Desktop PROXY E2E проходит; все четыре Classic-пакета собираются с официальными sing-box 1.14.4.
+  TUN E2E на этой машине ограничен отсутствием административных прав.
+
+### Ограничения этапа
+- NX Panel и новые протоколы в эту альфу не входят.
+- Альфа не выпущена: требуются завершение автоматических проверок, iOS-сборка в macOS CI,
+  эмуляторные и живые серверные проверки, затем личное тестирование владельцем.
+
 ## [0.8.3] — стабильный релиз: одна иконка в меню Linux, актуальные ядра и панели
 
 Стабильный релиз (versionCode 85), 20.11.2026. Убирает вторую иконку Hydra в меню приложений
@@ -1479,7 +1631,7 @@ Classic (7 / 32-бит), Linux x64 / arm64 / x86 / armv7, macOS arm64 / x64, iOS
   desktop локально на Windows убрана — это делает CI на своих ОС.
 
 ### Проверено
-- Android: `:app:testStubDebugUnitTest`, `assembleStubDebug`, `assembleNativeDebug` (libbox.so в APK).
+- Android: :app:testStubDebugUnitTest + :app:testNativeDebugUnitTest — 420 тестов, 0 ошибок (210+210).
 - Desktop локально (Windows 11): тесты, 54 конфига через `sing-box check`, трафик через
   локальный Shadowsocks-сервер в режиме прокси (HTTP 204, SOCKS5, delay), MSI/EXE/ZIP,
   запуск собранного приложения, рендер всех экранов.
@@ -2014,7 +2166,7 @@ Classic (7 / 32-бит), Linux x64 / arm64 / x86 / armv7, macOS arm64 / x64, iOS
 запуске сервиса, аварийное завершение потока, гонка за создание базы, —
 живьём не воспроизводились. Остальные существующие тесты прогнать не
 удалось: они тянут androidx (Room), а `dl.google.com` в окружении закрыт —
-на машине разработчика это обычный `./gradlew :app:testStubDebugUnitTest`,
+- Android: :app:testStubDebugUnitTest + :app:testNativeDebugUnitTest — 420 тестов, 0 ошибок (210+210).
 и его стоит прогнать перед релизом.
 
 

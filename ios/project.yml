@@ -77,6 +77,7 @@ targets:
       # gomobile собирает статический фреймворк — встраивать не нужно, только линковать.
       - framework: Frameworks/Libbox.xcframework
         embed: false
+      - sdk: UIKit.framework
       - sdk: libresolv.tbd
     settings:
       base:

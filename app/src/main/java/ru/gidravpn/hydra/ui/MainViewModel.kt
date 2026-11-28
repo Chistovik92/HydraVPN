@@ -648,8 +648,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     else s(ru.gidravpn.hydra.R.string.import_done_servers, n)
                 }
                 is ru.gidravpn.hydra.data.subscription.ImportDetector.Result.Unsupported ->
-                    lines += s(if (r.reason == ru.gidravpn.hydra.data.subscription.ImportDetector.Reason.JSON_CONFIG)
-                        ru.gidravpn.hydra.R.string.import_json_unsupported else ru.gidravpn.hydra.R.string.import_unknown)
+                    lines += s(when (r.reason) {
+                        ru.gidravpn.hydra.data.subscription.ImportDetector.Reason.JSON_CONFIG -> ru.gidravpn.hydra.R.string.import_json_unsupported
+                        ru.gidravpn.hydra.data.subscription.ImportDetector.Reason.HYDRA_LINK -> ru.gidravpn.hydra.R.string.import_hydra_link
+                        else -> ru.gidravpn.hydra.R.string.import_unknown
+                    })
                 is ru.gidravpn.hydra.data.subscription.ImportDetector.Result.OpenFluxError ->
                     lines += when (r.code) {
                         "damaged", "case_changed", "bad_payload", "too_large", "not_link" -> s(ru.gidravpn.hydra.R.string.import_of_damaged)

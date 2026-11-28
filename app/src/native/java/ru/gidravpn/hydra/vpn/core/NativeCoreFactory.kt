@@ -31,6 +31,7 @@ class NativeCoreFactory : CoreFactory {
             Protocol.OLCRTC -> OlcRtcCore()
             Protocol.OPENFLUX -> OpenFluxCore()
             Protocol.BYEDPI -> ByeDpiCore()
+            Protocol.TRUSTTUNNEL -> TrustTunnelCore()
             else -> when {
                 proto?.engine == Engine.AWG -> AmneziaWgCore()
                 // 0.8.2-b: обычный WireGuard — тоже amneziawg-go (EngineToggles), sing-box — запасной

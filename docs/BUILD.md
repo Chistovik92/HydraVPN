@@ -22,16 +22,18 @@ gradle wrapper --gradle-version 8.9   # один раз, если нет gradlew
 
 ### 2.1 sing-box → `libbox.aar`
 
-**С 0.8.2-b — `scripts/build-libbox.sh`:** клон закреплённой версии + `scripts/sing-box-reality-mlkem.patch` (REALITY к Xray-core
-≥ 26.9.8, SagerNet/sing-box#4520), Go 1.25.5, рядом — метка `app/libs/libbox.aar.patch`; `release.sh` без неё не выпустит APK.
+**С 0.8.2-b — `scripts/build-libbox.sh`:** клон закреплённой версии, Go 1.25.5, рядом — метка `app/libs/libbox.aar.patch`
+(SHA-256 наложенного патча либо `UPSTREAM-FIXED`, когда патч не нужен); `release.sh` без метки не выпустит APK.
+REALITY-патч (SagerNet/sing-box#4520) накладывается, только если применим: **с 1.14.5 фикс вошёл в апстрим** и патч не нужен.
 Ручной рецепт ниже — то же самое по шагам.
 
 ```bash
 git clone https://github.com/SagerNet/sing-box
 cd sing-box
-git checkout v1.12.25          # версия, против которой собран/проверен Hydra
-# 0.8.2-b: правка REALITY — без неё нет подключения к Xray-core >= 26.9.8 (SagerNet/sing-box#4520)
-git apply /path/to/Hydra/scripts/sing-box-reality-mlkem.patch
+git checkout v1.14.5          # версия, против которой собран/проверен Hydra
+# до 1.14.4 включительно: правка REALITY для Xray-core >= 26.9.8 (SagerNet/sing-box#4520);
+# с 1.14.5 фикс в апстриме — патч не нужен
+# git apply /path/to/Hydra/scripts/sing-box-reality-mlkem.patch
 # инструмент gomobile от SagerNet
 go install github.com/sagernet/gomobile/cmd/gomobile@latest
 go install github.com/sagernet/gomobile/cmd/gobind@latest
@@ -42,7 +44,7 @@ gomobile init
 TAGS="with_gvisor,with_quic,with_utls,with_clash_api,with_wireguard,with_conntrack"
 gomobile bind -v -androidapi 21 -javapkg=io.nekohasekai -libname=box \
   -tags "$TAGS" -trimpath -buildvcs=false \
-  -ldflags="-X github.com/sagernet/sing-box/constant.Version=1.12.25 -s -w -buildid= -checklinkname=0" \
+  -ldflags="-X github.com/sagernet/sing-box/constant.Version=1.14.5 -s -w -buildid= -checklinkname=0" \
   -o libbox.aar ./experimental/libbox
 
 cp libbox.aar /path/to/Hydra/app/libs/

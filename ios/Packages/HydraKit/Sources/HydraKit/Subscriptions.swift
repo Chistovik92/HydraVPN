@@ -121,6 +121,8 @@ public enum ImportDetector {
         case subscriptionURL(url: String, nameHint: String)
         case servers([ServerProfile])
         case unsupportedJSON
+        /// `hydra://crypt1/…` не расшифровывается: повреждена или создана другой версией Hydra (0.8.4-rc1).
+        case hydraLinkError
         /// Ссылка `openflux://v1/…` не годится: код ошибки ядра (`damaged`, `short_secret`, …) или `stream_unsupported`.
         case openFluxError(code: String)
         case unknown
@@ -135,6 +137,12 @@ public enum ImportDetector {
         var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if text.hasPrefix("\u{FEFF}") { text.removeFirst() }
         if text.isEmpty { return .empty }
+        // 0.8.4-rc1: зашифрованная hydra://crypt1/… — расшифровать; повреждённая — отдельная причина,
+        // а не общее «не распознано» (пользователь явно ожидал импорт).
+        if text.lowercased().hasPrefix(HydraCryptLink.prefix) {
+            if let d = HydraCryptLink.decode(text) { return .subscriptionURL(url: d.url, nameHint: d.name ?? nameFrom(d.url)) }
+            return .hydraLinkError
+        }
         if let url = unwrapDeepLink(text) { return .subscriptionURL(url: url, nameHint: nameFrom(text)) }
         if (text.hasPrefix("http://") || text.hasPrefix("https://")) && !text.contains(where: \.isWhitespace) {
             return .subscriptionURL(url: text.components(separatedBy: "#")[0], nameHint: nameFrom(text))

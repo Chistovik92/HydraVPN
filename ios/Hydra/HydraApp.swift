@@ -46,7 +46,9 @@ struct HydraApp: App {
             // hydravpn-router://… — ссылка сопряжения роутера: добавить его на вкладку «Роутеры».
             .onOpenURL { url in
                 if url.scheme == RouterLink.scheme { routers.add(link: url.absoluteString, token: "", name: "") }
-                else if url.scheme != "hydra" { model.importText(url.absoluteString) }
+                // hydra://open — виджет: просто открыть; hydra://crypt1/… — зашифрованная подписка (0.8.4-rc1).
+                else if url.scheme == "hydra" { if url.host != "open" { model.importText(url.absoluteString) } }
+                else { model.importText(url.absoluteString) }
             }
             // При включённой блокировке содержимое не показывается в переключателе приложений.
             .overlay { if model.state.app.appLock && phase != .active { LockView(onUnlock: nil) } }

@@ -48,6 +48,7 @@ import ru.gidravpn.hydra.data.model.ServerProfile
 import ru.gidravpn.hydra.data.model.SplitTunnelMode
 import ru.gidravpn.hydra.data.model.Subscription
 import ru.gidravpn.hydra.data.subscription.LinkBuilder
+import ru.gidravpn.hydra.data.subscription.HydraCryptLink
 import ru.gidravpn.hydra.data.subscription.LinkParser
 import ru.gidravpn.hydra.data.subscription.OlcRtcConfigBuilder
 import ru.gidravpn.hydra.data.subscription.OpenFluxArgs
@@ -248,6 +249,13 @@ class AppController(
         val t = text.trim()
         if (t.isEmpty()) return toast("Буфер обмена пуст")
         if (t.length > Subscriptions.MAX_BYTES) return toast("Слишком большой текст для импорта")
+        // hydra://crypt1/… — зашифрованная ссылка подписки (0.8.4-rc1): адрес подписки внутри не
+        // светится в чатах и на скриншотах. Повреждённая — отдельное сообщение, а не «нет ссылок».
+        if (t.startsWith("hydra://", true)) {
+            val d = HydraCryptLink.decode(t)
+                ?: return toast("Ссылка hydra:// повреждена или создана другой версией Hydra — скопируйте её заново целиком.")
+            return addSubscription(d.url, name?.takeIf { it.isNotBlank() } ?: d.name.orEmpty())
+        }
         if (t.startsWith("http://", true) || t.startsWith("https://", true)) {
             return addSubscription(t.lineSequence().first().trim(), name.orEmpty())
         }

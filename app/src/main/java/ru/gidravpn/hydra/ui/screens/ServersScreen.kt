@@ -213,7 +213,7 @@ fun ServersScreen(vm: MainViewModel, onSelected: () -> Unit, onMyServers: () -> 
                             onToggle = { vm.toggleSubscriptionCollapsed(sub) },
                             onRefresh = { vm.refreshSubscription(sub) },
                             onPing = { vm.pingSubscription(sub) },
-                            onShare = { shareTarget = sub.displayName to sub.url },
+                            onShare = { shareTarget = sub.displayName to (ru.gidravpn.hydra.data.subscription.HydraCryptLink.encode(sub.url, sub.displayName) ?: sub.url) },
                             onAutoUpdate = { vm.setSubscriptionAutoUpdate(sub, it) },
                             onDelete = { vm.deleteSubscription(sub) },
                         )

@@ -96,6 +96,7 @@ final class AppModel: ObservableObject {
         switch ImportDetector.classify(text) {
         case .empty: message = L("srv_clipboard_empty")
         case .unsupportedJSON: message = L("import_json_unsupported")
+        case .hydraLinkError: message = L("import_hydra_link")
         case .openFluxError(let code):
             switch code {
             case "damaged", "case_changed", "bad_payload", "too_large", "not_link": message = L("import_of_damaged")

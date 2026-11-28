@@ -11,6 +11,8 @@ import java.net.URLDecoder
  * Распознаётся:
  *  - URL подписки `https://…` (и обёртки панелей/клиентов: `sing-box://import-remote-profile?url=`,
  *    `clash://install-config?url=`, `hiddify://import/<url>`, `v2rayng://install-sub?url=`);
+ *  - зашифрованная ссылка подписки `hydra://crypt1/…` (0.8.4-rc1, аналог incy-link-encoder):
+ *    URL внутри, в чате/на скриншоте не светится;
  *  - одна или несколько ссылок серверов (`vless://`, `vmess://`, …), в т.ч. списком по строке;
  *  - base64-блоб подписки;
  *  - целиком вставленный `.conf` WireGuard/AmneziaWG.
@@ -28,7 +30,7 @@ object ImportDetector {
         data object Empty : Result
     }
 
-    enum class Reason { JSON_CONFIG, UNKNOWN }
+    enum class Reason { JSON_CONFIG, HYDRA_LINK, UNKNOWN }
 
     private val wrapperSchemes = setOf(
         "sing-box", "clash", "clashmeta", "hiddify", "v2rayng", "v2raytun", "happ", "flclash", "olcbox",
@@ -37,6 +39,13 @@ object ImportDetector {
     fun classify(raw: String): Result {
         val text = raw.trim().removePrefix("﻿").trim()
         if (text.isEmpty()) return Result.Empty
+
+        // 0. Шифрованная hydra://crypt1/… — расшифровать; повреждённая — отдельная причина,
+        //    а не общее «не распознано» (пользователь явно ожидал импорт).
+        if (text.startsWith("hydra://crypt1/", ignoreCase = true)) {
+            HydraCryptLink.decode(text)?.let { return Result.SubscriptionUrl(it.url, it.name ?: nameFrom(it.url)) }
+            return Result.Unsupported(Reason.HYDRA_LINK)
+        }
 
         // 1. Обёртки deep-link'ов панелей и клиентов → внутри URL подписки.
         unwrapDeepLink(text)?.let { return Result.SubscriptionUrl(it, nameFrom(text)) }

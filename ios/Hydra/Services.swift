@@ -96,7 +96,7 @@ final class TrafficClient: ObservableObject {
     func connect() {
         guard client == nil else { return }
         let options = LibboxCommandClientOptions()
-        options.command = LibboxCommandStatus
+        options.addCommand(LibboxCommandStatus)
         options.statusInterval = Int64(NSEC_PER_SEC)
         guard let c = LibboxNewCommandClient(Handler(self), options) else { return }
         Task.detached {
@@ -121,8 +121,9 @@ final class TrafficClient: ObservableObject {
         init(_ owner: TrafficClient) { self.owner = owner }
         func connected() {}
         func disconnected(_: String?) {}
+        func setDefaultLogLevel(_: Int32) {}
         func clearLogs() {}
-        func writeLogs(_: (any LibboxStringIteratorProtocol)?) {}
+        func writeLogs(_: (any LibboxLogIteratorProtocol)?) {}
         func writeStatus(_ message: LibboxStatusMessage?) {
             guard let message else { return }
             let up = message.uplinkTotal, down = message.downlinkTotal
@@ -133,8 +134,9 @@ final class TrafficClient: ObservableObject {
             }
         }
         func writeGroups(_: LibboxOutboundGroupIteratorProtocol?) {}
+        func writeOutbounds(_: (any LibboxOutboundGroupItemIteratorProtocol)?) {}
         func initializeClashMode(_: LibboxStringIteratorProtocol?, currentMode _: String?) {}
         func updateClashMode(_: String?) {}
-        func write(_: LibboxConnections?) {}
+        func write(_: LibboxConnectionEvents?) {}
     }
 }

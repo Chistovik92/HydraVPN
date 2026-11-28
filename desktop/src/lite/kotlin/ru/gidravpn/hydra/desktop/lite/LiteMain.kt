@@ -25,15 +25,20 @@ fun main(args: Array<String>) {
     System.setProperty("hydra.classic", "true")
     runCatching { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()) }
 
+    // hydra://crypt1/… из зарегистрированной схемы ОС (0.8.4-rc1): ссылку забирает запущенный экземпляр.
+    val deepLink = args.firstOrNull { it.startsWith("hydra://", ignoreCase = true) }
     // Второй экземпляр запустил бы второе ядро на тех же портах.
     if (!SingleInstance.acquire()) {
-        JOptionPane.showMessageDialog(null, "Hydra уже запущена.", "Hydra", JOptionPane.INFORMATION_MESSAGE)
+        if (deepLink != null) ru.gidravpn.hydra.desktop.core.LinkHandoff.offer(deepLink)
+        else JOptionPane.showMessageDialog(null, "Hydra уже запущена.", "Hydra", JOptionPane.INFORMATION_MESSAGE)
         exitProcess(0)
     }
     EventQueue.invokeLater { start(args) }
 }
 
 private fun start(args: Array<String>) {
+    // hydra://crypt1/… из аргументов запуска: main() уже отбросил второй экземпляр — ссылка наша.
+    val deepLink = args.firstOrNull { it.startsWith("hydra://", ignoreCase = true) }
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Swing)
     val controller = AppController(scope)
     val iconBytes = AppController::class.java.getResourceAsStream("/hydra-icon.png")!!.use { it.readBytes() }
@@ -83,4 +88,8 @@ private fun start(args: Array<String>) {
     // Автозапуск при входе в систему — сразу в трей (если трей есть).
     window.isVisible = !(trayOk && Autostart.MINIMIZED_ARG in args)
     controller.onStartup(ru.gidravpn.hydra.desktop.core.Elevation.RECONNECT_ARG in args)
+    // Схема hydra:// в ОС и передача ссылки от второго экземпляра (0.8.4-rc1).
+    Thread { runCatching { ru.gidravpn.hydra.desktop.core.UrlScheme.register() } }.apply { isDaemon = true }.start()
+    deepLink?.let { scope.launch { controller.import(it) } }
+    ru.gidravpn.hydra.desktop.core.LinkHandoff.watch { link -> scope.launch { controller.import(link) } }
 }

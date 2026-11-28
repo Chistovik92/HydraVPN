@@ -26,10 +26,17 @@ remove_pkg() {
 smoke() {
   local stage="$1" home log pid
   home="$(mktemp -d)"; log="$(mktemp)"
-  HOME="$home" XDG_CONFIG_HOME="$home/.config" xvfb-run -a /opt/hydra-vpn/bin/Hydra >"$log" 2>&1 & pid=$!
+  HOME="$home" XDG_CONFIG_HOME="$home/.config" setsid xvfb-run -a /opt/hydra-vpn/bin/Hydra >"$log" 2>&1 & pid=$!
   sleep 20
   if ! kill -0 "$pid" 2>/dev/null; then cat "$log"; echo "Hydra не запустилась после $stage" >&2; exit 1; fi
-  pkill -f '/opt/hydra-vpn/bin/Hydra' 2>/dev/null || kill "$pid" 2>/dev/null || true
+  # xvfb-run, Hydra и её Java-процесс должны завершиться до удаления временного HOME.
+  kill -TERM -- "-$pid" 2>/dev/null || true
+  for _ in {1..50}; do
+    kill -0 -- "-$pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  kill -KILL -- "-$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
   grep -iE 'exception|error' "$log" | head -5 || true
   rm -rf "$home" "$log"
 }

@@ -32,6 +32,14 @@ class ScriptPinsTest {
         assertTrue("sha256sum -c" in nexora && ScriptPins.sha256(NexoraPanel.REPO, NexoraPanel.TAG, "install.sh")!! in nexora)
     }
 
+    @Test fun pinsAreSha256HexOfRawFileNotGitBlobSha() {
+        // 0.8.4-rc1: пин NX был git-blob SHA-1 (40 симв.) из поля sha GitHub API — никогда не совпал бы с SHA-256 файла.
+        for (h in ScriptPins.pinnedHashes) {
+            assertEquals(64, h.length, h)
+            assertTrue(h.all { it in "0123456789abcdef" }, h)
+        }
+    }
+
     @Test fun unknownTagHasNoPinAndNoCheck() {
         assertNull(ScriptPins.sha256("MHSanaei/3x-ui", "v0.0.1", "install.sh"))
         assertEquals("", ScriptPins.verify("MHSanaei/3x-ui", "v0.0.1", "install.sh", "/tmp/x"))

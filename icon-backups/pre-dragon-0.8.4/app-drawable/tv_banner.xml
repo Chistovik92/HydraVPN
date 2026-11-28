@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Баннер Android TV (Фаза 8), 320×180 dp: фон бренда и герб по центру. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:width="320dp" android:height="180dp">
+        <shape android:shape="rectangle">
+            <gradient android:angle="135" android:startColor="#FF070A0D" android:endColor="#FF0E181B" />
+        </shape>
+    </item>
+    <item android:width="96dp" android:height="96dp" android:gravity="center"
+        android:drawable="@drawable/ic_hydra_ambient" />
+</layer-list>

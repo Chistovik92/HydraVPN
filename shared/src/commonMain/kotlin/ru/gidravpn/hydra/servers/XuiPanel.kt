@@ -19,8 +19,8 @@ enum class PanelKind(val title: String, val repo: String) {
     PASARGUARD("PasarGuard", "PasarGuard/panel"),
     /** Remnawave (Docker, за прокси Caddy на 127.0.0.1) — 0.8.2-a3 ([RemnawavePanel]). */
     REMNAWAVE("Remnawave", "remnawave/panel"),
-    /** Nexora: стабильный Bearer API v1, ноды ставятся заданиями панели по SSH ([NexoraPanel]). */
-    NEXORA("Nexora", "Nexora-VPN/panel");
+    /** Nexora (NX Panel с 0.1.x): стабильный Bearer API v1, ноды ставятся заданиями панели по SSH ([NexoraPanel]). */
+    NEXORA("Nexora", "nx-panel/panel");
 
     /** Панель видна только с самого сервера: сайт — через туннель Hydra, без сертификата на IP и «открыть извне». */
     val tunnelOnly: Boolean get() = this == PASARGUARD || this == REMNAWAVE || this == NEXORA

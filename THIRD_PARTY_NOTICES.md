@@ -18,6 +18,8 @@ Hydra распространяется под GPL-3.0 (см. [LICENSE](../LICENS
 | WDTT libclient (beta) | upstream WDTT | **проверить перед включением** | WG через TURN ВК |
 | olcRTC (beta) | github.com/openlibrecommunity/olcrtc | WTFPL (апстрим заархивирован) | TCP over WebRTC; Android — libolcrtc.so, ПК — собирается из закреплённого коммита |
 | OpenFlux (beta) | github.com/p1neappleXpress/OpenFlux | GPL-3.0 | TCP-туннель с транспортами; Android — libopenflux.so, ПК — бинарь релиза v0.3.0 (SHA-256 закреплён) |
+| TrustTunnel | github.com/TrustTunnel/TrustTunnel | **Apache-2.0** | эндпоинт-сервер trusttunnel_endpoint; протокол HTTPS (h2/h3) TCP/UDP/ICMP; AdGuard |
+| TrustTunnelClient (libtrusttunnel) | github.com/TrustTunnel/TrustTunnelClient | **Apache-2.0** | нативный trusttunnel_client libtrusttunnel.so + trusttunnel_deeplink_decode; Android adapter; scripts/build-trusttunnel.sh |
 
 ## ByeDPI и стратегии обхода DPI (0.7.13)
 
@@ -38,6 +40,18 @@ Hydra распространяется под GPL-3.0 (см. [LICENSE](../LICENS
 | DataStore Preferences | Apache-2.0 |
 | OkHttp | Apache-2.0 |
 | kotlinx.serialization | Apache-2.0 |
+
+## Графика (0.8.4-rc1)
+
+| Компонент | Источник | Лицензия | Где |
+|---|---|---|---|
+| Twemoji — флаги стран 72x72 PNG, 251 файл, ~485 КБ | github.com/jdecked/twemoji, тег 15.1.0 | **CC-BY 4.0** | desktop/src/main/resources/flags/*.png — Windows не содержит шрифтовых флагов стран, а панели кладут эмодзи-флаги в имена серверов; атрибуция: Twemoji, Twitter/X и участники jdecked/twemoji |
+
+## Формат шифрованных ссылок подписок (0.8.4-rc1)
+
+| Компонент | Источник | Лицензия | Где |
+|---|---|---|---|
+| Идея и структура формата `hydra://crypt1/…` вдохновлены incy-link-encoder; код Hydra собственный, ключевые константы свои | github.com/INCY-DEV/incy-link-encoder | MIT | `shared/.../HydraCryptLink.kt`, `ios/Packages/HydraKit/Sources/HydraKit/HydraCryptLink.swift` |
 
 ## Спецификации, использованные при реализации
 

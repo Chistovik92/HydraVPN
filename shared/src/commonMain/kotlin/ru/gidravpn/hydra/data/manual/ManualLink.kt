@@ -57,7 +57,7 @@ object ManualLink {
     private val INSECURE = Field("insecure", "Не проверять сертификат", "Skip certificate check", Kind.CHOICE, default = "no", choices = listOf("no", "yes"))
 
     /** Протоколы, для которых есть ручная форма (WDTT — только ссылкой своего бота). */
-    val SUPPORTED = listOf("vless", "vmess", "trojan", "ss", "hysteria2", "tuic", "wireguard", "awg", "sstp", "l2tp", "pptp", "openflux", "olcrtc", "byedpi")
+    val SUPPORTED = listOf("vless", "vmess", "trojan", "ss", "hysteria2", "tuic", "wireguard", "awg", "sstp", "l2tp", "pptp", "openflux", "olcrtc", "byedpi", "trusttunnel")
 
     fun fields(protocolId: String): List<Field> = when (protocolId) {
         "vless" -> address(443) + listOf(
@@ -133,6 +133,15 @@ object ManualLink {
         "byedpi" -> listOf(
             Field("strategy", "Стратегия (аргументы ciadpi; пусто — по умолчанию)", "Strategy (ciadpi arguments; empty = default)", Kind.MULTILINE,
                 hintRu = "Например: -o1 -At,r,s -d1 — подобрать можно в «Маршрутизация → Обход DPI»", hintEn = "E.g. -o1 -At,r,s -d1 — tune it in Routing → DPI bypass"),
+        )
+        // TrustTunnel (AdGuard, Apache-2.0): HTTPS-туннель TCP/UDP/ICMP; username/password (Basic), TLS+SNI.
+        "trusttunnel" -> address(443) + listOf(
+            Field("username", "Пользователь", "Username", required = true),
+            Field("password", "Пароль", "Password", Kind.SECRET, required = true),
+            SNI.copy(hintRu = "Имя для TLS (SNI); пусто — адрес сервера. Поддерживается sni|remote_id", hintEn = "TLS server name (SNI); empty = server address. sni|remote_id supported"),
+            Field("upstream", "Транспорт", "Transport", Kind.CHOICE, default = "http2", choices = listOf("http2", "http3")),
+            Field("tls_profile", "Отпечаток TLS", "TLS fingerprint", Kind.CHOICE, default = "chrome", choices = listOf("chrome", "chrome_canary", "safari", "firefox", "okhttp", "openssl", "boringssl")),
+            INSECURE,
         )
         else -> emptyList()
     }
@@ -212,6 +221,11 @@ object ManualLink {
             }
             "olcrtc" -> "olcrtc://${v["provider"]}?${v["transport"]}@${v["room"]}#${v["key"]}" + if (n.isEmpty()) "" else "\$$n"
             "byedpi" -> "byedpi://?s=${enc(v["strategy"].orEmpty().replace('\n', ' ').trim())}" + (if (n.isEmpty()) "#" + enc("Обход DPI") else frag)
+            // trusttunnel://user:pass@host:port?...#name → TrustTunnelLink
+            "trusttunnel" -> "trusttunnel://${enc(v["username"]!!)}:${enc(v["password"]!!)}@$addr?" + q(
+                "sni" to v["sni"], "hostname" to v["sni"], "upstream" to v["upstream"], "tls_profile" to v["tls_profile"],
+                "insecure" to ins,
+            ) + frag
             else -> null
         }
     }

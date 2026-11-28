@@ -57,6 +57,7 @@ object LinkParser {
             "olcrtc"    -> OlcRtcLink.parse(link)
             "openflux"  -> OpenFluxLink.parse(link)
             "byedpi"    -> ByeDpiLink.parse(link)
+            "trusttunnel", "tt" -> TrustTunnelLink.parse(link)
             // вставленный целиком .conf (без схемы): AWG-параметры → AmneziaWG, иначе WireGuard
             else -> if ("[Interface]" in link) {
                 // MULTILINE (0.8.0-rc4): без него «^» видел только первую строку, и AmneziaWG-.conf становился обычным WireGuard

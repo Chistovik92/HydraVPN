@@ -279,6 +279,7 @@
     <string name="import_done_servers">已添加服务器：%1$d</string>
     <string name="import_json_unsupported">这是完整的 JSON 配置（sing-box/Xray），暂不支持 — 请改为导入链接或订阅。</string>
     <string name="import_unknown">无法识别为服务器链接、订阅或配置。</string>
+    <string name="import_hydra_link">hydra:// 链接已损坏或由其他版本的 Hydra 生成 — 请重新完整复制。</string>
     <string name="share_action">分享</string>
     <string name="share_qr_desc">二维码</string>
     <string name="share_send">分享链接 + 二维码</string>

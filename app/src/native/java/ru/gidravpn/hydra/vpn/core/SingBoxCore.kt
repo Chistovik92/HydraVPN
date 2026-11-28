@@ -7,13 +7,18 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.HandlerThread
 import android.os.ParcelFileDescriptor
-import io.nekohasekai.libbox.BoxService
+import io.nekohasekai.libbox.BridgeOptions
+import io.nekohasekai.libbox.BridgeSession
+import io.nekohasekai.libbox.ConnectionOwner
 import io.nekohasekai.libbox.InterfaceUpdateListener
 import io.nekohasekai.libbox.Libbox
+import io.nekohasekai.libbox.NeighborUpdateListener
 import io.nekohasekai.libbox.NetworkInterface
 import io.nekohasekai.libbox.NetworkInterfaceIterator
 import io.nekohasekai.libbox.Notification
 import io.nekohasekai.libbox.PlatformInterface
+import io.nekohasekai.libbox.PlatformUser
+import io.nekohasekai.libbox.ShellSession
 import io.nekohasekai.libbox.StringIterator
 import io.nekohasekai.libbox.TunOptions
 import io.nekohasekai.libbox.WIFIState
@@ -30,22 +35,20 @@ import ru.gidravpn.hydra.data.repository.RoutingRepository
 import ru.gidravpn.hydra.data.repository.SplitTunnelRepository
 import ru.gidravpn.hydra.data.subscription.GeoAssets
 import ru.gidravpn.hydra.data.subscription.SingBoxConfigBuilder
-import java.io.File
 
 /**
  * Интеграция sing-box через libbox.aar (gomobile-биндинг experimental/libbox).
  *
- * Собрано и проверено против **libbox 1.12.25** (сигнатуры PlatformInterface
- * сверены с фактическим .aar). При обновлении .aar компилятор укажет
- * расхождения — реф. SagerNet/sing-box-for-android → PlatformInterfaceWrapper.
+ * Собрано против **libbox 1.14.5** (сигнатуры PlatformInterface сверены с
+ * фактическим .aar). При обновлении .aar компилятор укажет расхождения —
+ * реф. SagerNet/sing-box-for-android → PlatformInterfaceWrapper.
  */
 class SingBoxCore : VpnCore {
 
     override val name = "sing-box ${Libbox.version()}"
-    private var service: BoxService? = null
     private var sidecars: PreparedRoute? = null
 
-    /** Смерть сервиса sing-box у поднятого туннеля (Фаза 7a) — через postServiceClose() libbox. */
+    /** Внешняя RPC-команда остановки CommandServer; асинхронный core-death API в libbox 1.14 отсутствует. */
     override fun setDeathListener(listener: (reason: String) -> Unit) {
         SingBoxRuntime.onServiceClosed = listener
     }
@@ -88,17 +91,12 @@ class SingBoxCore : VpnCore {
         // libbox.setup вызывается один раз за процесс (idempotent guard в SingBoxRuntime)
         SingBoxRuntime.ensureSetup()
 
-        // Command-server поднимается ДО сервиса — к нему затем подключается
-        // клиент за статистикой трафика (см. SingBoxRuntime).
-        SingBoxRuntime.startCommandServer(onLog)
-
+        // В libbox 1.14 CommandServer сам владеет сервисом и обслуживает
+        // локального клиента статистики (см. SingBoxRuntime).
         val platform = HydraPlatformInterface(existingTun = tun, onLogLine = onLog)
-        val svc = Libbox.newService(config, platform)
-        service = svc
-        svc.start()
+        SingBoxRuntime.startService(config, platform, onLog)
         onLog("sing-box: сервис запущен")
 
-        SingBoxRuntime.attachService(svc)
         SingBoxRuntime.startStatsPolling(onStats, onLog)
         } catch (e: Throwable) {
             // ByeDPI и клиенты узлов уже запущены: без ядра они бесполезны и держали бы порты.
@@ -108,11 +106,9 @@ class SingBoxCore : VpnCore {
         }
     }
 
-override fun stop() {
+    override fun stop() {
         SingBoxRuntime.shutdown()
         SingBoxRuntime.onServiceClosed = null
-        runCatching { service?.close() }
-        service = null
         sidecars?.stop()
         sidecars = null
     }
@@ -158,7 +154,7 @@ internal fun resolveRouting(ctx: android.content.Context?): RoutingOptions {
 }
 
 /**
- * Реализация PlatformInterface (libbox 1.12.x) поверх VpnService:
+ * Реализация PlatformInterface (libbox 1.14.x) поверх VpnService:
  *  - tun поднят сервисом заранее, openTun отдаёт его fd;
  *  - монитор дефолтного интерфейса — ConnectivityManager.NetworkCallback;
  *  - сокеты sing-box защищаются через autoDetectInterfaceControl → protect(): с 0.8.0-rc3 приложение
@@ -183,8 +179,6 @@ class HydraPlatformInterface(
     /** libbox запрашивает tun через openTun — отдаём дескриптор нашего VpnService. */
     override fun openTun(options: TunOptions): Int = existingTun.detachFd()
 
-    override fun useProcFS(): Boolean = false
-
     /**
      * VpnService.protect(fd) на исходящие сокеты, если libbox сам его запросит.
      * На практике для VLESS/gRPC этот колбэк не вызывается ни разу (реальная
@@ -198,46 +192,38 @@ class HydraPlatformInterface(
         ru.gidravpn.hydra.vpn.SocketGuard.protect(fd)
     }
 
-    override fun writeLog(message: String) {
-        onLogLine(message)
-    }
-
     override fun underNetworkExtension(): Boolean = false
 
     override fun includeAllNetworks(): Boolean = false
 
-    /** UID владельца соединения (Android 10+); 0 = неизвестно. */
+    /** UID и пакеты владельца соединения для package_name-правил маршрутизации. */
     override fun findConnectionOwner(
         ipProtocol: Int,
         sourceAddress: String,
         sourcePort: Int,
         destinationAddress: String,
         destinationPort: Int,
-    ): Int {
-        val ctx = appContext ?: return 0
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) return 0
-        return runCatching {
-            val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: return 0
-            cm.getConnectionOwnerUid(
-                ipProtocol,
-                java.net.InetSocketAddress(sourceAddress, sourcePort),
-                java.net.InetSocketAddress(destinationAddress, destinationPort),
+    ): ConnectionOwner {
+        val ctx = appContext
+        if (ctx == null || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
+            return Libbox.findConnectionOwner(
+                ipProtocol, sourceAddress, sourcePort, destinationAddress, destinationPort,
             )
-        }.getOrDefault(0)
-    }
-
-    override fun packageNameByUid(uid: Int): String {
-        val ctx = appContext ?: return "unknown"
-        return runCatching {
-            ctx.packageManager.getNameForUid(uid) ?: "uid:$uid"
-        }.getOrDefault("unknown")
-    }
-
-    override fun uidByPackageName(packageName: String): Int {
-        val ctx = appContext ?: return -1
-        return runCatching {
-            ctx.packageManager.getApplicationInfo(packageName, 0).uid
-        }.getOrDefault(-1)
+        }
+        val cm = ctx.getSystemService(ConnectivityManager::class.java)
+            ?: error("ConnectivityManager недоступен")
+        val uid = cm.getConnectionOwnerUid(
+            ipProtocol,
+            java.net.InetSocketAddress(sourceAddress, sourcePort),
+            java.net.InetSocketAddress(destinationAddress, destinationPort),
+        )
+        if (uid == android.os.Process.INVALID_UID) error("владелец соединения не найден")
+        val packages = ctx.packageManager.getPackagesForUid(uid).orEmpty().toList()
+        return ConnectionOwner().apply {
+            userId = uid
+            userName = packages.firstOrNull().orEmpty()
+            setAndroidPackageNames(StringIteratorImpl(packages))
+        }
     }
 
     /**
@@ -426,19 +412,6 @@ class HydraPlatformInterface(
     /** Состояние Wi-Fi для маршрутизации policy-based (не используется). */
     override fun readWIFIState(): WIFIState? = null
 
-    /**
-     * Системные CA-сертификаты (/system/etc/security/cacerts, как в SFA).
-     * `listFiles()` может кинуть SecurityException на прошивках со своей
-     * SELinux-политикой доступа к /system — не должно ронять JNI-вызов.
-     */
-    override fun systemCertificates(): StringIterator {
-        val names = runCatching {
-            File("/system/etc/security/cacerts").listFiles().orEmpty()
-                .map { it.name }.sorted()
-        }.getOrDefault(emptyList())
-        return StringIteratorImpl(names)
-    }
-
     /** DNS-сервер `type: local` — на Android sing-box резолвит только через него (см. HydraLocalDns). */
     override fun localDNSTransport(): io.nekohasekai.libbox.LocalDNSTransport = localDns
 
@@ -446,6 +419,31 @@ class HydraPlatformInterface(
     override fun sendNotification(notification: Notification) {
         onLogLine("sing-box: [${notification.typeName}] ${notification.title}")
     }
+
+    override fun cancelNotification(identifier: String, typeID: Int) {}
+
+    // Neighbor/tailscale/bridge и платформенный shell в Hydra не используются.
+    override fun startNeighborMonitor(listener: NeighborUpdateListener) {}
+    override fun closeNeighborMonitor(listener: NeighborUpdateListener) {}
+    override fun registerMyInterface(name: String) {}
+    override fun usePlatformShell(): Boolean = false
+    override fun checkPlatformShell(): Unit = error("платформенный shell не поддерживается Hydra")
+    override fun openShellSession(
+        user: PlatformUser,
+        command: String,
+        environ: StringIterator,
+        term: String,
+        rows: Int,
+        cols: Int,
+    ): ShellSession = error("платформенный shell не поддерживается Hydra")
+    override fun lookupUser(username: String): PlatformUser =
+        error("платформенный shell не поддерживается Hydra")
+    override fun lookupSFTPServer(): String = error("SFTP не поддерживается Hydra")
+    override fun readSystemSSHHostKey(): String = error("SSH host key не поддерживается Hydra")
+    override fun tailscaleHostname(): String = android.os.Build.MODEL
+    override fun usePlatformBridge(): Boolean = false
+    override fun createBridge(options: BridgeOptions): BridgeSession =
+        error("платформенный bridge не поддерживается Hydra")
 
     /** Очистка кэша DNS — системный DNS-резолвер пересоздаётся при следующем запросе. */
     override fun clearDNSCache() {}

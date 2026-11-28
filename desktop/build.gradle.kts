@@ -63,8 +63,9 @@ val linuxPkgVersion: String = winPkgVersion
 
 // ---- Ядро sing-box -------------------------------------------------------------
 // Та же версия, что libbox в Android и Libbox.xcframework в iOS (ios.yml).
-// SHA-256 архивов с https://github.com/SagerNet/sing-box/releases/tag/v1.12.25 .
-val singBoxVersion = "1.12.25"
+// SHA-256 архивов с https://github.com/SagerNet/sing-box/releases/tag/v1.14.5 .
+// 1.14.5: фикс REALITY/X25519MLKEM768 (SagerNet/sing-box#4520) вошёл в апстрим — патч больше не нужен.
+val singBoxVersion = "1.14.5"
 
 data class CoreArchive(val target: String, val archive: String, val sha256: String) {
     val isZip get() = archive.endsWith(".zip")
@@ -72,12 +73,12 @@ data class CoreArchive(val target: String, val archive: String, val sha256: Stri
 }
 
 val coreArchives = listOf(
-    CoreArchive("windows-x64", "windows-amd64.zip", "492df6eb97c4c749d45350d792ecece71278d83c4979149ba6a142765b8fc1d4"),
-    CoreArchive("windows-arm64", "windows-arm64.zip", "5c722c7e3ff23fbb0f09a49dce10726b3e4f39e4bc4bf17d2826fbb6b990ef7a"),
-    CoreArchive("linux-x64", "linux-amd64.tar.gz", "a1ec76e2b6b139eb747a1b1ebee7d14b8d4be5a833596cad8070a31ef960301f"),
-    CoreArchive("linux-arm64", "linux-arm64.tar.gz", "719b76196c8b31efa636b2d8f669e314547e0da0a5ab38a75e1882d307bbd154"),
-    CoreArchive("macos-x64", "darwin-amd64.tar.gz", "fb9cb2a1d3160b9ef4a288818286ad27711907228232b8d84410cad7e42726d8"),
-    CoreArchive("macos-arm64", "darwin-arm64.tar.gz", "a4a06d507f3f4d951490168d1372fce4c02db7211e88af9da13f93ed98068d5e"),
+    CoreArchive("windows-x64", "windows-amd64.zip", "b935f7b38bffcc1f600165e79e5d0c2d58b547942ac1b6cf61a27b5447c089e7"),
+    CoreArchive("windows-arm64", "windows-arm64.zip", "6c309af5981d40517a84144cb0df8434779ae98774846b04923feefbc74af9d4"),
+    CoreArchive("linux-x64", "linux-amd64.tar.gz", "ca57e405be6b7dc79a0efa91823a0cc4d81138cbe4a9aacbfd749c65e6fca3b2"),
+    CoreArchive("linux-arm64", "linux-arm64.tar.gz", "1bd0560b1afd4695fb29a28f86131f8426f6cd3ac5f6e844cafae0ab6f493023"),
+    CoreArchive("macos-x64", "darwin-amd64.tar.gz", "13510a651737873b7a2464b4a222a56737c33361bbe809a9ec8dd38d680fed77"),
+    CoreArchive("macos-arm64", "darwin-arm64.tar.gz", "8550351d344ba28b6358d2b011d96384b70b299e6c4c254df7a5dae47430fcd4"),
 )
 
 /** Цель текущей машины в терминах каталогов ресурсов Compose (<os>-<arch>). */
@@ -654,26 +655,26 @@ val classicTargets = listOf(
     // olcRTC и OpenFlux (0.7.10) собраны обычным Go и работают только с Windows 8.1/10: на Windows 7 Hydra Classic их
     // не предлагает (Platform.goClientsSupported), на 32-битной Windows 10 — работают.
     Classic("windows-x86", "WindowsX86", "windows", "x86",
-        "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "e1cb15e4a381f685c6253dcb885354b607e4a9f047e2171a78b1e622faac2cbb",
+        "sing-box-$singBoxVersion-windows-386-legacy-windows-7.zip", "f47701522bdd0324f2cffe26d067644eb5949a648354e4923f3eec6f11d824ed",
         "Xray-win7-32.zip", "48a8b160a0f45d21bd56aa81d74c2420758fa72abac75b4b6faf45767c5ef48f",
         olcRtc = Triple("windows", "386", ""), openFluxSrc = Triple("windows", "386", ""),
         byeDpi = "byedpi-17.3-i686-w64.zip" to "3f3d0af999371cfa623bd641738a42785e107a9d829b38480ed3d942dafea28a",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.29%2B7/OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip",
             "OpenJDK11U-jre_x86-32_windows_hotspot_11.0.29_7.zip", "b747698a05a39391a58b9caac30310275e4e6bd9fef92d6c149cba310d91d2be")),
     Classic("windows-x64", "WindowsX64", "windows", "x64",
-        "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "aebaaac4eece1a1d95787edaff683b4e4cd2d5e07764634b5d575a4cc6f1a031",
+        "sing-box-$singBoxVersion-windows-amd64-legacy-windows-7.zip", "e6156e268af67d567ef8d29ea8072533eb59b04febad8d3c2cd0b654009697fe",
         "Xray-win7-64.zip", "df87ef380c58d3e2286b4e49834f4b6a4819a8155ebf9124b4610b0d8148af7e",
         olcRtc = Triple("windows", "amd64", ""), openFluxSrc = Triple("windows", "amd64", ""),
         byeDpi = "byedpi-17.3-x86_64-w64.zip" to "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456",
         jre = Triple("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.32.1%2B1/OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip",
             "OpenJDK11U-jre_x64_windows_hotspot_11.0.32.1_1.zip", "f8c7da672f5dba36b6f870608820b6b598cfae91296929f1b8f21ef2f1e8a0dd")),
     Classic("linux-x86", "LinuxX86", "linux", "x86",
-        "sing-box-$singBoxVersion-linux-386.tar.gz", "b2361b5eb0ef6da8f068d9bba762b9edbb3a8637515e30251ee8d5d78b30d846",
+        "sing-box-$singBoxVersion-linux-386.tar.gz", "940cb80e27b3b659e0c910232183189d0026f27eccefdeb962e4fef7b797450f",
         "Xray-linux-32.zip", "225343a01db48e23c1d3091e7fa45971b0d12c20943927846a4a87da374e384d",
         olcRtc = Triple("linux", "386", ""), openFluxSrc = Triple("linux", "386", ""),
         byeDpi = "byedpi-17.3-i686.tar.gz" to "655452c2f8e1e3a99b021043b0a68f57927c97010efe19b06ac3b9949fd784ed"),
     Classic("linux-armv7", "LinuxArmv7", "linux", "armv7",
-        "sing-box-$singBoxVersion-linux-armv7.tar.gz", "9eedd8eb2d3ea66a48794359d1cc1e32ce618b6e1b105c9cd314da6408c9fc87",
+        "sing-box-$singBoxVersion-linux-armv7.tar.gz", "08514142fcf582abc3868d39a4912b3495f39f6da227fd6e93618f0fe5fec4bb",
         "Xray-linux-arm32-v7a.zip", "19c51e08a6562705fb1cb032a84fd87df21d7e27b194f035be7e754dbe3a97b3",
         openFlux = "openflux-linux-arm" to "1a6aed5fa8044e758e0a9c542781d2c307af5170d8648b2bd2d336b4d47acf12",
         olcRtc = Triple("linux", "arm", "7"),
@@ -796,7 +797,7 @@ val classicDistTasks = classicTargets.map { t ->
                     into(res)
                 }
             }
-            extract(fetch("$depsMirror/${t.singBoxAsset}", t.singBoxSha, t.singBoxAsset, t.singBoxAsset),
+            extract(fetch("https://github.com/SagerNet/sing-box/releases/download/v$singBoxVersion/${t.singBoxAsset}", t.singBoxSha, t.singBoxAsset, t.singBoxAsset),
                 "sing-box$exe", "sing-box$exe", "LICENSE-sing-box")
             val xrayFile = fetch("https://github.com/XTLS/Xray-core/releases/download/v$xrayVersion/${t.xrayAsset}", t.xraySha, t.xrayAsset, "Xray-$xrayVersion-${t.xrayAsset.removePrefix("Xray-")}")
             extract(xrayFile, "xray$exe", "xray$exe", "LICENSE-xray")

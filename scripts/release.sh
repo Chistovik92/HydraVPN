@@ -56,11 +56,16 @@ step "Предполётные проверки"
 "нет app/libs/libbox.aar — full-APK будет нерабочим.
        Соберите ядро по docs/BUILD.md (раздел 2.1) или положите готовый .aar."
 # 0.8.2-b: libbox — с правкой REALITY (SagerNet/sing-box#4520); метку пишет scripts/build-libbox.sh.
+# 1.14.5 (0.8.4-rc2): фикс вошёл в апстрим — метка тогда UPSTREAM-FIXED, патч не накладывается.
 LIBBOX_PATCH="$(tr -d '\r' < scripts/sing-box-reality-mlkem.patch | sha256sum | cut -d' ' -f1)"
-[[ "$(cat app/libs/libbox.aar.patch 2>/dev/null)" == "$LIBBOX_PATCH" ]] || err \
-"app/libs/libbox.aar собран без текущей scripts/sing-box-reality-mlkem.patch — sing-box не подключится по REALITY
-       к Xray-core >= 26.9.8. Пересоберите: scripts/build-libbox.sh"
-echo "    libbox.aar на месте (с правкой REALITY)"
+LIBBOX_MARK="$(cat app/libs/libbox.aar.patch 2>/dev/null)"
+if [[ "$LIBBOX_MARK" == "$LIBBOX_PATCH" ]]; then
+  echo "    libbox.aar на месте (с правкой REALITY)"
+elif [[ "$LIBBOX_MARK" == "UPSTREAM-FIXED" ]]; then
+  echo "    libbox.aar на месте (фикс REALITY #4520 в апстриме sing-box, патч не нужен)"
+else
+  err "app/libs/libbox.aar собран с чужой меткой патча REALITY — пересоберите: scripts/build-libbox.sh"
+fi
 
 # Xray — штатное второе ядро: без libXray.aar переключатель «Xray Core» в настройках неактивен
 # (так вышли 0.6.x–0.7.2, пока ядро не было собрано).

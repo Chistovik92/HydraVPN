@@ -41,14 +41,15 @@ data class EngineToggles(
             Engine.OLCRTC -> if (olcRtc) Kind.OLCRTC else null
             Engine.OPENFLUX -> if (openFlux) Kind.OPENFLUX else null
             Engine.BYEDPI -> Kind.BYEDPI  // отдельного тумблера нет: это обход DPI, а не VPN-протокол
-            Engine.WDTT, Engine.UNAVAILABLE -> null
+            // TrustTunnel выбирается напрямую по протоколу в NativeCoreFactory (нативный trusttunnel_client); отдельного тумблера нет.
+            Engine.TRUSTTUNNEL, Engine.WDTT, Engine.UNAVAILABLE -> null
         }
     }
 
     /**
      * Кто обслужит этот профиль (0.8.1-rc2). Как [engineFor] по протоколу, плюс: **REALITY — через Xray**, если он включён и
      * есть в сборке. Сервер Xray-core ≥ 26.9.8 (его ставит 3x-ui v3.10, проверено на стенде: Xray 26.10.10) требует в ClientHello
-     * гибридный ключ X25519MLKEM768, а sing-box (все версии, в т. ч. 1.12.25 приложения) его не шлёт — сервер молча отдаёт сайт
+     * гибридный ключ X25519MLKEM768, а непропатченный sing-box его не шлёт — сервер молча отдаёт сайт
      * маскировки, и подключение «подключено, 12 КБ и тишина» (sing-box: «reality verification failed»; SagerNet/sing-box#4520).
      * Xray-core Hydra (26.9.30, с 0.8.2-b — 26.10.10) этот ключ шлёт — на стенде через тот же инбаунд 1,9 МБ за 1,3 с.
      */

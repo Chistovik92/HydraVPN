@@ -32,7 +32,11 @@ struct ServersView: View {
                 }
                 ForEach(model.state.subscriptions) { sub in
                     Section {
-                        SubscriptionCard(sub: sub, count: servers(of: sub.id).count, onShare: { share = (sub.displayName, sub.url) })
+                        // 0.8.4-rc1: ссылка подписки уходит зашифрованной hydra://crypt1/… —
+                        // адрес панели и токен не видны в чате/на скриншоте; открывается в Hydra.
+                        SubscriptionCard(sub: sub, count: servers(of: sub.id).count, onShare: {
+                            share = (sub.displayName, HydraCryptLink.encode(sub.url, name: sub.displayName) ?? sub.url)
+                        })
                         if !sub.collapsed {
                             ForEach(servers(of: sub.id)) { row($0) }
                         }
